@@ -1,115 +1,150 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
 
 export default function SwapSection() {
-  const [sellToken, setSellToken] = useState("ETH");
-  const [buyToken, setBuyToken] = useState("");
   const [sellAmount, setSellAmount] = useState("0");
   const [buyAmount, setBuyAmount] = useState("0");
 
   return (
-    <div
-      className="bg-black rounded-[20px] border border-[#2C2C2C] h-full flex flex-col overflow-hidden"
-      style={{ width: "500px" }}
-    >
-      <h2 className="text-lg font-semibold text-white mb-6 font-satoshi flex-shrink-0">
+    <div className="bg-black rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-6 overflow-hidden">
+      {/* Header */}
+      <h2 className="text-lg font-semibold text-white mb-6 font-satoshi">
         Swap
       </h2>
 
-      {/* Swap Form */}
-      <div className="flex-1 flex flex-col overflow-hidden px-6 pt-6">
+      {/* Swap Form Container */}
+      <div className="relative mb-6 flex-shrink-0">
         {/* Sell Section */}
-        <div className="mb-4 flex-shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-400 text-sm font-satoshi">Sell</span>
-          </div>
-          <div className="bg-[#1A1A1A] rounded-lg p-4">
+        <div>
+          <div className="bg-black border border-[#2C2C2C] rounded-2xl p-4 w-full h-36 overflow-hidden">
             <div className="flex items-center justify-between mb-3">
-              <button className="flex items-center bg-[#2C2C2C] hover:bg-[#3A3A3A] px-3 py-2 rounded-lg transition-colors">
-                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mr-2">
-                  <span className="text-white text-xs font-medium">E</span>
+              <span className="text-white text-sm font-satoshi">Sell</span>
+              <button className="flex items-center bg-[#0F0F0F] px-3 py-2 rounded-full text-sm flex-shrink-0">
+                <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center mr-2">
+                  <span className="text-white text-xs font-bold">Ξ</span>
                 </div>
-                <span className="text-white font-satoshi mr-2">ETH</span>
-                <ChevronDown size={16} className="text-gray-400" />
+                <span className="text-white font-satoshi mr-2 text-xs">
+                  ETH
+                </span>
+                <svg
+                  className="w-3 h-3 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
               </button>
-              <div className="text-right">
-                <div className="text-gray-400 text-xs font-satoshi">0 ETH</div>
-                <div className="text-gray-400 text-xs font-satoshi">Max</div>
+            </div>
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex-1 mr-3">
+                <input
+                  type="text"
+                  value={sellAmount}
+                  onChange={(e) => setSellAmount(e.target.value)}
+                  className="bg-transparent text-2xl font-bold text-white focus:outline-none font-satoshi w-full"
+                  placeholder="0"
+                />
+                <div className="text-gray-400 text-sm font-satoshi mt-1">
+                  $0
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 text-xs font-satoshi">
+                    0 ETH
+                  </span>
+                  <button className="text-gray-400 text-xs font-satoshi bg-[#2C2C2C] px-2 py-1 rounded-full">
+                    Max
+                  </button>
+                </div>
               </div>
             </div>
-            <input
-              type="text"
-              value={sellAmount}
-              onChange={(e) => setSellAmount(e.target.value)}
-              className="w-full bg-transparent text-4xl font-bold text-white placeholder-gray-500 focus:outline-none font-satoshi"
-              placeholder="0"
-            />
           </div>
         </div>
 
-        {/* Swap Direction Arrow */}
-        <div className="flex justify-center mb-4">
-          <div className="w-8 h-8 bg-[#1A1A1A] rounded-full flex items-center justify-center">
-            <span className="text-white">↓</span>
-          </div>
-        </div>
+        {/* Slightly larger gap */}
+        <div className="h-3"></div>
 
         {/* Buy Section */}
-        <div className="mb-6 flex-shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-400 text-sm font-satoshi">Buy</span>
-          </div>
-          <div className="bg-[#1A1A1A] rounded-lg p-4">
+        <div>
+          <div className="bg-black border border-[#2C2C2C] rounded-2xl p-4 w-full h-36 overflow-hidden">
             <div className="flex items-center justify-between mb-3">
-              <button className="flex items-center bg-[#2C2C2C] hover:bg-[#3A3A3A] px-3 py-2 rounded-lg transition-colors">
-                <span className="text-white font-satoshi mr-2">
-                  Select Token
-                </span>
-                <ChevronDown size={16} className="text-gray-400" />
-              </button>
+              <span className="text-white text-sm font-satoshi">Buy</span>
             </div>
-            <input
-              type="text"
-              value={buyAmount}
-              onChange={(e) => setBuyAmount(e.target.value)}
-              className="w-full bg-transparent text-4xl font-bold text-white placeholder-gray-500 focus:outline-none font-satoshi"
-              placeholder="0"
-            />
+            <div className="flex items-center justify-between">
+              <div className="flex-1 mr-3">
+                <input
+                  type="text"
+                  value={buyAmount}
+                  onChange={(e) => setBuyAmount(e.target.value)}
+                  className="bg-transparent text-2xl font-bold text-white focus:outline-none font-satoshi w-full"
+                  placeholder="0"
+                />
+              </div>
+              <div className="flex items-center flex-shrink-0">
+                <button className="bg-[#E2AF19] text-black px-3 py-2 rounded-full font-satoshi font-medium text-xs">
+                  Select Token
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Swap Button */}
-        <button className="w-full bg-[#E2AF19] hover:bg-[#D4A853] text-black font-semibold py-3 rounded-lg transition-colors font-satoshi mb-6 flex-shrink-0">
-          Swap
-        </button>
+        {/* Overlaid Down Arrow - perfectly centered between the boxes */}
+        <div
+          className="absolute left-1/2 transform -translate-x-1/2 z-10"
+          style={{ top: "calc(50% - 16px)" }}
+        >
+          <div className="w-8 h-8 bg-black border border-[#2C2C2C] rounded-lg flex items-center justify-center">
+            <span className="text-white text-sm">↓</span>
+          </div>
+        </div>
+      </div>
 
-        {/* Blockpal Info - Scrollable section */}
-        <div className="border-t border-[#2C2C2C] flex-1 overflow-y-auto scrollbar-hide px-0">
-          <div className="pt-6">
-            <div className="flex items-center mb-3">
-              <div className="w-6 h-6 bg-[#E2AF19] rounded-full mr-2"></div>
-              <span className="text-white font-semibold font-satoshi">
-                Blockpal
-              </span>
+      {/* Swap Button */}
+      <button className="w-full bg-[#E2AF19] hover:bg-[#D4A853] text-black font-semibold py-3 rounded-xl transition-colors font-satoshi mb-6 flex-shrink-0">
+        Swap
+      </button>
+
+      {/* Blockpal Info Section - Takes remaining space and content at bottom */}
+      <div className="flex-1 flex flex-col justify-end min-h-0 overflow-hidden">
+        <div className="text-center max-h-full overflow-y-auto scrollbar-hide">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-6 h-6 bg-[#E2AF19] rounded-full mr-2 flex items-center justify-center">
+              <span className="text-black text-sm font-bold">B</span>
             </div>
-            <p className="text-gray-400 text-sm font-satoshi leading-relaxed mb-3">
+            <span className="text-white font-semibold font-satoshi text-lg">
+              Blockpal
+            </span>
+          </div>
+
+          <div className="mb-8">
+            <p className="text-gray-400 text-sm font-satoshi leading-relaxed mb-4 max-w-sm mx-auto">
               Blockpal is a modern crypto wallet that makes managing your
               digital assets easy and stress-free. Whether you're sending
               tokens, tracking your balance, or planning future payments,
               Blockpal brings everything you need to one streamlined space.
             </p>
-            <p className="text-gray-400 text-sm font-satoshi mb-4">
+
+            <p className="text-gray-400 text-sm font-satoshi mb-8">
               No complex tools, just a smooth, secure, and simple way to stay in
               control of your crypto.
             </p>
+          </div>
 
-            <div className="flex justify-center space-x-3">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-            </div>
+          {/* Social icons at the very bottom */}
+          <div className="flex justify-center space-x-4 pb-2">
+            <div className="w-6 h-6 bg-gray-700 rounded-full"></div>
+            <div className="w-6 h-6 bg-gray-700 rounded-full"></div>
+            <div className="w-6 h-6 bg-gray-700 rounded-full"></div>
+            <div className="w-6 h-6 bg-gray-700 rounded-full"></div>
           </div>
         </div>
       </div>

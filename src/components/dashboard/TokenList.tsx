@@ -52,7 +52,7 @@ export default function TokenList() {
   };
 
   return (
-    <div className="bg-black rounded-lg p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+    <div className="bg-black rounded-[20px] p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
       <h2 className="text-lg font-semibold text-white mb-6 font-satoshi flex-shrink-0">
         Token Holdings
       </h2>
@@ -63,7 +63,7 @@ export default function TokenList() {
           {tokens.map((token) => (
             <div
               key={token.id}
-              className="flex items-center justify-between p-3 bg-[#1A1A1A] hover:bg-[#2C2C2C] rounded-lg transition-colors cursor-pointer"
+              className="flex items-center justify-between p-3 hover:bg-[#1A1A1A] rounded-lg transition-colors cursor-pointer"
             >
               <div className="flex items-center">
                 <div

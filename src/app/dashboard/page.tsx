@@ -41,12 +41,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div
-      className="h-full bg-[#0F0F0F] rounded-[20px] p-6 flex flex-col"
-      style={{ height: "calc(100vh - 40px)" }}
-    >
+    <div className="h-full bg-[#0F0F0F] rounded-[20px] p-6 flex flex-col overflow-hidden">
       {/* Header - Fixed */}
-      <div className="flex items-center justify-between mb-8 flex-shrink-0">
+      <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <div>
           <h1 className="text-3xl font-bold text-white font-mayeka">
             Dashboard
@@ -55,40 +52,63 @@ export default function DashboardPage() {
 
         <div className="flex items-center space-x-6">
           {/* Wallet Selector */}
-          <div className="flex items-center bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg px-3 py-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-            <span className="text-white text-sm font-satoshi mr-1">
+          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-4 py-3">
+            <div className="w-8 h-8 bg-gradient-to-b from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center relative">
+              {/* Grid pattern overlay */}
+              <div
+                className="absolute inset-0 rounded-full opacity-30"
+                style={{
+                  backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
+                                 linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
+                  backgroundSize: "8px 8px",
+                }}
+              ></div>
+            </div>
+            <span className="text-white text-sm font-satoshi mr-2">
               Wallet 1
             </span>
-            <span className="text-gray-400 text-sm font-satoshi">
-              0xA57643dhw64...R8J6153
+
+            {/* Divider */}
+            <div className="w-px h-4 bg-[#2C2C2C] mr-3"></div>
+
+            <span className="text-gray-400 text-sm font-satoshi mr-3">
+              0xAD7a4hw64...R8J6153
             </span>
           </div>
 
-          {/* Icons */}
-          <div className="flex items-center space-x-3">
-            <button className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors">
+          {/* Icons Container */}
+          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 py-3">
+            <button className="p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
               <Bell size={20} className="text-gray-400" />
             </button>
-            <button className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors">
+
+            {/* Divider */}
+            <div className="w-px h-4 bg-[#2C2C2C] mx-2"></div>
+
+            <button className="p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
               <HelpCircle size={20} className="text-gray-400" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Main Content - Fixed dimensions to fill remaining space */}
-      <div className="flex gap-5 flex-1 min-h-0">
-        {/* Middle Column - Wallet Balance & Token Holdings */}
-        <div className="w-[800px] flex flex-col gap-5 h-full">
-          <WalletBalance />
+      {/* Main Content - Properly sized grid layout */}
+      <div className="flex gap-6 flex-1 min-h-0">
+        {/* Left Column - Wallet Balance & Token Holdings */}
+        <div className="flex-1 flex flex-col gap-6 min-w-0">
+          {/* Wallet Balance - Fixed height */}
+          <div className="flex-shrink-0">
+            <WalletBalance />
+          </div>
+
+          {/* Token Holdings - Takes remaining space */}
           <div className="flex-1 min-h-0">
             <TokenList />
           </div>
         </div>
 
-        {/* Right Column - Swap Section */}
-        <div className="w-[500px] h-full">
+        {/* Right Column - Swap Section - Fixed width */}
+        <div className="w-[400px] flex-shrink-0 h-full">
           <SwapSection />
         </div>
       </div>

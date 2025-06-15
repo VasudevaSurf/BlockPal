@@ -29,7 +29,7 @@ export default function WalletBalance() {
   };
 
   return (
-    <div className="bg-black rounded-lg p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
+    <div className="bg-black rounded-[20px] p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-white font-satoshi">
           Wallet Balance
@@ -40,9 +40,10 @@ export default function WalletBalance() {
           </span>
           <button
             onClick={() => copyToClipboard(activeWallet?.address || "")}
-            className="text-[#E2AF19] hover:text-[#D4A853] transition-colors bg-[#E2AF19] bg-opacity-20 px-2 py-1 rounded text-xs font-satoshi"
+            className="text-black hover:bg-[#D4A853] transition-colors bg-[#E2AF19] bg-opacity-100 px-3 py-1 rounded-full text-xs font-satoshi flex items-center gap-1"
           >
-            Copy
+            copy
+            <Copy size={12} className="text-black" />
           </button>
         </div>
       </div>
