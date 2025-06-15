@@ -128,7 +128,7 @@ export default function AIChatPage() {
           {/* Quick Start Suggestion - Responsive */}
           <div className="flex justify-end mb-4 lg:mb-8">
             <button
-              className="bg-[#F9EFD1] text-black px-3 lg:px-4 py-2 text-xs sm:text-sm font-satoshi hover:bg-[#F5E8C8] transition-colors"
+              className="bg-[#F9EFD1] text-black px-3 lg:px-4 py-2 text-xs sm:text-sm font-satoshi rounded-[16px] hover:bg-[#F5E8C8] transition-colors"
               style={{
                 borderRadius: "12px 12px 12px 0px lg:16px 16px 16px 0px",
               }}

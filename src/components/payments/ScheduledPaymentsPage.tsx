@@ -519,7 +519,7 @@ export default function ScheduledPaymentsPage() {
             <button className="px-4 py-2 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity">
               Reset
             </button>
-            <Button className="font-satoshi">Schedule Payment</Button>
+            <Button className="font-satoshi">Transfer</Button>
           </div>
         </div>
 

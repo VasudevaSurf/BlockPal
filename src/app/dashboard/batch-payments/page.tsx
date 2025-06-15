@@ -622,7 +622,7 @@ export default function BatchPaymentsPage() {
               >
                 Reset
               </button>
-              <Button className="font-satoshi">Execute Batch</Button>
+              <Button className="font-satoshi">Transfer</Button>
             </div>
           )}
         </div>
