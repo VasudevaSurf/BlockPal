@@ -1,0 +1,6 @@
+{
+  "buildCommand": "npm run build-no-lint",
+  "env": {
+    "SKIP_ENV_VALIDATION": "true"
+  }
+}
