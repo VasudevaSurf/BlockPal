@@ -29,14 +29,20 @@ export default function Input({
         )}
         <input
           className={clsx(
-            "block w-full rounded-lg py-3 px-4 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 sm:text-sm sm:leading-6 bg-black border",
-            icon && "pl-10",
+            "block w-full rounded-lg py-2 sm:py-3 px-3 sm:px-4 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 text-sm sm:text-base bg-black border transition-colors",
+            icon && "pl-8 sm:pl-10",
             error
               ? "border-red-500 focus:border-red-500"
               : "border-[#2C2C2C] focus:border-[#E2AF19]",
             "focus:ring-[#E2AF19] focus:ring-opacity-50",
             className
           )}
+          style={{
+            fontSize:
+              typeof window !== "undefined" && window.innerWidth < 640
+                ? "16px"
+                : undefined,
+          }}
           {...props}
         />
       </div>

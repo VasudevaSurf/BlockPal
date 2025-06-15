@@ -77,43 +77,45 @@ export default function AIChatPage() {
   };
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[20px] p-6 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 flex-shrink-0">
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+      {/* Header - Responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 flex-shrink-0 gap-4 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold text-white font-mayeka">AI Chat</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
+            AI Chat
+          </h1>
         </div>
 
-        <div className="flex items-center space-x-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
           {/* Wallet Selector */}
-          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-4 py-3">
-            <div className="w-8 h-8 bg-gradient-to-b from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center relative">
+          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto">
+            <div className="w-6 h-6 lg:w-8 lg:h-8 bg-gradient-to-b from-blue-400 to-cyan-400 rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0">
               <div
                 className="absolute inset-0 rounded-full opacity-30"
                 style={{
                   backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
                                  linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
-                  backgroundSize: "8px 8px",
+                  backgroundSize: "6px 6px lg:8px 8px",
                 }}
               ></div>
             </div>
-            <span className="text-white text-sm font-satoshi mr-2">
+            <span className="text-white text-xs sm:text-sm font-satoshi mr-2 min-w-0 truncate">
               Wallet 1
             </span>
-            <div className="w-px h-4 bg-[#2C2C2C] mr-3"></div>
-            <span className="text-gray-400 text-sm font-satoshi mr-3">
+            <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
+            <span className="text-gray-400 text-xs sm:text-sm font-satoshi mr-2 lg:mr-3 hidden sm:block truncate">
               0xAD7a4hw64...R8J6153
             </span>
           </div>
 
           {/* Icons Container */}
-          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 py-3">
-            <button className="p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
-              <Bell size={20} className="text-gray-400" />
+          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
+            <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
+              <Bell size={16} className="text-gray-400 lg:w-5 lg:h-5" />
             </button>
-            <div className="w-px h-4 bg-[#2C2C2C] mx-2"></div>
-            <button className="p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
-              <HelpCircle size={20} className="text-gray-400" />
+            <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+            <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
+              <HelpCircle size={16} className="text-gray-400 lg:w-5 lg:h-5" />
             </button>
           </div>
         </div>
@@ -122,12 +124,14 @@ export default function AIChatPage() {
       {/* Chat Container */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-6 space-y-6 flex flex-col justify-end">
-          {/* Quick Start Suggestion */}
-          <div className="flex justify-end mb-8">
+        <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 space-y-4 lg:space-y-6 flex flex-col justify-end pb-4">
+          {/* Quick Start Suggestion - Responsive */}
+          <div className="flex justify-end mb-4 lg:mb-8">
             <button
-              className="bg-[#F9EFD1] text-black px-4 py-2 text-sm font-satoshi hover:bg-[#F5E8C8] transition-colors"
-              style={{ borderRadius: "16px 16px 16px 0px" }}
+              className="bg-[#F9EFD1] text-black px-3 lg:px-4 py-2 text-xs sm:text-sm font-satoshi hover:bg-[#F5E8C8] transition-colors"
+              style={{
+                borderRadius: "12px 12px 12px 0px lg:16px 16px 16px 0px",
+              }}
             >
               What is crypto?
             </button>
@@ -139,11 +143,8 @@ export default function AIChatPage() {
               {message.type === "assistant" ? (
                 <div className="flex flex-col items-start space-y-2">
                   {/* Message Content */}
-                  <div
-                    className="max-w-4xl bg-black p-4"
-                    style={{ borderRadius: "16px 16px 16px 0px" }}
-                  >
-                    <p className="text-[#F9EFD1] text-sm leading-relaxed font-satoshi">
+                  <div className="max-w-full sm:max-w-4xl bg-black p-3 lg:p-4 rounded-2xl">
+                    <p className="text-[#F9EFD1] text-xs sm:text-sm leading-relaxed font-satoshi">
                       {message.content}
                     </p>
                   </div>
@@ -151,19 +152,18 @@ export default function AIChatPage() {
                   {/* Copy Button */}
                   <button
                     onClick={() => copyMessage(message.content)}
-                    className="bg-[#E2AF19] text-black px-3 py-1 rounded-md text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1"
+                    className="bg-[#E2AF19] text-black px-2 lg:px-3 py-1 rounded-md text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1"
                   >
                     Copy
-                    <Copy size={12} />
+                    <Copy size={10} className="lg:w-3 lg:h-3" />
                   </button>
                 </div>
               ) : (
                 <div className="flex justify-end">
-                  <div
-                    className="bg-[#F9EFD1] text-black p-4 max-w-2xl"
-                    style={{ borderRadius: "16px 16px 16px 0px" }}
-                  >
-                    <p className="text-sm font-satoshi">{message.content}</p>
+                  <div className="bg-[#F9EFD1] text-black p-3 lg:p-4 max-w-full sm:max-w-2xl rounded-2xl">
+                    <p className="text-xs sm:text-sm font-satoshi">
+                      {message.content}
+                    </p>
                   </div>
                 </div>
               )}
@@ -184,7 +184,7 @@ export default function AIChatPage() {
                   style={{ animationDelay: "0.2s" }}
                 ></div>
               </div>
-              <button className="bg-[#E2AF19] text-black px-3 py-1 rounded-md text-xs font-satoshi font-medium">
+              <button className="bg-[#E2AF19] text-black px-2 lg:px-3 py-1 rounded-md text-xs font-satoshi font-medium">
                 Copy
               </button>
             </div>
@@ -193,8 +193,8 @@ export default function AIChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
-        <div className="p-6">
+        {/* Input Area - Responsive */}
+        <div className="p-3 sm:p-4 lg:p-6 flex-shrink-0">
           <div className="relative">
             <textarea
               ref={inputRef}
@@ -202,7 +202,7 @@ export default function AIChatPage() {
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Type your message"
-              className="w-full bg-black text-white placeholder-gray-400 resize-none font-satoshi focus:outline-none pr-16 pl-6 py-4 min-h-[60px] max-h-32"
+              className="w-full bg-black text-white placeholder-gray-400 resize-none font-satoshi focus:outline-none pr-12 sm:pr-16 pl-4 sm:pl-6 py-3 sm:py-4 min-h-[50px] sm:min-h-[60px] max-h-32 text-sm sm:text-base border border-[#2C2C2C] focus:border-[#E2AF19]"
               rows={1}
               style={{
                 borderRadius: "100px",
@@ -213,12 +213,12 @@ export default function AIChatPage() {
             <button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || isTyping}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 disabled:cursor-not-allowed text-black rounded-full transition-colors flex-shrink-0 w-12 h-12 flex items-center justify-center"
+              className="absolute right-1 sm:right-2 top-1/2 transform -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 disabled:cursor-not-allowed text-black rounded-full transition-colors flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center"
               style={{
                 borderRadius: "200px",
               }}
             >
-              <Send size={18} />
+              <Send size={14} className="sm:w-[18px] sm:h-[18px]" />
             </button>
           </div>
         </div>
@@ -241,6 +241,17 @@ export default function AIChatPage() {
           }
           40% {
             transform: translateY(-6px);
+          }
+        }
+
+        /* Mobile specific styles */
+        @media (max-width: 640px) {
+          .animate-bounce {
+            animation: bounce 1.4s infinite;
+          }
+
+          textarea {
+            font-size: 16px; /* Prevents zoom on iOS */
           }
         }
       `}</style>

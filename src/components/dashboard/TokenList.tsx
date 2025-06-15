@@ -58,13 +58,60 @@ export default function TokenList() {
   };
 
   return (
-    <div className="bg-black rounded-[20px] p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-      <h2 className="text-lg font-semibold text-white mb-6 font-satoshi flex-shrink-0">
+    <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+      <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi flex-shrink-0">
         Token Holdings
       </h2>
 
-      {/* Scrollable token list without visible scrollbar */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide">
+      {/* Mobile Grid Layout */}
+      <div className="block sm:hidden flex-1 overflow-y-auto scrollbar-hide">
+        <div className="grid grid-cols-1 gap-3 pr-2">
+          {tokens.map((token) => (
+            <div
+              key={token.id}
+              onClick={() => handleTokenClick(token.id)}
+              className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] cursor-pointer hover:bg-[#1A1A1A] transition-colors"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center">
+                  <div
+                    className={`w-8 h-8 ${getTokenIcon(
+                      token.symbol
+                    )} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}
+                  >
+                    <span className="text-white text-sm font-medium">
+                      {getTokenLetter(token.symbol)}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-white font-medium font-satoshi">
+                      {token.name}
+                    </div>
+                    <div className="text-gray-400 text-sm font-satoshi">
+                      {token.balance.toFixed(4)} {token.symbol}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-white font-medium font-satoshi">
+                    {formatCurrency(token.value)}
+                  </div>
+                  <div
+                    className={`text-sm font-satoshi ${
+                      token.change24h >= 0 ? "text-green-400" : "text-red-400"
+                    }`}
+                  >
+                    {formatPercentage(token.change24h)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tablet/Desktop List Layout */}
+      <div className="hidden sm:block flex-1 overflow-y-auto scrollbar-hide">
         <div className="space-y-3 pr-2">
           {tokens.map((token) => (
             <div
@@ -72,9 +119,9 @@ export default function TokenList() {
               onClick={() => handleTokenClick(token.id)}
               className="flex items-center justify-between p-3 hover:bg-[#1A1A1A] rounded-lg transition-colors cursor-pointer"
             >
-              <div className="flex items-center">
+              <div className="flex items-center min-w-0 flex-1">
                 <div
-                  className={`w-10 h-10 ${getTokenIcon(
+                  className={`w-8 h-8 sm:w-10 sm:h-10 ${getTokenIcon(
                     token.symbol
                   )} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}
                 >
@@ -82,22 +129,22 @@ export default function TokenList() {
                     {getTokenLetter(token.symbol)}
                   </span>
                 </div>
-                <div className="min-w-0">
-                  <div className="text-white font-medium font-satoshi">
+                <div className="min-w-0 flex-1">
+                  <div className="text-white font-medium font-satoshi text-sm sm:text-base">
                     {token.name}
                   </div>
-                  <div className="text-gray-400 text-sm font-satoshi">
+                  <div className="text-gray-400 text-xs sm:text-sm font-satoshi">
                     {token.balance.toFixed(4)} {token.symbol}
                   </div>
                 </div>
               </div>
 
               <div className="text-right flex-shrink-0">
-                <div className="text-white font-medium font-satoshi">
+                <div className="text-white font-medium font-satoshi text-sm sm:text-base">
                   {formatCurrency(token.value)}
                 </div>
                 <div
-                  className={`text-sm font-satoshi ${
+                  className={`text-xs sm:text-sm font-satoshi ${
                     token.change24h >= 0 ? "text-green-400" : "text-red-400"
                   }`}
                 >

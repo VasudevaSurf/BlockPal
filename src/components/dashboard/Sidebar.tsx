@@ -45,7 +45,11 @@ const menuItems = [
   },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  onItemClick?: () => void;
+}
+
+export default function Sidebar({ onItemClick }: SidebarProps) {
   const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
@@ -54,65 +58,66 @@ export default function Sidebar() {
   const handleLogout = () => {
     dispatch(logout());
     router.push("/auth");
+    onItemClick?.();
   };
 
   const handleNavigation = (href: string) => {
     router.push(href);
+    onItemClick?.();
   };
 
   return (
     <div
-      className="relative w-64 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
+      className="relative w-full lg:w-64 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
       style={{ borderRadius: "20px" }}
     >
-      {/* Top Gradient Blur - Reduced */}
+      {/* Top Gradient Blur - Reduced for mobile */}
       <div
-        className="absolute -top-5 -left-5 -right-5 h-80 pointer-events-none z-10"
+        className="absolute -top-2 lg:-top-5 -left-2 lg:-left-5 -right-2 lg:-right-5 h-40 lg:h-80 pointer-events-none z-10"
         style={{
-          borderRadius: "898px",
+          borderRadius: "400px lg:898px",
           background:
-            "linear-gradient(180deg, rgba(226, 175, 25, 0.60) 0%, rgba(226, 175, 25, 0.45) 25%, rgba(226, 175, 25, 0.20) 50%, rgba(226, 175, 25, 0.00) 75%)",
-          filter: "blur(70px)",
+            "linear-gradient(180deg, rgba(226, 175, 25, 0.40) 0%, rgba(226, 175, 25, 0.25) 25%, rgba(226, 175, 25, 0.10) 50%, rgba(226, 175, 25, 0.00) 75%)",
+          filter: "blur(30px lg:blur(70px))",
         }}
       />
 
-      {/* Bottom Gradient Blur - Reduced */}
+      {/* Bottom Gradient Blur - Reduced for mobile */}
       <div
-        className="absolute -bottom-5 -left-5 -right-5 h-80 pointer-events-none z-10"
+        className="absolute -bottom-2 lg:-bottom-5 -left-2 lg:-left-5 -right-2 lg:-right-5 h-40 lg:h-80 pointer-events-none z-10"
         style={{
-          borderRadius: "898px",
+          borderRadius: "400px lg:898px",
           background:
-            "linear-gradient(0deg, rgba(226, 175, 25, 0.60) 0%, rgba(226, 175, 25, 0.45) 25%, rgba(226, 175, 25, 0.20) 50%, rgba(226, 175, 25, 0.00) 75%)",
-          filter: "blur(70px)",
+            "linear-gradient(0deg, rgba(226, 175, 25, 0.40) 0%, rgba(226, 175, 25, 0.25) 25%, rgba(226, 175, 25, 0.10) 50%, rgba(226, 175, 25, 0.00) 75%)",
+          filter: "blur(30px lg:blur(70px))",
         }}
       />
 
       {/* Additional Middle Fade Gradient */}
       <div
-        className="absolute top-1/3 bottom-1/3 -left-5 -right-5 pointer-events-none z-15"
+        className="absolute top-1/3 bottom-1/3 -left-2 lg:-left-5 -right-2 lg:-right-5 pointer-events-none z-15"
         style={{
           background:
             "linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.9) 50%, rgba(0, 0, 0, 0.3) 100%)",
-          filter: "blur(40px)",
+          filter: "blur(20px lg:blur(40px))",
         }}
       />
 
       {/* Logo Section */}
-      <div className="p-6 flex-shrink-0 relative z-20">
-        <div className="flex items-center mb-8">
+      <div className="p-4 lg:p-6 flex-shrink-0 relative z-20">
+        <div className="flex items-center mb-4 lg:mb-8">
           <img
             src="/blockName.png"
             alt="Blockpal"
-            className="brightness-110"
+            className="brightness-110 h-6 lg:h-7"
             style={{
-              width: "179.84px",
-              height: "28px",
+              width: "auto",
             }}
           />
         </div>
 
-        {/* Navigations Section with Lines */}
-        <div className="mb-6">
+        {/* Navigations Section with Lines - Hidden on mobile, shown on lg+ */}
+        <div className="mb-4 lg:mb-6 hidden lg:block">
           <div className="flex items-center mb-4">
             <div className="flex-1 h-px bg-[#DCDCDC]"></div>
             <span className="px-4 text-sm font-medium text-gray-300 font-satoshi">
@@ -124,21 +129,21 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation Menu */}
-      <div className="flex-1 px-4 overflow-y-auto relative z-20">
-        <nav className="space-y-3 mb-8">
+      <div className="flex-1 px-3 lg:px-4 overflow-y-auto relative z-20">
+        <nav className="space-y-2 lg:space-y-3 mb-6 lg:mb-8">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <button
                 key={item.label}
                 onClick={() => handleNavigation(item.href)}
-                className={`w-full flex items-center px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi ${
+                className={`w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
                   isActive
                     ? "bg-[#E2AF19] text-black font-medium"
                     : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
                 }`}
               >
-                <item.icon size={20} className="mr-3" />
+                <item.icon size={18} className="mr-3 flex-shrink-0" />
                 <span className={isActive ? "font-medium" : ""}>
                   {item.label}
                 </span>
@@ -149,9 +154,9 @@ export default function Sidebar() {
       </div>
 
       {/* Others Section - Fixed at bottom */}
-      <div className="p-4 flex-shrink-0 relative z-20">
-        {/* Others Section with Lines */}
-        <div className="mb-6">
+      <div className="p-3 lg:p-4 flex-shrink-0 relative z-20">
+        {/* Others Section with Lines - Hidden on mobile */}
+        <div className="mb-4 lg:mb-6 hidden lg:block">
           <div className="flex items-center mb-4">
             <div className="flex-1 h-px bg-[#DCDCDC]"></div>
             <span className="px-4 text-sm font-medium text-gray-300 font-satoshi">
@@ -161,34 +166,43 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <button className="w-full flex items-center px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi">
-            <User size={20} className="mr-3" />
-            <span>User profile</span>
-            <div className="ml-auto">
-              <LogOut size={16} className="text-red-500" />
+        <div className="space-y-2 lg:space-y-3">
+          <button className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base">
+            <User size={18} className="mr-3 flex-shrink-0" />
+            <span className="truncate">User profile</span>
+            <div className="ml-auto flex-shrink-0">
+              <LogOut size={14} className="text-red-500" />
             </div>
           </button>
 
-          <button className="w-full flex items-center px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi">
-            <ExternalLink size={20} className="mr-3" />
-            <span>Go to website</span>
-            <div className="ml-auto">
-              <ExternalLink size={16} className="text-gray-400" />
+          <button className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base">
+            <ExternalLink size={18} className="mr-3 flex-shrink-0" />
+            <span className="truncate">Go to website</span>
+            <div className="ml-auto flex-shrink-0">
+              <ExternalLink size={14} className="text-gray-400" />
             </div>
           </button>
 
           <button
             onClick={() => dispatch(toggleTheme())}
-            className="w-full flex items-center px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi"
+            className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
           >
-            <Moon size={20} className="mr-3" />
-            <span>Dark Mode</span>
-            <div className="ml-auto">
-              <div className="w-10 h-6 rounded-full relative bg-[#E2AF19]">
-                <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1"></div>
+            <Moon size={18} className="mr-3 flex-shrink-0" />
+            <span className="truncate">Dark Mode</span>
+            <div className="ml-auto flex-shrink-0">
+              <div className="w-8 lg:w-10 h-5 lg:h-6 rounded-full relative bg-[#E2AF19]">
+                <div className="w-3 lg:w-4 h-3 lg:h-4 bg-white rounded-full absolute top-1 right-1"></div>
               </div>
             </div>
+          </button>
+
+          {/* Logout button - Mobile only */}
+          <button
+            onClick={handleLogout}
+            className="lg:hidden w-full flex items-center px-3 py-3 rounded-xl text-red-400 hover:bg-[#2C2C2C] hover:text-red-300 transition-all duration-200 font-satoshi text-sm"
+          >
+            <LogOut size={18} className="mr-3 flex-shrink-0" />
+            <span>Logout</span>
           </button>
         </div>
       </div>

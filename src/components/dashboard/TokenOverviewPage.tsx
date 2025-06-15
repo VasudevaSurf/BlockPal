@@ -11,6 +11,8 @@ import {
   Send,
   Bell,
   HelpCircle,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { RootState } from "@/store";
 
@@ -122,67 +124,363 @@ export default function TokenOverviewPage() {
   if (!currentToken) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-[#E2AF19]"></div>
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[20px] p-6 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 flex-shrink-0">
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+      {/* Header - Responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 flex-shrink-0 gap-4 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold text-white font-mayeka">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
             Token Overview
           </h1>
         </div>
 
-        <div className="flex items-center space-x-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
           {/* Wallet Selector */}
-          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-4 py-3">
-            <div className="w-8 h-8 bg-gradient-to-b from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center relative">
+          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto">
+            <div className="w-6 h-6 lg:w-8 lg:h-8 bg-gradient-to-b from-blue-400 to-cyan-400 rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0">
               <div
                 className="absolute inset-0 rounded-full opacity-30"
                 style={{
                   backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
                                  linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
-                  backgroundSize: "8px 8px",
+                  backgroundSize: "6px 6px lg:8px 8px",
                 }}
               ></div>
             </div>
-            <span className="text-white text-sm font-satoshi mr-2">
+            <span className="text-white text-xs sm:text-sm font-satoshi mr-2 min-w-0 truncate">
               Wallet 1
             </span>
-            <div className="w-px h-4 bg-[#2C2C2C] mr-3"></div>
-            <span className="text-gray-400 text-sm font-satoshi mr-3">
+            <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
+            <span className="text-gray-400 text-xs sm:text-sm font-satoshi mr-2 lg:mr-3 hidden sm:block truncate">
               0xAD7a4hw64...R8J6153
             </span>
           </div>
 
           {/* Icons Container */}
-          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 py-3">
-            <button className="p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
-              <Bell size={20} className="text-gray-400" />
+          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
+            <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
+              <Bell size={16} className="text-gray-400 lg:w-5 lg:h-5" />
             </button>
-            <div className="w-px h-4 bg-[#2C2C2C] mx-2"></div>
-            <button className="p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
-              <HelpCircle size={20} className="text-gray-400" />
+            <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+            <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
+              <HelpCircle size={16} className="text-gray-400 lg:w-5 lg:h-5" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Content Grid */}
-      <div className="flex gap-6 flex-1 min-h-0">
+      {/* Mobile Layout */}
+      <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        {/* Token Header */}
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+          <div className="flex items-center mb-4">
+            <button
+              onClick={() => router.back()}
+              className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+            >
+              <ArrowLeft size={20} className="text-white" />
+            </button>
+            <div
+              className={`w-10 h-10 ${getTokenIcon(
+                currentToken.symbol
+              )} rounded-full mr-3 flex items-center justify-center`}
+            >
+              <span className="text-white text-lg font-bold">
+                {getTokenLetter(currentToken.symbol)}
+              </span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white font-mayeka">
+                {currentToken.name}
+              </h2>
+            </div>
+          </div>
+
+          {/* Price Information */}
+          <div className="mb-4">
+            <div className="text-2xl sm:text-3xl font-bold text-white font-satoshi mb-2">
+              {formatCurrency(currentToken.price)}
+            </div>
+            <div className="flex items-center">
+              {currentToken.change24h >= 0 ? (
+                <TrendingUp size={16} className="text-green-400 mr-1" />
+              ) : (
+                <TrendingDown size={16} className="text-red-400 mr-1" />
+              )}
+              <span
+                className={`text-sm font-satoshi ${
+                  currentToken.change24h >= 0
+                    ? "text-green-400"
+                    : "text-red-400"
+                }`}
+              >
+                {formatPercentage(currentToken.change24h)}
+              </span>
+            </div>
+          </div>
+
+          {/* Contract Address */}
+          <div className="mb-4">
+            <div className="text-gray-400 text-sm font-satoshi mb-1">
+              Contract Address
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-white text-sm font-satoshi">
+                0x9e7D4hw64...SrAY95EW
+              </span>
+              <button
+                onClick={() => copyToClipboard("0x9e7D4hw64SrAY95EW")}
+                className="hover:text-white transition-colors"
+              >
+                <Copy size={14} className="text-gray-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Action Buttons */}
+          <div className="flex flex-wrap gap-2">
+            <button className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm flex items-center">
+              <ExternalLink size={14} className="mr-1" />
+              WEBSITE
+            </button>
+            <button className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm flex items-center">
+              <FileText size={14} className="mr-1" />
+              DOCS
+            </button>
+            <button className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm flex items-center">
+              <ExternalLink size={14} className="mr-1" />
+              EXPLORER
+            </button>
+          </div>
+        </div>
+
+        {/* Chart Area - Mobile */}
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+          <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
+            Price Chart
+          </h3>
+          <div className="relative h-48">
+            <svg className="w-full h-full" viewBox="0 0 400 150">
+              <defs>
+                <linearGradient
+                  id="priceGradientMobile"
+                  x1="0%"
+                  y1="0%"
+                  x2="0%"
+                  y2="100%"
+                >
+                  <stop
+                    offset="0%"
+                    stopColor={
+                      currentToken.change24h >= 0
+                        ? "rgba(34, 197, 94, 0.3)"
+                        : "rgba(239, 68, 68, 0.3)"
+                    }
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={
+                      currentToken.change24h >= 0
+                        ? "rgba(34, 197, 94, 0.0)"
+                        : "rgba(239, 68, 68, 0.0)"
+                    }
+                  />
+                </linearGradient>
+              </defs>
+
+              {/* Grid lines */}
+              {[0, 37.5, 75, 112.5, 150].map((y) => (
+                <line
+                  key={y}
+                  x1="0"
+                  y1={y}
+                  x2="400"
+                  y2={y}
+                  stroke="#2C2C2C"
+                  strokeWidth="1"
+                />
+              ))}
+
+              {/* Price line */}
+              <path
+                d={
+                  currentToken.change24h >= 0
+                    ? "M 0 135 Q 50 120 100 105 T 200 90 T 300 75 T 400 60"
+                    : "M 0 90 Q 50 105 100 120 T 200 127 T 300 131 T 400 135"
+                }
+                fill="url(#priceGradientMobile)"
+                stroke={currentToken.change24h >= 0 ? "#22C55E" : "#EF4444"}
+                strokeWidth="2"
+              />
+            </svg>
+          </div>
+
+          {/* Chart Info - Mobile */}
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <div className="bg-[#2C2C2C] px-3 py-2 rounded-lg">
+              <span className="text-white font-satoshi text-xs">
+                MARKET CAP
+              </span>
+              <div className="text-gray-400 text-xs font-satoshi">$338.17B</div>
+            </div>
+            <div className="bg-[#2C2C2C] px-3 py-2 rounded-lg">
+              <span className="text-white font-satoshi text-xs">
+                24H VOLUME
+              </span>
+              <div className="text-gray-400 text-xs font-satoshi">$338.17B</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Portfolio Section - Mobile */}
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <div
+                className={`w-8 h-8 ${getTokenIcon(
+                  currentToken.symbol
+                )} rounded-full mr-3 flex items-center justify-center`}
+              >
+                <span className="text-white text-sm font-bold">
+                  {getTokenLetter(currentToken.symbol)}
+                </span>
+              </div>
+              <span className="text-white font-semibold font-satoshi">
+                Portfolio
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-white text-sm font-satoshi">
+                0xAD7a4hw64...R8J6153
+              </span>
+              <button
+                onClick={() => copyToClipboard("0xAD7a4hw64R8J6153")}
+                className="hover:text-white transition-colors"
+              >
+                <Copy size={14} className="text-gray-400" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-2xl font-bold text-white mb-1 font-satoshi">
+                {formatCurrency(currentToken.value)}
+              </div>
+              <div
+                className={`text-sm font-satoshi ${
+                  currentToken.change24h >= 0
+                    ? "text-green-400"
+                    : "text-red-400"
+                }`}
+              >
+                {formatPercentage(currentToken.change24h)} (65.72%)
+              </div>
+            </div>
+            {currentToken.symbol === "ETH" && (
+              <img
+                src="/currencyMain.png"
+                alt="Currency"
+                className="w-12 h-12"
+              />
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <button className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi">
+              Swap
+            </button>
+            <button className="bg-[#4B3A08] text-[#E2AF19] p-3 rounded-xl hover:bg-[#5A4509] transition-colors">
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* About Token - Mobile */}
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+          <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
+            About {currentToken.name}
+          </h3>
+          <p className="text-gray-400 text-sm leading-relaxed font-satoshi">
+            {currentToken.symbol === "ETH" ? (
+              <>
+                Ethereum is a global, open-source platform for decentralized
+                applications. In other words, the vision is to create a world
+                computer that anyone can build applications in a decentralized
+                manner; while all states and data are distributed and publicly
+                accessible.
+              </>
+            ) : (
+              <>
+                {currentToken.name} is a cryptocurrency token that provides
+                various utilities and features within its ecosystem. It enables
+                users to participate in the network's governance, facilitate
+                transactions, and access various decentralized applications and
+                services.
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* Transaction History - Mobile */}
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+          <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
+            Recent Transactions
+          </h3>
+          <div className="space-y-3 max-h-80 overflow-y-auto scrollbar-hide">
+            {transactions.slice(0, 6).map((tx, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-3 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C]"
+              >
+                <div className="flex items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full mr-3 flex items-center justify-center ${
+                      tx.type === "Send" ? "bg-red-500" : "bg-green-500"
+                    }`}
+                  >
+                    <span className="text-white text-sm">
+                      {tx.type === "Send" ? "↗" : "↙"}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-white font-medium text-sm font-satoshi">
+                      {tx.type}
+                    </div>
+                    <div className="text-gray-400 text-xs font-satoshi">
+                      {tx.date}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div
+                    className={`text-sm font-medium font-satoshi ${
+                      tx.type === "Send" ? "text-red-400" : "text-green-400"
+                    }`}
+                  >
+                    {tx.amount}
+                  </div>
+                  <div className="text-gray-400 text-xs font-satoshi">
+                    {tx.value}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Layout */}
+      <div className="hidden xl:flex gap-6 flex-1 min-h-0">
         {/* Left Column */}
         <div className="flex-1 flex flex-col gap-6 min-w-0 max-h-full overflow-hidden">
-          <div
-            className="flex-1 overflow-y-auto space-y-6"
-            style={{
-              msOverflowStyle: "none",
-              scrollbarWidth: "none",
-            }}
-          >
+          <div className="flex-1 overflow-y-auto space-y-6 scrollbar-hide">
             {/* Combined Token Info and Price Chart */}
             <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-shrink-0">
               {/* Token Header with Back Button */}
@@ -211,7 +509,7 @@ export default function TokenOverviewPage() {
                     </div>
                   </div>
 
-                  {/* Price Information - Starting from beginning */}
+                  {/* Price Information */}
                   <div className="flex items-center space-x-6">
                     <div className="text-4xl font-bold text-white font-satoshi">
                       {formatCurrency(currentToken.price)}
@@ -316,7 +614,7 @@ export default function TokenOverviewPage() {
                 </svg>
               </div>
 
-              {/* Chart Info - 4 Batches Evenly Spread with proper margins */}
+              {/* Chart Info */}
               <div className="flex items-center justify-between w-full text-sm my-6">
                 <div className="bg-[#2C2C2C] px-3 py-2 rounded-full">
                   <span className="text-white font-satoshi">FDV</span>
@@ -404,18 +702,12 @@ export default function TokenOverviewPage() {
               </p>
             </div>
           </div>
-
-          <style>{`
-            div[style*="msOverflowStyle"]::-webkit-scrollbar {
-              display: none;
-            }
-          `}</style>
         </div>
 
         {/* Right Column - Portfolio */}
         <div className="w-[400px] flex-shrink-0 h-full">
           <div className="bg-black rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-6">
-            {/* Portfolio Header - Only Title */}
+            {/* Portfolio Header */}
             <div className="flex items-center mb-6">
               <div className="flex items-center">
                 <div
@@ -451,11 +743,13 @@ export default function TokenOverviewPage() {
               {/* Currency Icon and Portfolio Value */}
               <div className="mb-4">
                 <div className="flex items-start">
-                  <img
-                    src="/currencyMain.png"
-                    alt="Currency"
-                    className="w-14.5 h-14.5 mr-3 flex-shrink-0"
-                  />
+                  {currentToken.symbol === "ETH" && (
+                    <img
+                      src="/currencyMain.png"
+                      alt="Currency"
+                      className="w-14.5 h-14.5 mr-3 flex-shrink-0"
+                    />
+                  )}
                   <div className="flex flex-col">
                     <div className="text-3xl font-bold text-white mb-1 font-satoshi">
                       {formatCurrency(currentToken.value)}
@@ -475,12 +769,9 @@ export default function TokenOverviewPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-3">
-                {/* Swap Button */}
                 <button className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi">
                   Swap
                 </button>
-
-                {/* Send Button */}
                 <button className="bg-[#4B3A08] text-[#E2AF19] p-3 rounded-xl hover:bg-[#5A4509] transition-colors">
                   <Send size={16} />
                 </button>
@@ -496,13 +787,7 @@ export default function TokenOverviewPage() {
                 Transaction History
               </h3>
 
-              <div
-                className="flex-1 overflow-y-auto space-y-3 pr-2"
-                style={{
-                  msOverflowStyle: "none",
-                  scrollbarWidth: "none",
-                }}
-              >
+              <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-hide">
                 {transactions.map((tx, index) => (
                   <div
                     key={index}
@@ -542,16 +827,20 @@ export default function TokenOverviewPage() {
                   </div>
                 ))}
               </div>
-
-              <style>{`
-                div[style*="msOverflowStyle"]::-webkit-scrollbar {
-                  display: none;
-                }
-              `}</style>
             </div>
           </div>
         </div>
       </div>
+
+      <style>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }

@@ -29,27 +29,31 @@ export default function WalletBalance() {
   };
 
   return (
-    <div className="bg-black rounded-[20px] p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white font-satoshi">
+    <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
+      {/* Header - Responsive layout */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 sm:gap-0">
+        <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi">
           Wallet Balance
         </h2>
-        <div className="flex items-center space-x-3">
-          <span className="text-gray-400 text-sm font-satoshi">
+
+        {/* Address and Copy Button - Responsive */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <span className="text-gray-400 text-xs sm:text-sm font-satoshi truncate max-w-[150px] sm:max-w-none">
             0xA57643dhw64...R8J6153
           </span>
           <button
             onClick={() => copyToClipboard(activeWallet?.address || "")}
-            className="text-black hover:bg-[#D4A853] transition-colors bg-[#E2AF19] bg-opacity-100 px-3 py-1 rounded-full text-xs font-satoshi flex items-center gap-1"
+            className="text-black hover:bg-[#D4A853] transition-colors bg-[#E2AF19] bg-opacity-100 px-2 sm:px-3 py-1 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0"
           >
             copy
-            <Copy size={12} className="text-black" />
+            <Copy size={10} className="text-black sm:w-3 sm:h-3" />
           </button>
         </div>
       </div>
 
+      {/* Balance Display - Responsive */}
       <div>
-        <div className="text-4xl font-bold text-white mb-2 font-satoshi">
+        <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 font-satoshi">
           {formatBalance(totalBalance)}
         </div>
         <div className="flex items-center text-sm">
