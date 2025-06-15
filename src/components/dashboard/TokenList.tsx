@@ -1,9 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 
 export default function TokenList() {
+  const router = useRouter();
   const { tokens } = useSelector((state: RootState) => state.wallet);
 
   const formatCurrency = (value: number) => {
@@ -51,6 +53,10 @@ export default function TokenList() {
     return letters[symbol] || symbol.charAt(0);
   };
 
+  const handleTokenClick = (tokenId: string) => {
+    router.push(`/dashboard/token/${tokenId}`);
+  };
+
   return (
     <div className="bg-black rounded-[20px] p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
       <h2 className="text-lg font-semibold text-white mb-6 font-satoshi flex-shrink-0">
@@ -63,6 +69,7 @@ export default function TokenList() {
           {tokens.map((token) => (
             <div
               key={token.id}
+              onClick={() => handleTokenClick(token.id)}
               className="flex items-center justify-between p-3 hover:bg-[#1A1A1A] rounded-lg transition-colors cursor-pointer"
             >
               <div className="flex items-center">
