@@ -41,7 +41,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[20px] p-6 flex flex-col overflow-hidden">
+    <div
+      className="h-full bg-[#0F0F0F] rounded-[20px] p-6 flex flex-col"
+      style={{ height: "calc(100vh - 40px)" }}
+    >
       {/* Header - Fixed */}
       <div className="flex items-center justify-between mb-8 flex-shrink-0">
         <div>
@@ -74,19 +77,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main Content Grid - Scrollable */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 pb-6">
-          {/* Left Column - Wallet Balance & Token Holdings */}
-          <div className="xl:col-span-2 space-y-6">
-            <WalletBalance />
+      {/* Main Content - Fixed dimensions to fill remaining space */}
+      <div className="flex gap-5 flex-1 min-h-0">
+        {/* Middle Column - Wallet Balance & Token Holdings */}
+        <div className="w-[800px] flex flex-col gap-5 h-full">
+          <WalletBalance />
+          <div className="flex-1 min-h-0">
             <TokenList />
           </div>
+        </div>
 
-          {/* Right Column - Swap Section */}
-          <div className="xl:col-span-1">
-            <SwapSection />
-          </div>
+        {/* Right Column - Swap Section */}
+        <div className="w-[500px] h-full">
+          <SwapSection />
         </div>
       </div>
     </div>

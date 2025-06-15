@@ -52,52 +52,65 @@ export default function TokenList() {
   };
 
   return (
-    <div className="bg-black rounded-lg p-6 border border-[#2C2C2C]">
-      <h2 className="text-lg font-semibold text-white mb-6 font-satoshi">
+    <div className="bg-black rounded-lg p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+      <h2 className="text-lg font-semibold text-white mb-6 font-satoshi flex-shrink-0">
         Token Holdings
       </h2>
 
-      <div className="space-y-3">
-        {tokens.map((token) => (
-          <div
-            key={token.id}
-            className="flex items-center justify-between p-3 bg-[#1A1A1A] hover:bg-[#2C2C2C] rounded-lg transition-colors cursor-pointer"
-          >
-            <div className="flex items-center">
-              <div
-                className={`w-10 h-10 ${getTokenIcon(
-                  token.symbol
-                )} rounded-full flex items-center justify-center mr-3`}
-              >
-                <span className="text-white text-sm font-medium">
-                  {getTokenLetter(token.symbol)}
-                </span>
-              </div>
-              <div>
-                <div className="text-white font-medium font-satoshi">
-                  {token.name}
+      {/* Scrollable token list without visible scrollbar */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <div className="space-y-3 pr-2">
+          {tokens.map((token) => (
+            <div
+              key={token.id}
+              className="flex items-center justify-between p-3 bg-[#1A1A1A] hover:bg-[#2C2C2C] rounded-lg transition-colors cursor-pointer"
+            >
+              <div className="flex items-center">
+                <div
+                  className={`w-10 h-10 ${getTokenIcon(
+                    token.symbol
+                  )} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}
+                >
+                  <span className="text-white text-sm font-medium">
+                    {getTokenLetter(token.symbol)}
+                  </span>
                 </div>
-                <div className="text-gray-400 text-sm font-satoshi">
-                  {token.balance.toFixed(4)} {token.symbol}
+                <div className="min-w-0">
+                  <div className="text-white font-medium font-satoshi">
+                    {token.name}
+                  </div>
+                  <div className="text-gray-400 text-sm font-satoshi">
+                    {token.balance.toFixed(4)} {token.symbol}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="text-right">
-              <div className="text-white font-medium font-satoshi">
-                {formatCurrency(token.value)}
-              </div>
-              <div
-                className={`text-sm font-satoshi ${
-                  token.change24h >= 0 ? "text-green-400" : "text-red-400"
-                }`}
-              >
-                {formatPercentage(token.change24h)}
+              <div className="text-right flex-shrink-0">
+                <div className="text-white font-medium font-satoshi">
+                  {formatCurrency(token.value)}
+                </div>
+                <div
+                  className={`text-sm font-satoshi ${
+                    token.change24h >= 0 ? "text-green-400" : "text-red-400"
+                  }`}
+                >
+                  {formatPercentage(token.change24h)}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+
+      <style jsx global>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }

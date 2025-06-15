@@ -29,7 +29,7 @@ export default function WalletBalance() {
   };
 
   return (
-    <div className="bg-black rounded-lg p-6 border border-[#2C2C2C]">
+    <div className="bg-black rounded-lg p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-white font-satoshi">
           Wallet Balance
@@ -47,7 +47,7 @@ export default function WalletBalance() {
         </div>
       </div>
 
-      <div className="mb-6">
+      <div>
         <div className="text-4xl font-bold text-white mb-2 font-satoshi">
           {formatBalance(totalBalance)}
         </div>
