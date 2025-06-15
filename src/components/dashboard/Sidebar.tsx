@@ -1,7 +1,7 @@
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Calendar,
@@ -18,21 +18,46 @@ import { toggleTheme } from "@/store/slices/uiSlice";
 import { logout } from "@/store/slices/authSlice";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", active: true },
-  { icon: Calendar, label: "Schedule Payments", active: false },
-  { icon: CreditCard, label: "Batch Payments", active: false },
-  { icon: MessageCircle, label: "AI Chat", active: false },
-  { icon: Users, label: "Friends", active: false },
+  {
+    icon: LayoutDashboard,
+    label: "Dashboard",
+    href: "/dashboard",
+  },
+  {
+    icon: Calendar,
+    label: "Schedule Payments",
+    href: "/dashboard/scheduled-payments",
+  },
+  {
+    icon: CreditCard,
+    label: "Batch Payments",
+    href: "/dashboard/batch-payments",
+  },
+  {
+    icon: MessageCircle,
+    label: "AI Chat",
+    href: "/dashboard/ai-chat",
+  },
+  {
+    icon: Users,
+    label: "Friends",
+    href: "/dashboard/friends",
+  },
 ];
 
 export default function Sidebar() {
   const dispatch = useDispatch();
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useSelector((state: RootState) => state.auth);
 
   const handleLogout = () => {
     dispatch(logout());
     router.push("/auth");
+  };
+
+  const handleNavigation = (href: string) => {
+    router.push(href);
   };
 
   return (
@@ -101,21 +126,25 @@ export default function Sidebar() {
       {/* Navigation Menu */}
       <div className="flex-1 px-4 overflow-y-auto relative z-20">
         <nav className="space-y-3 mb-8">
-          {menuItems.map((item) => (
-            <button
-              key={item.label}
-              className={`w-full flex items-center px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi ${
-                item.active
-                  ? "bg-[#E2AF19] text-black font-medium"
-                  : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
-              }`}
-            >
-              <item.icon size={20} className="mr-3" />
-              <span className={item.active ? "font-medium" : ""}>
-                {item.label}
-              </span>
-            </button>
-          ))}
+          {menuItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <button
+                key={item.label}
+                onClick={() => handleNavigation(item.href)}
+                className={`w-full flex items-center px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi ${
+                  isActive
+                    ? "bg-[#E2AF19] text-black font-medium"
+                    : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
+                }`}
+              >
+                <item.icon size={20} className="mr-3" />
+                <span className={isActive ? "font-medium" : ""}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
         </nav>
       </div>
 
