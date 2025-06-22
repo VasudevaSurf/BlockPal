@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { RootState, AppDispatch } from "@/store";
 import { fetchWalletTokens } from "@/store/slices/walletSlice";
 
@@ -13,9 +13,27 @@ export default function TokenList() {
     (state: RootState) => state.wallet
   );
 
+  // Use ref to prevent duplicate API calls
+  const tokensLoaded = useRef<string | null>(null);
+
   useEffect(() => {
-    // Fetch tokens when active wallet changes
-    if (activeWallet?.address) {
+    console.log("🪙 TokenList - Effect triggered", {
+      activeWalletAddress: activeWallet?.address,
+      tokensLoadedFor: tokensLoaded.current,
+      shouldFetch:
+        activeWallet?.address && tokensLoaded.current !== activeWallet.address,
+    });
+
+    // Only fetch tokens if we have an active wallet and haven't already loaded tokens for this wallet
+    if (
+      activeWallet?.address &&
+      tokensLoaded.current !== activeWallet.address
+    ) {
+      console.log(
+        "📡 TokenList - Fetching tokens for wallet:",
+        activeWallet.address
+      );
+      tokensLoaded.current = activeWallet.address;
       dispatch(fetchWalletTokens(activeWallet.address));
     }
   }, [activeWallet?.address, dispatch]);
@@ -73,7 +91,7 @@ export default function TokenList() {
     router.push(`/dashboard/token/${tokenId}`);
   };
 
-  if (loading) {
+  if (loading && tokens.length === 0) {
     return (
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi flex-shrink-0">
@@ -219,19 +237,21 @@ export default function TokenList() {
       </div>
 
       {/* Empty State */}
-      {tokens.length === 0 && !loading && (
-        <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-          <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-            <span className="text-gray-400 text-lg lg:text-xl">₿</span>
+      {tokens.length === 0 &&
+        !loading &&
+        tokensLoaded.current === activeWallet?.address && (
+          <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
+            <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+              <span className="text-gray-400 text-lg lg:text-xl">₿</span>
+            </div>
+            <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+              No tokens found
+            </h3>
+            <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+              Your tokens will appear here once detected
+            </p>
           </div>
-          <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
-            No tokens found
-          </h3>
-          <p className="text-gray-400 font-satoshi text-sm lg:text-base">
-            Your tokens will appear here once detected
-          </p>
-        </div>
-      )}
+        )}
 
       <style jsx global>{`
         .scrollbar-hide {

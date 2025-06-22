@@ -10,21 +10,43 @@ const initialState: WalletState = {
   error: null,
 };
 
+// Track pending requests to prevent duplicates
+const pendingRequests = new Set<string>();
+
 // Async thunks for API calls
 export const fetchWallets = createAsyncThunk(
   "wallet/fetchWallets",
   async (_, { rejectWithValue }) => {
+    const requestKey = "fetchWallets";
+
+    if (pendingRequests.has(requestKey)) {
+      console.log("🔄 fetchWallets already pending, skipping...");
+      return rejectWithValue("Request already pending");
+    }
+
     try {
-      const response = await fetch("/api/wallets");
+      pendingRequests.add(requestKey);
+      console.log("📡 Fetching wallets...");
+
+      const response = await fetch("/api/wallets", {
+        credentials: "include",
+      });
 
       if (!response.ok) {
         return rejectWithValue("Failed to fetch wallets");
       }
 
       const data = await response.json();
+      console.log(
+        "✅ Wallets fetched successfully:",
+        data.wallets?.length || 0
+      );
       return data.wallets;
     } catch (error) {
+      console.error("❌ Error fetching wallets:", error);
       return rejectWithValue("Network error occurred");
+    } finally {
+      pendingRequests.delete(requestKey);
     }
   }
 );
@@ -47,6 +69,7 @@ export const createWallet = createAsyncThunk(
           "Content-Type": "application/json",
         },
         body: JSON.stringify(walletData),
+        credentials: "include",
       });
 
       const data = await response.json();
@@ -65,9 +88,24 @@ export const createWallet = createAsyncThunk(
 export const fetchWalletTokens = createAsyncThunk(
   "wallet/fetchWalletTokens",
   async (walletAddress: string, { rejectWithValue }) => {
+    const requestKey = `fetchWalletTokens:${walletAddress}`;
+
+    if (pendingRequests.has(requestKey)) {
+      console.log(
+        `🔄 fetchWalletTokens for ${walletAddress} already pending, skipping...`
+      );
+      return rejectWithValue("Request already pending");
+    }
+
     try {
+      pendingRequests.add(requestKey);
+      console.log("📡 Fetching tokens for wallet:", walletAddress);
+
       const response = await fetch(
-        `/api/wallets/tokens?walletAddress=${walletAddress}`
+        `/api/wallets/tokens?walletAddress=${walletAddress}`,
+        {
+          credentials: "include",
+        }
       );
 
       if (!response.ok) {
@@ -75,9 +113,13 @@ export const fetchWalletTokens = createAsyncThunk(
       }
 
       const data = await response.json();
-      return data.tokens;
+      console.log("✅ Tokens fetched successfully:", data.tokens?.length || 0);
+      return { tokens: data.tokens || [], walletAddress };
     } catch (error) {
+      console.error("❌ Error fetching wallet tokens:", error);
       return rejectWithValue("Network error occurred");
+    } finally {
+      pendingRequests.delete(requestKey);
     }
   }
 );
@@ -85,19 +127,43 @@ export const fetchWalletTokens = createAsyncThunk(
 export const updateWalletBalance = createAsyncThunk(
   "wallet/updateWalletBalance",
   async (walletAddress: string, { rejectWithValue }) => {
+    const requestKey = `updateWalletBalance:${walletAddress}`;
+
+    if (pendingRequests.has(requestKey)) {
+      console.log(
+        `🔄 updateWalletBalance for ${walletAddress} already pending, skipping...`
+      );
+      return rejectWithValue("Request already pending");
+    }
+
     try {
+      pendingRequests.add(requestKey);
+      console.log("📡 Updating balance for wallet:", walletAddress);
+
       const response = await fetch(
-        `/api/wallets/balance?walletAddress=${walletAddress}`
+        `/api/wallets/balance?walletAddress=${walletAddress}`,
+        {
+          credentials: "include",
+        }
       );
 
       if (!response.ok) {
-        return rejectWithValue("Failed to update wallet balance");
+        // Balance endpoint might not exist, return default
+        console.log(
+          "ℹ️ Balance endpoint not available (404), using default balance of 0"
+        );
+        return { walletAddress, balance: 0 };
       }
 
       const data = await response.json();
+      console.log("✅ Balance updated successfully:", data.balance);
       return { walletAddress, balance: data.balance };
     } catch (error) {
-      return rejectWithValue("Network error occurred");
+      console.error("❌ Error updating wallet balance:", error);
+      // Don't reject, just return default balance
+      return { walletAddress, balance: 0 };
+    } finally {
+      pendingRequests.delete(requestKey);
     }
   }
 );
@@ -105,8 +171,18 @@ export const updateWalletBalance = createAsyncThunk(
 export const refreshTokenPrices = createAsyncThunk(
   "wallet/refreshTokenPrices",
   async (_, { rejectWithValue }) => {
+    const requestKey = "refreshTokenPrices";
+
+    if (pendingRequests.has(requestKey)) {
+      console.log("🔄 refreshTokenPrices already pending, skipping...");
+      return rejectWithValue("Request already pending");
+    }
+
     try {
-      const response = await fetch("/api/tokens/prices");
+      pendingRequests.add(requestKey);
+      const response = await fetch("/api/tokens/prices", {
+        credentials: "include",
+      });
 
       if (!response.ok) {
         return rejectWithValue("Failed to refresh token prices");
@@ -116,6 +192,8 @@ export const refreshTokenPrices = createAsyncThunk(
       return data.prices;
     } catch (error) {
       return rejectWithValue("Network error occurred");
+    } finally {
+      pendingRequests.delete(requestKey);
     }
   }
 );
@@ -125,8 +203,12 @@ const walletSlice = createSlice({
   initialState,
   reducers: {
     setActiveWallet: (state, action: PayloadAction<string>) => {
+      console.log("🎯 Setting active wallet:", action.payload);
       const wallet = state.wallets.find((w) => w.id === action.payload);
-      if (wallet) {
+      if (
+        wallet &&
+        (!state.activeWallet || state.activeWallet.id !== wallet.id)
+      ) {
         // Reset all wallets to inactive
         state.wallets.forEach((w) => (w.isActive = false));
         // Set selected wallet as active
@@ -135,6 +217,10 @@ const walletSlice = createSlice({
 
         // Calculate total balance for active wallet
         state.totalBalance = wallet.balance;
+        console.log("✅ Active wallet set:", wallet.name);
+
+        // Clear tokens when switching wallets to trigger fresh fetch
+        state.tokens = [];
       }
     },
     clearError: (state) => {
@@ -175,6 +261,10 @@ const walletSlice = createSlice({
         wallet.name = name;
       }
     },
+    // Add action to clear tokens when switching wallets
+    clearTokens: (state) => {
+      state.tokens = [];
+    },
   },
   extraReducers: (builder) => {
     // Fetch wallets cases
@@ -185,28 +275,36 @@ const walletSlice = createSlice({
       })
       .addCase(fetchWallets.fulfilled, (state, action) => {
         state.loading = false;
-        state.wallets = action.payload.map((wallet: any) => ({
-          id: wallet._id.toString(),
-          name: wallet.walletName,
-          address: wallet.walletAddress,
-          balance: 0, // Will be updated separately
-          isActive: wallet.isDefault,
-        }));
 
-        // Set active wallet
-        const activeWallet = state.wallets.find((w) => w.isActive);
-        if (activeWallet) {
-          state.activeWallet = activeWallet;
-        } else if (state.wallets.length > 0) {
-          state.wallets[0].isActive = true;
-          state.activeWallet = state.wallets[0];
+        if (action.payload && Array.isArray(action.payload)) {
+          state.wallets = action.payload.map((wallet: any) => ({
+            id: wallet._id?.toString() || wallet.id,
+            name: wallet.walletName || wallet.name,
+            address: wallet.walletAddress || wallet.address,
+            balance: 0, // Will be updated separately
+            isActive: wallet.isDefault || false,
+          }));
+
+          // Set active wallet
+          const activeWallet = state.wallets.find((w) => w.isActive);
+          if (
+            activeWallet &&
+            (!state.activeWallet || state.activeWallet.id !== activeWallet.id)
+          ) {
+            state.activeWallet = activeWallet;
+          } else if (state.wallets.length > 0 && !state.activeWallet) {
+            state.wallets[0].isActive = true;
+            state.activeWallet = state.wallets[0];
+          }
         }
 
         state.error = null;
       })
       .addCase(fetchWallets.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        if (action.payload !== "Request already pending") {
+          state.error = action.payload as string;
+        }
       })
       // Create wallet cases
       .addCase(createWallet.pending, (state) => {
@@ -216,11 +314,11 @@ const walletSlice = createSlice({
       .addCase(createWallet.fulfilled, (state, action) => {
         state.loading = false;
         const newWallet: Wallet = {
-          id: action.payload._id.toString(),
-          name: action.payload.walletName,
-          address: action.payload.walletAddress,
+          id: action.payload._id?.toString() || action.payload.id,
+          name: action.payload.walletName || action.payload.name,
+          address: action.payload.walletAddress || action.payload.address,
           balance: 0,
-          isActive: action.payload.isDefault,
+          isActive: action.payload.isDefault || false,
         };
 
         if (newWallet.isActive) {
@@ -238,26 +336,54 @@ const walletSlice = createSlice({
       })
       // Fetch wallet tokens cases
       .addCase(fetchWalletTokens.pending, (state) => {
-        state.loading = true;
+        // Don't set loading if we already have tokens to prevent UI flicker
+        if (state.tokens.length === 0) {
+          state.loading = true;
+        }
         state.error = null;
       })
       .addCase(fetchWalletTokens.fulfilled, (state, action) => {
         state.loading = false;
-        state.tokens = action.payload.map((token: any) => ({
-          id: token.id || token._id?.toString(),
-          symbol: token.symbol,
-          name: token.name,
-          balance: token.balance,
-          value: token.value || 0,
-          change24h: token.change24h || 0,
-          icon: token.logoUrl || "/icons/default-token.svg",
-          price: token.price || 0,
-        }));
+
+        if (action.payload && action.payload.tokens) {
+          // Use real tokens from API response
+          state.tokens = action.payload.tokens.map((token: any) => ({
+            id: token.id || `${token.symbol}-${Date.now()}`,
+            symbol: token.symbol,
+            name: token.name,
+            balance: token.balance || 0,
+            value: token.value || 0,
+            change24h: token.change24h || 0,
+            icon: token.logoUrl || "/icons/default-token.svg",
+            price: token.price || 0,
+          }));
+
+          // Update total balance
+          state.totalBalance = state.tokens.reduce(
+            (total, token) => total + token.value,
+            0
+          );
+
+          console.log(
+            "📊 Tokens loaded:",
+            state.tokens.length,
+            "Total value:",
+            state.totalBalance
+          );
+        } else {
+          // No tokens returned from API
+          state.tokens = [];
+          state.totalBalance = 0;
+          console.log("📊 No tokens found for wallet");
+        }
+
         state.error = null;
       })
       .addCase(fetchWalletTokens.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        if (action.payload !== "Request already pending") {
+          state.error = action.payload as string;
+        }
       })
       // Update wallet balance cases
       .addCase(updateWalletBalance.fulfilled, (state, action) => {
@@ -265,7 +391,8 @@ const walletSlice = createSlice({
         const wallet = state.wallets.find((w) => w.address === walletAddress);
         if (wallet) {
           wallet.balance = balance;
-          if (wallet.isActive) {
+          if (wallet.isActive && state.tokens.length === 0) {
+            // If no tokens, use wallet balance as total balance
             state.totalBalance = balance;
           }
         }
@@ -283,12 +410,10 @@ const walletSlice = createSlice({
         });
 
         // Recalculate total balance
-        if (state.activeWallet) {
-          state.totalBalance = state.tokens.reduce(
-            (total, token) => total + token.value,
-            0
-          );
-        }
+        state.totalBalance = state.tokens.reduce(
+          (total, token) => total + token.value,
+          0
+        );
       });
   },
 });
@@ -301,6 +426,7 @@ export const {
   addToken,
   removeToken,
   updateWalletName,
+  clearTokens,
 } = walletSlice.actions;
 
 export default walletSlice.reducer;

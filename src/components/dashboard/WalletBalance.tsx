@@ -1,7 +1,7 @@
 "use client";
 
 import { useSelector, useDispatch } from "react-redux";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Copy, ChevronDown } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { openWalletSelector } from "@/store/slices/uiSlice";
@@ -13,9 +13,27 @@ export default function WalletBalance() {
     (state: RootState) => state.wallet
   );
 
+  // Use ref to prevent duplicate balance updates
+  const balanceLoaded = useRef<string | null>(null);
+
   useEffect(() => {
-    // Update wallet balance when component mounts or active wallet changes
-    if (activeWallet?.address) {
+    console.log("💰 WalletBalance - Effect triggered", {
+      activeWalletAddress: activeWallet?.address,
+      balanceLoadedFor: balanceLoaded.current,
+      shouldUpdate:
+        activeWallet?.address && balanceLoaded.current !== activeWallet.address,
+    });
+
+    // Only update balance if we have an active wallet and haven't already loaded balance for this wallet
+    if (
+      activeWallet?.address &&
+      balanceLoaded.current !== activeWallet.address
+    ) {
+      console.log(
+        "📡 WalletBalance - Updating balance for wallet:",
+        activeWallet.address
+      );
+      balanceLoaded.current = activeWallet.address;
       dispatch(updateWalletBalance(activeWallet.address));
     }
   }, [activeWallet?.address, dispatch]);
@@ -41,7 +59,7 @@ export default function WalletBalance() {
     dispatch(openWalletSelector());
   };
 
-  if (loading) {
+  if (loading && !activeWallet) {
     return (
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
         <div className="animate-pulse">
@@ -64,7 +82,12 @@ export default function WalletBalance() {
         {/* Address and Copy Button - Responsive */}
         <div className="flex items-center space-x-2 sm:space-x-3">
           <span className="text-gray-400 text-xs sm:text-sm font-satoshi truncate max-w-[150px] sm:max-w-none">
-            {activeWallet?.address || "No wallet selected"}
+            {activeWallet?.address
+              ? `${activeWallet.address.slice(
+                  0,
+                  6
+                )}...${activeWallet.address.slice(-4)}`
+              : "No wallet selected"}
           </span>
           {activeWallet?.address && (
             <button
@@ -79,10 +102,7 @@ export default function WalletBalance() {
       </div>
 
       {/* Wallet Selector - Click to change wallet */}
-      <div 
-        className="mb-4 cursor-pointer"
-        onClick={handleWalletClick}
-      >
+      <div className="mb-4 cursor-pointer" onClick={handleWalletClick}>
         <button className="flex items-center text-gray-400 hover:text-white transition-colors font-satoshi text-sm">
           <span className="mr-2">{activeWallet?.name || "Select Wallet"}</span>
           <ChevronDown size={16} />

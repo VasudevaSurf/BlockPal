@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { Bell, Settings } from "lucide-react";
@@ -25,48 +25,72 @@ export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
-  useEffect(() => {
-    console.log("Dashboard - Auth state:", {
-      isAuthenticated,
-      authLoading,
-      user,
-    });
+  // Use refs to track if we've already made initial calls
+  const authChecked = useRef(false);
+  const walletsLoaded = useRef(false);
+  const activeWalletSet = useRef(false);
 
-    // Only check auth status if not already authenticated and not loading
-    if (!isAuthenticated && !authLoading) {
-      console.log("Checking auth status...");
+  // Auth check effect - only run once
+  useEffect(() => {
+    console.log("🔍 Dashboard - Auth check effect");
+
+    if (!authChecked.current && !isAuthenticated && !authLoading) {
+      console.log("📡 Checking auth status...");
+      authChecked.current = true;
       dispatch(checkAuthStatus());
     }
   }, [dispatch, isAuthenticated, authLoading]);
 
+  // Redirect effect - separate from auth check
   useEffect(() => {
-    console.log("Dashboard - Auth effect:", { isAuthenticated, authLoading });
+    console.log("🚪 Dashboard - Redirect effect", {
+      isAuthenticated,
+      authLoading,
+      authChecked: authChecked.current,
+    });
 
-    // Only redirect if we're sure the user is not authenticated
-    if (!authLoading && !isAuthenticated) {
-      console.log("User not authenticated, redirecting to auth");
+    // Only redirect if auth check is complete and user is not authenticated
+    if (authChecked.current && !authLoading && !isAuthenticated) {
+      console.log("🔄 Redirecting to auth");
       router.push("/auth");
-      return;
     }
+  }, [isAuthenticated, authLoading, router]);
 
-    if (isAuthenticated && user) {
-      console.log("User authenticated, fetching wallets");
-      // Fetch user's wallets
+  // Wallets loading effect - only run when authenticated and not already loaded
+  useEffect(() => {
+    console.log("💼 Dashboard - Wallets effect", {
+      isAuthenticated,
+      user: !!user,
+      walletsLoaded: walletsLoaded.current,
+      walletsLength: wallets.length,
+    });
+
+    if (isAuthenticated && user && !walletsLoaded.current) {
+      console.log("📡 Fetching wallets...");
+      walletsLoaded.current = true;
       dispatch(fetchWallets());
     }
-  }, [isAuthenticated, authLoading, router, dispatch, user]);
+  }, [isAuthenticated, user, dispatch]);
 
+  // Set active wallet effect - only run when wallets are loaded and no active wallet
   useEffect(() => {
-    // Set first wallet as active if none is set
-    if (!activeWallet && wallets.length > 0) {
+    console.log("🎯 Dashboard - Active wallet effect", {
+      activeWallet: !!activeWallet,
+      walletsLength: wallets.length,
+      activeWalletSet: activeWalletSet.current,
+    });
+
+    if (!activeWallet && wallets.length > 0 && !activeWalletSet.current) {
+      console.log("🎯 Setting active wallet...");
+      activeWalletSet.current = true;
       const defaultWallet = wallets.find((w) => w.isActive) || wallets[0];
       dispatch(setActiveWallet(defaultWallet.id));
     }
   }, [activeWallet, wallets, dispatch]);
 
   // Show loading state while checking authentication
-  if (authLoading) {
-    console.log("Dashboard - Showing auth loading state");
+  if (authLoading || !authChecked.current) {
+    console.log("🔄 Dashboard - Showing auth loading state");
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F]">
         <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-[#E2AF19]"></div>
@@ -74,13 +98,13 @@ export default function DashboardPage() {
     );
   }
 
-  // Redirect if not authenticated (this should be handled by middleware, but keeping as backup)
+  // Redirect if not authenticated
   if (!isAuthenticated) {
-    console.log("Dashboard - User not authenticated, should redirect");
-    return null; // Will redirect in useEffect
+    console.log("🚪 Dashboard - User not authenticated, should redirect");
+    return null;
   }
 
-  console.log("Dashboard - Rendering main content");
+  console.log("🎨 Dashboard - Rendering main content");
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
@@ -191,7 +215,7 @@ export default function DashboardPage() {
       )}
 
       {/* Empty State for No Wallets */}
-      {!walletLoading && wallets.length === 0 && (
+      {!walletLoading && wallets.length === 0 && walletsLoaded.current && (
         <div className="flex flex-col items-center justify-center flex-1 text-center">
           <div className="w-16 h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
             <span className="text-gray-400 text-2xl">+</span>
