@@ -1,3 +1,4 @@
+// src/components/dashboard/Sidebar.tsx (UPDATED - Removed Wallet Section)
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";

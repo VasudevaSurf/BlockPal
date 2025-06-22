@@ -1,15 +1,18 @@
+// src/app/dashboard/page.tsx (UPDATED with Wallet Switcher)
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { Bell, Settings, LogOut } from "lucide-react";
+import { Bell, Settings, LogOut, Wallet, ChevronDown } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
 import { fetchWallets, setActiveWallet } from "@/store/slices/walletSlice";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
+import WalletSetupPrompt from "@/components/wallet/WalletSetupPrompt";
+import WalletSwitcher from "@/components/wallet/WalletSwitcher";
 
 export default function DashboardPage() {
   const {
@@ -24,6 +27,9 @@ export default function DashboardPage() {
   } = useSelector((state: RootState) => state.wallet);
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
+
+  // Wallet switcher state
+  const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
 
   // Use refs to track if we've already made initial calls
   const authChecked = useRef(false);
@@ -115,6 +121,23 @@ export default function DashboardPage() {
     return null;
   }
 
+  // Show wallet setup if no wallets exist
+  if (isAuthenticated && !walletLoading && wallets.length === 0) {
+    return <WalletSetupPrompt />;
+  }
+
+  const getWalletColor = (index: number) => {
+    const colors = [
+      "bg-gradient-to-br from-blue-400 to-cyan-400",
+      "bg-gradient-to-br from-purple-400 to-pink-400",
+      "bg-gradient-to-br from-green-400 to-emerald-400",
+      "bg-gradient-to-br from-orange-400 to-red-400",
+      "bg-gradient-to-br from-indigo-400 to-purple-400",
+    ];
+    const activeIndex = wallets.findIndex((w) => w.id === activeWallet?.id);
+    return colors[activeIndex % colors.length] || colors[0];
+  };
+
   console.log("🎨 Dashboard - Rendering main content");
 
   return (
@@ -131,9 +154,16 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
-          {/* Wallet Selector */}
-          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto">
-            <div className="w-6 h-6 lg:w-8 lg:h-8 bg-gradient-to-b from-blue-400 to-cyan-400 rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0">
+          {/* Wallet Selector - Clickable */}
+          <button
+            onClick={() => setWalletSwitcherOpen(true)}
+            className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto hover:border-[#E2AF19] transition-colors group"
+          >
+            <div
+              className={`w-6 h-6 lg:w-8 lg:h-8 ${getWalletColor(
+                0
+              )} rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0`}
+            >
               {/* Grid pattern overlay */}
               <div
                 className="absolute inset-0 rounded-full opacity-30"
@@ -144,8 +174,8 @@ export default function DashboardPage() {
                 }}
               ></div>
             </div>
-            <span className="text-white text-xs sm:text-sm font-satoshi mr-2 min-w-0 truncate">
-              {activeWallet?.name || "No Wallet"}
+            <span className="text-white text-xs sm:text-sm font-satoshi mr-2 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors">
+              {activeWallet?.name || "Loading..."}
             </span>
 
             {/* Divider */}
@@ -157,36 +187,45 @@ export default function DashboardPage() {
                     0,
                     6
                   )}...${activeWallet.address.slice(-4)}`
-                : "Select wallet"}
+                : "Loading..."}
             </span>
-          </div>
 
-          {/* Icons Container */}
-          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
-            <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
-              <Bell size={16} className="text-gray-400 lg:w-5 lg:h-5" />
-            </button>
+            {/* Dropdown Icon */}
+            <ChevronDown
+              size={14}
+              className="text-gray-400 group-hover:text-[#E2AF19] transition-colors lg:w-4 lg:h-4"
+            />
+          </button>
 
-            {/* Divider */}
-            <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+          {/* Action Icons Container */}
+          <div className="flex items-center space-x-3">
+            {/* Other Icons Container */}
+            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
+              <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
+                <Bell size={16} className="text-gray-400 lg:w-5 lg:h-5" />
+              </button>
 
-            <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
-              <Settings size={16} className="text-gray-400 lg:w-5 lg:h-5" />
-            </button>
+              {/* Divider */}
+              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
 
-            {/* Divider */}
-            <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+              <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
+                <Settings size={16} className="text-gray-400 lg:w-5 lg:h-5" />
+              </button>
 
-            <button
-              onClick={handleLogout}
-              className="p-1.5 lg:p-2 transition-colors hover:bg-red-600 hover:bg-opacity-20 rounded-full group"
-              title="Logout"
-            >
-              <LogOut
-                size={16}
-                className="text-gray-400 lg:w-5 lg:h-5 group-hover:text-red-400 transition-colors"
-              />
-            </button>
+              {/* Divider */}
+              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+
+              <button
+                onClick={handleLogout}
+                className="p-1.5 lg:p-2 transition-colors hover:bg-red-600 hover:bg-opacity-20 rounded-full group"
+                title="Logout"
+              >
+                <LogOut
+                  size={16}
+                  className="text-gray-400 lg:w-5 lg:h-5 group-hover:text-red-400 transition-colors"
+                />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -229,6 +268,12 @@ export default function DashboardPage() {
           <SwapSection />
         </div>
       </div>
+
+      {/* Wallet Switcher Modal */}
+      <WalletSwitcher
+        isOpen={walletSwitcherOpen}
+        onClose={() => setWalletSwitcherOpen(false)}
+      />
 
       <style jsx global>{`
         .scrollbar-hide {

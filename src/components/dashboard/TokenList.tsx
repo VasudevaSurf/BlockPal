@@ -1,3 +1,4 @@
+// src/components/dashboard/TokenList.tsx (UPDATED)
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -5,8 +6,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useEffect, useRef } from "react";
 import { RootState, AppDispatch } from "@/store";
 import { fetchWalletTokens } from "@/store/slices/walletSlice";
-
-// No sample data - only use real data from database
+import WalletRefreshButton from "@/components/wallet/WalletRefreshButton";
 
 export default function TokenList() {
   const router = useRouter();
@@ -66,6 +66,7 @@ export default function TokenList() {
       DOT: "bg-pink-500",
       USDT: "bg-green-500",
       USDC: "bg-blue-600",
+      YAI: "bg-yellow-500",
     };
 
     return colors[symbol] || "bg-gray-500";
@@ -84,13 +85,33 @@ export default function TokenList() {
       DOT: "●",
       USDT: "₮",
       USDC: "$",
+      YAI: "Ÿ",
     };
 
     return letters[symbol] || symbol.charAt(0);
   };
 
-  const handleTokenClick = (tokenId: string) => {
-    router.push(`/dashboard/token/${tokenId}`);
+  const handleTokenClick = (token: any) => {
+    // Use contract address for routing, handle native ETH case
+    const contractAddress =
+      token.contractAddress === "native" ? "ETH" : token.contractAddress;
+
+    // Debug logging
+    console.log("Token clicked:", {
+      tokenId: token.id,
+      symbol: token.symbol,
+      contractAddress: token.contractAddress,
+      routingAddress: contractAddress,
+    });
+
+    if (!contractAddress || contractAddress === "undefined") {
+      console.error("Invalid contract address for token:", token);
+      return;
+    }
+
+    router.push(
+      `/dashboard/token/${contractAddress}?wallet=${activeWallet?.address}`
+    );
   };
 
   // Only use real tokens from database
@@ -99,9 +120,12 @@ export default function TokenList() {
   if (loading && tokens.length === 0) {
     return (
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-        <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi flex-shrink-0">
-          Token Holdings
-        </h2>
+        <div className="flex items-center justify-between mb-4 lg:mb-6">
+          <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
+            Token Holdings
+          </h2>
+          <WalletRefreshButton />
+        </div>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center space-x-3">
@@ -124,9 +148,12 @@ export default function TokenList() {
   if (!activeWallet) {
     return (
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-        <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi flex-shrink-0">
-          Token Holdings
-        </h2>
+        <div className="flex items-center justify-between mb-4 lg:mb-6">
+          <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
+            Token Holdings
+          </h2>
+          <WalletRefreshButton />
+        </div>
         <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
           <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
             <span className="text-gray-400 text-lg lg:text-xl">₿</span>
@@ -142,11 +169,45 @@ export default function TokenList() {
     );
   }
 
+  if (displayTokens.length === 0 && !loading) {
+    return (
+      <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+        <div className="flex items-center justify-between mb-4 lg:mb-6">
+          <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
+            Token Holdings
+          </h2>
+          <WalletRefreshButton />
+        </div>
+        <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
+          <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+            <span className="text-gray-400 text-lg lg:text-xl">🪙</span>
+          </div>
+          <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+            No tokens found
+          </h3>
+          <p className="text-gray-400 font-satoshi text-sm lg:text-base mb-4">
+            This wallet doesn't have any tokens yet
+          </p>
+          <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 max-w-sm">
+            <p className="text-blue-400 text-sm font-satoshi">
+              💡 <strong>Tip:</strong> Send some tokens to your wallet address:{" "}
+              {activeWallet.address.slice(0, 8)}...
+              {activeWallet.address.slice(-6)}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-      <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi flex-shrink-0">
-        Token Holdings
-      </h2>
+      <div className="flex items-center justify-between mb-4 lg:mb-6">
+        <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
+          Token Holdings
+        </h2>
+        <WalletRefreshButton />
+      </div>
 
       {/* Mobile Grid Layout */}
       <div className="block sm:hidden flex-1 overflow-y-auto scrollbar-hide">
@@ -154,15 +215,32 @@ export default function TokenList() {
           {displayTokens.map((token) => (
             <div
               key={token.id}
-              onClick={() => handleTokenClick(token.id)}
+              onClick={() => handleTokenClick(token)}
               className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] cursor-pointer hover:bg-[#1A1A1A] transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
+                  {token.icon && token.icon.startsWith("http") ? (
+                    <img
+                      src={token.icon}
+                      alt={token.symbol}
+                      className="w-8 h-8 rounded-full mr-3 flex-shrink-0"
+                      onError={(e) => {
+                        // Fallback to colored circle if image fails
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                        target.nextElementSibling?.classList.remove("hidden");
+                      }}
+                    />
+                  ) : null}
                   <div
                     className={`w-8 h-8 ${getTokenIcon(
                       token.symbol
-                    )} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}
+                    )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
+                      token.icon && token.icon.startsWith("http")
+                        ? "hidden"
+                        : ""
+                    }`}
                   >
                     <span className="text-white text-sm font-medium">
                       {getTokenLetter(token.symbol)}
@@ -201,14 +279,29 @@ export default function TokenList() {
           {displayTokens.map((token) => (
             <div
               key={token.id}
-              onClick={() => handleTokenClick(token.id)}
+              onClick={() => handleTokenClick(token)}
               className="flex items-center justify-between p-3 hover:bg-[#1A1A1A] rounded-lg transition-colors cursor-pointer"
             >
               <div className="flex items-center min-w-0 flex-1">
+                {token.icon && token.icon.startsWith("http") ? (
+                  <img
+                    src={token.icon}
+                    alt={token.symbol}
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-3 flex-shrink-0"
+                    onError={(e) => {
+                      // Fallback to colored circle if image fails
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                      target.nextElementSibling?.classList.remove("hidden");
+                    }}
+                  />
+                ) : null}
                 <div
                   className={`w-8 h-8 sm:w-10 sm:h-10 ${getTokenIcon(
                     token.symbol
-                  )} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}
+                  )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
+                    token.icon && token.icon.startsWith("http") ? "hidden" : ""
+                  }`}
                 >
                   <span className="text-white text-sm font-medium">
                     {getTokenLetter(token.symbol)}

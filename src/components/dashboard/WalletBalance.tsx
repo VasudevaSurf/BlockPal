@@ -92,14 +92,6 @@ export default function WalletBalance() {
         </div>
       </div>
 
-      {/* Wallet Selector - Click to change wallet */}
-      <div className="mb-4 cursor-pointer" onClick={handleWalletClick}>
-        <button className="flex items-center text-gray-400 hover:text-white transition-colors font-satoshi text-sm">
-          <span className="mr-2">{activeWallet?.name || "Select Wallet"}</span>
-          <ChevronDown size={16} />
-        </button>
-      </div>
-
       {/* Balance Display - Responsive */}
       <div>
         {displayBalance > 0 ? (

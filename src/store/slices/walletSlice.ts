@@ -1,3 +1,4 @@
+// src/store/slices/walletSlice.ts (FIXED - Token Contract Address Mapping)
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { WalletState, Wallet, Token } from "@/types";
 
@@ -215,9 +216,14 @@ const walletSlice = createSlice({
         wallet.isActive = true;
         state.activeWallet = wallet;
 
+        // Store active wallet ID in localStorage for persistence
+        if (typeof window !== "undefined") {
+          localStorage.setItem("activeWalletId", wallet.id);
+        }
+
         // Calculate total balance for active wallet
         state.totalBalance = wallet.balance;
-        console.log("✅ Active wallet set:", wallet.name);
+        console.log("✅ Active wallet set:", wallet.name, "ID:", wallet.id);
 
         // Clear tokens when switching wallets to trigger fresh fetch
         state.tokens = [];
@@ -265,6 +271,12 @@ const walletSlice = createSlice({
     clearTokens: (state) => {
       state.tokens = [];
     },
+    // Add action to clear active wallet ID from localStorage
+    clearActiveWalletPersistence: () => {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("activeWalletId");
+      }
+    },
   },
   extraReducers: (builder) => {
     // Fetch wallets cases
@@ -285,16 +297,49 @@ const walletSlice = createSlice({
             isActive: wallet.isDefault || false,
           }));
 
-          // Set active wallet
-          const activeWallet = state.wallets.find((w) => w.isActive);
-          if (
-            activeWallet &&
-            (!state.activeWallet || state.activeWallet.id !== activeWallet.id)
-          ) {
-            state.activeWallet = activeWallet;
-          } else if (state.wallets.length > 0 && !state.activeWallet) {
-            state.wallets[0].isActive = true;
-            state.activeWallet = state.wallets[0];
+          // Try to restore previously active wallet from localStorage
+          let activeWalletSet = false;
+          if (typeof window !== "undefined") {
+            const savedActiveWalletId = localStorage.getItem("activeWalletId");
+            if (savedActiveWalletId) {
+              const savedWallet = state.wallets.find(
+                (w) => w.id === savedActiveWalletId
+              );
+              if (savedWallet) {
+                // Reset all wallets to inactive first
+                state.wallets.forEach((w) => (w.isActive = false));
+                // Set saved wallet as active
+                savedWallet.isActive = true;
+                state.activeWallet = savedWallet;
+                activeWalletSet = true;
+                console.log(
+                  "✅ Restored active wallet from localStorage:",
+                  savedWallet.name
+                );
+              }
+            }
+          }
+
+          // If no saved wallet or saved wallet not found, use default logic
+          if (!activeWalletSet) {
+            const activeWallet = state.wallets.find((w) => w.isActive);
+            if (
+              activeWallet &&
+              (!state.activeWallet || state.activeWallet.id !== activeWallet.id)
+            ) {
+              state.activeWallet = activeWallet;
+              // Save to localStorage
+              if (typeof window !== "undefined") {
+                localStorage.setItem("activeWalletId", activeWallet.id);
+              }
+            } else if (state.wallets.length > 0 && !state.activeWallet) {
+              state.wallets[0].isActive = true;
+              state.activeWallet = state.wallets[0];
+              // Save to localStorage
+              if (typeof window !== "undefined") {
+                localStorage.setItem("activeWalletId", state.wallets[0].id);
+              }
+            }
           }
         }
 
@@ -346,9 +391,9 @@ const walletSlice = createSlice({
         state.loading = false;
 
         if (action.payload && action.payload.tokens) {
-          // Use real tokens from API response
+          // FIXED: Use real tokens from API response with proper contract addresses
           state.tokens = action.payload.tokens.map((token: any) => ({
-            id: token.id || `${token.symbol}-${Date.now()}`,
+            id: token.contractAddress || `${token.symbol}-${Date.now()}`, // Use contract address as ID
             symbol: token.symbol,
             name: token.name,
             balance: token.balance || 0,
@@ -356,6 +401,8 @@ const walletSlice = createSlice({
             change24h: token.change24h || 0,
             icon: token.logoUrl || "/icons/default-token.svg",
             price: token.price || 0,
+            contractAddress: token.contractAddress, // CRITICAL: Include contract address
+            decimals: token.decimals || 18,
           }));
 
           // Update total balance
@@ -368,7 +415,12 @@ const walletSlice = createSlice({
             "📊 Tokens loaded:",
             state.tokens.length,
             "Total value:",
-            state.totalBalance
+            state.totalBalance,
+            "Tokens with contract addresses:",
+            state.tokens.map((t) => ({
+              symbol: t.symbol,
+              contractAddress: t.contractAddress,
+            }))
           );
         } else {
           // No tokens returned from API
@@ -427,6 +479,7 @@ export const {
   removeToken,
   updateWalletName,
   clearTokens,
+  clearActiveWalletPersistence,
 } = walletSlice.actions;
 
 export default walletSlice.reducer;
