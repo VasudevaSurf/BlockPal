@@ -1,6 +1,14 @@
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+import { connectToDatabase } from "@/lib/mongodb";
+
 export async function POST(request: NextRequest) {
   try {
     const { name, email, password } = await request.json();
+
+    console.log("Registration attempt for email:", email);
 
     const { db } = await connectToDatabase();
 
@@ -10,6 +18,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
+      console.log("User already exists:", email);
       return NextResponse.json(
         { error: "User already exists" },
         { status: 409 }
@@ -40,12 +49,16 @@ export async function POST(request: NextRequest) {
 
     const result = await db.collection("users").insertOne(newUser);
 
+    console.log("User created successfully:", email);
+
     // Create JWT token
     const token = jwt.sign(
       { userId: result.insertedId, username: newUser.username },
       process.env.JWT_SECRET || "your-secret-key",
       { expiresIn: "24h" }
     );
+
+    console.log("Registration token created:", !!token);
 
     const userData = {
       id: result.insertedId,
@@ -61,12 +74,16 @@ export async function POST(request: NextRequest) {
       token,
     });
 
+    // Set HTTP-only cookie with corrected settings
     response.cookies.set("auth-token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: "lax", // Changed from "strict" to "lax"
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: "/", // Explicitly set path
     });
+
+    console.log("Registration cookie set successfully");
 
     return response;
   } catch (error) {

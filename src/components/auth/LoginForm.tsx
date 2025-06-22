@@ -19,18 +19,51 @@ export default function LoginForm() {
 
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
-  const { loading, error, isAuthenticated } = useSelector(
+  const { loading, error, isAuthenticated, user } = useSelector(
     (state: RootState) => state.auth
   );
 
+  // Debug: Log all state changes
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push("/dashboard");
+    console.log("🔄 LoginForm State Change:", {
+      isAuthenticated,
+      loading,
+      user: user ? { id: user.id, email: user.email } : null,
+      error,
+    });
+  }, [isAuthenticated, loading, user, error]);
+
+  // Handle navigation when authenticated
+  useEffect(() => {
+    if (isAuthenticated && !loading && user) {
+      console.log("🚀 NAVIGATING TO DASHBOARD");
+      console.log("User authenticated:", user);
+
+      // Check if cookies are available
+      const cookies = document.cookie;
+      console.log("🍪 Current cookies:", cookies);
+
+      // Try multiple navigation methods
+      console.log("Method 1: window.location.href");
+      window.location.href = "/dashboard";
+
+      // Backup method
+      setTimeout(() => {
+        console.log("Method 2: router.push (backup)");
+        router.push("/dashboard");
+      }, 100);
+
+      // Last resort
+      setTimeout(() => {
+        console.log("Method 3: window.location.replace (last resort)");
+        window.location.replace("/dashboard");
+      }, 500);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, loading, user, router]);
 
   useEffect(() => {
     if (error) {
+      console.log("❌ Login error:", error);
       // Clear error after 5 seconds
       const timer = setTimeout(() => {
         dispatch(clearError());
@@ -59,11 +92,20 @@ export default function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log("🔐 LOGIN FORM SUBMISSION");
+    console.log("Email:", formData.email);
+    console.log("Password length:", formData.password.length);
+
     if (!validateForm()) {
+      console.log("❌ Form validation failed");
       return;
     }
 
+    console.log("✅ Form validation passed");
+
     try {
+      console.log("📤 Dispatching login action...");
+
       const result = await dispatch(
         loginUser({
           email: formData.email,
@@ -71,18 +113,42 @@ export default function LoginForm() {
         })
       );
 
+      console.log("📥 Login action result:", result);
+
       if (loginUser.fulfilled.match(result)) {
-        router.push("/dashboard");
+        console.log("✅ Login fulfilled successfully");
+        console.log("User data:", result.payload);
+
+        // Check cookies immediately after login
+        setTimeout(() => {
+          const cookies = document.cookie;
+          console.log("🍪 Cookies after login:", cookies);
+
+          // Check if auth-token exists
+          const hasAuthToken = cookies.includes("auth-token");
+          console.log("🍪 Auth token in cookies:", hasAuthToken);
+        }, 100);
+      } else if (loginUser.rejected.match(result)) {
+        console.log("❌ Login rejected:", result.error);
+      } else {
+        console.log("⚠️ Login result unclear:", result);
       }
     } catch (err) {
-      console.error("Login error:", err);
+      console.error("💥 Login error:", err);
     }
   };
 
   const handleGoogleLogin = () => {
-    // Implement Google OAuth login
     console.log("Google login not implemented yet");
   };
+
+  // Debug render
+  console.log("🎨 LoginForm rendering with state:", {
+    isAuthenticated,
+    loading,
+    hasUser: !!user,
+    hasError: !!error,
+  });
 
   return (
     <div className="w-full">
@@ -222,6 +288,14 @@ export default function LoginForm() {
           {loading ? "Logging in..." : "Login"}
         </Button>
       </form>
+
+      {/* Debug info */}
+      <div className="mt-4 p-2 bg-gray-800 rounded text-xs text-gray-300">
+        <div>Auth State: {isAuthenticated ? "✅" : "❌"}</div>
+        <div>Loading: {loading ? "⏳" : "✅"}</div>
+        <div>User: {user ? "✅" : "❌"}</div>
+        <div>Error: {error || "None"}</div>
+      </div>
     </div>
   );
 }

@@ -26,17 +26,31 @@ export default function DashboardPage() {
   const dispatch = useDispatch<AppDispatch>();
 
   useEffect(() => {
-    // Check authentication status on mount
-    dispatch(checkAuthStatus());
-  }, [dispatch]);
+    console.log("Dashboard - Auth state:", {
+      isAuthenticated,
+      authLoading,
+      user,
+    });
+
+    // Only check auth status if not already authenticated and not loading
+    if (!isAuthenticated && !authLoading) {
+      console.log("Checking auth status...");
+      dispatch(checkAuthStatus());
+    }
+  }, [dispatch, isAuthenticated, authLoading]);
 
   useEffect(() => {
+    console.log("Dashboard - Auth effect:", { isAuthenticated, authLoading });
+
+    // Only redirect if we're sure the user is not authenticated
     if (!authLoading && !isAuthenticated) {
+      console.log("User not authenticated, redirecting to auth");
       router.push("/auth");
       return;
     }
 
     if (isAuthenticated && user) {
+      console.log("User authenticated, fetching wallets");
       // Fetch user's wallets
       dispatch(fetchWallets());
     }
@@ -52,6 +66,7 @@ export default function DashboardPage() {
 
   // Show loading state while checking authentication
   if (authLoading) {
+    console.log("Dashboard - Showing auth loading state");
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F]">
         <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-[#E2AF19]"></div>
@@ -59,10 +74,13 @@ export default function DashboardPage() {
     );
   }
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (this should be handled by middleware, but keeping as backup)
   if (!isAuthenticated) {
+    console.log("Dashboard - User not authenticated, should redirect");
     return null; // Will redirect in useEffect
   }
+
+  console.log("Dashboard - Rendering main content");
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
