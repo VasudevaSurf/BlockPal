@@ -11,11 +11,9 @@ import {
   User,
   ExternalLink,
   Moon,
-  LogOut,
 } from "lucide-react";
 import { RootState } from "@/store";
 import { toggleTheme } from "@/store/slices/uiSlice";
-import { logoutUser } from "@/store/slices/authSlice";
 
 const menuItems = [
   {
@@ -54,13 +52,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useSelector((state: RootState) => state.auth);
-
-  const handleLogout = () => {
-    dispatch(logoutUser());
-    router.push("/auth");
-    onItemClick?.();
-     
-  };
 
   const handleNavigation = (href: string) => {
     router.push(href);
@@ -171,9 +162,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
           <button className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base">
             <User size={18} className="mr-3 flex-shrink-0" />
             <span className="truncate">User profile</span>
-            <div className="ml-auto flex-shrink-0">
-              <LogOut size={14} className="text-red-500" />
-            </div>
           </button>
 
           <button className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base">
@@ -195,15 +183,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 <div className="w-3 lg:w-4 h-3 lg:h-4 bg-white rounded-full absolute top-1 right-1"></div>
               </div>
             </div>
-          </button>
-
-          {/* Logout button - Mobile only */}
-          <button
-            onClick={handleLogout}
-            className="lg:hidden w-full flex items-center px-3 py-3 rounded-xl text-red-400 hover:bg-[#2C2C2C] hover:text-red-300 transition-all duration-200 font-satoshi text-sm"
-          >
-            <LogOut size={18} className="mr-3 flex-shrink-0" />
-            <span>Logout</span>
           </button>
         </div>
       </div>

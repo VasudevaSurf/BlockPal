@@ -6,6 +6,8 @@ import { useEffect, useRef } from "react";
 import { RootState, AppDispatch } from "@/store";
 import { fetchWalletTokens } from "@/store/slices/walletSlice";
 
+// No sample data - only use real data from database
+
 export default function TokenList() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -91,6 +93,9 @@ export default function TokenList() {
     router.push(`/dashboard/token/${tokenId}`);
   };
 
+  // Only use real tokens from database
+  const displayTokens = tokens;
+
   if (loading && tokens.length === 0) {
     return (
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
@@ -146,7 +151,7 @@ export default function TokenList() {
       {/* Mobile Grid Layout */}
       <div className="block sm:hidden flex-1 overflow-y-auto scrollbar-hide">
         <div className="grid grid-cols-1 gap-3 pr-2">
-          {tokens.map((token) => (
+          {displayTokens.map((token) => (
             <div
               key={token.id}
               onClick={() => handleTokenClick(token.id)}
@@ -193,7 +198,7 @@ export default function TokenList() {
       {/* Tablet/Desktop List Layout */}
       <div className="hidden sm:block flex-1 overflow-y-auto scrollbar-hide">
         <div className="space-y-3 pr-2">
-          {tokens.map((token) => (
+          {displayTokens.map((token) => (
             <div
               key={token.id}
               onClick={() => handleTokenClick(token.id)}
@@ -235,23 +240,6 @@ export default function TokenList() {
           ))}
         </div>
       </div>
-
-      {/* Empty State */}
-      {tokens.length === 0 &&
-        !loading &&
-        tokensLoaded.current === activeWallet?.address && (
-          <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-            <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-              <span className="text-gray-400 text-lg lg:text-xl">₿</span>
-            </div>
-            <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
-              No tokens found
-            </h3>
-            <p className="text-gray-400 font-satoshi text-sm lg:text-base">
-              Your tokens will appear here once detected
-            </p>
-          </div>
-        )}
 
       <style jsx global>{`
         .scrollbar-hide {

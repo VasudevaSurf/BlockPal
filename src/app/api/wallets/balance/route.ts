@@ -33,15 +33,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
     }
 
-    // For now, return a default balance
-    // In a real implementation, you would:
-    // 1. Connect to blockchain RPC
-    // 2. Get actual ETH/token balances
-    // 3. Calculate USD value using price APIs
-
-    const balance = 0; // Default balance
-
-    // You could also get balance from wallet_tokens collection
+    // Calculate total USD value from wallet tokens
     const walletTokens = await db
       .collection("wallet_tokens")
       .find({
@@ -50,12 +42,30 @@ export async function GET(request: NextRequest) {
       })
       .toArray();
 
-    // Calculate total USD value from tokens
     let totalValue = 0;
-    for (const token of walletTokens) {
-      totalValue +=
-        parseFloat(token.balanceFormatted || "0") * (token.priceUSD || 0);
+
+    if (walletTokens.length > 0) {
+      // Get token metadata for price information
+      const contractAddresses = walletTokens.map((wt) => wt.contractAddress);
+      const tokenMetadata = await db
+        .collection("tokens")
+        .find({
+          contractAddress: { $in: contractAddresses },
+        })
+        .toArray();
+
+      // Calculate total USD value
+      for (const token of walletTokens) {
+        const metadata = tokenMetadata.find(
+          (meta) => meta.contractAddress === token.contractAddress
+        );
+        const balance = parseFloat(token.balanceFormatted || "0");
+        const priceUSD = metadata?.priceUSD || 0;
+        totalValue += balance * priceUSD;
+      }
     }
+
+    console.log(`Wallet ${walletAddress} balance: $${totalValue.toFixed(2)}`);
 
     return NextResponse.json({
       balance: totalValue,

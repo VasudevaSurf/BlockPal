@@ -3,9 +3,9 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { Bell, Settings } from "lucide-react";
+import { Bell, Settings, LogOut } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
-import { checkAuthStatus } from "@/store/slices/authSlice";
+import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
 import { fetchWallets, setActiveWallet } from "@/store/slices/walletSlice";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
@@ -72,6 +72,17 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, user, dispatch]);
 
+  const handleLogout = async () => {
+    try {
+      await dispatch(logoutUser());
+      router.push("/auth");
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Force redirect even if logout fails
+      router.push("/auth");
+    }
+  };
+
   // Set active wallet effect - only run when wallets are loaded and no active wallet
   useEffect(() => {
     console.log("🎯 Dashboard - Active wallet effect", {
@@ -88,8 +99,8 @@ export default function DashboardPage() {
     }
   }, [activeWallet, wallets, dispatch]);
 
-  // Show loading state while checking authentication
-  if (authLoading || !authChecked.current) {
+  // Show loading state only while checking authentication OR if not authenticated yet
+  if (authLoading || (!isAuthenticated && !authChecked.current)) {
     console.log("🔄 Dashboard - Showing auth loading state");
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F]">
@@ -98,7 +109,7 @@ export default function DashboardPage() {
     );
   }
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (but don't show loading)
   if (!isAuthenticated) {
     console.log("🚪 Dashboard - User not authenticated, should redirect");
     return null;
@@ -162,76 +173,62 @@ export default function DashboardPage() {
             <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
               <Settings size={16} className="text-gray-400 lg:w-5 lg:h-5" />
             </button>
+
+            {/* Divider */}
+            <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+
+            <button
+              onClick={handleLogout}
+              className="p-1.5 lg:p-2 transition-colors hover:bg-red-600 hover:bg-opacity-20 rounded-full group"
+              title="Logout"
+            >
+              <LogOut
+                size={16}
+                className="text-gray-400 lg:w-5 lg:h-5 group-hover:text-red-400 transition-colors"
+              />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Loading State for Wallets */}
-      {walletLoading && (
-        <div className="flex items-center justify-center flex-1">
-          <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-[#E2AF19]"></div>
-        </div>
-      )}
-
-      {/* Main Content - Responsive Grid */}
-      {!walletLoading && (
-        <div className="flex flex-col xl:flex-row gap-4 lg:gap-6 flex-1 min-h-0">
-          {/* Mobile Layout - Scrollable */}
-          <div className="flex xl:hidden flex-col gap-4 lg:gap-6 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-            {/* Wallet Balance - Fixed at top */}
-            <div className="flex-shrink-0">
-              <WalletBalance />
-            </div>
-
-            {/* Token Holdings - Full content visible */}
-            <div className="flex-shrink-0">
-              <TokenList />
-            </div>
-
-            {/* Swap Section - Full content visible */}
-            <div className="flex-shrink-0">
-              <SwapSection />
-            </div>
+      {/* Main Content - Always show, even if wallets are loading */}
+      <div className="flex flex-col xl:flex-row gap-4 lg:gap-6 flex-1 min-h-0">
+        {/* Mobile Layout - Scrollable */}
+        <div className="flex xl:hidden flex-col gap-4 lg:gap-6 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+          {/* Wallet Balance - Fixed at top */}
+          <div className="flex-shrink-0">
+            <WalletBalance />
           </div>
 
-          {/* Desktop Layout - Same as before */}
-          <div className="hidden xl:flex flex-1 flex-col gap-6 min-w-0">
-            {/* Wallet Balance - Fixed height */}
-            <div className="flex-shrink-0">
-              <WalletBalance />
-            </div>
-
-            {/* Token Holdings - Takes remaining space */}
-            <div className="flex-1 min-h-0">
-              <TokenList />
-            </div>
+          {/* Token Holdings - Full content visible */}
+          <div className="flex-shrink-0">
+            <TokenList />
           </div>
 
-          {/* Right Column - Swap Section - Responsive width - Desktop only */}
-          <div className="hidden xl:block w-[400px] flex-shrink-0 h-full">
+          {/* Swap Section - Full content visible */}
+          <div className="flex-shrink-0">
             <SwapSection />
           </div>
         </div>
-      )}
 
-      {/* Empty State for No Wallets */}
-      {!walletLoading && wallets.length === 0 && walletsLoaded.current && (
-        <div className="flex flex-col items-center justify-center flex-1 text-center">
-          <div className="w-16 h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-            <span className="text-gray-400 text-2xl">+</span>
+        {/* Desktop Layout - Same as before */}
+        <div className="hidden xl:flex flex-1 flex-col gap-6 min-w-0">
+          {/* Wallet Balance - Fixed height */}
+          <div className="flex-shrink-0">
+            <WalletBalance />
           </div>
-          <h3 className="text-white text-lg font-satoshi mb-2">
-            No wallets found
-          </h3>
-          <p className="text-gray-400 font-satoshi text-center mb-6">
-            Add your first wallet to get started with managing your crypto
-            assets
-          </p>
-          <button className="bg-[#E2AF19] text-black px-6 py-3 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors">
-            Add Wallet
-          </button>
+
+          {/* Token Holdings - Takes remaining space */}
+          <div className="flex-1 min-h-0">
+            <TokenList />
+          </div>
         </div>
-      )}
+
+        {/* Right Column - Swap Section - Responsive width - Desktop only */}
+        <div className="hidden xl:block w-[400px] flex-shrink-0 h-full">
+          <SwapSection />
+        </div>
+      </div>
 
       <style jsx global>{`
         .scrollbar-hide {

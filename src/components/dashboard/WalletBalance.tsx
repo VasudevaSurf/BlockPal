@@ -59,17 +59,8 @@ export default function WalletBalance() {
     dispatch(openWalletSelector());
   };
 
-  if (loading && !activeWallet) {
-    return (
-      <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-700 rounded w-1/3 mb-4"></div>
-          <div className="h-8 bg-gray-700 rounded w-2/3 mb-2"></div>
-          <div className="h-4 bg-gray-700 rounded w-1/4"></div>
-        </div>
-      </div>
-    );
-  }
+  // Only use real balance from database
+  const displayBalance = totalBalance;
 
   return (
     <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
@@ -111,13 +102,28 @@ export default function WalletBalance() {
 
       {/* Balance Display - Responsive */}
       <div>
-        <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 font-satoshi">
-          {formatBalance(totalBalance)}
-        </div>
-        <div className="flex items-center text-sm">
-          <span className="text-green-400 mr-1 font-satoshi">+$177.56</span>
-          <span className="text-green-400 font-satoshi">(0.30%)</span>
-        </div>
+        {displayBalance > 0 ? (
+          <>
+            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 font-satoshi">
+              {formatBalance(displayBalance)}
+            </div>
+            <div className="flex items-center text-sm">
+              <span className="text-green-400 mr-1 font-satoshi">+$177.56</span>
+              <span className="text-green-400 font-satoshi">(0.30%)</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 font-satoshi">
+              {formatBalance(0)}
+            </div>
+            <div className="flex items-center text-sm">
+              <span className="text-gray-400 font-satoshi">
+                No balance available
+              </span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
