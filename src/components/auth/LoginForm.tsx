@@ -288,14 +288,6 @@ export default function LoginForm() {
           {loading ? "Logging in..." : "Login"}
         </Button>
       </form>
-
-      {/* Debug info */}
-      <div className="mt-4 p-2 bg-gray-800 rounded text-xs text-gray-300">
-        <div>Auth State: {isAuthenticated ? "✅" : "❌"}</div>
-        <div>Loading: {loading ? "⏳" : "✅"}</div>
-        <div>User: {user ? "✅" : "❌"}</div>
-        <div>Error: {error || "None"}</div>
-      </div>
     </div>
   );
 }
