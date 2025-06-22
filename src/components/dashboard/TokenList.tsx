@@ -1,12 +1,24 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useSelector } from "react-redux";
-import { RootState } from "@/store";
+import { useSelector, useDispatch } from "react-redux";
+import { useEffect } from "react";
+import { RootState, AppDispatch } from "@/store";
+import { fetchWalletTokens } from "@/store/slices/walletSlice";
 
 export default function TokenList() {
   const router = useRouter();
-  const { tokens } = useSelector((state: RootState) => state.wallet);
+  const dispatch = useDispatch<AppDispatch>();
+  const { tokens, activeWallet, loading } = useSelector(
+    (state: RootState) => state.wallet
+  );
+
+  useEffect(() => {
+    // Fetch tokens when active wallet changes
+    if (activeWallet?.address) {
+      dispatch(fetchWalletTokens(activeWallet.address));
+    }
+  }, [activeWallet?.address, dispatch]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -32,6 +44,8 @@ export default function TokenList() {
       AVAX: "bg-red-500",
       TON: "bg-blue-400",
       DOT: "bg-pink-500",
+      USDT: "bg-green-500",
+      USDC: "bg-blue-600",
     };
 
     return colors[symbol] || "bg-gray-500";
@@ -39,15 +53,17 @@ export default function TokenList() {
 
   const getTokenLetter = (symbol: string) => {
     const letters: Record<string, string> = {
-      ETH: "E",
-      SOL: "S",
-      BTC: "B",
-      SUI: "S",
-      XRP: "X",
-      ADA: "C",
+      ETH: "Ξ",
+      SOL: "◎",
+      BTC: "₿",
+      SUI: "~",
+      XRP: "✕",
+      ADA: "₳",
       AVAX: "A",
       TON: "T",
-      DOT: "P",
+      DOT: "●",
+      USDT: "₮",
+      USDC: "$",
     };
 
     return letters[symbol] || symbol.charAt(0);
@@ -56,6 +72,52 @@ export default function TokenList() {
   const handleTokenClick = (tokenId: string) => {
     router.push(`/dashboard/token/${tokenId}`);
   };
+
+  if (loading) {
+    return (
+      <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+        <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi flex-shrink-0">
+          Token Holdings
+        </h2>
+        <div className="animate-pulse space-y-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gray-700 rounded-full"></div>
+              <div className="flex-1">
+                <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+              </div>
+              <div className="text-right">
+                <div className="h-4 bg-gray-700 rounded w-16 mb-2"></div>
+                <div className="h-3 bg-gray-700 rounded w-12"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!activeWallet) {
+    return (
+      <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+        <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi flex-shrink-0">
+          Token Holdings
+        </h2>
+        <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
+          <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+            <span className="text-gray-400 text-lg lg:text-xl">₿</span>
+          </div>
+          <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+            No wallet selected
+          </h3>
+          <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+            Please select a wallet to view your tokens
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
@@ -155,6 +217,21 @@ export default function TokenList() {
           ))}
         </div>
       </div>
+
+      {/* Empty State */}
+      {tokens.length === 0 && !loading && (
+        <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
+          <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+            <span className="text-gray-400 text-lg lg:text-xl">₿</span>
+          </div>
+          <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+            No tokens found
+          </h3>
+          <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+            Your tokens will appear here once detected
+          </p>
+        </div>
+      )}
 
       <style jsx global>{`
         .scrollbar-hide {

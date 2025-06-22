@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import { loginSuccess } from "@/store/slices/authSlice";
+import { loginUser, clearError } from "@/store/slices/authSlice";
+import { RootState, AppDispatch } from "@/store";
 
 export default function LoginForm() {
   const [formData, setFormData] = useState({
@@ -14,52 +15,73 @@ export default function LoginForm() {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
+  const { loading, error, isAuthenticated } = useSelector(
+    (state: RootState) => state.auth
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, router]);
 
-    // Basic validation
-    const newErrors: Record<string, string> = {};
+  useEffect(() => {
+    if (error) {
+      // Clear error after 5 seconds
+      const timer = setTimeout(() => {
+        dispatch(clearError());
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, dispatch]);
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
 
     if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
+      errors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
+      errors.email = "Email is invalid";
     }
 
     if (!formData.password) {
-      newErrors.password = "Password is required";
+      errors.password = "Password is required";
     }
 
-    setErrors(newErrors);
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-    if (Object.keys(newErrors).length === 0) {
-      // Simulate login
-      const user = {
-        id: "1",
-        name: "User",
-        email: formData.email,
-      };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-      dispatch(loginSuccess(user));
-      router.push("/dashboard");
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      const result = await dispatch(
+        loginUser({
+          email: formData.email,
+          password: formData.password,
+        })
+      );
+
+      if (loginUser.fulfilled.match(result)) {
+        router.push("/dashboard");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
     }
   };
 
   const handleGoogleLogin = () => {
-    // Simulate Google login
-    const user = {
-      id: "1",
-      name: "Google User",
-      email: "user@gmail.com",
-    };
-
-    dispatch(loginSuccess(user));
-    router.push("/dashboard");
+    // Implement Google OAuth login
+    console.log("Google login not implemented yet");
   };
 
   return (
@@ -73,12 +95,19 @@ export default function LoginForm() {
         </p>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+          <p className="text-red-400 text-sm font-satoshi">{error}</p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <Button
           type="button"
           variant="secondary"
           className="w-full flex items-center justify-center py-3 font-satoshi"
           onClick={handleGoogleLogin}
+          disabled={loading}
         >
           <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
             <path
@@ -114,10 +143,16 @@ export default function LoginForm() {
           type="email"
           placeholder="Enter your email"
           value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          error={errors.email}
+          onChange={(e) => {
+            setFormData({ ...formData, email: e.target.value });
+            if (formErrors.email) {
+              setFormErrors({ ...formErrors, email: "" });
+            }
+          }}
+          error={formErrors.email}
           icon={<Mail size={20} />}
           className="font-satoshi"
+          disabled={loading}
         />
 
         <div className="relative">
@@ -125,17 +160,22 @@ export default function LoginForm() {
             type={showPassword ? "text" : "password"}
             placeholder="Enter your password"
             value={formData.password}
-            onChange={(e) =>
-              setFormData({ ...formData, password: e.target.value })
-            }
-            error={errors.password}
+            onChange={(e) => {
+              setFormData({ ...formData, password: e.target.value });
+              if (formErrors.password) {
+                setFormErrors({ ...formErrors, password: "" });
+              }
+            }}
+            error={formErrors.password}
             icon={<Lock size={20} />}
             className="font-satoshi"
+            disabled={loading}
           />
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
             onClick={() => setShowPassword(!showPassword)}
+            disabled={loading}
           >
             {showPassword ? (
               <EyeOff className="h-5 w-5 text-gray-400" />
@@ -153,6 +193,7 @@ export default function LoginForm() {
               type="checkbox"
               className="h-4 w-4 rounded focus:ring-2 bg-black border border-[#2C2C2C] text-[#E2AF19] focus:ring-[#E2AF19]"
               style={{ accentColor: "#E2AF19" }}
+              disabled={loading}
             />
             <label
               htmlFor="remember-me"
@@ -166,6 +207,7 @@ export default function LoginForm() {
             <button
               type="button"
               className="font-medium hover:opacity-80 text-[#E2AF19] font-satoshi"
+              disabled={loading}
             >
               Forgotten Password?
             </button>
@@ -175,8 +217,9 @@ export default function LoginForm() {
         <Button
           type="submit"
           className="w-full py-3 text-base font-semibold font-satoshi"
+          disabled={loading}
         >
-          Login
+          {loading ? "Logging in..." : "Login"}
         </Button>
       </form>
     </div>

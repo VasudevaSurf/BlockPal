@@ -8,12 +8,17 @@
     "build-with-lint": "next build",
     "build-no-lint": "SKIP_ENV_VALIDATION=true next build",
     "start": "next start",
+    "seed": "node scripts/seed-database.js",
     "lint": "next lint"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",
+    "bcryptjs": "^3.0.2",
     "clsx": "^2.1.1",
+    "ethers": "^6.14.4",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.515.0",
+    "mongodb": "^6.17.0",
     "next": "15.3.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -22,6 +27,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

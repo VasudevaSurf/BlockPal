@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import { registerSuccess } from "@/store/slices/authSlice";
+import { registerUser, clearError } from "@/store/slices/authSlice";
+import { RootState, AppDispatch } from "@/store";
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -17,62 +18,82 @@ export default function RegisterForm() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
+  const { loading, error, isAuthenticated } = useSelector(
+    (state: RootState) => state.auth
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, router]);
 
-    // Basic validation
-    const newErrors: Record<string, string> = {};
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        dispatch(clearError());
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, dispatch]);
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = "Full name is required";
+      errors.name = "Full name is required";
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
+      errors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
+      errors.email = "Email is invalid";
     }
 
     if (!formData.password) {
-      newErrors.password = "Password is required";
+      errors.password = "Password is required";
     } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+      errors.password = "Password must be at least 6 characters";
     }
 
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
+      errors.confirmPassword = "Passwords do not match";
     }
 
-    setErrors(newErrors);
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-    if (Object.keys(newErrors).length === 0) {
-      // Simulate registration
-      const user = {
-        id: "1",
-        name: formData.name,
-        email: formData.email,
-      };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-      dispatch(registerSuccess(user));
-      router.push("/dashboard");
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      const result = await dispatch(
+        registerUser({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        })
+      );
+
+      if (registerUser.fulfilled.match(result)) {
+        router.push("/dashboard");
+      }
+    } catch (err) {
+      console.error("Registration error:", err);
     }
   };
 
   const handleGoogleLogin = () => {
-    // Simulate Google login
-    const user = {
-      id: "1",
-      name: "Google User",
-      email: "user@gmail.com",
-    };
-
-    dispatch(registerSuccess(user));
-    router.push("/dashboard");
+    console.log("Google registration not implemented yet");
   };
 
   return (
@@ -86,12 +107,19 @@ export default function RegisterForm() {
         </p>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+          <p className="text-red-400 text-sm font-satoshi">{error}</p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <Button
           type="button"
           variant="secondary"
           className="w-full flex items-center justify-center py-3 font-satoshi"
           onClick={handleGoogleLogin}
+          disabled={loading}
         >
           <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
             <path
@@ -111,7 +139,7 @@ export default function RegisterForm() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          Login with Google
+          Register with Google
         </Button>
 
         <div className="relative">
@@ -127,20 +155,32 @@ export default function RegisterForm() {
           type="text"
           placeholder="Enter your full name"
           value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          error={errors.name}
+          onChange={(e) => {
+            setFormData({ ...formData, name: e.target.value });
+            if (formErrors.name) {
+              setFormErrors({ ...formErrors, name: "" });
+            }
+          }}
+          error={formErrors.name}
           icon={<User size={20} />}
           className="font-satoshi"
+          disabled={loading}
         />
 
         <Input
           type="email"
           placeholder="Enter your email"
           value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          error={errors.email}
+          onChange={(e) => {
+            setFormData({ ...formData, email: e.target.value });
+            if (formErrors.email) {
+              setFormErrors({ ...formErrors, email: "" });
+            }
+          }}
+          error={formErrors.email}
           icon={<Mail size={20} />}
           className="font-satoshi"
+          disabled={loading}
         />
 
         <div className="relative">
@@ -148,17 +188,22 @@ export default function RegisterForm() {
             type={showPassword ? "text" : "password"}
             placeholder="Create password"
             value={formData.password}
-            onChange={(e) =>
-              setFormData({ ...formData, password: e.target.value })
-            }
-            error={errors.password}
+            onChange={(e) => {
+              setFormData({ ...formData, password: e.target.value });
+              if (formErrors.password) {
+                setFormErrors({ ...formErrors, password: "" });
+              }
+            }}
+            error={formErrors.password}
             icon={<Lock size={20} />}
             className="font-satoshi"
+            disabled={loading}
           />
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
             onClick={() => setShowPassword(!showPassword)}
+            disabled={loading}
           >
             {showPassword ? (
               <EyeOff className="h-5 w-5 text-gray-400" />
@@ -173,17 +218,22 @@ export default function RegisterForm() {
             type={showConfirmPassword ? "text" : "password"}
             placeholder="Repeat password"
             value={formData.confirmPassword}
-            onChange={(e) =>
-              setFormData({ ...formData, confirmPassword: e.target.value })
-            }
-            error={errors.confirmPassword}
+            onChange={(e) => {
+              setFormData({ ...formData, confirmPassword: e.target.value });
+              if (formErrors.confirmPassword) {
+                setFormErrors({ ...formErrors, confirmPassword: "" });
+              }
+            }}
+            error={formErrors.confirmPassword}
             icon={<Lock size={20} />}
             className="font-satoshi"
+            disabled={loading}
           />
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            disabled={loading}
           >
             {showConfirmPassword ? (
               <EyeOff className="h-5 w-5 text-gray-400" />
@@ -196,8 +246,9 @@ export default function RegisterForm() {
         <Button
           type="submit"
           className="w-full py-3 text-base font-semibold font-satoshi"
+          disabled={loading}
         >
-          Create account
+          {loading ? "Creating account..." : "Create account"}
         </Button>
       </form>
     </div>

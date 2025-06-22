@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { RootState } from "@/store";
 import { toggleTheme } from "@/store/slices/uiSlice";
-import { logout } from "@/store/slices/authSlice";
+import { logoutUser } from "@/store/slices/authSlice";
 
 const menuItems = [
   {
@@ -56,9 +56,10 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
   const { user } = useSelector((state: RootState) => state.auth);
 
   const handleLogout = () => {
-    dispatch(logout());
+    dispatch(logoutUser());
     router.push("/auth");
     onItemClick?.();
+     
   };
 
   const handleNavigation = (href: string) => {
