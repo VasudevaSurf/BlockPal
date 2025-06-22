@@ -1,4 +1,4 @@
-// src/app/api/wallets/sync/route.ts
+// src/app/api/wallets/sync/route.ts (FIXED - Better Token Storage)
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { verifyToken } from "@/lib/auth";
@@ -41,11 +41,20 @@ export async function POST(request: NextRequest) {
       walletAddress
     );
 
+    console.log("📊 Portfolio data received:", {
+      ethBalance: portfolioData.ethBalance,
+      ethValueUSD: portfolioData.ethValueUSD,
+      tokenCount: portfolioData.tokens.length,
+      totalValueUSD: portfolioData.totalValueUSD,
+    });
+
     // Clear existing tokens for this wallet
     await db.collection("wallet_tokens").deleteMany({
       walletAddress,
       username: decoded.username,
     });
+
+    console.log("🗑️ Cleared existing wallet tokens");
 
     // Save ETH balance
     const ethToken = {
@@ -68,50 +77,72 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection("wallet_tokens").insertOne(ethToken);
+    console.log("✅ Saved ETH token");
 
-    // Save ERC-20 tokens
+    // Save ERC-20 tokens if any
     if (portfolioData.tokens.length > 0) {
-      const tokenDocuments = portfolioData.tokens.map((token) => ({
-        username: decoded.username,
-        walletAddress,
-        contractAddress: token.contractAddress,
-        symbol: token.symbol,
-        name: token.name,
-        balance: token.tokenBalance,
-        balanceFormatted: token.balanceFormatted,
-        decimals: token.decimals,
-        priceUSD: token.priceUSD,
-        valueUSD: token.valueUSD,
-        change24h: token.change24h,
-        logoUrl: token.logoUrl,
-        isFavorite: false,
-        isHidden: false,
-        lastUpdated: new Date(),
-      }));
+      const tokenDocuments = portfolioData.tokens.map((token) => {
+        console.log("💾 Preparing token for storage:", {
+          contractAddress: token.contractAddress,
+          symbol: token.symbol,
+          name: token.name,
+          balanceFormatted: token.balanceFormatted,
+          priceUSD: token.priceUSD,
+          valueUSD: token.valueUSD,
+        });
+
+        return {
+          username: decoded.username,
+          walletAddress,
+          contractAddress: token.contractAddress,
+          symbol: token.symbol || "UNKNOWN",
+          name: token.name || "Unknown Token",
+          balance: token.tokenBalance || "0",
+          balanceFormatted: token.balanceFormatted || "0",
+          decimals: token.decimals || 18,
+          priceUSD: token.priceUSD || 0,
+          valueUSD: token.valueUSD || 0,
+          change24h: token.change24h || 0,
+          logoUrl: token.logoUrl || null,
+          isFavorite: false,
+          isHidden: false,
+          lastUpdated: new Date(),
+        };
+      });
 
       await db.collection("wallet_tokens").insertMany(tokenDocuments);
+      console.log(`✅ Saved ${tokenDocuments.length} ERC-20 tokens`);
 
-      // Update token metadata
+      // Also save token metadata to tokens collection for future reference
       const tokenMetadata = portfolioData.tokens.map((token) => ({
         contractAddress: token.contractAddress,
-        symbol: token.symbol,
-        name: token.name,
-        decimals: token.decimals,
-        priceUSD: token.priceUSD,
-        change24h: token.change24h,
-        logoUrl: token.logoUrl,
+        symbol: token.symbol || "UNKNOWN",
+        name: token.name || "Unknown Token",
+        decimals: token.decimals || 18,
+        priceUSD: token.priceUSD || 0,
+        change24h: token.change24h || 0,
+        logoUrl: token.logoUrl || null,
         lastPriceUpdate: new Date(),
       }));
 
+      // Use upsert to avoid duplicates
       for (const metadata of tokenMetadata) {
-        await db
-          .collection("tokens")
-          .updateOne(
-            { contractAddress: metadata.contractAddress },
-            { $set: metadata },
-            { upsert: true }
-          );
+        try {
+          await db
+            .collection("tokens")
+            .updateOne(
+              { contractAddress: metadata.contractAddress },
+              { $set: metadata },
+              { upsert: true }
+            );
+        } catch (error) {
+          console.error("Error upserting token metadata:", error);
+        }
       }
+
+      console.log(
+        `✅ Updated token metadata for ${tokenMetadata.length} tokens`
+      );
     }
 
     console.log(
@@ -122,11 +153,16 @@ export async function POST(request: NextRequest) {
       success: true,
       tokensCount: portfolioData.tokens.length + 1, // +1 for ETH
       totalValue: portfolioData.totalValueUSD,
+      ethBalance: portfolioData.ethBalance,
+      ethValueUSD: portfolioData.ethValueUSD,
     });
   } catch (error) {
-    console.error("Sync wallet tokens error:", error);
+    console.error("💥 Sync wallet tokens error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

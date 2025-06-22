@@ -1,4 +1,4 @@
-// src/lib/crypto-integration.ts
+// src/lib/crypto-integration.ts (FIXED - BigInt handling)
 import { ethers } from "ethers";
 import axios from "axios";
 
@@ -35,6 +35,34 @@ export interface PortfolioSummary {
   ethBalance: number;
   ethValueUSD: number;
   tokens: TokenBalance[];
+}
+
+// Helper function to safely convert BigInt to string
+function safeBigIntToString(value: any): string {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  if (typeof value === "number") {
+    return value.toString();
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return String(value);
+}
+
+// Helper function to ensure all numeric values are properly converted
+function safeNumericConvert(value: any): number {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  if (typeof value === "string") {
+    return parseFloat(value);
+  }
+  if (typeof value === "number") {
+    return value;
+  }
+  return 0;
 }
 
 export class CryptoIntegrationService {
@@ -135,6 +163,8 @@ export class CryptoIntegrationService {
   // Get wallet tokens using Alchemy API
   async getWalletTokens(address: string): Promise<TokenBalance[]> {
     try {
+      console.log("🔍 Fetching tokens for address:", address);
+
       const response = await axios.post(
         `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
         {
@@ -150,10 +180,14 @@ export class CryptoIntegrationService {
           (token: any) => parseInt(token.tokenBalance, 16) > 0
         );
 
+        console.log(`📊 Found ${tokens.length} tokens with non-zero balance`);
+
         // Enrich with metadata
         const enrichedTokens = await Promise.all(
           tokens.map(async (token: any) => {
             try {
+              console.log(`🔧 Enriching token: ${token.contractAddress}`);
+
               const contract = new ethers.Contract(
                 token.contractAddress,
                 ERC20_ABI,
@@ -166,9 +200,15 @@ export class CryptoIntegrationService {
                 contract.decimals().catch(() => 18),
               ]);
 
+              // FIXED: Properly handle BigInt conversion
+              const decimalsSafe = safeNumericConvert(decimals);
               const balanceFormatted = ethers.formatUnits(
                 token.tokenBalance,
-                decimals
+                decimalsSafe
+              );
+
+              console.log(
+                `✅ Token metadata: ${symbol} (${name}), Balance: ${balanceFormatted}`
               );
 
               // Get price data
@@ -176,13 +216,13 @@ export class CryptoIntegrationService {
                 token.contractAddress
               );
 
-              return {
+              const enrichedToken = {
                 contractAddress: token.contractAddress,
-                tokenBalance: token.tokenBalance,
-                name,
-                symbol,
-                decimals,
-                balanceFormatted,
+                tokenBalance: safeBigIntToString(token.tokenBalance),
+                name: String(name),
+                symbol: String(symbol),
+                decimals: decimalsSafe,
+                balanceFormatted: String(balanceFormatted),
                 priceUSD: priceData?.current_price || 0,
                 valueUSD:
                   parseFloat(balanceFormatted) *
@@ -190,14 +230,22 @@ export class CryptoIntegrationService {
                 change24h: priceData?.price_change_percentage_24h || 0,
                 logoUrl: priceData?.image,
               };
+
+              console.log(
+                `💰 Token value: ${symbol} = $${enrichedToken.valueUSD.toFixed(
+                  2
+                )}`
+              );
+
+              return enrichedToken;
             } catch (error) {
               console.error(
-                `Error enriching token ${token.contractAddress}:`,
+                `❌ Error enriching token ${token.contractAddress}:`,
                 error
               );
               return {
                 contractAddress: token.contractAddress,
-                tokenBalance: token.tokenBalance,
+                tokenBalance: safeBigIntToString(token.tokenBalance),
                 name: "Unknown",
                 symbol: "UNKNOWN",
                 decimals: 18,
@@ -215,7 +263,7 @@ export class CryptoIntegrationService {
 
       return [];
     } catch (error) {
-      console.error("Error fetching wallet tokens:", error);
+      console.error("❌ Error fetching wallet tokens:", error);
       return [];
     }
   }
@@ -223,13 +271,19 @@ export class CryptoIntegrationService {
   // Calculate portfolio value
   async calculatePortfolioValue(address: string): Promise<PortfolioSummary> {
     try {
+      console.log("📊 Calculating portfolio value for:", address);
+
       // Get ETH balance and price
       const ethBalance = await this.getETHBalance(address);
       const ethBalanceFloat = parseFloat(ethBalance);
+      console.log(`🔷 ETH Balance: ${ethBalanceFloat}`);
 
       const ethPrice = await this.getTokenPrice("ethereum");
       const ethPriceUSD = ethPrice?.current_price || 0;
       const ethValueUSD = ethBalanceFloat * ethPriceUSD;
+      console.log(
+        `💎 ETH Price: $${ethPriceUSD}, Value: $${ethValueUSD.toFixed(2)}`
+      );
 
       // Get ERC-20 tokens
       const tokens = await this.getWalletTokens(address);
@@ -244,6 +298,13 @@ export class CryptoIntegrationService {
       const totalValueUSD = ethValueUSD + totalTokenValueUSD;
       const totalValueETH = ethPriceUSD > 0 ? totalValueUSD / ethPriceUSD : 0;
 
+      console.log(`💰 Portfolio Summary:`, {
+        totalValueUSD: totalValueUSD.toFixed(2),
+        ethBalance: ethBalanceFloat,
+        tokensCount: tokens.length,
+        totalTokenValueUSD: totalTokenValueUSD.toFixed(2),
+      });
+
       return {
         totalValueUSD,
         totalValueETH,
@@ -253,7 +314,7 @@ export class CryptoIntegrationService {
         tokens,
       };
     } catch (error) {
-      console.error("Error calculating portfolio value:", error);
+      console.error("❌ Error calculating portfolio value:", error);
       return {
         totalValueUSD: 0,
         totalValueETH: 0,
@@ -268,6 +329,8 @@ export class CryptoIntegrationService {
   // Get token price from CoinGecko
   async getTokenPrice(tokenId: string) {
     try {
+      console.log(`📈 Fetching price for token: ${tokenId}`);
+
       const response = await axios.get(
         `https://api.coingecko.com/api/v3/coins/${tokenId}`,
         {
@@ -277,7 +340,7 @@ export class CryptoIntegrationService {
         }
       );
 
-      return {
+      const priceData = {
         current_price: response.data.market_data.current_price.usd,
         price_change_percentage_24h:
           response.data.market_data.price_change_percentage_24h,
@@ -295,8 +358,11 @@ export class CryptoIntegrationService {
         subreddit_url: response.data.links?.subreddit_url || null,
         whitepaper: response.data.links?.whitepaper || null,
       };
+
+      console.log(`✅ Price fetched: ${tokenId} = $${priceData.current_price}`);
+      return priceData;
     } catch (error) {
-      console.error(`Could not fetch price for ${tokenId}:`, error);
+      console.error(`❌ Could not fetch price for ${tokenId}:`, error);
       return null;
     }
   }
@@ -304,6 +370,8 @@ export class CryptoIntegrationService {
   // Get token price by contract address
   async getTokenPriceByContract(contractAddress: string) {
     try {
+      console.log(`📈 Fetching price for contract: ${contractAddress}`);
+
       const response = await axios.get(
         `https://api.coingecko.com/api/v3/coins/ethereum/contract/${contractAddress}`,
         {
@@ -313,7 +381,7 @@ export class CryptoIntegrationService {
         }
       );
 
-      return {
+      const priceData = {
         id: response.data.id,
         current_price: response.data.market_data.current_price.usd,
         price_change_percentage_24h:
@@ -332,8 +400,16 @@ export class CryptoIntegrationService {
         subreddit_url: response.data.links?.subreddit_url || null,
         whitepaper: response.data.links?.whitepaper || null,
       };
+
+      console.log(
+        `✅ Contract price fetched: ${contractAddress} = $${priceData.current_price}`
+      );
+      return priceData;
     } catch (error) {
-      console.error(`Price data not available for ${contractAddress}:`, error);
+      console.error(
+        `❌ Price data not available for ${contractAddress}:`,
+        error
+      );
       return null;
     }
   }
@@ -341,6 +417,8 @@ export class CryptoIntegrationService {
   // Get price chart data
   async getPriceChart(tokenId: string, days: number = 7) {
     try {
+      console.log(`📊 Fetching chart data for ${tokenId}, ${days} days`);
+
       const response = await axios.get(
         `https://api.coingecko.com/api/v3/coins/${tokenId}/market_chart`,
         {
@@ -354,9 +432,14 @@ export class CryptoIntegrationService {
         }
       );
 
+      console.log(
+        `✅ Chart data fetched: ${
+          response.data.prices?.length || 0
+        } price points`
+      );
       return response.data;
     } catch (error) {
-      console.error(`Error fetching price chart for ${tokenId}:`, error);
+      console.error(`❌ Error fetching price chart for ${tokenId}:`, error);
       return null;
     }
   }
@@ -364,6 +447,12 @@ export class CryptoIntegrationService {
   // Get detailed token information
   async getTokenInfo(contractAddress: string, walletAddress: string) {
     try {
+      console.log(`🔍 Getting token info for contract: ${contractAddress}`);
+
+      if (!this.isValidAddress(contractAddress)) {
+        throw new Error(`Invalid contract address: ${contractAddress}`);
+      }
+
       const contract = new ethers.Contract(
         contractAddress,
         ERC20_ABI,
@@ -371,29 +460,69 @@ export class CryptoIntegrationService {
       );
 
       // Get basic token info
+      console.log("📋 Fetching basic token metadata...");
       const [name, symbol, decimals] = await Promise.all([
-        contract.name().catch(() => "Unknown"),
-        contract.symbol().catch(() => "UNKNOWN"),
-        contract.decimals().catch(() => 18),
+        contract.name().catch((e) => {
+          console.warn(`Failed to get name for ${contractAddress}:`, e.message);
+          return "Unknown";
+        }),
+        contract.symbol().catch((e) => {
+          console.warn(
+            `Failed to get symbol for ${contractAddress}:`,
+            e.message
+          );
+          return "UNKNOWN";
+        }),
+        contract.decimals().catch((e) => {
+          console.warn(
+            `Failed to get decimals for ${contractAddress}:`,
+            e.message
+          );
+          return 18;
+        }),
       ]);
 
+      // FIXED: Safely convert all values to avoid BigInt issues
+      const nameSafe = String(name);
+      const symbolSafe = String(symbol);
+      const decimalsSafe = safeNumericConvert(decimals);
+
+      console.log(
+        `✅ Token metadata: ${nameSafe} (${symbolSafe}), decimals: ${decimalsSafe}`
+      );
+
       // Get user balance
+      console.log("💰 Fetching user balance...");
       const balance = await contract.balanceOf(walletAddress);
-      const balanceFormatted = ethers.formatUnits(balance, decimals);
+      const balanceFormatted = ethers.formatUnits(balance, decimalsSafe);
+      console.log(`✅ User balance: ${balanceFormatted} ${symbolSafe}`);
 
       // Get price and market data
+      console.log("📈 Fetching price and market data...");
       const tokenData = await this.getTokenPriceByContract(contractAddress);
 
-      return {
-        name,
-        symbol,
-        contractAddress,
-        decimals,
-        balance: balanceFormatted,
+      const result = {
+        name: nameSafe,
+        symbol: symbolSafe,
+        contractAddress: contractAddress,
+        decimals: decimalsSafe,
+        balance: String(balanceFormatted),
         priceData: tokenData,
       };
+
+      console.log("✅ Token info complete:", {
+        name: result.name,
+        symbol: result.symbol,
+        balance: result.balance,
+        hasPrice: !!result.priceData,
+      });
+
+      return result;
     } catch (error) {
-      console.error("Error loading token information:", error);
+      console.error(
+        `❌ Error loading token information for ${contractAddress}:`,
+        error
+      );
       throw error;
     }
   }
