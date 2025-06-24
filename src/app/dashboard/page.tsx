@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx (UPDATED with Test Mode Support)
+// src/app/dashboard/page.tsx (FIXED - Better Test Mode Support)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -6,7 +6,11 @@ import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { Bell, Settings, LogOut, Wallet, ChevronDown } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
-import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
+import {
+  checkAuthStatus,
+  logoutUser,
+  setAuthenticated,
+} from "@/store/slices/authSlice";
 import {
   fetchWallets,
   setActiveWallet,
@@ -19,10 +23,16 @@ import WalletSetupPrompt from "@/components/wallet/WalletSetupPrompt";
 import WalletSwitcher from "@/components/wallet/WalletSwitcher";
 
 // Check if we're in test mode
-const isTestMode =
-  typeof window !== "undefined"
-    ? process.env.NEXT_PUBLIC_TEST_MODE === "true"
-    : process.env.NEXT_PUBLIC_TEST_MODE === "true";
+const isTestMode = process.env.NEXT_PUBLIC_TEST_MODE === "true";
+
+// Mock test user for test mode
+const testUser = {
+  id: "test-user-1",
+  name: "Test User",
+  email: "test@example.com",
+  displayName: "Test User",
+  username: "testuser",
+};
 
 export default function DashboardPage() {
   const {
@@ -44,13 +54,28 @@ export default function DashboardPage() {
   // Use refs to track if we've already made initial calls
   const authChecked = useRef(false);
   const walletsLoaded = useRef(false);
-  const activeWalletSet = useRef(false);
+  const testModeInitialized = useRef(false);
 
-  // Auth check effect - only run once (skip in test mode)
+  // Test mode initialization - run immediately
+  useEffect(() => {
+    if (isTestMode && !testModeInitialized.current) {
+      console.log("🧪 Test mode: Initializing immediately");
+      testModeInitialized.current = true;
+
+      // Set test user as authenticated
+      dispatch(setAuthenticated(testUser));
+
+      // Initialize test wallet
+      dispatch(initializeTestWallet());
+
+      console.log("🧪 Test mode: Initialization complete");
+    }
+  }, [dispatch]);
+
+  // Auth check effect - only run in production mode
   useEffect(() => {
     if (isTestMode) {
-      console.log("🧪 Test mode: Skipping auth check");
-      return;
+      return; // Skip auth check in test mode
     }
 
     console.log("🔍 Dashboard - Auth check effect");
@@ -62,7 +87,7 @@ export default function DashboardPage() {
     }
   }, [dispatch, isAuthenticated, authLoading]);
 
-  // Redirect effect - separate from auth check (skip in test mode)
+  // Redirect effect - only in production mode
   useEffect(() => {
     if (isTestMode) {
       return; // Skip redirect logic in test mode
@@ -81,29 +106,31 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, authLoading, router]);
 
-  // Wallets loading effect - only run when authenticated and not already loaded
+  // Wallets loading effect - run when authenticated or in test mode
   useEffect(() => {
+    const shouldLoadWallets = isTestMode || (isAuthenticated && user);
+
     console.log("💼 Dashboard - Wallets effect", {
-      isAuthenticated: isTestMode || isAuthenticated,
-      user: isTestMode || !!user,
+      isTestMode,
+      isAuthenticated,
+      user: !!user,
       walletsLoaded: walletsLoaded.current,
       walletsLength: wallets.length,
-      isTestMode,
+      shouldLoadWallets,
     });
 
-    // In test mode, we don't need auth check - load wallets immediately
-    if ((isTestMode || (isAuthenticated && user)) && !walletsLoaded.current) {
-      console.log("📡 Fetching wallets...");
+    if (shouldLoadWallets && !walletsLoaded.current) {
+      console.log("📡 Loading wallets...");
       walletsLoaded.current = true;
 
       if (isTestMode) {
-        console.log("🧪 Test mode: Initializing test wallet");
-        dispatch(initializeTestWallet());
+        console.log("🧪 Test mode: Test wallet should already be initialized");
+        // Test wallet is already initialized in the first effect
       } else {
         dispatch(fetchWallets());
       }
     }
-  }, [isAuthenticated, user, dispatch]);
+  }, [isAuthenticated, user, dispatch, wallets.length]);
 
   const handleLogout = async () => {
     if (isTestMode) {
@@ -127,18 +154,16 @@ export default function DashboardPage() {
     console.log("🎯 Dashboard - Active wallet effect", {
       activeWallet: !!activeWallet,
       walletsLength: wallets.length,
-      activeWalletSet: activeWalletSet.current,
     });
 
-    if (!activeWallet && wallets.length > 0 && !activeWalletSet.current) {
+    if (!activeWallet && wallets.length > 0) {
       console.log("🎯 Setting active wallet...");
-      activeWalletSet.current = true;
       const defaultWallet = wallets.find((w) => w.isActive) || wallets[0];
       dispatch(setActiveWallet(defaultWallet.id));
     }
   }, [activeWallet, wallets, dispatch]);
 
-  // Show loading state only while checking authentication OR if not authenticated yet (skip in test mode)
+  // Show loading state only in production mode
   if (
     !isTestMode &&
     (authLoading || (!isAuthenticated && !authChecked.current))
@@ -179,7 +204,12 @@ export default function DashboardPage() {
     return colors[activeIndex % colors.length] || colors[0];
   };
 
-  console.log("🎨 Dashboard - Rendering main content", { isTestMode });
+  console.log("🎨 Dashboard - Rendering main content", {
+    isTestMode,
+    isAuthenticated: isTestMode || isAuthenticated,
+    walletsCount: wallets.length,
+    activeWallet: activeWallet?.name,
+  });
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">

@@ -1,3 +1,4 @@
+// src/store/slices/authSlice.ts (FIXED - Test Mode Support)
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { AuthState, User } from "@/types";
 
@@ -8,6 +9,9 @@ const initialState: AuthState = {
   error: null,
 };
 
+// Check if we're in test mode
+const isTestMode = process.env.NEXT_PUBLIC_TEST_MODE === "true";
+
 // Async thunks for API calls
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
@@ -15,6 +19,18 @@ export const loginUser = createAsyncThunk(
     credentials: { email: string; password: string },
     { rejectWithValue }
   ) => {
+    // Skip API call in test mode
+    if (isTestMode) {
+      console.log("🧪 Test mode: Simulating login");
+      return {
+        id: "test-user-1",
+        name: "Test User",
+        email: credentials.email,
+        displayName: "Test User",
+        username: "testuser",
+      };
+    }
+
     try {
       console.log("🔐 Redux: Starting login request");
 
@@ -63,6 +79,18 @@ export const registerUser = createAsyncThunk(
     userData: { name: string; email: string; password: string },
     { rejectWithValue }
   ) => {
+    // Skip API call in test mode
+    if (isTestMode) {
+      console.log("🧪 Test mode: Simulating registration");
+      return {
+        id: "test-user-1",
+        name: userData.name,
+        email: userData.email,
+        displayName: userData.name,
+        username: "testuser",
+      };
+    }
+
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
@@ -89,6 +117,12 @@ export const registerUser = createAsyncThunk(
 export const logoutUser = createAsyncThunk(
   "auth/logoutUser",
   async (_, { rejectWithValue }) => {
+    // Skip API call in test mode
+    if (isTestMode) {
+      console.log("🧪 Test mode: Simulating logout");
+      return null;
+    }
+
     try {
       const response = await fetch("/api/auth/logout", {
         method: "POST",
@@ -109,6 +143,18 @@ export const logoutUser = createAsyncThunk(
 export const checkAuthStatus = createAsyncThunk(
   "auth/checkAuthStatus",
   async (_, { rejectWithValue }) => {
+    // Skip API call in test mode
+    if (isTestMode) {
+      console.log("🧪 Test mode: Simulating auth check - returning test user");
+      return {
+        id: "test-user-1",
+        name: "Test User",
+        email: "test@example.com",
+        displayName: "Test User",
+        username: "testuser",
+      };
+    }
+
     try {
       console.log("🔍 Redux: Checking auth status");
 
@@ -146,8 +192,9 @@ const authSlice = createSlice({
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
-    // Add manual authentication setter
+    // Add manual authentication setter (useful for test mode)
     setAuthenticated: (state, action: PayloadAction<User>) => {
+      console.log("🎯 Redux: Manual authentication set", action.payload);
       state.isAuthenticated = true;
       state.user = action.payload;
       state.error = null;
@@ -155,6 +202,7 @@ const authSlice = createSlice({
     },
     // Add manual logout
     setUnauthenticated: (state) => {
+      console.log("🚪 Redux: Manual unauthentication set");
       state.isAuthenticated = false;
       state.user = null;
       state.error = null;

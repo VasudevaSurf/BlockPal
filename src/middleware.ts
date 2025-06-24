@@ -1,5 +1,9 @@
+// src/middleware.ts (FIXED - Test Mode Support)
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+
+// Check if we're in test mode
+const isTestMode = process.env.NEXT_PUBLIC_TEST_MODE === "true";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -30,7 +34,17 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  console.log("Middleware processing:", pathname);
+  console.log(
+    "Middleware processing:",
+    pathname,
+    isTestMode ? "(TEST MODE)" : ""
+  );
+
+  // In test mode, allow all routes without authentication
+  if (isTestMode) {
+    console.log("🧪 Test mode: Allowing all routes");
+    return NextResponse.next();
+  }
 
   // Public paths that don't require authentication
   const publicPaths = ["/", "/auth"];
