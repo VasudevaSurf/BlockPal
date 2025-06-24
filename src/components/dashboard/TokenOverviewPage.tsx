@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenOverviewPage.tsx (ENHANCED)
+// src/components/dashboard/TokenOverviewPage.tsx (ENHANCED WITH SIMPLE TRANSFER)
 "use client";
 
 import { useEffect, useState } from "react";
@@ -22,6 +22,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { RootState } from "@/store";
+import SimpleTransferModal from "@/components/transfer/SimpleTransferModal";
 
 interface TokenInfo {
   name: string;
@@ -69,6 +70,7 @@ export default function TokenOverviewPage() {
   const [chartLoading, setChartLoading] = useState(false);
   const [selectedTimeframe, setSelectedTimeframe] = useState(7);
   const [copied, setCopied] = useState<string>("");
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
 
   const contractAddress = params.tokenId as string;
   const walletAddress = searchParams.get("wallet") || activeWallet?.address;
@@ -153,6 +155,7 @@ export default function TokenOverviewPage() {
       USDT: "bg-green-500",
       USDC: "bg-blue-600",
       YAI: "bg-yellow-500",
+      LINK: "bg-blue-700",
     };
     return colors[symbol] || "bg-gray-500";
   };
@@ -171,6 +174,7 @@ export default function TokenOverviewPage() {
       USDT: "₮",
       USDC: "$",
       YAI: "Ÿ",
+      LINK: "⛓",
     };
     return letters[symbol] || symbol.charAt(0);
   };
@@ -639,8 +643,11 @@ export default function TokenOverviewPage() {
 
           {/* Action Buttons */}
           <div className="flex gap-3">
-            <button className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi">
-              Swap
+            <button
+              onClick={() => setTransferModalOpen(true)}
+              className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi"
+            >
+              Send {tokenInfo.symbol}
             </button>
             <button className="bg-[#4B3A08] text-[#E2AF19] p-3 rounded-xl hover:bg-[#5A4509] transition-colors">
               <Send size={16} />
@@ -1123,8 +1130,11 @@ export default function TokenOverviewPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-3">
-                <button className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi">
-                  Swap
+                <button
+                  onClick={() => setTransferModalOpen(true)}
+                  className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi"
+                >
+                  Send {tokenInfo.symbol}
                 </button>
                 <button className="bg-[#4B3A08] text-[#E2AF19] p-3 rounded-xl hover:bg-[#5A4509] transition-colors">
                   <Send size={16} />
@@ -1177,6 +1187,23 @@ export default function TokenOverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* SimpleTransfer Modal */}
+      {tokenInfo && (
+        <SimpleTransferModal
+          isOpen={transferModalOpen}
+          onClose={() => setTransferModalOpen(false)}
+          tokenInfo={{
+            name: tokenInfo.name,
+            symbol: tokenInfo.symbol,
+            contractAddress: tokenInfo.contractAddress,
+            decimals: tokenInfo.decimals,
+            balance: tokenInfo.balance,
+            priceData: tokenInfo.priceData || undefined,
+          }}
+          walletAddress={walletAddress || ""}
+        />
+      )}
 
       <style>{`
         .scrollbar-hide {
