@@ -1,4 +1,4 @@
-// src/lib/crypto-integration.ts (FIXED - Test Mode Address Validation)
+// src/lib/crypto-integration.ts (UPDATED - Real Test Tokens from Sepolia)
 import { ethers } from "ethers";
 import axios from "axios";
 
@@ -13,39 +13,49 @@ const isTestMode =
     ? process.env.NEXT_PUBLIC_TEST_MODE === "true"
     : process.env.NEXT_PUBLIC_TEST_MODE === "true";
 
-// Test wallet data based on your JS output
+// Known Sepolia testnet ERC20 tokens (these are real testnet contracts)
+const SEPOLIA_TEST_TOKENS = {
+  // Chainlink LINK token on Sepolia
+  LINK: {
+    contractAddress: "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+    symbol: "LINK",
+    name: "ChainLink Token",
+    decimals: 18,
+    logoUrl: "https://cryptologos.cc/logos/chainlink-link-logo.png",
+  },
+  // USDC on Sepolia
+  USDC: {
+    contractAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    symbol: "USDC",
+    name: "USD Coin",
+    decimals: 6,
+    logoUrl: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png",
+  },
+  // DAI on Sepolia
+  DAI: {
+    contractAddress: "0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6",
+    symbol: "DAI",
+    name: "Dai Stablecoin",
+    decimals: 18,
+    logoUrl: "https://cryptologos.cc/logos/multi-collateral-dai-dai-logo.png",
+  },
+  // Uniswap Token on Sepolia
+  UNI: {
+    contractAddress: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+    symbol: "UNI",
+    name: "Uniswap",
+    decimals: 18,
+    logoUrl: "https://cryptologos.cc/logos/uniswap-uni-logo.png",
+  },
+};
+
+// Test wallet data - you can update this with your real test wallet
 const testWalletData = {
-  address: "0x3750E833ba248459e8355A4A90Bb5531F6476c30",
+  address: "0x3750E833ba248459e8355A4A90Bb5531F6476c30", // Your test wallet address
   privateKey:
-    "c1fcde81f943602b92f11121d426b8b499f2f52a24468894ad058ec5f9931b23",
-  ethBalance: 0.050961,
+    "c1fcde81f943602b92f11121d426b8b499f2f52a24468894ad058ec5f9931b23", // Your test wallet private key
+  ethBalance: 0.050961, // Real ETH balance from Sepolia faucet
   ethPriceUSD: 2000, // Mock price for ETH
-  tokens: [
-    {
-      contractAddress: "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238",
-      symbol: "USDC",
-      name: "USDC",
-      balance: "360273450", // Raw balance with decimals
-      balanceFormatted: "360.273450",
-      decimals: 6,
-      priceUSD: 1.0,
-      valueUSD: 360.27,
-      change24h: 0.01,
-      logoUrl: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png",
-    },
-    {
-      contractAddress: "0x779877a7b0d9e8603169ddbd7836e478b4624789",
-      symbol: "LINK",
-      name: "ChainLink Token",
-      balance: "10000000000000000000", // 10 LINK with 18 decimals
-      balanceFormatted: "10.000000",
-      decimals: 18,
-      priceUSD: 15.0,
-      valueUSD: 150.0,
-      change24h: -2.34,
-      logoUrl: "https://cryptologos.cc/logos/chainlink-link-logo.png",
-    },
-  ],
 };
 
 // ERC-20 Token ABI (minimal)
@@ -108,18 +118,32 @@ function safeNumericConvert(value: any): number {
 
 export class CryptoIntegrationService {
   private provider: ethers.JsonRpcProvider;
+  private sepoliaProvider: ethers.JsonRpcProvider;
 
   constructor() {
+    // Mainnet provider
     this.provider = new ethers.JsonRpcProvider(
       `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
     );
 
+    // Sepolia testnet provider
+    this.sepoliaProvider = new ethers.JsonRpcProvider(
+      `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+    );
+
     if (isTestMode) {
-      console.log("🧪 CRYPTO SERVICE RUNNING IN TEST MODE");
+      console.log(
+        "🧪 CRYPTO SERVICE RUNNING IN TEST MODE - Using Sepolia Testnet"
+      );
     }
   }
 
-  // FIXED: Validation functions - separate wallet and contract validation
+  // Get the appropriate provider based on test mode
+  private getProvider(): ethers.JsonRpcProvider {
+    return isTestMode ? this.sepoliaProvider : this.provider;
+  }
+
+  // Validation functions
   isValidAddress(address: string): boolean {
     try {
       return ethers.isAddress(address);
@@ -137,8 +161,8 @@ export class CryptoIntegrationService {
 
   isValidContractAddress(address: string): boolean {
     if (isTestMode) {
-      // In test mode, check if it's one of our test token contracts
-      const validTestContracts = testWalletData.tokens.map((t) =>
+      // In test mode, check if it's one of our known Sepolia test tokens
+      const validTestContracts = Object.values(SEPOLIA_TEST_TOKENS).map((t) =>
         t.contractAddress.toLowerCase()
       );
       return validTestContracts.includes(address.toLowerCase());
@@ -215,19 +239,26 @@ export class CryptoIntegrationService {
     };
   }
 
-  // Get ETH balance
+  // Get ETH balance (works on both mainnet and Sepolia)
   async getETHBalance(address: string): Promise<string> {
-    if (isTestMode) {
-      if (address === testWalletData.address) {
+    if (isTestMode && address === testWalletData.address) {
+      // In test mode, get real balance from Sepolia
+      try {
+        const balance = await this.sepoliaProvider.getBalance(address);
+        const balanceInEth = ethers.formatEther(balance);
         console.log(
-          `🧪 TEST ETH Balance for ${address}: ${testWalletData.ethBalance}`
+          `🧪 TEST ETH Balance from Sepolia for ${address}: ${balanceInEth}`
         );
-        return testWalletData.ethBalance.toString();
+        return balanceInEth;
+      } catch (error) {
+        console.error("❌ Error getting Sepolia ETH balance:", error);
+        return testWalletData.ethBalance.toString(); // Fallback to stored value
       }
-      return "0";
     }
+
     try {
-      const balance = await this.provider.getBalance(address);
+      const provider = this.getProvider();
+      const balance = await provider.getBalance(address);
       return ethers.formatEther(balance);
     } catch (error) {
       console.error("Error getting ETH balance:", error);
@@ -235,30 +266,94 @@ export class CryptoIntegrationService {
     }
   }
 
-  // Get wallet tokens using Test Mode or Alchemy API
+  // Get wallet tokens from real Sepolia testnet in test mode
   async getWalletTokens(address: string): Promise<TokenBalance[]> {
     if (isTestMode) {
       if (address !== testWalletData.address) {
         return [];
       }
 
-      console.log("🔍 Fetching TEST tokens for address:", address);
-      console.log(`📊 Found ${testWalletData.tokens.length} test tokens`);
+      console.log("🔍 Fetching REAL Sepolia tokens for address:", address);
 
-      return testWalletData.tokens.map((token) => ({
-        contractAddress: token.contractAddress,
-        tokenBalance: token.balance,
-        symbol: token.symbol,
-        name: token.name,
-        decimals: token.decimals,
-        balanceFormatted: token.balanceFormatted,
-        priceUSD: token.priceUSD,
-        valueUSD: token.valueUSD,
-        change24h: token.change24h,
-        logoUrl: token.logoUrl,
-      }));
+      try {
+        const tokens: TokenBalance[] = [];
+
+        // Check balance for each known Sepolia test token
+        for (const [tokenKey, tokenInfo] of Object.entries(
+          SEPOLIA_TEST_TOKENS
+        )) {
+          try {
+            console.log(
+              `🔧 Checking balance for ${tokenInfo.symbol} (${tokenInfo.contractAddress})`
+            );
+
+            const contract = new ethers.Contract(
+              tokenInfo.contractAddress,
+              ERC20_ABI,
+              this.sepoliaProvider
+            );
+
+            // Get token balance
+            const balance = await contract.balanceOf(address);
+            const balanceFormatted = ethers.formatUnits(
+              balance,
+              tokenInfo.decimals
+            );
+            const balanceFloat = parseFloat(balanceFormatted);
+
+            console.log(`💰 ${tokenInfo.symbol} balance: ${balanceFormatted}`);
+
+            // Only include tokens with non-zero balance
+            if (balanceFloat > 0) {
+              // Mock price data for test tokens
+              const mockPriceUSD =
+                tokenInfo.symbol === "USDC" || tokenInfo.symbol === "DAI"
+                  ? 1.0
+                  : tokenInfo.symbol === "LINK"
+                  ? 15.0
+                  : tokenInfo.symbol === "UNI"
+                  ? 8.0
+                  : 1.0;
+
+              const valueUSD = balanceFloat * mockPriceUSD;
+
+              tokens.push({
+                contractAddress: tokenInfo.contractAddress,
+                tokenBalance: safeBigIntToString(balance),
+                symbol: tokenInfo.symbol,
+                name: tokenInfo.name,
+                decimals: tokenInfo.decimals,
+                balanceFormatted: balanceFormatted,
+                priceUSD: mockPriceUSD,
+                valueUSD: valueUSD,
+                change24h: Math.random() * 10 - 5, // Random change between -5% to +5%
+                logoUrl: tokenInfo.logoUrl,
+              });
+
+              console.log(
+                `✅ Added ${tokenInfo.symbol}: $${valueUSD.toFixed(2)}`
+              );
+            }
+          } catch (error) {
+            console.error(
+              `❌ Error checking ${tokenInfo.symbol} balance:`,
+              error
+            );
+            // Continue to next token instead of failing completely
+          }
+        }
+
+        console.log(
+          `📊 Found ${tokens.length} tokens with balances on Sepolia`
+        );
+        return tokens;
+      } catch (error) {
+        console.error("❌ Error fetching Sepolia tokens:", error);
+        return []; // Return empty array instead of failing
+      }
     }
 
+    // Production mode - use existing Alchemy logic
     try {
       console.log("🔍 Fetching tokens for address:", address);
 
@@ -297,7 +392,6 @@ export class CryptoIntegrationService {
                 contract.decimals().catch(() => 18),
               ]);
 
-              // FIXED: Properly handle BigInt conversion
               const decimalsSafe = safeNumericConvert(decimals);
               const balanceFormatted = ethers.formatUnits(
                 token.tokenBalance,
@@ -365,7 +459,7 @@ export class CryptoIntegrationService {
     }
   }
 
-  // Calculate portfolio value
+  // Calculate portfolio value (updated for test mode)
   async calculatePortfolioValue(address: string): Promise<PortfolioSummary> {
     if (isTestMode) {
       if (address !== testWalletData.address) {
@@ -379,17 +473,20 @@ export class CryptoIntegrationService {
         };
       }
 
-      console.log("📊 Calculating TEST portfolio value for:", address);
+      console.log("📊 Calculating REAL Sepolia portfolio value for:", address);
 
-      const ethBalance = testWalletData.ethBalance;
-      const ethPriceUSD = testWalletData.ethPriceUSD;
+      // Get real ETH balance from Sepolia
+      const ethBalanceStr = await this.getETHBalance(address);
+      const ethBalance = parseFloat(ethBalanceStr);
+      const ethPriceUSD = testWalletData.ethPriceUSD; // Mock price
       const ethValueUSD = ethBalance * ethPriceUSD;
 
-      console.log(`🔷 TEST ETH Balance: ${ethBalance}`);
+      console.log(`🔷 Sepolia ETH Balance: ${ethBalance}`);
       console.log(
-        `💎 TEST ETH Price: $${ethPriceUSD}, Value: $${ethValueUSD.toFixed(2)}`
+        `💎 ETH Price: $${ethPriceUSD}, Value: $${ethValueUSD.toFixed(2)}`
       );
 
+      // Get real token balances from Sepolia
       const tokens = await this.getWalletTokens(address);
       const totalTokenValueUSD = tokens.reduce(
         (sum, token) => sum + (token.valueUSD || 0),
@@ -398,7 +495,7 @@ export class CryptoIntegrationService {
       const totalValueUSD = ethValueUSD + totalTokenValueUSD;
       const totalValueETH = ethPriceUSD > 0 ? totalValueUSD / ethPriceUSD : 0;
 
-      console.log(`💰 TEST Portfolio Summary:`, {
+      console.log(`💰 Sepolia Portfolio Summary:`, {
         totalValueUSD: totalValueUSD.toFixed(2),
         ethBalance,
         tokensCount: tokens.length,
@@ -415,10 +512,10 @@ export class CryptoIntegrationService {
       };
     }
 
+    // Production mode logic remains the same
     try {
       console.log("📊 Calculating portfolio value for:", address);
 
-      // Get ETH balance and price
       const ethBalance = await this.getETHBalance(address);
       const ethBalanceFloat = parseFloat(ethBalance);
       console.log(`🔷 ETH Balance: ${ethBalanceFloat}`);
@@ -430,16 +527,12 @@ export class CryptoIntegrationService {
         `💎 ETH Price: $${ethPriceUSD}, Value: $${ethValueUSD.toFixed(2)}`
       );
 
-      // Get ERC-20 tokens
       const tokens = await this.getWalletTokens(address);
-
-      // Calculate total token value
       const totalTokenValueUSD = tokens.reduce(
         (sum, token) => sum + (token.valueUSD || 0),
         0
       );
 
-      // Calculate totals
       const totalValueUSD = ethValueUSD + totalTokenValueUSD;
       const totalValueETH = ethPriceUSD > 0 ? totalValueUSD / ethPriceUSD : 0;
 
@@ -589,7 +682,7 @@ export class CryptoIntegrationService {
     }
   }
 
-  // FIXED: Get detailed token information with better test mode support
+  // Get detailed token information (updated for Sepolia test mode)
   async getTokenInfo(contractAddress: string, walletAddress: string) {
     if (isTestMode) {
       if (walletAddress !== testWalletData.address) {
@@ -602,12 +695,13 @@ export class CryptoIntegrationService {
 
       if (contractAddress === "native" || contractAddress === "ETH") {
         // Handle ETH
+        const realBalance = await this.getETHBalance(walletAddress);
         return {
           name: "Ethereum",
           symbol: "ETH",
           contractAddress: "native",
           decimals: 18,
-          balance: testWalletData.ethBalance.toString(),
+          balance: realBalance,
           priceData: {
             id: "ethereum",
             current_price: testWalletData.ethPriceUSD,
@@ -621,23 +715,22 @@ export class CryptoIntegrationService {
         };
       }
 
-      // Find token by contract address
-      const token = testWalletData.tokens.find(
+      // Find token by contract address in Sepolia tokens
+      const tokenInfo = Object.values(SEPOLIA_TEST_TOKENS).find(
         (t) => t.contractAddress.toLowerCase() === contractAddress.toLowerCase()
       );
 
-      if (!token) {
+      if (!tokenInfo) {
         console.log(
-          `🔍 Available test tokens:`,
-          testWalletData.tokens.map((t) => ({
+          `🔍 Available Sepolia test tokens:`,
+          Object.values(SEPOLIA_TEST_TOKENS).map((t) => ({
             contractAddress: t.contractAddress,
             symbol: t.symbol,
             name: t.name,
           }))
         );
 
-        // FIXED: Instead of throwing error, return mock data for unknown tokens
-        // This allows the UI to show the portfolio section even for unknown tokens
+        // Return mock data for unknown tokens
         console.log(
           `⚠️ Test token not found for contract: ${contractAddress}, returning mock data`
         );
@@ -660,26 +753,71 @@ export class CryptoIntegrationService {
         };
       }
 
-      return {
-        name: token.name,
-        symbol: token.symbol,
-        contractAddress: token.contractAddress,
-        decimals: token.decimals,
-        balance: token.balanceFormatted,
-        priceData: {
-          id: token.symbol.toLowerCase(),
-          current_price: token.priceUSD,
-          price_change_percentage_24h: token.change24h,
-          market_cap:
-            token.priceUSD * parseFloat(token.balanceFormatted) * 1000, // Mock market cap
-          total_volume:
-            token.priceUSD * parseFloat(token.balanceFormatted) * 100, // Mock volume
-          description: `${token.name} is a test token on Sepolia testnet.`,
-          image: token.logoUrl,
-        },
-      };
+      // Get real balance from Sepolia for this token
+      try {
+        const contract = new ethers.Contract(
+          tokenInfo.contractAddress,
+          ERC20_ABI,
+          this.sepoliaProvider
+        );
+
+        const balance = await contract.balanceOf(walletAddress);
+        const balanceFormatted = ethers.formatUnits(
+          balance,
+          tokenInfo.decimals
+        );
+
+        // Mock price data
+        const mockPrice =
+          tokenInfo.symbol === "USDC" || tokenInfo.symbol === "DAI"
+            ? 1.0
+            : tokenInfo.symbol === "LINK"
+            ? 15.0
+            : tokenInfo.symbol === "UNI"
+            ? 8.0
+            : 1.0;
+
+        return {
+          name: tokenInfo.name,
+          symbol: tokenInfo.symbol,
+          contractAddress: tokenInfo.contractAddress,
+          decimals: tokenInfo.decimals,
+          balance: balanceFormatted,
+          priceData: {
+            id: tokenInfo.symbol.toLowerCase(),
+            current_price: mockPrice,
+            price_change_percentage_24h: Math.random() * 10 - 5,
+            market_cap: mockPrice * parseFloat(balanceFormatted) * 1000,
+            total_volume: mockPrice * parseFloat(balanceFormatted) * 100,
+            description: `${tokenInfo.name} is a test token on Sepolia testnet.`,
+            image: tokenInfo.logoUrl,
+          },
+        };
+      } catch (error) {
+        console.error(
+          `❌ Error getting real balance for ${tokenInfo.symbol}:`,
+          error
+        );
+        return {
+          name: tokenInfo.name,
+          symbol: tokenInfo.symbol,
+          contractAddress: tokenInfo.contractAddress,
+          decimals: tokenInfo.decimals,
+          balance: "0",
+          priceData: {
+            id: tokenInfo.symbol.toLowerCase(),
+            current_price: 0,
+            price_change_percentage_24h: 0,
+            market_cap: 0,
+            total_volume: 0,
+            description: `${tokenInfo.name} is a test token on Sepolia testnet.`,
+            image: tokenInfo.logoUrl,
+          },
+        };
+      }
     }
 
+    // Production mode logic remains the same
     try {
       console.log(`🔍 Getting token info for contract: ${contractAddress}`);
 
@@ -693,7 +831,6 @@ export class CryptoIntegrationService {
         this.provider
       );
 
-      // Get basic token info
       console.log("📋 Fetching basic token metadata...");
       const [name, symbol, decimals] = await Promise.all([
         contract.name().catch((e) => {
@@ -716,7 +853,6 @@ export class CryptoIntegrationService {
         }),
       ]);
 
-      // FIXED: Safely convert all values to avoid BigInt issues
       const nameSafe = String(name);
       const symbolSafe = String(symbol);
       const decimalsSafe = safeNumericConvert(decimals);
@@ -725,13 +861,11 @@ export class CryptoIntegrationService {
         `✅ Token metadata: ${nameSafe} (${symbolSafe}), decimals: ${decimalsSafe}`
       );
 
-      // Get user balance
       console.log("💰 Fetching user balance...");
       const balance = await contract.balanceOf(walletAddress);
       const balanceFormatted = ethers.formatUnits(balance, decimalsSafe);
       console.log(`✅ User balance: ${balanceFormatted} ${symbolSafe}`);
 
-      // Get price and market data
       console.log("📈 Fetching price and market data...");
       const tokenData = await this.getTokenPriceByContract(contractAddress);
 
@@ -769,6 +903,11 @@ export class CryptoIntegrationService {
   // Helper method to check if in test mode
   isTestMode(): boolean {
     return isTestMode;
+  }
+
+  // Helper method to get known Sepolia test tokens
+  getSepoliaTestTokens() {
+    return SEPOLIA_TEST_TOKENS;
   }
 }
 
