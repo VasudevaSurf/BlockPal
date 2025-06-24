@@ -1,6 +1,7 @@
-// src/store/slices/walletSlice.ts (FIXED - Token Contract Address Mapping)
+// src/store/slices/walletSlice.ts (UPDATED - Test Mode Support)
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { WalletState, Wallet, Token } from "@/types";
+import { cryptoService } from "@/lib/crypto-integration";
 
 const initialState: WalletState = {
   wallets: [],
@@ -11,13 +12,58 @@ const initialState: WalletState = {
   error: null,
 };
 
+// Check if we're in test mode
+const isTestMode =
+  typeof window !== "undefined"
+    ? process.env.NEXT_PUBLIC_TEST_MODE === "true"
+    : process.env.NEXT_PUBLIC_TEST_MODE === "true";
+
 // Track pending requests to prevent duplicates
 const pendingRequests = new Set<string>();
+
+// Auto-create test wallet if in test mode
+export const initializeTestWallet = createAsyncThunk(
+  "wallet/initializeTestWallet",
+  async (_, { rejectWithValue }) => {
+    if (!isTestMode) {
+      return rejectWithValue("Not in test mode");
+    }
+
+    try {
+      console.log("🧪 Initializing test wallet...");
+
+      const testWallet: Wallet = {
+        id: "test-wallet-1",
+        name: "TESTING WALLET",
+        address: cryptoService.getTestWalletAddress(),
+        balance: 0,
+        isActive: true,
+        status: "active",
+        isDefault: true,
+      };
+
+      return testWallet;
+    } catch (error) {
+      console.error("❌ Error initializing test wallet:", error);
+      return rejectWithValue("Failed to initialize test wallet");
+    }
+  }
+);
 
 // Async thunks for API calls
 export const fetchWallets = createAsyncThunk(
   "wallet/fetchWallets",
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, dispatch }) => {
+    // If in test mode, return test wallet directly
+    if (isTestMode) {
+      console.log("🧪 Test mode: Using test wallet");
+      const testWallet = await dispatch(initializeTestWallet());
+      if (initializeTestWallet.fulfilled.match(testWallet)) {
+        return [testWallet.payload];
+      }
+      return [];
+    }
+
     const requestKey = "fetchWallets";
 
     if (pendingRequests.has(requestKey)) {
@@ -89,6 +135,52 @@ export const createWallet = createAsyncThunk(
 export const fetchWalletTokens = createAsyncThunk(
   "wallet/fetchWalletTokens",
   async (walletAddress: string, { rejectWithValue }) => {
+    // In test mode, use crypto service directly
+    if (isTestMode) {
+      try {
+        console.log(
+          "🧪 Test mode: Fetching tokens using crypto service for:",
+          walletAddress
+        );
+        const portfolioData = await cryptoService.calculatePortfolioValue(
+          walletAddress
+        );
+
+        // Format tokens to match expected structure
+        const tokens = portfolioData.tokens.map((token) => ({
+          contractAddress: token.contractAddress,
+          symbol: token.symbol || "UNKNOWN",
+          name: token.name || "Unknown Token",
+          balance: parseFloat(token.balanceFormatted || "0"),
+          balanceFormatted: token.balanceFormatted || "0",
+          decimals: token.decimals || 18,
+          price: token.priceUSD || 0,
+          value: token.valueUSD || 0,
+          change24h: token.change24h || 0,
+          logoUrl: token.logoUrl || null,
+        }));
+
+        // Add ETH as a token
+        const ethToken = {
+          contractAddress: "native",
+          symbol: "ETH",
+          name: "Ethereum",
+          balance: portfolioData.ethBalance,
+          balanceFormatted: portfolioData.ethBalance.toFixed(6),
+          decimals: 18,
+          price: portfolioData.ethPriceUSD,
+          value: portfolioData.ethValueUSD,
+          change24h: -1.23, // Mock change
+          logoUrl: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+        };
+
+        return { tokens: [ethToken, ...tokens], walletAddress };
+      } catch (error) {
+        console.error("❌ Error fetching test tokens:", error);
+        return rejectWithValue("Test mode error occurred");
+      }
+    }
+
     const requestKey = `fetchWalletTokens:${walletAddress}`;
 
     if (pendingRequests.has(requestKey)) {
@@ -128,6 +220,20 @@ export const fetchWalletTokens = createAsyncThunk(
 export const updateWalletBalance = createAsyncThunk(
   "wallet/updateWalletBalance",
   async (walletAddress: string, { rejectWithValue }) => {
+    // In test mode, calculate balance using crypto service
+    if (isTestMode) {
+      try {
+        console.log("🧪 Test mode: Calculating balance for:", walletAddress);
+        const portfolioData = await cryptoService.calculatePortfolioValue(
+          walletAddress
+        );
+        return { walletAddress, balance: portfolioData.totalValueUSD };
+      } catch (error) {
+        console.error("❌ Error calculating test balance:", error);
+        return { walletAddress, balance: 0 };
+      }
+    }
+
     const requestKey = `updateWalletBalance:${walletAddress}`;
 
     if (pendingRequests.has(requestKey)) {
@@ -172,6 +278,11 @@ export const updateWalletBalance = createAsyncThunk(
 export const refreshTokenPrices = createAsyncThunk(
   "wallet/refreshTokenPrices",
   async (_, { rejectWithValue }) => {
+    if (isTestMode) {
+      console.log("🧪 Test mode: Skipping price refresh");
+      return {};
+    }
+
     const requestKey = "refreshTokenPrices";
 
     if (pendingRequests.has(requestKey)) {
@@ -216,8 +327,8 @@ const walletSlice = createSlice({
         wallet.isActive = true;
         state.activeWallet = wallet;
 
-        // Store active wallet ID in localStorage for persistence
-        if (typeof window !== "undefined") {
+        // Store active wallet ID in localStorage for persistence (skip in test mode)
+        if (!isTestMode && typeof window !== "undefined") {
           localStorage.setItem("activeWalletId", wallet.id);
         }
 
@@ -273,14 +384,30 @@ const walletSlice = createSlice({
     },
     // Add action to clear active wallet ID from localStorage
     clearActiveWalletPersistence: () => {
-      if (typeof window !== "undefined") {
+      if (!isTestMode && typeof window !== "undefined") {
         localStorage.removeItem("activeWalletId");
       }
     },
   },
   extraReducers: (builder) => {
-    // Fetch wallets cases
+    // Initialize test wallet cases
     builder
+      .addCase(initializeTestWallet.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(initializeTestWallet.fulfilled, (state, action) => {
+        state.loading = false;
+        state.wallets = [action.payload];
+        state.activeWallet = action.payload;
+        state.error = null;
+        console.log("✅ Test wallet initialized:", action.payload.name);
+      })
+      .addCase(initializeTestWallet.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // Fetch wallets cases
       .addCase(fetchWallets.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -289,55 +416,63 @@ const walletSlice = createSlice({
         state.loading = false;
 
         if (action.payload && Array.isArray(action.payload)) {
-          state.wallets = action.payload.map((wallet: any) => ({
-            id: wallet._id?.toString() || wallet.id,
-            name: wallet.walletName || wallet.name,
-            address: wallet.walletAddress || wallet.address,
-            balance: 0, // Will be updated separately
-            isActive: wallet.isDefault || false,
-          }));
+          if (isTestMode) {
+            // In test mode, use the test wallet directly
+            state.wallets = action.payload;
+            state.activeWallet = action.payload[0] || null;
+          } else {
+            state.wallets = action.payload.map((wallet: any) => ({
+              id: wallet._id?.toString() || wallet.id,
+              name: wallet.walletName || wallet.name,
+              address: wallet.walletAddress || wallet.address,
+              balance: 0, // Will be updated separately
+              isActive: wallet.isDefault || false,
+            }));
 
-          // Try to restore previously active wallet from localStorage
-          let activeWalletSet = false;
-          if (typeof window !== "undefined") {
-            const savedActiveWalletId = localStorage.getItem("activeWalletId");
-            if (savedActiveWalletId) {
-              const savedWallet = state.wallets.find(
-                (w) => w.id === savedActiveWalletId
-              );
-              if (savedWallet) {
-                // Reset all wallets to inactive first
-                state.wallets.forEach((w) => (w.isActive = false));
-                // Set saved wallet as active
-                savedWallet.isActive = true;
-                state.activeWallet = savedWallet;
-                activeWalletSet = true;
-                console.log(
-                  "✅ Restored active wallet from localStorage:",
-                  savedWallet.name
+            // Try to restore previously active wallet from localStorage
+            let activeWalletSet = false;
+            if (typeof window !== "undefined") {
+              const savedActiveWalletId =
+                localStorage.getItem("activeWalletId");
+              if (savedActiveWalletId) {
+                const savedWallet = state.wallets.find(
+                  (w) => w.id === savedActiveWalletId
                 );
+                if (savedWallet) {
+                  // Reset all wallets to inactive first
+                  state.wallets.forEach((w) => (w.isActive = false));
+                  // Set saved wallet as active
+                  savedWallet.isActive = true;
+                  state.activeWallet = savedWallet;
+                  activeWalletSet = true;
+                  console.log(
+                    "✅ Restored active wallet from localStorage:",
+                    savedWallet.name
+                  );
+                }
               }
             }
-          }
 
-          // If no saved wallet or saved wallet not found, use default logic
-          if (!activeWalletSet) {
-            const activeWallet = state.wallets.find((w) => w.isActive);
-            if (
-              activeWallet &&
-              (!state.activeWallet || state.activeWallet.id !== activeWallet.id)
-            ) {
-              state.activeWallet = activeWallet;
-              // Save to localStorage
-              if (typeof window !== "undefined") {
-                localStorage.setItem("activeWalletId", activeWallet.id);
-              }
-            } else if (state.wallets.length > 0 && !state.activeWallet) {
-              state.wallets[0].isActive = true;
-              state.activeWallet = state.wallets[0];
-              // Save to localStorage
-              if (typeof window !== "undefined") {
-                localStorage.setItem("activeWalletId", state.wallets[0].id);
+            // If no saved wallet or saved wallet not found, use default logic
+            if (!activeWalletSet) {
+              const activeWallet = state.wallets.find((w) => w.isActive);
+              if (
+                activeWallet &&
+                (!state.activeWallet ||
+                  state.activeWallet.id !== activeWallet.id)
+              ) {
+                state.activeWallet = activeWallet;
+                // Save to localStorage
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("activeWalletId", activeWallet.id);
+                }
+              } else if (state.wallets.length > 0 && !state.activeWallet) {
+                state.wallets[0].isActive = true;
+                state.activeWallet = state.wallets[0];
+                // Save to localStorage
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("activeWalletId", state.wallets[0].id);
+                }
               }
             }
           }
@@ -391,7 +526,7 @@ const walletSlice = createSlice({
         state.loading = false;
 
         if (action.payload && action.payload.tokens) {
-          // FIXED: Use real tokens from API response with proper contract addresses
+          // Use real tokens from API response with proper contract addresses
           state.tokens = action.payload.tokens.map((token: any) => ({
             id: token.contractAddress || `${token.symbol}-${Date.now()}`, // Use contract address as ID
             symbol: token.symbol,
@@ -416,6 +551,7 @@ const walletSlice = createSlice({
             state.tokens.length,
             "Total value:",
             state.totalBalance,
+            isTestMode ? "(TEST MODE)" : "",
             "Tokens with contract addresses:",
             state.tokens.map((t) => ({
               symbol: t.symbol,
@@ -451,21 +587,23 @@ const walletSlice = createSlice({
       })
       // Refresh token prices cases
       .addCase(refreshTokenPrices.fulfilled, (state, action) => {
-        const prices = action.payload;
-        state.tokens.forEach((token) => {
-          const priceData = prices[token.symbol.toLowerCase()];
-          if (priceData) {
-            token.price = priceData.current_price;
-            token.change24h = priceData.price_change_percentage_24h;
-            token.value = token.balance * priceData.current_price;
-          }
-        });
+        if (!isTestMode) {
+          const prices = action.payload;
+          state.tokens.forEach((token) => {
+            const priceData = prices[token.symbol.toLowerCase()];
+            if (priceData) {
+              token.price = priceData.current_price;
+              token.change24h = priceData.price_change_percentage_24h;
+              token.value = token.balance * priceData.current_price;
+            }
+          });
 
-        // Recalculate total balance
-        state.totalBalance = state.tokens.reduce(
-          (total, token) => total + token.value,
-          0
-        );
+          // Recalculate total balance
+          state.totalBalance = state.tokens.reduce(
+            (total, token) => total + token.value,
+            0
+          );
+        }
       });
   },
 });

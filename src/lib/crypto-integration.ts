@@ -1,4 +1,4 @@
-// src/lib/crypto-integration.ts (FIXED - BigInt handling)
+// src/lib/crypto-integration.ts (UPDATED - Test Mode Support)
 import { ethers } from "ethers";
 import axios from "axios";
 
@@ -6,6 +6,47 @@ const ALCHEMY_API_KEY =
   process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "EH1H6OhzYUtjjHCYJ49zv43ILefPyF0X";
 const COINGECKO_API_KEY =
   process.env.NEXT_PUBLIC_COINGECKO_API_KEY || "CG-JxUrd1Y1MHtzK2LSkonPTam9";
+
+// Check if we're in test mode
+const isTestMode =
+  typeof window !== "undefined"
+    ? process.env.NEXT_PUBLIC_TEST_MODE === "true"
+    : process.env.NEXT_PUBLIC_TEST_MODE === "true";
+
+// Test wallet data based on your JS output
+const testWalletData = {
+  address: "0x3750E833ba248459e8355A4A90Bb5531F6476c30",
+  privateKey:
+    "c1fcde81f943602b92f11121d426b8b499f2f52a24468894ad058ec5f9931b23",
+  ethBalance: 0.050961,
+  ethPriceUSD: 2000, // Mock price for ETH
+  tokens: [
+    {
+      contractAddress: "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238",
+      symbol: "USDC",
+      name: "USDC",
+      balance: "360273450", // Raw balance with decimals
+      balanceFormatted: "360.273450",
+      decimals: 6,
+      priceUSD: 1.0,
+      valueUSD: 360.27,
+      change24h: 0.01,
+      logoUrl: "https://cryptologos.cc/logos/usd-coin-usdc-logo.png",
+    },
+    {
+      contractAddress: "0x779877a7b0d9e8603169ddbd7836e478b4624789",
+      symbol: "LINK",
+      name: "ChainLink Token",
+      balance: "10000000000000000000", // 10 LINK with 18 decimals
+      balanceFormatted: "10.000000",
+      decimals: 18,
+      priceUSD: 15.0,
+      valueUSD: 150.0,
+      change24h: -2.34,
+      logoUrl: "https://cryptologos.cc/logos/chainlink-link-logo.png",
+    },
+  ],
+};
 
 // ERC-20 Token ABI (minimal)
 const ERC20_ABI = [
@@ -72,10 +113,17 @@ export class CryptoIntegrationService {
     this.provider = new ethers.JsonRpcProvider(
       `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
     );
+
+    if (isTestMode) {
+      console.log("🧪 CRYPTO SERVICE RUNNING IN TEST MODE");
+    }
   }
 
   // Validation functions
   isValidAddress(address: string): boolean {
+    if (isTestMode) {
+      return address === testWalletData.address;
+    }
     try {
       return ethers.isAddress(address);
     } catch {
@@ -84,6 +132,9 @@ export class CryptoIntegrationService {
   }
 
   isValidPrivateKey(privateKey: string): boolean {
+    if (isTestMode) {
+      return privateKey === testWalletData.privateKey;
+    }
     try {
       const cleanKey = privateKey.startsWith("0x")
         ? privateKey.slice(2)
@@ -151,6 +202,15 @@ export class CryptoIntegrationService {
 
   // Get ETH balance
   async getETHBalance(address: string): Promise<string> {
+    if (isTestMode) {
+      if (address === testWalletData.address) {
+        console.log(
+          `🧪 TEST ETH Balance for ${address}: ${testWalletData.ethBalance}`
+        );
+        return testWalletData.ethBalance.toString();
+      }
+      return "0";
+    }
     try {
       const balance = await this.provider.getBalance(address);
       return ethers.formatEther(balance);
@@ -160,8 +220,30 @@ export class CryptoIntegrationService {
     }
   }
 
-  // Get wallet tokens using Alchemy API
+  // Get wallet tokens using Test Mode or Alchemy API
   async getWalletTokens(address: string): Promise<TokenBalance[]> {
+    if (isTestMode) {
+      if (address !== testWalletData.address) {
+        return [];
+      }
+
+      console.log("🔍 Fetching TEST tokens for address:", address);
+      console.log(`📊 Found ${testWalletData.tokens.length} test tokens`);
+
+      return testWalletData.tokens.map((token) => ({
+        contractAddress: token.contractAddress,
+        tokenBalance: token.balance,
+        symbol: token.symbol,
+        name: token.name,
+        decimals: token.decimals,
+        balanceFormatted: token.balanceFormatted,
+        priceUSD: token.priceUSD,
+        valueUSD: token.valueUSD,
+        change24h: token.change24h,
+        logoUrl: token.logoUrl,
+      }));
+    }
+
     try {
       console.log("🔍 Fetching tokens for address:", address);
 
@@ -270,6 +352,54 @@ export class CryptoIntegrationService {
 
   // Calculate portfolio value
   async calculatePortfolioValue(address: string): Promise<PortfolioSummary> {
+    if (isTestMode) {
+      if (address !== testWalletData.address) {
+        return {
+          totalValueUSD: 0,
+          totalValueETH: 0,
+          ethPriceUSD: 0,
+          ethBalance: 0,
+          ethValueUSD: 0,
+          tokens: [],
+        };
+      }
+
+      console.log("📊 Calculating TEST portfolio value for:", address);
+
+      const ethBalance = testWalletData.ethBalance;
+      const ethPriceUSD = testWalletData.ethPriceUSD;
+      const ethValueUSD = ethBalance * ethPriceUSD;
+
+      console.log(`🔷 TEST ETH Balance: ${ethBalance}`);
+      console.log(
+        `💎 TEST ETH Price: $${ethPriceUSD}, Value: $${ethValueUSD.toFixed(2)}`
+      );
+
+      const tokens = await this.getWalletTokens(address);
+      const totalTokenValueUSD = tokens.reduce(
+        (sum, token) => sum + (token.valueUSD || 0),
+        0
+      );
+      const totalValueUSD = ethValueUSD + totalTokenValueUSD;
+      const totalValueETH = ethPriceUSD > 0 ? totalValueUSD / ethPriceUSD : 0;
+
+      console.log(`💰 TEST Portfolio Summary:`, {
+        totalValueUSD: totalValueUSD.toFixed(2),
+        ethBalance,
+        tokensCount: tokens.length,
+        totalTokenValueUSD: totalTokenValueUSD.toFixed(2),
+      });
+
+      return {
+        totalValueUSD,
+        totalValueETH,
+        ethPriceUSD,
+        ethBalance,
+        ethValueUSD,
+        tokens,
+      };
+    }
+
     try {
       console.log("📊 Calculating portfolio value for:", address);
 
@@ -446,6 +576,67 @@ export class CryptoIntegrationService {
 
   // Get detailed token information
   async getTokenInfo(contractAddress: string, walletAddress: string) {
+    if (isTestMode) {
+      if (walletAddress !== testWalletData.address) {
+        throw new Error("Invalid test wallet address");
+      }
+
+      console.log(
+        `🔍 Getting TEST token info for contract: ${contractAddress}`
+      );
+
+      if (contractAddress === "native" || contractAddress === "ETH") {
+        // Handle ETH
+        return {
+          name: "Ethereum",
+          symbol: "ETH",
+          contractAddress: "native",
+          decimals: 18,
+          balance: testWalletData.ethBalance.toString(),
+          priceData: {
+            id: "ethereum",
+            current_price: testWalletData.ethPriceUSD,
+            price_change_percentage_24h: -1.23,
+            market_cap: 240000000000,
+            total_volume: 15000000000,
+            description:
+              "Ethereum is a decentralized platform for smart contracts.",
+            image: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+          },
+        };
+      }
+
+      // Find token by contract address
+      const token = testWalletData.tokens.find(
+        (t) => t.contractAddress.toLowerCase() === contractAddress.toLowerCase()
+      );
+
+      if (!token) {
+        throw new Error(
+          `Test token not found for contract: ${contractAddress}`
+        );
+      }
+
+      return {
+        name: token.name,
+        symbol: token.symbol,
+        contractAddress: token.contractAddress,
+        decimals: token.decimals,
+        balance: token.balanceFormatted,
+        priceData: {
+          id: token.symbol.toLowerCase(),
+          current_price: token.priceUSD,
+          price_change_percentage_24h: token.change24h,
+          market_cap:
+            token.priceUSD * parseFloat(token.balanceFormatted) * 1000, // Mock market cap
+          total_volume:
+            token.priceUSD * parseFloat(token.balanceFormatted) * 100, // Mock volume
+          description: `${token.name} is a test token on Sepolia testnet.`,
+          image: token.logoUrl,
+        },
+      };
+    }
+
     try {
       console.log(`🔍 Getting token info for contract: ${contractAddress}`);
 
@@ -525,6 +716,16 @@ export class CryptoIntegrationService {
       );
       throw error;
     }
+  }
+
+  // Helper method to get test wallet address
+  getTestWalletAddress(): string {
+    return testWalletData.address;
+  }
+
+  // Helper method to check if in test mode
+  isTestMode(): boolean {
+    return isTestMode;
   }
 }
 

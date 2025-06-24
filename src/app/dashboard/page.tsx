@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx (UPDATED with Wallet Switcher)
+// src/app/dashboard/page.tsx (UPDATED with Test Mode Support)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -7,12 +7,22 @@ import { useSelector, useDispatch } from "react-redux";
 import { Bell, Settings, LogOut, Wallet, ChevronDown } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
-import { fetchWallets, setActiveWallet } from "@/store/slices/walletSlice";
+import {
+  fetchWallets,
+  setActiveWallet,
+  initializeTestWallet,
+} from "@/store/slices/walletSlice";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
 import WalletSetupPrompt from "@/components/wallet/WalletSetupPrompt";
 import WalletSwitcher from "@/components/wallet/WalletSwitcher";
+
+// Check if we're in test mode
+const isTestMode =
+  typeof window !== "undefined"
+    ? process.env.NEXT_PUBLIC_TEST_MODE === "true"
+    : process.env.NEXT_PUBLIC_TEST_MODE === "true";
 
 export default function DashboardPage() {
   const {
@@ -36,8 +46,13 @@ export default function DashboardPage() {
   const walletsLoaded = useRef(false);
   const activeWalletSet = useRef(false);
 
-  // Auth check effect - only run once
+  // Auth check effect - only run once (skip in test mode)
   useEffect(() => {
+    if (isTestMode) {
+      console.log("🧪 Test mode: Skipping auth check");
+      return;
+    }
+
     console.log("🔍 Dashboard - Auth check effect");
 
     if (!authChecked.current && !isAuthenticated && !authLoading) {
@@ -47,8 +62,12 @@ export default function DashboardPage() {
     }
   }, [dispatch, isAuthenticated, authLoading]);
 
-  // Redirect effect - separate from auth check
+  // Redirect effect - separate from auth check (skip in test mode)
   useEffect(() => {
+    if (isTestMode) {
+      return; // Skip redirect logic in test mode
+    }
+
     console.log("🚪 Dashboard - Redirect effect", {
       isAuthenticated,
       authLoading,
@@ -65,20 +84,34 @@ export default function DashboardPage() {
   // Wallets loading effect - only run when authenticated and not already loaded
   useEffect(() => {
     console.log("💼 Dashboard - Wallets effect", {
-      isAuthenticated,
-      user: !!user,
+      isAuthenticated: isTestMode || isAuthenticated,
+      user: isTestMode || !!user,
       walletsLoaded: walletsLoaded.current,
       walletsLength: wallets.length,
+      isTestMode,
     });
 
-    if (isAuthenticated && user && !walletsLoaded.current) {
+    // In test mode, we don't need auth check - load wallets immediately
+    if ((isTestMode || (isAuthenticated && user)) && !walletsLoaded.current) {
       console.log("📡 Fetching wallets...");
       walletsLoaded.current = true;
-      dispatch(fetchWallets());
+
+      if (isTestMode) {
+        console.log("🧪 Test mode: Initializing test wallet");
+        dispatch(initializeTestWallet());
+      } else {
+        dispatch(fetchWallets());
+      }
     }
   }, [isAuthenticated, user, dispatch]);
 
   const handleLogout = async () => {
+    if (isTestMode) {
+      console.log("🧪 Test mode: Simulating logout");
+      router.push("/auth");
+      return;
+    }
+
     try {
       await dispatch(logoutUser());
       router.push("/auth");
@@ -105,8 +138,11 @@ export default function DashboardPage() {
     }
   }, [activeWallet, wallets, dispatch]);
 
-  // Show loading state only while checking authentication OR if not authenticated yet
-  if (authLoading || (!isAuthenticated && !authChecked.current)) {
+  // Show loading state only while checking authentication OR if not authenticated yet (skip in test mode)
+  if (
+    !isTestMode &&
+    (authLoading || (!isAuthenticated && !authChecked.current))
+  ) {
     console.log("🔄 Dashboard - Showing auth loading state");
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F]">
@@ -115,14 +151,19 @@ export default function DashboardPage() {
     );
   }
 
-  // Redirect if not authenticated (but don't show loading)
-  if (!isAuthenticated) {
+  // Redirect if not authenticated (but don't show loading) - skip in test mode
+  if (!isTestMode && !isAuthenticated) {
     console.log("🚪 Dashboard - User not authenticated, should redirect");
     return null;
   }
 
-  // Show wallet setup if no wallets exist
-  if (isAuthenticated && !walletLoading && wallets.length === 0) {
+  // Show wallet setup if no wallets exist (skip in test mode)
+  if (
+    !isTestMode &&
+    isAuthenticated &&
+    !walletLoading &&
+    wallets.length === 0
+  ) {
     return <WalletSetupPrompt />;
   }
 
@@ -138,18 +179,34 @@ export default function DashboardPage() {
     return colors[activeIndex % colors.length] || colors[0];
   };
 
-  console.log("🎨 Dashboard - Rendering main content");
+  console.log("🎨 Dashboard - Rendering main content", { isTestMode });
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+      {/* Test Mode Banner */}
+      {isTestMode && (
+        <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
+          <div className="flex items-center">
+            <span className="text-yellow-400 text-sm font-satoshi font-medium">
+              🧪 TEST MODE ACTIVE
+            </span>
+            <span className="text-yellow-400 text-xs font-satoshi ml-2">
+              Using test wallet: {activeWallet?.address?.slice(0, 10)}...
+              {activeWallet?.address?.slice(-6)}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Header - Fixed and Responsive */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 flex-shrink-0 gap-4 sm:gap-0">
         <div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
-            Dashboard
+            {isTestMode ? "Test Dashboard" : "Dashboard"}
           </h1>
           <p className="text-gray-400 text-sm font-satoshi mt-1">
-            Welcome back, {user?.displayName || user?.name || "User"}
+            Welcome back{isTestMode ? " to test mode" : ""},{" "}
+            {user?.displayName || user?.name || "Test User"}
           </p>
         </div>
 
