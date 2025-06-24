@@ -1,4 +1,4 @@
-// src/lib/crypto-integration.ts (UPDATED - Test Mode Support)
+// src/lib/crypto-integration.ts (FIXED - Test Mode Address Validation)
 import { ethers } from "ethers";
 import axios from "axios";
 
@@ -119,16 +119,31 @@ export class CryptoIntegrationService {
     }
   }
 
-  // Validation functions
+  // FIXED: Validation functions - separate wallet and contract validation
   isValidAddress(address: string): boolean {
-    if (isTestMode) {
-      return address === testWalletData.address;
-    }
     try {
       return ethers.isAddress(address);
     } catch {
       return false;
     }
+  }
+
+  isValidWalletAddress(address: string): boolean {
+    if (isTestMode) {
+      return address === testWalletData.address;
+    }
+    return this.isValidAddress(address);
+  }
+
+  isValidContractAddress(address: string): boolean {
+    if (isTestMode) {
+      // In test mode, check if it's one of our test token contracts
+      const validTestContracts = testWalletData.tokens.map((t) =>
+        t.contractAddress.toLowerCase()
+      );
+      return validTestContracts.includes(address.toLowerCase());
+    }
+    return this.isValidAddress(address);
   }
 
   isValidPrivateKey(privateKey: string): boolean {
@@ -574,7 +589,7 @@ export class CryptoIntegrationService {
     }
   }
 
-  // Get detailed token information
+  // FIXED: Get detailed token information with better test mode support
   async getTokenInfo(contractAddress: string, walletAddress: string) {
     if (isTestMode) {
       if (walletAddress !== testWalletData.address) {
@@ -612,9 +627,37 @@ export class CryptoIntegrationService {
       );
 
       if (!token) {
-        throw new Error(
-          `Test token not found for contract: ${contractAddress}`
+        console.log(
+          `🔍 Available test tokens:`,
+          testWalletData.tokens.map((t) => ({
+            contractAddress: t.contractAddress,
+            symbol: t.symbol,
+            name: t.name,
+          }))
         );
+
+        // FIXED: Instead of throwing error, return mock data for unknown tokens
+        // This allows the UI to show the portfolio section even for unknown tokens
+        console.log(
+          `⚠️ Test token not found for contract: ${contractAddress}, returning mock data`
+        );
+
+        return {
+          name: "Unknown Test Token",
+          symbol: "UNKNOWN",
+          contractAddress: contractAddress,
+          decimals: 18,
+          balance: "0",
+          priceData: {
+            id: "unknown",
+            current_price: 0,
+            price_change_percentage_24h: 0,
+            market_cap: 0,
+            total_volume: 0,
+            description: `This is a mock token for testing purposes. Contract: ${contractAddress}`,
+            image: null,
+          },
+        };
       }
 
       return {
