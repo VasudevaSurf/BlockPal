@@ -1072,6 +1072,13 @@ export default function UserProfilePage() {
         </div>
       )}
 
+      <TwoFactorSetupModal
+        isOpen={show2FAModal}
+        onClose={() => setShow2FAModal(false)}
+        onComplete={handle2FAComplete}
+        isEnabling={is2FAEnabling}
+      />
+
       <style jsx global>{`
         .scrollbar-hide {
           -ms-overflow-style: none;
