@@ -16,6 +16,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") || "all";
     const walletAddress = searchParams.get("walletAddress");
+    const limit = parseInt(searchParams.get("limit") || "100"); // Default limit
+    const offset = parseInt(searchParams.get("offset") || "0"); // For pagination
+
+    console.log(
+      `🔍 Fetching scheduled payments - Status: ${status}, Wallet: ${walletAddress}, Limit: ${limit}, Offset: ${offset}`
+    );
 
     const { db } = await connectToDatabase();
 
@@ -26,56 +32,175 @@ export async function GET(request: NextRequest) {
       query.walletAddress = walletAddress;
     }
 
+    // Handle status filtering
     if (status !== "all") {
-      query.status = status;
+      if (status === "completed") {
+        // Show ALL completed payments (including manually completed ones)
+        query.$or = [
+          { status: "completed" },
+          { status: "failed" }, // Sometimes users want to see failed ones too
+          { manuallyCompleted: true }, // Include manually completed ones
+        ];
+      } else {
+        query.status = status;
+      }
     }
 
-    // Fetch scheduled payments
+    console.log(`📋 Query being used:`, JSON.stringify(query, null, 2));
+
+    // Get total count for pagination
+    const totalCount = await db.collection("schedules").countDocuments(query);
+
+    // Fetch scheduled payments with proper sorting
+    let sortOrder: any = { createdAt: -1 }; // Default: newest first
+
+    // For completed payments, sort by completion date if available
+    if (status === "completed") {
+      sortOrder = {
+        completedAt: -1, // Completed payments by completion date (newest first)
+        lastExecutionAt: -1, // Fallback to last execution
+        createdAt: -1, // Final fallback to creation date
+      };
+    }
+
     const scheduledPayments = await db
       .collection("schedules")
       .find(query)
-      .sort({ createdAt: -1 })
+      .sort(sortOrder)
+      .skip(offset)
+      .limit(limit)
       .toArray();
 
-    // Transform to frontend format
-    const formattedPayments = scheduledPayments.map((payment) => ({
-      id: payment._id.toString(),
-      scheduleId: payment.scheduleId,
-      walletAddress: payment.walletAddress,
-      tokenSymbol: payment.tokenSymbol,
-      tokenName: payment.tokenName || payment.tokenSymbol,
-      contractAddress: payment.contractAddress,
-      recipient: payment.recipients?.[0] || payment.recipient,
-      amount: payment.amounts?.[0] || payment.totalAmount,
-      totalAmount: payment.totalAmount,
-      frequency: payment.frequency || "once",
-      status: payment.status,
-      scheduledFor: payment.scheduledFor || payment.nextExecutionAt,
-      nextExecution: payment.nextExecutionAt,
-      executionCount: payment.executedCount || 0,
-      maxExecutions: payment.maxExecutions || 1,
-      description: payment.description,
-      createdAt: payment.createdAt,
-      lastExecutionAt: payment.lastExecutionAt,
-      timezone: payment.timezone,
-      estimatedGas: payment.estimatedGas,
-      gasCostETH: payment.gasCostETH,
-      gasCostUSD: payment.gasCostUSD,
-    }));
+    console.log(
+      `📊 Found ${scheduledPayments.length} payments (Total: ${totalCount})`
+    );
+
+    // Enhanced transformation to include more details
+    const formattedPayments = scheduledPayments.map((payment) => {
+      // Determine display status
+      let displayStatus = payment.status;
+      if (payment.manuallyCompleted) {
+        displayStatus = "completed (manual)";
+      }
+      if (payment.fixedStuckProcessing) {
+        displayStatus = payment.status + " (auto-fixed)";
+      }
+
+      return {
+        id: payment._id.toString(),
+        scheduleId: payment.scheduleId,
+        walletAddress: payment.walletAddress,
+        tokenSymbol: payment.tokenSymbol,
+        tokenName: payment.tokenName || payment.tokenSymbol,
+        contractAddress: payment.contractAddress,
+        recipient: payment.recipients?.[0] || payment.recipient,
+        amount: payment.amounts?.[0] || payment.totalAmount,
+        totalAmount: payment.totalAmount,
+        frequency: payment.frequency || "once",
+        status: payment.status,
+        displayStatus: displayStatus, // Enhanced status for UI
+        scheduledFor: payment.scheduledFor || payment.nextExecutionAt,
+        nextExecution: payment.nextExecutionAt,
+        executionCount: payment.executedCount || 0,
+        maxExecutions: payment.maxExecutions || 1,
+        description: payment.description,
+        createdAt: payment.createdAt,
+        lastExecutionAt: payment.lastExecutionAt,
+        completedAt: payment.completedAt, // Important for completed payments
+        failedAt: payment.failedAt,
+        cancelledAt: payment.cancelledAt,
+        timezone: payment.timezone,
+        estimatedGas: payment.estimatedGas,
+        gasCostETH: payment.gasCostETH,
+        gasCostUSD: payment.gasCostUSD,
+
+        // Execution details
+        lastTransactionHash: payment.lastTransactionHash,
+        lastGasUsed: payment.lastGasUsed,
+        lastBlockNumber: payment.lastBlockNumber,
+        lastActualCostETH: payment.lastActualCostETH,
+        lastActualCostUSD: payment.lastActualCostUSD,
+
+        // Processing/completion metadata
+        processingBy: payment.processingBy,
+        processingStarted: payment.processingStarted,
+        manuallyCompleted: payment.manuallyCompleted,
+        manualCompletionAt: payment.manualCompletionAt,
+        fixedStuckProcessing: payment.fixedStuckProcessing,
+        fixedAt: payment.fixedAt,
+
+        // Error information
+        lastError: payment.lastError,
+        retryCount: payment.retryCount || 0,
+      };
+    });
+
+    // Add some statistics
+    const stats = {
+      total: totalCount,
+      returned: formattedPayments.length,
+      hasMore: offset + formattedPayments.length < totalCount,
+      offset: offset,
+      limit: limit,
+    };
+
+    // If showing completed payments, also get execution records for additional context
+    if (status === "completed" && formattedPayments.length > 0) {
+      const scheduleIds = formattedPayments.map((p) => p.scheduleId);
+
+      const executionRecords = await db
+        .collection("executed_transactions")
+        .find({
+          scheduleId: { $in: scheduleIds },
+          username: decoded.username,
+        })
+        .sort({ executedAt: -1 })
+        .toArray();
+
+      console.log(
+        `📊 Found ${executionRecords.length} execution records for completed payments`
+      );
+
+      // Attach execution records to payments
+      formattedPayments.forEach((payment) => {
+        const records = executionRecords.filter(
+          (record) => record.scheduleId === payment.scheduleId
+        );
+        payment.executionRecords = records.map((record) => ({
+          transactionHash: record.transactionHash,
+          executedAt: record.executedAt,
+          gasUsed: record.gasUsed,
+          blockNumber: record.blockNumber,
+          actualCostETH: record.actualCostETH,
+          actualCostUSD: record.actualCostUSD,
+          executionCount: record.executionCount,
+          isManualCompletion: record.isManualCompletion,
+        }));
+      });
+    }
+
+    console.log(`✅ Returning ${formattedPayments.length} formatted payments`);
 
     return NextResponse.json({
       scheduledPayments: formattedPayments,
       count: formattedPayments.length,
+      stats: stats,
+      status: status,
+      walletAddress: walletAddress,
     });
   } catch (error) {
-    console.error("Get scheduled payments error:", error);
+    console.error("💥 Get scheduled payments error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
 }
 
+// Rest of the POST method remains the same...
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("auth-token")?.value;
@@ -238,7 +363,6 @@ async function handleCreate(body: any, decoded: any) {
     const result = await db.collection("schedules").insertOne(scheduledPayment);
 
     // Schedule the job (implement your scheduling logic here)
-    // This could be handled by a background service or cron job
     console.log(`📅 Scheduled payment created: ${scheduleId}`);
     console.log(`⏰ Next execution: ${nextExecution.toISOString()}`);
 
@@ -290,130 +414,6 @@ async function handleApprove(body: any, decoded: any) {
     console.error("Approval error:", error);
     return NextResponse.json(
       { error: "Token approval failed: " + error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// src/app/api/scheduled-payments/[scheduleId]/route.ts
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ scheduleId: string }> }
-) {
-  try {
-    const token = request.cookies.get("auth-token")?.value;
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const resolvedParams = await params;
-    const { scheduleId } = resolvedParams;
-    const { action, status } = await request.json();
-
-    const { db } = await connectToDatabase();
-
-    if (action === "cancel") {
-      const result = await db.collection("schedules").updateOne(
-        {
-          scheduleId,
-          username: decoded.username,
-        },
-        {
-          $set: {
-            status: "cancelled",
-            cancelledAt: new Date(),
-          },
-        }
-      );
-
-      if (result.matchedCount === 0) {
-        return NextResponse.json(
-          { error: "Scheduled payment not found" },
-          { status: 404 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: "Scheduled payment cancelled successfully",
-      });
-    } else if (action === "execute") {
-      // Execute scheduled payment immediately
-      const schedule = await db.collection("schedules").findOne({
-        scheduleId,
-        username: decoded.username,
-      });
-
-      if (!schedule) {
-        return NextResponse.json(
-          { error: "Scheduled payment not found" },
-          { status: 404 }
-        );
-      }
-
-      if (schedule.status !== "active") {
-        return NextResponse.json(
-          { error: "Scheduled payment is not active" },
-          { status: 400 }
-        );
-      }
-
-      // Execute payment (you would need the private key for this)
-      // This is a placeholder - in production, you'd handle this securely
-      return NextResponse.json({
-        success: true,
-        message: "Manual execution initiated",
-      });
-    }
-
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error) {
-    console.error("Update scheduled payment error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ scheduleId: string }> }
-) {
-  try {
-    const token = request.cookies.get("auth-token")?.value;
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const resolvedParams = await params;
-    const { scheduleId } = resolvedParams;
-    const { db } = await connectToDatabase();
-
-    const result = await db.collection("schedules").deleteOne({
-      scheduleId,
-      username: decoded.username,
-    });
-
-    if (result.deletedCount === 0) {
-      return NextResponse.json(
-        { error: "Scheduled payment not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "Scheduled payment deleted successfully",
-    });
-  } catch (error) {
-    console.error("Delete scheduled payment error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
       { status: 500 }
     );
   }
