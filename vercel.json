@@ -2,11 +2,5 @@
   "buildCommand": "npm run build-no-lint",
   "env": {
     "SKIP_ENV_VALIDATION": "true"
-  },
-  // "crons": [
-  //   {
-  //     "path": "/api/scheduled-payments/executor",
-  //     "schedule": "*/2 * * * *"
-  //   }
-  // ]
+  }
 }
