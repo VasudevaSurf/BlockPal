@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx (UPDATED - Removed Wallet Section)
+// src/components/dashboard/Sidebar.tsx (UPDATED - Added User Profile)
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -41,6 +41,14 @@ const menuItems = [
     icon: Users,
     label: "Friends",
     href: "/dashboard/friends",
+  },
+];
+
+const otherItems = [
+  {
+    icon: User,
+    label: "User Profile",
+    href: "/dashboard/profile",
   },
 ];
 
@@ -160,10 +168,26 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         </div>
 
         <div className="space-y-2 lg:space-y-3">
-          <button className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base">
-            <User size={18} className="mr-3 flex-shrink-0" />
-            <span className="truncate">User profile</span>
-          </button>
+          {/* User Profile Link */}
+          {otherItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <button
+                key={item.label}
+                onClick={() => handleNavigation(item.href)}
+                className={`w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
+                  isActive
+                    ? "bg-[#E2AF19] text-black font-medium"
+                    : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
+                }`}
+              >
+                <item.icon size={18} className="mr-3 flex-shrink-0" />
+                <span className={isActive ? "font-medium" : ""}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
 
           <button className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base">
             <ExternalLink size={18} className="mr-3 flex-shrink-0" />
