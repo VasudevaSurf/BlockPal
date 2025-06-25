@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx (FIXED - Better Test Mode Support)
+// src/app/dashboard/page.tsx (UPDATED - With Payment Executor)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -21,6 +21,9 @@ import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
 import WalletSetupPrompt from "@/components/wallet/WalletSetupPrompt";
 import WalletSwitcher from "@/components/wallet/WalletSwitcher";
+
+// Import the web-based payment executor
+import { webScheduledPaymentExecutor } from "@/lib/web-scheduled-payment-executor";
 
 // Check if we're in test mode
 const isTestMode = process.env.NEXT_PUBLIC_TEST_MODE === "true";
@@ -51,10 +54,17 @@ export default function DashboardPage() {
   // Wallet switcher state
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
 
+  // Payment executor state
+  const [executorStatus, setExecutorStatus] = useState({
+    isRunning: false,
+    nextCheck: null as Date | null,
+  });
+
   // Use refs to track if we've already made initial calls
   const authChecked = useRef(false);
   const walletsLoaded = useRef(false);
   const testModeInitialized = useRef(false);
+  const executorInitialized = useRef(false);
 
   // Test mode initialization - run immediately
   useEffect(() => {
@@ -71,6 +81,36 @@ export default function DashboardPage() {
       console.log("🧪 Test mode: Initialization complete");
     }
   }, [dispatch]);
+
+  // Initialize payment executor when authenticated (test mode only)
+  useEffect(() => {
+    if (
+      isTestMode &&
+      !executorInitialized.current &&
+      (isAuthenticated || user)
+    ) {
+      console.log("🚀 Initializing payment executor for test mode");
+      executorInitialized.current = true;
+
+      // Start the payment executor
+      webScheduledPaymentExecutor.start();
+
+      // Update status periodically
+      const updateStatus = () => {
+        const status = webScheduledPaymentExecutor.getStatus();
+        setExecutorStatus(status);
+      };
+
+      updateStatus();
+      const statusInterval = setInterval(updateStatus, 10000); // Update every 10 seconds
+
+      // Cleanup function
+      return () => {
+        clearInterval(statusInterval);
+        webScheduledPaymentExecutor.stop();
+      };
+    }
+  }, [isAuthenticated, user]);
 
   // Auth check effect - only run in production mode
   useEffect(() => {
@@ -135,6 +175,9 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     if (isTestMode) {
       console.log("🧪 Test mode: Simulating logout");
+      // Stop the payment executor
+      webScheduledPaymentExecutor.stop();
+      executorInitialized.current = false;
       router.push("/auth");
       return;
     }
@@ -209,6 +252,7 @@ export default function DashboardPage() {
     isAuthenticated: isTestMode || isAuthenticated,
     walletsCount: wallets.length,
     activeWallet: activeWallet?.name,
+    executorRunning: executorStatus.isRunning,
   });
 
   return (
@@ -216,14 +260,43 @@ export default function DashboardPage() {
       {/* Test Mode Banner */}
       {isTestMode && (
         <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
-          <div className="flex items-center">
-            <span className="text-yellow-400 text-sm font-satoshi font-medium">
-              🧪 TEST MODE ACTIVE
-            </span>
-            <span className="text-yellow-400 text-xs font-satoshi ml-2">
-              Using test wallet: {activeWallet?.address?.slice(0, 10)}...
-              {activeWallet?.address?.slice(-6)}
-            </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-yellow-400 text-sm font-satoshi font-medium">
+                🧪 TEST MODE ACTIVE
+              </span>
+              <span className="text-yellow-400 text-xs font-satoshi ml-2">
+                Using test wallet: {activeWallet?.address?.slice(0, 10)}...
+                {activeWallet?.address?.slice(-6)}
+              </span>
+            </div>
+            <div className="flex items-center">
+              <div
+                className={`w-2 h-2 rounded-full mr-2 ${
+                  executorStatus.isRunning ? "bg-green-400" : "bg-red-400"
+                }`}
+              />
+              <span className="text-yellow-400 text-xs font-satoshi">
+                Scheduler: {executorStatus.isRunning ? "Running" : "Stopped"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Scheduled Payment Executor Status (Test Mode Only) */}
+      {isTestMode && executorStatus.isRunning && (
+        <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse" />
+              <span className="text-green-400 text-sm font-satoshi font-medium">
+                ⚡ Payment Executor Active
+              </span>
+            </div>
+            <div className="text-green-400 text-xs font-satoshi">
+              Checking for due payments every 30 seconds
+            </div>
           </div>
         </div>
       )}
