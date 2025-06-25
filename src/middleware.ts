@@ -1,8 +1,7 @@
-// src/middleware.ts (FIXED - Test Mode Support)
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Check if we're in test mode
+// Check if we're in test mode - ensure this reads from the environment correctly
 const isTestMode = process.env.NEXT_PUBLIC_TEST_MODE === "true";
 
 export function middleware(request: NextRequest) {
@@ -15,6 +14,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/images/") ||
     pathname.startsWith("/icons/") ||
     pathname.startsWith("/.well-known/") ||
+    pathname.startsWith("/api/") || // IMPORTANT: Skip middleware for ALL API routes
     (pathname.includes(".") &&
       (pathname.endsWith(".js") ||
         pathname.endsWith(".css") ||
@@ -48,17 +48,6 @@ export function middleware(request: NextRequest) {
 
   // Public paths that don't require authentication
   const publicPaths = ["/", "/auth"];
-  const apiAuthPaths = [
-    "/api/auth/login",
-    "/api/auth/register",
-    "/api/auth/logout",
-  ];
-
-  // Allow API auth routes
-  if (apiAuthPaths.some((path) => pathname.startsWith(path))) {
-    console.log("Allowing API auth route:", pathname);
-    return NextResponse.next();
-  }
 
   // Check for authentication token
   const token = request.cookies.get("auth-token")?.value;
@@ -71,7 +60,6 @@ export function middleware(request: NextRequest) {
   }
 
   // If token exists, we'll trust it's valid for now
-  // (Real validation happens on the server-side API routes)
   if (token) {
     try {
       // Simple token format check (JWT has 3 parts separated by dots)
@@ -124,7 +112,7 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
+     * - api (API routes) - REMOVED from matcher to skip middleware
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)

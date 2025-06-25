@@ -1,7 +1,8 @@
-// src/app/api/tokens/[contractAddress]/route.ts (FIXED - Better Test Mode Support)
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { cryptoService } from "@/lib/crypto-integration";
+
+const isTestMode = process.env.NEXT_PUBLIC_TEST_MODE === "true";
 
 // Helper function to convert BigInt values to strings for JSON serialization
 function serializeBigInt(obj: any): any {
@@ -35,10 +36,16 @@ export async function GET(
   { params }: { params: Promise<{ contractAddress: string }> }
 ) {
   try {
+    console.log("🔍 Token API Request - Test Mode:", isTestMode);
+
     const token = request.cookies.get("auth-token")?.value;
+    console.log("🍪 Token exists:", !!token);
+
     const decoded = verifyToken(token);
+    console.log("🔓 Token decoded:", !!decoded);
 
     if (!decoded) {
+      console.log("❌ Unauthorized - no valid token");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -51,6 +58,7 @@ export async function GET(
       contractAddress,
       walletAddress,
       rawContractAddress: contractAddress,
+      isTestMode,
     });
 
     if (!walletAddress) {
@@ -73,7 +81,7 @@ export async function GET(
 
     let tokenInfo;
 
-    // FIXED: Better handling of ETH and contract addresses
+    // Handle ETH and contract addresses
     if (
       contractAddress === "native" ||
       contractAddress === "ETH" ||
@@ -105,8 +113,6 @@ export async function GET(
     } else {
       console.log("🪙 Handling ERC-20 token:", contractAddress);
 
-      // FIXED: In test mode, we don't need to validate addresses strictly
-      // Just attempt to get token info and let the service handle it
       try {
         // Handle ERC-20 tokens
         tokenInfo = await cryptoService.getTokenInfo(
@@ -123,8 +129,8 @@ export async function GET(
       } catch (error) {
         console.error("❌ Error fetching token info:", error);
 
-        // FIXED: Instead of returning 404, return a mock response for test mode
-        if (cryptoService.isTestMode()) {
+        // In test mode or if the token is not found, return mock data
+        if (isTestMode || cryptoService.isTestMode()) {
           console.log(
             "🧪 Test mode: Returning mock token data for unknown contract"
           );
@@ -173,7 +179,7 @@ export async function GET(
       contractAddress: tokenInfo.contractAddress,
     });
 
-    // FIXED: Serialize BigInt values before sending response
+    // Serialize BigInt values before sending response
     const serializedTokenInfo = serializeBigInt(tokenInfo);
     const serializedWalletAddress = serializeBigInt(walletAddress);
 
