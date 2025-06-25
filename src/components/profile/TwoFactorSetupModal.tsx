@@ -1,4 +1,3 @@
-// src/components/profile/TwoFactorSetupModal.tsx
 "use client";
 
 import { useState, useEffect } from "react";

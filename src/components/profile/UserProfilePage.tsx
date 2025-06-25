@@ -1,4 +1,3 @@
-// src/components/profile/UserProfilePage.tsx (UPDATED - with 2FA Modal Integration)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -67,8 +66,11 @@ export default function UserProfilePage() {
   const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+
+  // FIXED: 2FA Modal State
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [is2FAEnabling, setIs2FAEnabling] = useState(false);
+
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -90,6 +92,7 @@ export default function UserProfilePage() {
       if (response.ok) {
         const data = await response.json();
         setProfile(data.profile);
+        console.log("✅ Profile loaded:", data.profile);
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -151,15 +154,33 @@ export default function UserProfilePage() {
     }
   };
 
+  // FIXED: 2FA Toggle Handler
   const handleToggle2FA = async () => {
-    if (!profile) return;
+    if (!profile) {
+      console.log("❌ No profile available");
+      return;
+    }
 
-    // Open the 2FA setup modal
+    console.log("🔒 2FA Toggle clicked", {
+      currentlyEnabled: profile.twoFactorEnabled,
+      willEnable: !profile.twoFactorEnabled,
+    });
+
+    // Set the action we want to perform
     setIs2FAEnabling(!profile.twoFactorEnabled);
+
+    // Show the modal
     setShow2FAModal(true);
+
+    console.log("✅ 2FA Modal should now be open:", {
+      show2FAModal: true,
+      is2FAEnabling: !profile.twoFactorEnabled,
+    });
   };
 
+  // FIXED: 2FA Complete Handler
   const handle2FAComplete = async () => {
+    console.log("🎉 2FA Setup completed, refreshing profile...");
     // Refresh profile to get updated 2FA status
     await fetchUserProfile();
   };
@@ -427,6 +448,7 @@ export default function UserProfilePage() {
               </button>
             </div>
 
+            {/* FIXED: 2FA Section */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Shield size={16} className="text-gray-400 mr-3" />
@@ -436,7 +458,12 @@ export default function UserProfilePage() {
                   </span>
                   {profile.twoFactorEnabled && (
                     <div className="text-green-400 text-xs font-satoshi">
-                      Enabled
+                      ✅ Enabled
+                    </div>
+                  )}
+                  {!profile.twoFactorEnabled && (
+                    <div className="text-gray-400 text-xs font-satoshi">
+                      ❌ Disabled
                     </div>
                   )}
                 </div>
@@ -771,6 +798,7 @@ export default function UserProfilePage() {
                 </button>
               </div>
 
+              {/* FIXED: 2FA Section - Desktop */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <Shield size={20} className="text-gray-400 mr-3" />
@@ -780,7 +808,12 @@ export default function UserProfilePage() {
                     </span>
                     {profile.twoFactorEnabled && (
                       <div className="text-green-400 text-sm font-satoshi">
-                        Currently Enabled
+                        Currently Enabled ✅
+                      </div>
+                    )}
+                    {!profile.twoFactorEnabled && (
+                      <div className="text-gray-400 text-sm font-satoshi">
+                        Currently Disabled ❌
                       </div>
                     )}
                   </div>
@@ -1072,12 +1105,18 @@ export default function UserProfilePage() {
         </div>
       )}
 
-      <TwoFactorSetupModal
-        isOpen={show2FAModal}
-        onClose={() => setShow2FAModal(false)}
-        onComplete={handle2FAComplete}
-        isEnabling={is2FAEnabling}
-      />
+      {/* FIXED: 2FA Setup Modal */}
+      {show2FAModal && (
+        <TwoFactorSetupModal
+          isOpen={show2FAModal}
+          onClose={() => {
+            console.log("🔒 Closing 2FA modal");
+            setShow2FAModal(false);
+          }}
+          onComplete={handle2FAComplete}
+          isEnabling={is2FAEnabling}
+        />
+      )}
 
       <style jsx global>{`
         .scrollbar-hide {

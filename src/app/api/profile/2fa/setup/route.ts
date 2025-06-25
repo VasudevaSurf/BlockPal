@@ -1,11 +1,11 @@
-// src/app/api/profile/2fa/setup/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import bcrypt from "bcryptjs";
-import * as speakeasy from "speakeasy";
-import * as QRCode from "qrcode";
+// Use default import instead of named import
+import speakeasy from "speakeasy";
+import QRCode from "qrcode";
 import crypto from "crypto";
 
 export async function POST(request: NextRequest) {
