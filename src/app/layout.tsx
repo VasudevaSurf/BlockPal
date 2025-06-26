@@ -3,26 +3,12 @@
 import "./globals.css";
 import { Provider } from "react-redux";
 import { store } from "@/store";
-import {
-  initializeScheduledPaymentServices,
-  shutdownScheduledPaymentServices,
-} from "@/lib/scheduled-payment-cron";
-import { useEffect } from "react";
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  useEffect(() => {
-    // Initialize scheduled payment services
-    initializeScheduledPaymentServices();
-
-    // Cleanup on unmount
-    return () => {
-      shutdownScheduledPaymentServices();
-    };
-  }, []);
   return (
     <html lang="en">
       <head>
