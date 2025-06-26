@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx (UPDATED with Wallet Switcher)
+// src/app/dashboard/page.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";

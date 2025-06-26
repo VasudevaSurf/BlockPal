@@ -1,3 +1,4 @@
+// src/app/dashboard/scheduled-payments/page.tsx
 "use client";
 
 import { useEffect } from "react";

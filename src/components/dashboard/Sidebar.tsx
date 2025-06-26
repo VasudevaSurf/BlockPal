@@ -72,7 +72,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       className="relative w-full lg:w-64 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
       style={{ borderRadius: "20px" }}
     >
-      {/* Top Gradient Blur - Reduced for mobile */}
+      {/* Top Gradient Blur */}
       <div
         className="absolute -top-2 lg:-top-5 -left-2 lg:-left-5 -right-2 lg:-right-5 h-40 lg:h-80 pointer-events-none z-10"
         style={{
@@ -83,7 +83,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         }}
       />
 
-      {/* Bottom Gradient Blur - Reduced for mobile */}
+      {/* Bottom Gradient Blur */}
       <div
         className="absolute -bottom-2 lg:-bottom-5 -left-2 lg:-left-5 -right-2 lg:-right-5 h-40 lg:h-80 pointer-events-none z-10"
         style={{

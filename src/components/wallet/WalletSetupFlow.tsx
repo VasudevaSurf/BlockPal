@@ -1,3 +1,4 @@
+// src/components/wallet/WalletSetupFlow.tsx
 "use client";
 
 import { useState } from "react";

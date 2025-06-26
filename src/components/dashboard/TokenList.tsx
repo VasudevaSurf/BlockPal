@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx (FIXED - Contract Address Navigation)
+// src/components/dashboard/TokenList.tsx (Production Ready)
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -67,6 +67,7 @@ export default function TokenList() {
       USDT: "bg-green-500",
       USDC: "bg-blue-600",
       YAI: "bg-yellow-500",
+      LINK: "bg-blue-700",
     };
 
     return colors[symbol] || "bg-gray-500";
@@ -86,6 +87,7 @@ export default function TokenList() {
       USDT: "₮",
       USDC: "$",
       YAI: "Ÿ",
+      LINK: "⛓",
     };
 
     return letters[symbol] || symbol.charAt(0);
@@ -98,16 +100,27 @@ export default function TokenList() {
       symbol: token.symbol,
       contractAddress: token.contractAddress,
       name: token.name,
+      activeWallet: activeWallet?.address,
     });
 
-    // FIXED: Proper contract address handling
+    // Proper contract address handling with better error handling
     let routeContractAddress: string;
+
+    if (!activeWallet?.address) {
+      console.error("❌ No active wallet found");
+      alert("Please select an active wallet first.");
+      return;
+    }
 
     if (token.contractAddress === "native" || token.symbol === "ETH") {
       // For native ETH, use "ETH" as the route parameter
       routeContractAddress = "ETH";
       console.log("📍 Routing to ETH (native token)");
-    } else if (token.contractAddress && token.contractAddress !== "undefined") {
+    } else if (
+      token.contractAddress &&
+      token.contractAddress !== "undefined" &&
+      token.contractAddress !== ""
+    ) {
       // For ERC-20 tokens, use the actual contract address
       routeContractAddress = token.contractAddress;
       console.log("📍 Routing to ERC-20 token:", routeContractAddress);
@@ -120,10 +133,19 @@ export default function TokenList() {
       return;
     }
 
-    // Navigate to token details page
-    const url = `/dashboard/token/${routeContractAddress}?wallet=${activeWallet?.address}`;
-    console.log("🔗 Navigating to:", url);
-    router.push(url);
+    try {
+      // Navigate to token details page
+      const url = `/dashboard/token/${encodeURIComponent(
+        routeContractAddress
+      )}?wallet=${encodeURIComponent(activeWallet.address)}`;
+      console.log("🔗 Navigating to:", url);
+
+      // Use router.push with error handling
+      router.push(url);
+    } catch (error) {
+      console.error("❌ Navigation error:", error);
+      alert("Failed to navigate to token details. Please try again.");
+    }
   };
 
   // Only use real tokens from database
@@ -228,7 +250,7 @@ export default function TokenList() {
             <div
               key={token.id}
               onClick={() => handleTokenClick(token)}
-              className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] cursor-pointer hover:bg-[#1A1A1A] transition-colors"
+              className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] cursor-pointer hover:bg-[#1A1A1A] transition-colors active:bg-[#2A2A2A]"
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
@@ -292,7 +314,7 @@ export default function TokenList() {
             <div
               key={token.id}
               onClick={() => handleTokenClick(token)}
-              className="flex items-center justify-between p-3 hover:bg-[#1A1A1A] rounded-lg transition-colors cursor-pointer"
+              className="flex items-center justify-between p-3 hover:bg-[#1A1A1A] rounded-lg transition-colors cursor-pointer active:bg-[#2A2A2A]"
             >
               <div className="flex items-center min-w-0 flex-1">
                 {token.icon && token.icon.startsWith("http") ? (
@@ -322,16 +344,6 @@ export default function TokenList() {
                 <div className="min-w-0 flex-1">
                   <div className="text-white font-medium font-satoshi text-sm sm:text-base flex items-center">
                     {token.name}
-                    {/* Debug info in development */}
-                    {process.env.NODE_ENV === "development" && (
-                      <span className="text-xs text-gray-500 ml-2">
-                        (
-                        {token.contractAddress === "native"
-                          ? "native"
-                          : token.contractAddress?.slice(0, 8)}
-                        )
-                      </span>
-                    )}
                   </div>
                   <div className="text-gray-400 text-xs sm:text-sm font-satoshi">
                     {token.balance.toFixed(4)} {token.symbol}

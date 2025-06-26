@@ -1,3 +1,4 @@
+// src/app/dashboard/wallet-setup/page.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -6,7 +7,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import WalletSetupFlow from "@/components/wallet/WalletSetupFlow";
 
-export default function WalletSetupPage() {
+export default function WalletSetup() {
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
   const router = useRouter();
 

@@ -11,6 +11,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/images/") ||
     pathname.startsWith("/icons/") ||
     pathname.startsWith("/.well-known/") ||
+    pathname.startsWith("/api/") || // Skip middleware for ALL API routes
     (pathname.includes(".") &&
       (pathname.endsWith(".js") ||
         pathname.endsWith(".css") ||
@@ -34,17 +35,6 @@ export function middleware(request: NextRequest) {
 
   // Public paths that don't require authentication
   const publicPaths = ["/", "/auth"];
-  const apiAuthPaths = [
-    "/api/auth/login",
-    "/api/auth/register",
-    "/api/auth/logout",
-  ];
-
-  // Allow API auth routes
-  if (apiAuthPaths.some((path) => pathname.startsWith(path))) {
-    console.log("Allowing API auth route:", pathname);
-    return NextResponse.next();
-  }
 
   // Check for authentication token
   const token = request.cookies.get("auth-token")?.value;
@@ -56,8 +46,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth", request.url));
   }
 
-  // If token exists, we'll trust it's valid for now
-  // (Real validation happens on the server-side API routes)
+  // If token exists, validate it
   if (token) {
     try {
       // Simple token format check (JWT has 3 parts separated by dots)

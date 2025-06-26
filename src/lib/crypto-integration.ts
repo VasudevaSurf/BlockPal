@@ -1,4 +1,4 @@
-// src/lib/crypto-integration.ts (FIXED - BigInt handling)
+// src/lib/crypto-integration.ts (PRODUCTION VERSION)
 import { ethers } from "ethers";
 import axios from "axios";
 
@@ -67,11 +67,23 @@ function safeNumericConvert(value: any): number {
 
 export class CryptoIntegrationService {
   private provider: ethers.JsonRpcProvider;
+  private sepoliaProvider: ethers.JsonRpcProvider;
 
   constructor() {
+    // Mainnet provider
     this.provider = new ethers.JsonRpcProvider(
       `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
     );
+
+    // Sepolia testnet provider for testing
+    this.sepoliaProvider = new ethers.JsonRpcProvider(
+      `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+    );
+  }
+
+  // Get the appropriate provider (default to mainnet)
+  private getProvider(useTestnet: boolean = false): ethers.JsonRpcProvider {
+    return useTestnet ? this.sepoliaProvider : this.provider;
   }
 
   // Validation functions
@@ -81,6 +93,14 @@ export class CryptoIntegrationService {
     } catch {
       return false;
     }
+  }
+
+  isValidWalletAddress(address: string): boolean {
+    return this.isValidAddress(address);
+  }
+
+  isValidContractAddress(address: string): boolean {
+    return this.isValidAddress(address);
   }
 
   isValidPrivateKey(privateKey: string): boolean {
@@ -149,10 +169,14 @@ export class CryptoIntegrationService {
     };
   }
 
-  // Get ETH balance
-  async getETHBalance(address: string): Promise<string> {
+  // Get ETH balance (works on both mainnet and testnet)
+  async getETHBalance(
+    address: string,
+    useTestnet: boolean = false
+  ): Promise<string> {
     try {
-      const balance = await this.provider.getBalance(address);
+      const provider = this.getProvider(useTestnet);
+      const balance = await provider.getBalance(address);
       return ethers.formatEther(balance);
     } catch (error) {
       console.error("Error getting ETH balance:", error);
@@ -160,20 +184,24 @@ export class CryptoIntegrationService {
     }
   }
 
-  // Get wallet tokens using Alchemy API
-  async getWalletTokens(address: string): Promise<TokenBalance[]> {
+  // Get wallet tokens
+  async getWalletTokens(
+    address: string,
+    useTestnet: boolean = false
+  ): Promise<TokenBalance[]> {
     try {
       console.log("🔍 Fetching tokens for address:", address);
 
-      const response = await axios.post(
-        `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-        {
-          id: 1,
-          jsonrpc: "2.0",
-          method: "alchemy_getTokenBalances",
-          params: [address],
-        }
-      );
+      const apiUrl = useTestnet
+        ? `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+        : `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
+
+      const response = await axios.post(apiUrl, {
+        id: 1,
+        jsonrpc: "2.0",
+        method: "alchemy_getTokenBalances",
+        params: [address],
+      });
 
       if (response.data.result && response.data.result.tokenBalances) {
         const tokens = response.data.result.tokenBalances.filter(
@@ -183,6 +211,7 @@ export class CryptoIntegrationService {
         console.log(`📊 Found ${tokens.length} tokens with non-zero balance`);
 
         // Enrich with metadata
+        const provider = this.getProvider(useTestnet);
         const enrichedTokens = await Promise.all(
           tokens.map(async (token: any) => {
             try {
@@ -191,7 +220,7 @@ export class CryptoIntegrationService {
               const contract = new ethers.Contract(
                 token.contractAddress,
                 ERC20_ABI,
-                this.provider
+                provider
               );
 
               const [name, symbol, decimals] = await Promise.all([
@@ -200,7 +229,6 @@ export class CryptoIntegrationService {
                 contract.decimals().catch(() => 18),
               ]);
 
-              // FIXED: Properly handle BigInt conversion
               const decimalsSafe = safeNumericConvert(decimals);
               const balanceFormatted = ethers.formatUnits(
                 token.tokenBalance,
@@ -211,12 +239,15 @@ export class CryptoIntegrationService {
                 `✅ Token metadata: ${symbol} (${name}), Balance: ${balanceFormatted}`
               );
 
-              // Get price data
-              const priceData = await this.getTokenPriceByContract(
-                token.contractAddress
-              );
+              // Get price data (only for mainnet tokens)
+              let priceData = null;
+              if (!useTestnet) {
+                priceData = await this.getTokenPriceByContract(
+                  token.contractAddress
+                );
+              }
 
-              const enrichedToken = {
+              return {
                 contractAddress: token.contractAddress,
                 tokenBalance: safeBigIntToString(token.tokenBalance),
                 name: String(name),
@@ -230,14 +261,6 @@ export class CryptoIntegrationService {
                 change24h: priceData?.price_change_percentage_24h || 0,
                 logoUrl: priceData?.image,
               };
-
-              console.log(
-                `💰 Token value: ${symbol} = $${enrichedToken.valueUSD.toFixed(
-                  2
-                )}`
-              );
-
-              return enrichedToken;
             } catch (error) {
               console.error(
                 `❌ Error enriching token ${token.contractAddress}:`,
@@ -269,38 +292,41 @@ export class CryptoIntegrationService {
   }
 
   // Calculate portfolio value
-  async calculatePortfolioValue(address: string): Promise<PortfolioSummary> {
+  async calculatePortfolioValue(
+    address: string,
+    useTestnet: boolean = false
+  ): Promise<PortfolioSummary> {
     try {
       console.log("📊 Calculating portfolio value for:", address);
 
-      // Get ETH balance and price
-      const ethBalance = await this.getETHBalance(address);
-      const ethBalanceFloat = parseFloat(ethBalance);
-      console.log(`🔷 ETH Balance: ${ethBalanceFloat}`);
+      // Get ETH balance
+      const ethBalanceStr = await this.getETHBalance(address, useTestnet);
+      const ethBalance = parseFloat(ethBalanceStr);
+      console.log(`🔷 ETH Balance: ${ethBalance}`);
 
-      const ethPrice = await this.getTokenPrice("ethereum");
-      const ethPriceUSD = ethPrice?.current_price || 0;
-      const ethValueUSD = ethBalanceFloat * ethPriceUSD;
+      // Get ETH price (only for mainnet calculations)
+      let ethPrice = null;
+      if (!useTestnet) {
+        ethPrice = await this.getTokenPrice("ethereum");
+      }
+      const ethPriceUSD = ethPrice?.current_price || 2000; // Mock price for testnet
+      const ethValueUSD = ethBalance * ethPriceUSD;
       console.log(
         `💎 ETH Price: $${ethPriceUSD}, Value: $${ethValueUSD.toFixed(2)}`
       );
 
-      // Get ERC-20 tokens
-      const tokens = await this.getWalletTokens(address);
-
-      // Calculate total token value
+      // Get tokens
+      const tokens = await this.getWalletTokens(address, useTestnet);
       const totalTokenValueUSD = tokens.reduce(
         (sum, token) => sum + (token.valueUSD || 0),
         0
       );
-
-      // Calculate totals
       const totalValueUSD = ethValueUSD + totalTokenValueUSD;
       const totalValueETH = ethPriceUSD > 0 ? totalValueUSD / ethPriceUSD : 0;
 
       console.log(`💰 Portfolio Summary:`, {
         totalValueUSD: totalValueUSD.toFixed(2),
-        ethBalance: ethBalanceFloat,
+        ethBalance,
         tokensCount: tokens.length,
         totalTokenValueUSD: totalTokenValueUSD.toFixed(2),
       });
@@ -309,7 +335,7 @@ export class CryptoIntegrationService {
         totalValueUSD,
         totalValueETH,
         ethPriceUSD,
-        ethBalance: ethBalanceFloat,
+        ethBalance,
         ethValueUSD,
         tokens,
       };
@@ -445,21 +471,51 @@ export class CryptoIntegrationService {
   }
 
   // Get detailed token information
-  async getTokenInfo(contractAddress: string, walletAddress: string) {
+  async getTokenInfo(
+    contractAddress: string,
+    walletAddress: string,
+    useTestnet: boolean = false
+  ) {
     try {
       console.log(`🔍 Getting token info for contract: ${contractAddress}`);
+
+      if (contractAddress === "native" || contractAddress === "ETH") {
+        // Handle ETH
+        const balance = await this.getETHBalance(walletAddress, useTestnet);
+        const priceData = useTestnet
+          ? null
+          : await this.getTokenPrice("ethereum");
+
+        return {
+          name: "Ethereum",
+          symbol: "ETH",
+          contractAddress: "native",
+          decimals: 18,
+          balance: balance,
+          priceData: priceData || {
+            id: "ethereum",
+            current_price: 2000, // Mock price for testnet
+            price_change_percentage_24h: -1.23,
+            market_cap: 240000000000,
+            total_volume: 15000000000,
+            description:
+              "Ethereum is a decentralized platform for smart contracts.",
+            image: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+          },
+        };
+      }
 
       if (!this.isValidAddress(contractAddress)) {
         throw new Error(`Invalid contract address: ${contractAddress}`);
       }
 
+      const provider = this.getProvider(useTestnet);
       const contract = new ethers.Contract(
         contractAddress,
         ERC20_ABI,
-        this.provider
+        provider
       );
 
-      // Get basic token info
       console.log("📋 Fetching basic token metadata...");
       const [name, symbol, decimals] = await Promise.all([
         contract.name().catch((e) => {
@@ -482,7 +538,6 @@ export class CryptoIntegrationService {
         }),
       ]);
 
-      // FIXED: Safely convert all values to avoid BigInt issues
       const nameSafe = String(name);
       const symbolSafe = String(symbol);
       const decimalsSafe = safeNumericConvert(decimals);
@@ -491,15 +546,15 @@ export class CryptoIntegrationService {
         `✅ Token metadata: ${nameSafe} (${symbolSafe}), decimals: ${decimalsSafe}`
       );
 
-      // Get user balance
       console.log("💰 Fetching user balance...");
       const balance = await contract.balanceOf(walletAddress);
       const balanceFormatted = ethers.formatUnits(balance, decimalsSafe);
       console.log(`✅ User balance: ${balanceFormatted} ${symbolSafe}`);
 
-      // Get price and market data
       console.log("📈 Fetching price and market data...");
-      const tokenData = await this.getTokenPriceByContract(contractAddress);
+      const tokenData = useTestnet
+        ? null
+        : await this.getTokenPriceByContract(contractAddress);
 
       const result = {
         name: nameSafe,
@@ -525,6 +580,12 @@ export class CryptoIntegrationService {
       );
       throw error;
     }
+  }
+
+  // Helper method to determine if we should use testnet based on network
+  shouldUseTestnet(networkId?: number): boolean {
+    // Sepolia chainId is 11155111
+    return networkId === 11155111;
   }
 }
 

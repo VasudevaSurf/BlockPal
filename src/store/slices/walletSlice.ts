@@ -1,4 +1,3 @@
-// src/store/slices/walletSlice.ts (FIXED - Token Contract Address Mapping)
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { WalletState, Wallet, Token } from "@/types";
 
@@ -391,7 +390,7 @@ const walletSlice = createSlice({
         state.loading = false;
 
         if (action.payload && action.payload.tokens) {
-          // FIXED: Use real tokens from API response with proper contract addresses
+          // Use real tokens from API response with proper contract addresses
           state.tokens = action.payload.tokens.map((token: any) => ({
             id: token.contractAddress || `${token.symbol}-${Date.now()}`, // Use contract address as ID
             symbol: token.symbol,
