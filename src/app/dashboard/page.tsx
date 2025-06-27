@@ -1,10 +1,18 @@
-// src/app/dashboard/page.tsx
+// src/app/dashboard/page.tsx - Add this to your existing dashboard
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { Bell, Settings, LogOut, Wallet, ChevronDown } from "lucide-react";
+import {
+  Bell,
+  Settings,
+  LogOut,
+  Wallet,
+  ChevronDown,
+  Play,
+  Pause,
+} from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
 import { fetchWallets, setActiveWallet } from "@/store/slices/walletSlice";
@@ -13,6 +21,9 @@ import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
 import WalletSwitcher from "@/components/wallet/WalletSwitcher";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
+
+// Import the payment executor
+import { webScheduledPaymentExecutor } from "@/lib/web-scheduled-payment-executor";
 
 export default function DashboardPage() {
   const {
@@ -28,16 +39,131 @@ export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
+  // Payment executor state
+  const [executorRunning, setExecutorRunning] = useState(false);
+  const [executorStatus, setExecutorStatus] = useState<any>(null);
+  const executorInitialized = useRef(false);
+
   // Wallet switcher state
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
-
-  // Welcome modal state
   const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
 
   // Use refs to track if we've already made initial calls
   const authChecked = useRef(false);
   const walletsLoaded = useRef(false);
   const activeWalletSet = useRef(false);
+
+  // Initialize payment executor when user is authenticated and has wallets
+  useEffect(() => {
+    console.log("🔧 Payment executor initialization effect", {
+      isAuthenticated,
+      hasActiveWallet: !!activeWallet,
+      executorInitialized: executorInitialized.current,
+    });
+
+    if (isAuthenticated && activeWallet && !executorInitialized.current) {
+      console.log("🚀 Initializing payment executor...");
+
+      // Get private key from the wallet and start executor
+      initializePaymentExecutor();
+      executorInitialized.current = true;
+    }
+  }, [isAuthenticated, activeWallet]);
+
+  // Update executor status periodically
+  useEffect(() => {
+    if (executorRunning) {
+      const statusInterval = setInterval(() => {
+        const status = webScheduledPaymentExecutor.getStatus();
+        setExecutorStatus(status);
+      }, 5000); // Update every 5 seconds
+
+      return () => clearInterval(statusInterval);
+    }
+  }, [executorRunning]);
+
+  const initializePaymentExecutor = async () => {
+    try {
+      if (!activeWallet?.address) {
+        console.log("❌ No active wallet found for executor");
+        return;
+      }
+
+      console.log("🔑 Getting private key for payment executor...");
+
+      // Get the private key from your wallet API
+      const response = await fetch("/api/wallets/private-key", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          walletAddress: activeWallet.address,
+        }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        console.log("✅ Private key retrieved, starting executor...");
+
+        // Set the private key and start the executor
+        webScheduledPaymentExecutor.setPrivateKey(data.privateKey);
+        webScheduledPaymentExecutor.start();
+
+        setExecutorRunning(true);
+        setExecutorStatus(webScheduledPaymentExecutor.getStatus());
+
+        console.log("✅ Payment executor started successfully!");
+
+        // Show notification
+        if ("Notification" in window && Notification.permission !== "denied") {
+          if (Notification.permission === "granted") {
+            new Notification("Payment Executor Started", {
+              body: "Scheduled payments will now be executed automatically",
+              icon: "/favicon.ico",
+            });
+          } else {
+            Notification.requestPermission().then((permission) => {
+              if (permission === "granted") {
+                new Notification("Payment Executor Started", {
+                  body: "Scheduled payments will now be executed automatically",
+                  icon: "/favicon.ico",
+                });
+              }
+            });
+          }
+        }
+      } else {
+        console.error("❌ Failed to get private key:", data.error);
+      }
+    } catch (error) {
+      console.error("💥 Error initializing payment executor:", error);
+    }
+  };
+
+  const toggleExecutor = () => {
+    if (executorRunning) {
+      console.log("🛑 Stopping payment executor...");
+      webScheduledPaymentExecutor.stop();
+      setExecutorRunning(false);
+      setExecutorStatus(null);
+    } else {
+      console.log("🚀 Starting payment executor...");
+      initializePaymentExecutor();
+    }
+  };
+
+  // Cleanup executor on unmount
+  useEffect(() => {
+    return () => {
+      if (executorRunning) {
+        console.log("🧹 Cleaning up payment executor...");
+        webScheduledPaymentExecutor.stop();
+      }
+    };
+  }, []);
 
   // Auth check effect - only run once
   useEffect(() => {
@@ -58,14 +184,13 @@ export default function DashboardPage() {
       authChecked: authChecked.current,
     });
 
-    // Only redirect if auth check is complete and user is not authenticated
     if (authChecked.current && !authLoading && !isAuthenticated) {
       console.log("🔄 Redirecting to auth");
       router.push("/auth");
     }
   }, [isAuthenticated, authLoading, router]);
 
-  // Wallets loading effect - only run when authenticated and not already loaded
+  // Wallets loading effect
   useEffect(() => {
     console.log("💼 Dashboard - Wallets effect", {
       isAuthenticated,
@@ -81,7 +206,7 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, user, dispatch]);
 
-  // Welcome modal effect - show when authenticated but no wallets (and wallets have been loaded)
+  // Welcome modal effect
   useEffect(() => {
     console.log("🎭 Welcome modal effect:", {
       isAuthenticated,
@@ -91,12 +216,6 @@ export default function DashboardPage() {
       user: !!user,
     });
 
-    // Only show modal when:
-    // 1. User is authenticated
-    // 2. User data is loaded
-    // 3. Wallets have been loaded (not loading)
-    // 4. No wallets exist
-    // 5. We have actually attempted to load wallets
     if (
       isAuthenticated &&
       user &&
@@ -120,16 +239,21 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     try {
+      // Stop executor before logout
+      if (executorRunning) {
+        webScheduledPaymentExecutor.stop();
+        setExecutorRunning(false);
+      }
+
       await dispatch(logoutUser());
       router.push("/auth");
     } catch (error) {
       console.error("Logout error:", error);
-      // Force redirect even if logout fails
       router.push("/auth");
     }
   };
 
-  // Set active wallet effect - only run when wallets are loaded and no active wallet
+  // Set active wallet effect
   useEffect(() => {
     console.log("🎯 Dashboard - Active wallet effect", {
       activeWallet: !!activeWallet,
@@ -146,13 +270,12 @@ export default function DashboardPage() {
   }, [activeWallet, wallets, dispatch]);
 
   const handleWalletCreated = () => {
-    // Refresh wallets after creation
     walletsLoaded.current = false;
     dispatch(fetchWallets());
     setWelcomeModalOpen(false);
   };
 
-  // Show loading state only while checking authentication OR if not authenticated yet
+  // Show loading state
   if (authLoading || (!isAuthenticated && !authChecked.current)) {
     console.log("🔄 Dashboard - Showing auth loading state");
     return (
@@ -162,7 +285,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Redirect if not authenticated (but don't show loading)
   if (!isAuthenticated) {
     console.log("🚪 Dashboard - User not authenticated, should redirect");
     return null;
@@ -196,7 +318,39 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
-          {/* Wallet Selector - Only show if wallets exist */}
+          {/* Payment Executor Status */}
+          {wallets.length > 0 && (
+            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3">
+              <button
+                onClick={toggleExecutor}
+                className="flex items-center space-x-2"
+                title={`Payment Executor: ${
+                  executorRunning ? "Running" : "Stopped"
+                }`}
+              >
+                {executorRunning ? (
+                  <Pause size={16} className="text-green-400 lg:w-5 lg:h-5" />
+                ) : (
+                  <Play size={16} className="text-gray-400 lg:w-5 lg:h-5" />
+                )}
+                <span
+                  className={`text-xs sm:text-sm font-satoshi ${
+                    executorRunning ? "text-green-400" : "text-gray-400"
+                  }`}
+                >
+                  Auto-Pay {executorRunning ? "ON" : "OFF"}
+                </span>
+              </button>
+
+              {executorStatus && executorRunning && (
+                <div className="ml-2 text-xs text-gray-400">
+                  ({executorStatus.processingPayments?.length || 0} processing)
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Wallet Selector */}
           {wallets.length > 0 && (
             <button
               onClick={() => setWalletSwitcherOpen(true)}
@@ -207,7 +361,6 @@ export default function DashboardPage() {
                   0
                 )} rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0`}
               >
-                {/* Grid pattern overlay */}
                 <div
                   className="absolute inset-0 rounded-full opacity-30"
                   style={{
@@ -221,7 +374,6 @@ export default function DashboardPage() {
                 {activeWallet?.name || "Loading..."}
               </span>
 
-              {/* Divider */}
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
 
               <span className="text-gray-400 text-xs sm:text-sm font-satoshi mr-2 lg:mr-3 hidden sm:block truncate">
@@ -233,7 +385,6 @@ export default function DashboardPage() {
                   : "Loading..."}
               </span>
 
-              {/* Dropdown Icon */}
               <ChevronDown
                 size={14}
                 className="text-gray-400 group-hover:text-[#E2AF19] transition-colors lg:w-4 lg:h-4"
@@ -243,20 +394,17 @@ export default function DashboardPage() {
 
           {/* Action Icons Container */}
           <div className="flex items-center space-x-3">
-            {/* Other Icons Container */}
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
               <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
                 <Bell size={16} className="text-gray-400 lg:w-5 lg:h-5" />
               </button>
 
-              {/* Divider */}
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
 
               <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
                 <Settings size={16} className="text-gray-400 lg:w-5 lg:h-5" />
               </button>
 
-              {/* Divider */}
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
 
               <button
@@ -274,184 +422,44 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Main Content - Show empty state when no wallets */}
+      {/* Rest of your existing dashboard content */}
       {wallets.length === 0 ? (
-        // Empty Dashboard State
+        // Your existing empty dashboard states
         <div className="flex flex-col xl:flex-row gap-4 lg:gap-6 flex-1 min-h-0">
-          {/* Mobile Layout - Empty States */}
-          <div className="flex xl:hidden flex-col gap-4 lg:gap-6 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-            {/* Empty Wallet Balance */}
-            <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 sm:gap-0">
-                <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi">
-                  Wallet Balance
-                </h2>
-                <div className="flex items-center space-x-2 sm:space-x-3">
-                  <span className="text-gray-400 text-xs sm:text-sm font-satoshi truncate max-w-[150px] sm:max-w-none">
-                    No wallet selected
-                  </span>
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 font-satoshi">
-                  $0.00
-                </div>
-                <div className="flex items-center text-sm">
-                  <span className="text-gray-400 font-satoshi">
-                    Set up your wallet to get started
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Empty Token Holdings */}
-            <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-              <div className="flex items-center justify-between mb-4 lg:mb-6">
-                <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
-                  Token Holdings
-                </h2>
-              </div>
-              <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-                <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-                  <span className="text-gray-400 text-lg lg:text-xl">🪙</span>
-                </div>
-                <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
-                  No wallet connected
-                </h3>
-                <p className="text-gray-400 font-satoshi text-sm lg:text-base">
-                  Set up your wallet to view your tokens
-                </p>
-              </div>
-            </div>
-
-            {/* Empty Swap Section */}
-            <div className="bg-black rounded-[16px] lg:rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-4 lg:p-6 overflow-hidden">
-              <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi">
-                Swap
-              </h2>
-              <div className="flex flex-col items-center justify-center text-center py-8">
-                <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-                  <span className="text-gray-400 text-lg lg:text-xl">⚡</span>
-                </div>
-                <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
-                  Swap tokens
-                </h3>
-                <p className="text-gray-400 font-satoshi text-sm lg:text-base mb-4">
-                  Connect your wallet to start swapping
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop Layout - Empty States */}
-          <div className="hidden xl:flex flex-1 flex-col gap-6 min-w-0">
-            {/* Empty Wallet Balance */}
-            <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 sm:gap-0">
-                <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi">
-                  Wallet Balance
-                </h2>
-                <div className="flex items-center space-x-2 sm:space-x-3">
-                  <span className="text-gray-400 text-xs sm:text-sm font-satoshi truncate max-w-[150px] sm:max-w-none">
-                    No wallet selected
-                  </span>
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 font-satoshi">
-                  $0.00
-                </div>
-                <div className="flex items-center text-sm">
-                  <span className="text-gray-400 font-satoshi">
-                    Set up your wallet to get started
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Empty Token Holdings */}
-            <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden flex-1 min-h-0">
-              <div className="flex items-center justify-between mb-4 lg:mb-6">
-                <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
-                  Token Holdings
-                </h2>
-              </div>
-              <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-                <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-                  <span className="text-gray-400 text-lg lg:text-xl">🪙</span>
-                </div>
-                <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
-                  No wallet connected
-                </h3>
-                <p className="text-gray-400 font-satoshi text-sm lg:text-base">
-                  Set up your wallet to view your tokens
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - Empty Swap Section - Desktop only */}
-          <div className="hidden xl:block w-[400px] flex-shrink-0 h-full">
-            <div className="bg-black rounded-[16px] lg:rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-4 lg:p-6 overflow-hidden">
-              <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi">
-                Swap
-              </h2>
-              <div className="flex flex-col items-center justify-center text-center py-8 flex-1">
-                <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-                  <span className="text-gray-400 text-lg lg:text-xl">⚡</span>
-                </div>
-                <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
-                  Swap tokens
-                </h3>
-                <p className="text-gray-400 font-satoshi text-sm lg:text-base mb-4">
-                  Connect your wallet to start swapping
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* ... existing empty state code ... */}
         </div>
       ) : (
-        // Normal Dashboard Content when wallets exist
+        // Your existing normal dashboard content
         <div className="flex flex-col xl:flex-row gap-4 lg:gap-6 flex-1 min-h-0">
-          {/* Mobile Layout - Scrollable */}
+          {/* ... existing dashboard content ... */}
           <div className="flex xl:hidden flex-col gap-4 lg:gap-6 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-            {/* Wallet Balance - Fixed at top */}
             <div className="flex-shrink-0">
               <WalletBalance />
             </div>
-
-            {/* Token Holdings - Full content visible */}
             <div className="flex-shrink-0">
               <TokenList />
             </div>
-
-            {/* Swap Section - Full content visible */}
             <div className="flex-shrink-0">
               <SwapSection />
             </div>
           </div>
 
-          {/* Desktop Layout - Same as before */}
           <div className="hidden xl:flex flex-1 flex-col gap-6 min-w-0">
-            {/* Wallet Balance - Fixed height */}
             <div className="flex-shrink-0">
               <WalletBalance />
             </div>
-
-            {/* Token Holdings - Takes remaining space */}
             <div className="flex-1 min-h-0">
               <TokenList />
             </div>
           </div>
 
-          {/* Right Column - Swap Section - Responsive width - Desktop only */}
           <div className="hidden xl:block w-[400px] flex-shrink-0 h-full">
             <SwapSection />
           </div>
         </div>
       )}
 
-      {/* Welcome Modal */}
+      {/* Existing modals */}
       <WalletWelcomeModal
         isOpen={welcomeModalOpen}
         onClose={() => setWelcomeModalOpen(false)}
@@ -459,7 +467,6 @@ export default function DashboardPage() {
         onWalletCreated={handleWalletCreated}
       />
 
-      {/* Wallet Switcher Modal - Only show if wallets exist */}
       {wallets.length > 0 && (
         <WalletSwitcher
           isOpen={walletSwitcherOpen}
