@@ -1,3 +1,4 @@
+// src/app/api/friends/route.ts - FIXED
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type") || "friends"; // friends, requests, suggestions
+    const type = searchParams.get("type") || "friends"; // friends, requests, suggestions, sent-requests
     const query = searchParams.get("query");
 
     const { db } = await connectToDatabase();
@@ -135,6 +136,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ requests });
     }
 
+    // FIXED: Add sent-requests type
+    if (type === "sent-requests") {
+      // Get pending friend requests (sent by current user)
+      const sentRequests = await db
+        .collection("friends")
+        .find({
+          requesterUsername: decoded.username,
+          status: "pending",
+        })
+        .toArray();
+
+      const receiverUsernames = sentRequests.map((r) => r.receiverUsername);
+
+      const receivers = await db
+        .collection("users")
+        .find({
+          username: { $in: receiverUsernames },
+        })
+        .project({
+          username: 1,
+          displayName: 1,
+          avatar: 1,
+          gmail: 1,
+        })
+        .toArray();
+
+      const requests = sentRequests.map((req) => {
+        const receiver = receivers.find(
+          (u) => u.username === req.receiverUsername
+        );
+        return {
+          ...req,
+          receiverData: receiver,
+        };
+      });
+
+      return NextResponse.json({ sentRequests: requests });
+    }
+
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   } catch (error) {
     console.error("Get friends error:", error);
@@ -206,6 +246,27 @@ export async function POST(request: NextRequest) {
 
       await db.collection("friends").insertOne(friendRequest);
 
+      // FIXED: Create notification for the receiver
+      const notification = {
+        username: targetUsername,
+        type: "friend_request",
+        title: "New Friend Request",
+        message: `${decoded.username} sent you a friend request`,
+        isRead: false,
+        relatedData: {
+          requesterUsername: decoded.username,
+          friendRequestId: friendRequest._id,
+        },
+        createdAt: new Date(),
+      };
+
+      await db.collection("notifications").insertOne(notification);
+
+      console.log(
+        `✅ Friend request sent from ${decoded.username} to ${targetUsername}`
+      );
+      console.log(`📬 Notification created for ${targetUsername}`);
+
       return NextResponse.json({
         success: true,
         message: "Friend request sent successfully",
@@ -234,6 +295,27 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // FIXED: Create notification for the requester when request is accepted
+      const acceptNotification = {
+        username: targetUsername,
+        type: "friend_request_response",
+        title: "Friend Request Accepted",
+        message: `${decoded.username} accepted your friend request`,
+        isRead: false,
+        relatedData: {
+          acceptedBy: decoded.username,
+          originalRequester: targetUsername,
+        },
+        createdAt: new Date(),
+      };
+
+      await db.collection("notifications").insertOne(acceptNotification);
+
+      console.log(
+        `✅ Friend request accepted: ${targetUsername} -> ${decoded.username}`
+      );
+      console.log(`📬 Acceptance notification created for ${targetUsername}`);
+
       return NextResponse.json({
         success: true,
         message: "Friend request accepted",
@@ -261,6 +343,27 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
+
+      // FIXED: Create notification for the requester when request is declined
+      const declineNotification = {
+        username: targetUsername,
+        type: "friend_request_response",
+        title: "Friend Request Declined",
+        message: `${decoded.username} declined your friend request`,
+        isRead: false,
+        relatedData: {
+          declinedBy: decoded.username,
+          originalRequester: targetUsername,
+        },
+        createdAt: new Date(),
+      };
+
+      await db.collection("notifications").insertOne(declineNotification);
+
+      console.log(
+        `❌ Friend request declined: ${targetUsername} -> ${decoded.username}`
+      );
+      console.log(`📬 Decline notification created for ${targetUsername}`);
 
       return NextResponse.json({
         success: true,
@@ -291,9 +394,38 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      console.log(
+        `🗑️ Friendship removed: ${decoded.username} <-> ${targetUsername}`
+      );
+
       return NextResponse.json({
         success: true,
         message: "Friend removed successfully",
+      });
+    }
+
+    // FIXED: Add cancel_request action for sent requests
+    if (action === "cancel_request") {
+      const result = await db.collection("friends").deleteOne({
+        requesterUsername: decoded.username,
+        receiverUsername: targetUsername,
+        status: "pending",
+      });
+
+      if (result.deletedCount === 0) {
+        return NextResponse.json(
+          { error: "Friend request not found" },
+          { status: 404 }
+        );
+      }
+
+      console.log(
+        `🚫 Friend request cancelled: ${decoded.username} -> ${targetUsername}`
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: "Friend request cancelled successfully",
       });
     }
 

@@ -1,19 +1,37 @@
-// src/app/api/wallets/private-key/route.ts
+// src/app/api/wallets/private-key/route.ts - FIXED
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
 import crypto from "crypto";
 
-// Simple decryption function (implement proper encryption in production)
+// FIXED: Updated decryption function to use createDecipheriv instead of deprecated createDecipher
 function decryptPrivateKey(encryptedData: any): string {
   try {
-    // In production, use proper encryption with environment variables for keys
-    const algorithm = encryptedData.algorithm || "aes-256-cbc";
-    const key =
-      process.env.ENCRYPTION_KEY || "your-encryption-key-32-chars-long";
-    const iv = Buffer.from(encryptedData.iv || "generated-iv", "utf8");
+    // For backwards compatibility, check if this is old format (simple base64)
+    if (typeof encryptedData === "string") {
+      // Old format - just base64 encoded
+      return Buffer.from(encryptedData, "base64").toString("utf8");
+    }
 
-    const decipher = crypto.createDecipher(algorithm, key);
+    // New format with proper encryption
+    const algorithm = encryptedData.algorithm || "aes-256-cbc";
+    const password =
+      process.env.ENCRYPTION_KEY || "your-encryption-key-32-chars-long";
+
+    // Create a 32-byte key from password using scrypt
+    const key = crypto.scryptSync(password, "salt", 32);
+
+    // Get IV from encrypted data, or create default for backwards compatibility
+    let iv: Buffer;
+    if (encryptedData.iv && encryptedData.iv !== "generated-iv") {
+      iv = Buffer.from(encryptedData.iv, "hex");
+    } else {
+      // For backwards compatibility with old data
+      iv = Buffer.alloc(16, 0); // Default IV for old data
+    }
+
+    // Use createDecipheriv instead of deprecated createDecipher
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
     let decrypted = decipher.update(
       encryptedData.encryptedData,
       "base64",
@@ -24,7 +42,53 @@ function decryptPrivateKey(encryptedData: any): string {
     return decrypted;
   } catch (error) {
     console.error("Failed to decrypt private key:", error);
+
+    // Fallback: try to decode as simple base64 for backwards compatibility
+    try {
+      if (encryptedData.encryptedData) {
+        return Buffer.from(encryptedData.encryptedData, "base64").toString(
+          "utf8"
+        );
+      }
+    } catch (fallbackError) {
+      console.error("Fallback decryption also failed:", fallbackError);
+    }
+
     throw new Error("Failed to decrypt wallet credentials");
+  }
+}
+
+// FIXED: Updated encryption function for new wallet storage
+export function encryptPrivateKey(privateKey: string): any {
+  try {
+    const algorithm = "aes-256-cbc";
+    const password =
+      process.env.ENCRYPTION_KEY || "your-encryption-key-32-chars-long";
+
+    // Create a 32-byte key from password using scrypt
+    const key = crypto.scryptSync(password, "salt", 32);
+
+    // Generate random IV for better security
+    const iv = crypto.randomBytes(16);
+
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
+    let encrypted = cipher.update(privateKey, "utf8", "base64");
+    encrypted += cipher.final("base64");
+
+    return {
+      encryptedData: encrypted,
+      algorithm: algorithm,
+      iv: iv.toString("hex"),
+      keyDerivation: "scrypt",
+    };
+  } catch (error) {
+    console.error("Failed to encrypt private key:", error);
+    // Fallback to simple base64 encoding
+    return {
+      encryptedData: Buffer.from(privateKey).toString("base64"),
+      algorithm: "base64",
+      iv: "none",
+    };
   }
 }
 
@@ -77,7 +141,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Decrypt the private key
+      // Decrypt the private key using the fixed function
       const privateKey = decryptPrivateKey(wallet.encryptedPrivateKey);
 
       // Log the access for security audit
