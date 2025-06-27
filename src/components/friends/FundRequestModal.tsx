@@ -1,4 +1,4 @@
-// src/components/friends/FundRequestModal.tsx
+// src/components/friends/FundRequestModal.tsx - FIXED VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -49,6 +49,12 @@ interface TransferResult {
   actualCostUSD?: string;
 }
 
+interface RequesterInfo {
+  username: string;
+  walletAddress: string;
+  displayName?: string;
+}
+
 export default function FundRequestModal({
   isOpen,
   onClose,
@@ -69,6 +75,10 @@ export default function FundRequestModal({
   );
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<string>("");
+  const [requesterInfo, setRequesterInfo] = useState<RequesterInfo | null>(
+    null
+  );
+  const [loadingRequester, setLoadingRequester] = useState(false);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -76,8 +86,83 @@ export default function FundRequestModal({
       setStep("review");
       setTransferResult(null);
       setError("");
+      setRequesterInfo(null);
+      // Fetch requester wallet address
+      fetchRequesterInfo();
     }
   }, [isOpen]);
+
+  const fetchRequesterInfo = async () => {
+    try {
+      setLoadingRequester(true);
+      console.log(
+        "🔍 Fetching requester info for:",
+        fundRequest.requesterUsername
+      );
+
+      // Call your API to get user wallet address by username
+      const response = await fetch(
+        `/api/users/by-username/${fundRequest.requesterUsername}`,
+        {
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        const userData = await response.json();
+        setRequesterInfo({
+          username: userData.username,
+          walletAddress: userData.walletAddress,
+          displayName: userData.displayName,
+        });
+        console.log("✅ Requester info fetched:", userData.walletAddress);
+      } else {
+        // Fallback: try to find the wallet address from friends or other sources
+        console.warn("⚠️ Could not fetch user info, trying friends API...");
+        await fetchRequesterFromFriends();
+      }
+    } catch (error) {
+      console.error("❌ Error fetching requester info:", error);
+      setError("Could not find requester's wallet address");
+    } finally {
+      setLoadingRequester(false);
+    }
+  };
+
+  const fetchRequesterFromFriends = async () => {
+    try {
+      // Try to get wallet address from friends list
+      const response = await fetch("/api/friends?type=friends", {
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const friend = data.friends?.find(
+          (f: any) => f.username === fundRequest.requesterUsername
+        );
+
+        if (friend && friend.walletAddress) {
+          setRequesterInfo({
+            username: friend.username,
+            walletAddress: friend.walletAddress,
+            displayName: friend.displayName,
+          });
+          console.log(
+            "✅ Found requester wallet from friends:",
+            friend.walletAddress
+          );
+        } else {
+          setError(
+            "Could not find requester's wallet address. They may need to add their wallet to their profile."
+          );
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error fetching from friends:", error);
+      setError("Could not find requester's wallet address");
+    }
+  };
 
   const copyToClipboard = async (text: string, type: string) => {
     try {
@@ -131,6 +216,11 @@ export default function FundRequestModal({
       return;
     }
 
+    if (!requesterInfo?.walletAddress) {
+      setError("Could not determine requester's wallet address");
+      return;
+    }
+
     // Check if user has enough balance
     if (
       parseFloat(tokenInfo.balanceFormatted) < parseFloat(fundRequest.amount)
@@ -143,6 +233,13 @@ export default function FundRequestModal({
       setLoading(true);
       setStep("sending");
 
+      console.log("🚀 Starting fund request fulfillment:", {
+        tokenSymbol: fundRequest.tokenSymbol,
+        amount: fundRequest.amount,
+        requesterWallet: requesterInfo.walletAddress,
+        senderWallet: activeWallet.address,
+      });
+
       // First, get the private key
       const keyResponse = await fetch("/api/wallets/private-key", {
         method: "POST",
@@ -154,11 +251,19 @@ export default function FundRequestModal({
       });
 
       if (!keyResponse.ok) {
-        throw new Error("Failed to retrieve wallet credentials");
+        const keyError = await keyResponse.json();
+        throw new Error(
+          keyError.error || "Failed to retrieve wallet credentials"
+        );
       }
 
       const keyData = await keyResponse.json();
-      const privateKey = keyData.privateKey;
+
+      if (!keyData.success || !keyData.privateKey) {
+        throw new Error("Private key not found in response");
+      }
+
+      console.log("✅ Private key retrieved successfully");
 
       // Execute the transfer
       const transferResponse = await fetch("/api/transfer/simple", {
@@ -173,10 +278,10 @@ export default function FundRequestModal({
             decimals: tokenInfo.decimals,
             isETH: tokenInfo.contractAddress === "native",
           },
-          recipientAddress: fundRequest.requesterUsername, // In real app, you'd need the wallet address
+          recipientAddress: requesterInfo.walletAddress, // FIXED: Use actual wallet address
           amount: fundRequest.amount,
           fromAddress: activeWallet.address,
-          privateKey: privateKey,
+          privateKey: keyData.privateKey,
           useStoredKey: true,
         }),
         credentials: "include",
@@ -184,9 +289,17 @@ export default function FundRequestModal({
 
       const transferData = await transferResponse.json();
 
-      if (transferData.success) {
+      console.log("📡 Transfer response:", {
+        success: transferData.success,
+        hasResult: !!transferData.result,
+        error: transferData.error,
+      });
+
+      if (transferData.success && transferData.result) {
         setTransferResult(transferData.result);
         setStep("success");
+
+        console.log("✅ Transfer successful, updating fund request status...");
 
         // Update the fund request status
         const updateResponse = await fetch(
@@ -203,14 +316,18 @@ export default function FundRequestModal({
         );
 
         if (updateResponse.ok) {
+          console.log("✅ Fund request status updated");
           onFulfilled?.();
+        } else {
+          console.warn("⚠️ Failed to update fund request status");
         }
       } else {
+        console.error("❌ Transfer failed:", transferData.error);
         setError(transferData.error || "Transfer failed");
         setStep("error");
       }
     } catch (error: any) {
-      console.error("Fund request fulfillment error:", error);
+      console.error("💥 Fund request fulfillment error:", error);
       setError(error.message || "Failed to fulfill request");
       setStep("error");
     } finally {
@@ -316,6 +433,43 @@ export default function FundRequestModal({
                       {isExpired && " (Expired)"}
                     </span>
                   </div>
+
+                  {/* FIXED: Show requester wallet address */}
+                  {loadingRequester && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        Recipient Wallet:
+                      </span>
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        Loading...
+                      </span>
+                    </div>
+                  )}
+
+                  {requesterInfo?.walletAddress && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        Recipient Wallet:
+                      </span>
+                      <div className="flex items-center">
+                        <span className="text-white text-sm font-satoshi font-mono mr-2">
+                          {requesterInfo.walletAddress.slice(0, 8)}...
+                          {requesterInfo.walletAddress.slice(-6)}
+                        </span>
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              requesterInfo.walletAddress,
+                              "wallet"
+                            )
+                          }
+                          className="text-gray-400 hover:text-white transition-colors"
+                        >
+                          <Copy size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -365,6 +519,23 @@ export default function FundRequestModal({
                 </div>
               )}
 
+              {/* Address Resolution Error */}
+              {!loadingRequester && !requesterInfo?.walletAddress && (
+                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <AlertTriangle
+                      size={16}
+                      className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+                    />
+                    <p className="text-red-400 text-sm font-satoshi">
+                      Could not find wallet address for @
+                      {fundRequest.requesterUsername}. They may need to add
+                      their wallet to their profile.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {error && (
                 <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3">
                   <p className="text-red-400 text-sm font-satoshi">{error}</p>
@@ -384,12 +555,19 @@ export default function FundRequestModal({
                 <Button
                   onClick={handleFulfill}
                   disabled={
-                    loading || isExpired || !tokenInfo || hasInsufficientBalance
+                    loading ||
+                    isExpired ||
+                    !tokenInfo ||
+                    hasInsufficientBalance ||
+                    loadingRequester ||
+                    !requesterInfo?.walletAddress
                   }
                   className="flex-1"
                 >
                   {loading
                     ? "Processing..."
+                    : loadingRequester
+                    ? "Loading..."
                     : `Send ${fundRequest.tokenSymbol}`}
                 </Button>
               </div>
@@ -403,7 +581,8 @@ export default function FundRequestModal({
                 Processing Transfer
               </h4>
               <p className="text-gray-400 text-sm font-satoshi">
-                Please wait while we process your transfer...
+                Sending {fundRequest.amount} {fundRequest.tokenSymbol} to @
+                {fundRequest.requesterUsername}...
               </p>
             </div>
           )}
