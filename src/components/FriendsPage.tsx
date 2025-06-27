@@ -1,10 +1,9 @@
+// src/components/FriendsPage.tsx - FIXED VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 import {
-  Bell,
-  HelpCircle,
   Search,
   UserPlus,
   Check,
@@ -13,10 +12,14 @@ import {
   Clock,
   AlertCircle,
   ChevronDown,
+  Bell,
+  HelpCircle,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import FundRequestModal from "@/components/friends/FundRequestModal";
+import NotificationCenter from "@/components/notifications/NotificationCenter";
 
 interface User {
   _id: string;
@@ -64,15 +67,20 @@ export default function FriendsPage() {
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [fundRequests, setFundRequests] = useState<FundRequest[]>([]);
   const [suggestions, setSuggestions] = useState<User[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [initialLoading, setInitialLoading] = useState(true);
 
   // Fund request modal
   const [showFundRequestModal, setShowFundRequestModal] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  const [selectedFundRequest, setSelectedFundRequest] =
+    useState<FundRequest | null>(null);
   const [fundRequestData, setFundRequestData] = useState({
     tokenSymbol: "ETH",
     amount: "",
@@ -119,16 +127,64 @@ export default function FriendsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Load initial data
+  // Load initial data and notifications
   useEffect(() => {
-    if (activeTab === "Friends") {
-      loadFriends();
-    } else if (activeTab === "Requests") {
-      loadFriendRequests();
-    } else if (activeTab === "FundRequests") {
-      loadFundRequests();
+    loadInitialData();
+    fetchUnreadCount();
+
+    // Set up polling for unread count
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Load data based on active tab
+  useEffect(() => {
+    if (!initialLoading) {
+      if (activeTab === "Friends") {
+        loadFriends();
+      } else if (activeTab === "Requests") {
+        loadFriendRequests();
+      } else if (activeTab === "FundRequests") {
+        loadFundRequests();
+      }
     }
-  }, [activeTab]);
+  }, [activeTab, initialLoading]);
+
+  const loadInitialData = async () => {
+    try {
+      setInitialLoading(true);
+      setError("");
+
+      // Load the default tab data first
+      if (activeTab === "Friends") {
+        await loadFriends();
+      } else if (activeTab === "Requests") {
+        await loadFriendRequests();
+      } else if (activeTab === "FundRequests") {
+        await loadFundRequests();
+      }
+    } catch (error) {
+      console.error("Error loading initial data:", error);
+      setError("Failed to load data. Please refresh the page.");
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await fetch("/api/notifications?unreadOnly=true", {
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadCount(data.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+    }
+  };
 
   const isWalletAddress = (input: string): boolean => {
     return /^0x[a-fA-F0-9]{40}$/.test(input);
@@ -148,9 +204,13 @@ export default function FriendsPage() {
         const data = await response.json();
         setSuggestions(data.suggestions || []);
         setShowSuggestions(true);
+      } else {
+        console.error("Search failed:", response.status);
+        setSuggestions([]);
       }
     } catch (error) {
       console.error("Error searching users:", error);
+      setSuggestions([]);
     } finally {
       setLoading(false);
     }
@@ -166,6 +226,10 @@ export default function FriendsPage() {
       if (response.ok) {
         const data = await response.json();
         setFriends(data.friends || []);
+        console.log("✅ Friends loaded:", data.friends?.length || 0);
+      } else {
+        console.error("Load friends failed:", response.status);
+        setError("Failed to load friends");
       }
     } catch (error) {
       console.error("Error loading friends:", error);
@@ -185,6 +249,10 @@ export default function FriendsPage() {
       if (response.ok) {
         const data = await response.json();
         setFriendRequests(data.requests || []);
+        console.log("✅ Friend requests loaded:", data.requests?.length || 0);
+      } else {
+        console.error("Load friend requests failed:", response.status);
+        setError("Failed to load friend requests");
       }
     } catch (error) {
       console.error("Error loading friend requests:", error);
@@ -204,6 +272,10 @@ export default function FriendsPage() {
       if (response.ok) {
         const data = await response.json();
         setFundRequests(data.fundRequests || []);
+        console.log("✅ Fund requests loaded:", data.fundRequests?.length || 0);
+      } else {
+        console.error("Load fund requests failed:", response.status);
+        setError("Failed to load fund requests");
       }
     } catch (error) {
       console.error("Error loading fund requests:", error);
@@ -234,7 +306,8 @@ export default function FriendsPage() {
         setSearchQuery("");
         setSuggestions([]);
         setShowSuggestions(false);
-        // Show success message
+        // Show success message or toast here
+        console.log("✅ Friend request sent successfully");
       } else {
         setError(data.error || "Failed to send friend request");
       }
@@ -328,6 +401,7 @@ export default function FriendsPage() {
         setShowFundRequestModal(false);
         setSelectedFriend(null);
         // Show success message
+        console.log("✅ Fund request sent successfully");
       } else {
         const data = await response.json();
         setError(data.error || "Failed to send fund request");
@@ -338,6 +412,35 @@ export default function FriendsPage() {
       setLoading(false);
     }
   };
+
+  // Show initial loading state
+  if (initialLoading) {
+    return (
+      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 flex-shrink-0 gap-4 sm:gap-0">
+          <div>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
+              Friends
+            </h1>
+            <p className="text-gray-400 text-sm font-satoshi mt-1">
+              Connect with friends and request funds
+            </p>
+          </div>
+        </div>
+
+        {/* Loading state */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19] mx-auto mb-4"></div>
+            <p className="text-gray-400 font-satoshi">
+              Loading your friends...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
@@ -381,8 +484,18 @@ export default function FriendsPage() {
 
           {/* Icons Container */}
           <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
-            <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
+            <button
+              onClick={() => setShowNotifications(true)}
+              className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
+            >
               <Bell size={16} className="text-gray-400 lg:w-5 lg:h-5" />
+              {unreadCount > 0 && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                </div>
+              )}
             </button>
             <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
             <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
@@ -401,6 +514,12 @@ export default function FriendsPage() {
               className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
             />
             <p className="text-red-400 text-sm font-satoshi">{error}</p>
+            <button
+              onClick={() => setError("")}
+              className="ml-auto text-red-400 hover:text-red-300"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
       )}
@@ -543,9 +662,15 @@ export default function FriendsPage() {
                     <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
                       No friends yet
                     </h3>
-                    <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+                    <p className="text-gray-400 font-satoshi text-sm lg:text-base mb-4">
                       Search for friends by username above
                     </p>
+                    <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 max-w-sm">
+                      <p className="text-blue-400 text-sm font-satoshi">
+                        💡 <strong>Tip:</strong> You can search by username or
+                        paste a wallet address to send a friend request!
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   friends.map((friend, index) => (
@@ -749,7 +874,11 @@ export default function FriendsPage() {
                   fundRequests.map((request) => (
                     <div
                       key={request._id}
-                      className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]"
+                      className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] cursor-pointer hover:bg-[#1A1A1A] transition-colors"
+                      onClick={() => {
+                        setSelectedFundRequest(request);
+                        // You could open a detailed modal here
+                      }}
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div>
@@ -772,7 +901,7 @@ export default function FriendsPage() {
                         </div>
                         <div className="flex flex-col space-y-2">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-satoshi ${
+                            className={`px-2 py-1 rounded-full text-xs font-satoshi text-center ${
                               request.status === "pending"
                                 ? "bg-yellow-500/20 text-yellow-400"
                                 : request.status === "fulfilled"
@@ -916,6 +1045,29 @@ export default function FriendsPage() {
           </div>
         </div>
       )}
+
+      {/* Fund Request Detail Modal */}
+      {selectedFundRequest && (
+        <FundRequestModal
+          isOpen={!!selectedFundRequest}
+          onClose={() => setSelectedFundRequest(null)}
+          fundRequest={selectedFundRequest}
+          onFulfilled={() => {
+            setSelectedFundRequest(null);
+            loadFundRequests();
+          }}
+          onDeclined={() => {
+            setSelectedFundRequest(null);
+            loadFundRequests();
+          }}
+        />
+      )}
+
+      {/* Notification Center */}
+      <NotificationCenter
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
 
       <style jsx global>{`
         .scrollbar-hide {
