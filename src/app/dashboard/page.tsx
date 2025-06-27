@@ -81,12 +81,42 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, user, dispatch]);
 
-  // Welcome modal effect - show when authenticated but no wallets
+  // Welcome modal effect - show when authenticated but no wallets (and wallets have been loaded)
   useEffect(() => {
-    if (isAuthenticated && !walletLoading && wallets.length === 0) {
+    console.log("🎭 Welcome modal effect:", {
+      isAuthenticated,
+      walletLoading,
+      walletsLength: wallets.length,
+      walletsLoaded: walletsLoaded.current,
+      user: !!user,
+    });
+
+    // Only show modal when:
+    // 1. User is authenticated
+    // 2. User data is loaded
+    // 3. Wallets have been loaded (not loading)
+    // 4. No wallets exist
+    // 5. We have actually attempted to load wallets
+    if (
+      isAuthenticated &&
+      user &&
+      !walletLoading &&
+      wallets.length === 0 &&
+      walletsLoaded.current
+    ) {
+      console.log("🎭 Showing welcome modal - no wallets found");
       setWelcomeModalOpen(true);
+    } else {
+      console.log("🎭 Not showing welcome modal");
+      setWelcomeModalOpen(false);
     }
-  }, [isAuthenticated, walletLoading, wallets.length]);
+  }, [
+    isAuthenticated,
+    user,
+    walletLoading,
+    wallets.length,
+    walletsLoaded.current,
+  ]);
 
   const handleLogout = async () => {
     try {
@@ -110,7 +140,7 @@ export default function DashboardPage() {
     if (!activeWallet && wallets.length > 0 && !activeWalletSet.current) {
       console.log("🎯 Setting active wallet...");
       activeWalletSet.current = true;
-      const defaultWallet = wallets.find((w) => w.isActive) || wallets[0];
+      const defaultWallet = wallets.find((w) => w.isDefault) || wallets[0];
       dispatch(setActiveWallet(defaultWallet.id));
     }
   }, [activeWallet, wallets, dispatch]);

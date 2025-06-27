@@ -25,19 +25,8 @@ type Step =
   | "import-options"
   | "import-recovery-phrase"
   | "import-private-key"
-  | "select-network"
+  | "create-wallet"
   | "wallet-created";
-
-const networks = [
-  { id: "ethereum", name: "Ethereum", icon: "🔷" },
-  { id: "solana", name: "Solana", icon: "🟣" },
-  { id: "bitcoin", name: "Bitcoin", icon: "🟠" },
-  { id: "sui", name: "SUI", icon: "🔵" },
-  { id: "xrp", name: "XRP", icon: "⚫" },
-  { id: "cardano", name: "Cardano", icon: "🔵" },
-  { id: "avalanche", name: "Avalanche", icon: "🔴" },
-  { id: "toncoin", name: "Toncoin", icon: "🔷" },
-];
 
 export default function WalletWelcomeModal({
   isOpen,
@@ -59,8 +48,13 @@ export default function WalletWelcomeModal({
   const [privateKey, setPrivateKey] = useState("");
   const [walletName, setWalletName] = useState("");
 
-  // Network selection
-  const [selectedNetwork, setSelectedNetwork] = useState("");
+  // New wallet creation states
+  const [newWalletName, setNewWalletName] = useState("");
+  const [generatedWallet, setGeneratedWallet] = useState<{
+    address: string;
+    privateKey: string;
+    mnemonic: string;
+  } | null>(null);
 
   if (!isOpen) return null;
 
@@ -70,7 +64,8 @@ export default function WalletWelcomeModal({
     setPhraseLength(12);
     setPrivateKey("");
     setWalletName("");
-    setSelectedNetwork("");
+    setNewWalletName("");
+    setGeneratedWallet(null);
     setError("");
   };
 
@@ -114,6 +109,40 @@ export default function WalletWelcomeModal({
     }
   };
 
+  // Generate a new wallet using ethers.js (client-side)
+  const generateNewWallet = async () => {
+    if (!newWalletName.trim()) {
+      setError("Please enter a wallet name");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      // Import ethers dynamically
+      const { ethers } = await import("ethers");
+
+      // Generate a random wallet
+      const wallet = ethers.Wallet.createRandom();
+
+      setGeneratedWallet({
+        address: wallet.address,
+        privateKey: wallet.privateKey,
+        mnemonic: wallet.mnemonic?.phrase || "",
+      });
+
+      // Continue to wallet creation step for confirmation
+      setCurrentStep("wallet-created");
+    } catch (err: any) {
+      console.error("Wallet generation error:", err);
+      setError("Failed to generate wallet. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Import wallet using recovery phrase
   const handleImportWithRecovery = async () => {
     const filledWords = phraseWords.filter((word) => word.trim() !== "");
 
@@ -128,16 +157,23 @@ export default function WalletWelcomeModal({
     setError("");
 
     try {
-      const response = await fetch("/api/wallets/import", {
+      // Import ethers dynamically
+      const { ethers } = await import("ethers");
+
+      // Create wallet from mnemonic
+      const wallet = ethers.Wallet.fromPhrase(recoveryPhrase);
+
+      // Use the existing /api/wallets endpoint
+      const response = await fetch("/api/wallets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          method: "mnemonic",
+          walletAddress: wallet.address,
+          walletName: `Imported Wallet ${Date.now()}`,
+          privateKey: wallet.privateKey,
           mnemonic: recoveryPhrase,
-          name: `Wallet ${Date.now()}`,
-          network: selectedNetwork || "ethereum",
         }),
         credentials: "include",
       });
@@ -151,12 +187,17 @@ export default function WalletWelcomeModal({
       setCurrentStep("wallet-created");
       onWalletCreated();
     } catch (err: any) {
-      setError(err.message || "Failed to import wallet");
+      console.error("Import error:", err);
+      setError(
+        err.message ||
+          "Failed to import wallet. Please check your recovery phrase."
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  // Import wallet using private key
   const handleImportWithPrivateKey = async () => {
     if (!privateKey.trim() || !walletName.trim()) {
       setError("Please fill in all fields");
@@ -167,16 +208,22 @@ export default function WalletWelcomeModal({
     setError("");
 
     try {
-      const response = await fetch("/api/wallets/import", {
+      // Import ethers dynamically
+      const { ethers } = await import("ethers");
+
+      // Create wallet from private key
+      const wallet = new ethers.Wallet(privateKey.trim());
+
+      // Use the existing /api/wallets endpoint
+      const response = await fetch("/api/wallets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          method: "privateKey",
-          privateKey: privateKey.trim(),
-          name: walletName.trim(),
-          network: selectedNetwork || "ethereum",
+          walletAddress: wallet.address,
+          walletName: walletName.trim(),
+          privateKey: wallet.privateKey,
         }),
         credentials: "include",
       });
@@ -190,32 +237,34 @@ export default function WalletWelcomeModal({
       setCurrentStep("wallet-created");
       onWalletCreated();
     } catch (err: any) {
-      setError(err.message || "Failed to import wallet");
+      console.error("Import error:", err);
+      setError(
+        err.message || "Failed to import wallet. Please check your private key."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateNewWallet = async () => {
-    if (!selectedNetwork) {
-      setError("Please select a network");
-      return;
-    }
+  // Save the generated wallet to database
+  const handleSaveGeneratedWallet = async () => {
+    if (!generatedWallet) return;
 
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch("/api/wallets/create", {
+      // Use the existing /api/wallets endpoint
+      const response = await fetch("/api/wallets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: `${
-            selectedNetwork.charAt(0).toUpperCase() + selectedNetwork.slice(1)
-          } Wallet`,
-          network: selectedNetwork,
+          walletAddress: generatedWallet.address,
+          walletName: newWalletName.trim(),
+          privateKey: generatedWallet.privateKey,
+          mnemonic: generatedWallet.mnemonic,
         }),
         credentials: "include",
       });
@@ -223,13 +272,14 @@ export default function WalletWelcomeModal({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create wallet");
+        throw new Error(data.error || "Failed to save wallet");
       }
 
-      setCurrentStep("wallet-created");
       onWalletCreated();
+      handleClose();
     } catch (err: any) {
-      setError(err.message || "Failed to create wallet");
+      console.error("Save error:", err);
+      setError(err.message || "Failed to save wallet");
     } finally {
       setLoading(false);
     }
@@ -251,7 +301,7 @@ export default function WalletWelcomeModal({
 
       <div className="space-y-4">
         <Button
-          onClick={() => setCurrentStep("select-network")}
+          onClick={() => setCurrentStep("create-wallet")}
           className="w-full"
           size="lg"
         >
@@ -264,9 +314,49 @@ export default function WalletWelcomeModal({
           className="w-full"
           size="lg"
         >
-          Import the existing wallet
+          Import existing wallet
         </Button>
       </div>
+    </div>
+  );
+
+  const renderCreateWallet = () => (
+    <div>
+      <div className="flex items-center mb-6">
+        <button
+          onClick={() => setCurrentStep("welcome")}
+          className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+        >
+          <ArrowLeft size={20} className="text-white" />
+        </button>
+        <h2 className="text-xl font-bold text-white font-mayeka">
+          Create new wallet
+        </h2>
+      </div>
+
+      <div className="space-y-4">
+        <Input
+          label="Wallet name"
+          placeholder="Enter wallet name"
+          value={newWalletName}
+          onChange={(e) => setNewWalletName(e.target.value)}
+        />
+
+        <Button
+          onClick={generateNewWallet}
+          disabled={loading || !newWalletName.trim()}
+          className="w-full"
+          size="lg"
+        >
+          {loading ? "Generating..." : "Generate Wallet"}
+        </Button>
+      </div>
+
+      {error && (
+        <div className="mt-4 bg-red-900/20 border border-red-500/50 rounded-lg p-3">
+          <p className="text-red-400 text-sm font-satoshi">{error}</p>
+        </div>
+      )}
     </div>
   );
 
@@ -342,7 +432,7 @@ export default function WalletWelcomeModal({
           <ArrowLeft size={20} className="text-white" />
         </button>
         <h2 className="text-xl font-bold text-white font-mayeka">
-          Import wallet using recovery phrase
+          Import with recovery phrase
         </h2>
       </div>
 
@@ -404,7 +494,7 @@ export default function WalletWelcomeModal({
         className="w-full"
         size="lg"
       >
-        {loading ? "Importing..." : "Import"}
+        {loading ? "Importing..." : "Import Wallet"}
       </Button>
 
       {error && (
@@ -425,7 +515,7 @@ export default function WalletWelcomeModal({
           <ArrowLeft size={20} className="text-white" />
         </button>
         <h2 className="text-xl font-bold text-white font-mayeka">
-          Import wallet using private key
+          Import with private key
         </h2>
       </div>
 
@@ -471,73 +561,9 @@ export default function WalletWelcomeModal({
           className="w-full"
           size="lg"
         >
-          {loading ? "Importing..." : "Import"}
+          {loading ? "Importing..." : "Import Wallet"}
         </Button>
       </div>
-
-      {error && (
-        <div className="mt-4 bg-red-900/20 border border-red-500/50 rounded-lg p-3">
-          <p className="text-red-400 text-sm font-satoshi">{error}</p>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderSelectNetwork = () => (
-    <div>
-      <div className="flex items-center mb-6">
-        <button
-          onClick={() => setCurrentStep("welcome")}
-          className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
-        >
-          <ArrowLeft size={20} className="text-white" />
-        </button>
-        <h2 className="text-xl font-bold text-white font-mayeka">
-          Select network
-        </h2>
-      </div>
-
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search network"
-          className="w-full px-4 py-3 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi"
-        />
-      </div>
-
-      <div className="space-y-2 mb-6 max-h-60 overflow-y-auto">
-        {networks.map((network) => (
-          <button
-            key={network.id}
-            onClick={() => setSelectedNetwork(network.id)}
-            className={`w-full flex items-center justify-between p-4 rounded-lg transition-colors ${
-              selectedNetwork === network.id
-                ? "bg-[#E2AF19] text-black"
-                : "bg-[#0F0F0F] border border-[#2C2C2C] text-white hover:bg-[#1A1A1A]"
-            }`}
-          >
-            <div className="flex items-center">
-              <span className="text-2xl mr-3">{network.icon}</span>
-              <span className="font-satoshi font-medium">{network.name}</span>
-            </div>
-            <ChevronRight
-              size={20}
-              className={
-                selectedNetwork === network.id ? "text-black" : "text-gray-400"
-              }
-            />
-          </button>
-        ))}
-      </div>
-
-      <Button
-        onClick={handleCreateNewWallet}
-        disabled={loading || !selectedNetwork}
-        className="w-full"
-        size="lg"
-      >
-        {loading ? "Creating..." : "Create Wallet"}
-      </Button>
 
       {error && (
         <div className="mt-4 bg-red-900/20 border border-red-500/50 rounded-lg p-3">
@@ -559,18 +585,78 @@ export default function WalletWelcomeModal({
         Your wallet has been successfully set up and is ready to use.
       </p>
 
-      <Button onClick={handleClose} className="w-full" size="lg">
-        Start Using Blockpal
-      </Button>
+      {/* Show generated wallet details if this was a new wallet */}
+      {generatedWallet && (
+        <div className="bg-[#0F0F0F] rounded-lg p-4 mb-6 text-left">
+          <h3 className="text-white font-semibold mb-3 font-satoshi">
+            ⚠️ Save Your Wallet Details
+          </h3>
+          <div className="space-y-3 text-sm">
+            <div>
+              <label className="text-gray-400 font-satoshi">Address:</label>
+              <div className="text-white font-mono text-xs mt-1 break-all">
+                {generatedWallet.address}
+              </div>
+            </div>
+            <div>
+              <label className="text-gray-400 font-satoshi">Private Key:</label>
+              <div className="text-white font-mono text-xs mt-1 break-all">
+                {generatedWallet.privateKey}
+              </div>
+            </div>
+            {generatedWallet.mnemonic && (
+              <div>
+                <label className="text-gray-400 font-satoshi">
+                  Recovery Phrase:
+                </label>
+                <div className="text-white font-mono text-xs mt-1 break-all">
+                  {generatedWallet.mnemonic}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-500/50 rounded-lg">
+            <p className="text-yellow-400 text-xs font-satoshi">
+              ⚠️ Save these details in a secure place. You'll need them to
+              recover your wallet.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {generatedWallet ? (
+        <div className="space-y-3">
+          <Button
+            onClick={handleSaveGeneratedWallet}
+            className="w-full"
+            size="lg"
+            disabled={loading}
+          >
+            {loading ? "Saving..." : "Save & Continue"}
+          </Button>
+          <Button
+            onClick={() => setCurrentStep("create-wallet")}
+            variant="secondary"
+            className="w-full"
+            size="lg"
+          >
+            Generate New Wallet
+          </Button>
+        </div>
+      ) : (
+        <Button onClick={handleClose} className="w-full" size="lg">
+          Start Using Blockpal
+        </Button>
+      )}
     </div>
   );
 
   const stepComponents = {
     welcome: renderWelcomeStep,
+    "create-wallet": renderCreateWallet,
     "import-options": renderImportOptions,
     "import-recovery-phrase": renderImportRecoveryPhrase,
     "import-private-key": renderImportPrivateKey,
-    "select-network": renderSelectNetwork,
     "wallet-created": renderWalletCreated,
   };
 
