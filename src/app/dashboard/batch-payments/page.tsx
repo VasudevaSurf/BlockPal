@@ -373,7 +373,6 @@ export default function BatchPaymentsPage() {
     (sum, payment) => sum + parseFloat(payment.amount),
     0
   );
-  const totalGas = batchPayments.reduce((sum, payment) => sum + 2.34, 0);
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
@@ -545,16 +544,6 @@ export default function BatchPaymentsPage() {
               />
             </div>
 
-            {/* Gas Estimate Display */}
-            <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400 text-sm font-satoshi">
-                  Estimated Gas:
-                </span>
-                <span className="text-white text-sm font-satoshi">$2.34</span>
-              </div>
-            </div>
-
             {/* Add Button */}
             <button
               onClick={addToBatch}
@@ -589,14 +578,6 @@ export default function BatchPaymentsPage() {
                   {batchPayments
                     .reduce((sum, p) => sum + p.usdValue, 0)
                     .toFixed(2)}
-                </div>
-              </div>
-              <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-                <div className="text-gray-400 text-xs font-satoshi mb-1">
-                  Total Gas
-                </div>
-                <div className="text-white text-lg font-bold font-satoshi">
-                  ${totalGas.toFixed(2)}
                 </div>
               </div>
             </div>
@@ -673,9 +654,6 @@ export default function BatchPaymentsPage() {
                       <div>
                         <div className="text-white font-bold font-satoshi">
                           {payment.amount} {payment.tokenInfo.symbol}
-                        </div>
-                        <div className="text-gray-400 text-xs font-satoshi">
-                          Gas: $2.34
                         </div>
                       </div>
                     </div>
@@ -947,10 +925,6 @@ export default function BatchPaymentsPage() {
 
                         <div className="text-white font-satoshi text-sm">
                           {payment.amount} {payment.tokenInfo.symbol}
-                        </div>
-
-                        <div className="text-white font-satoshi text-sm">
-                          $2.34
                         </div>
                       </div>
 

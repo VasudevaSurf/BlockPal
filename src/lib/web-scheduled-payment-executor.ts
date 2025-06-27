@@ -1,4 +1,4 @@
-// src/lib/web-scheduled-payment-executor.ts (PRODUCTION VERSION)
+// src/lib/web-scheduled-payment-executor.ts - FIXED VERSION with proper DB updates
 import { scheduledPaymentService } from "./scheduled-payment-service";
 
 interface ScheduledPaymentData {
@@ -29,18 +29,19 @@ interface ScheduledPaymentData {
 export class WebScheduledPaymentExecutor {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
-  private checkInterval = 30000; // Check every 30 seconds
-  private processingPayments = new Set<string>(); // Track payments being processed
-  private executorId = Math.random().toString(36).substr(2, 9); // Unique executor ID
-  private executedPayments = new Set<string>(); // Track already executed payments
-  private useTestnet = false; // Default to mainnet
+  private checkInterval = 15000; // Check every 15 seconds for faster execution
+  private processingPayments = new Set<string>();
+  private executorId = Math.random().toString(36).substr(2, 9);
+  private executedPayments = new Set<string>();
+  private useTestnet = false;
+  private privateKey: string = "";
 
   constructor(useTestnet: boolean = false) {
     this.useTestnet = useTestnet;
     console.log(
-      `🌐 Web-based scheduled payment executor initialized (ID: ${
-        this.executorId
-      }, Network: ${useTestnet ? "Testnet" : "Mainnet"})`
+      `🌐 Web Payment Executor initialized (ID: ${this.executorId}, Network: ${
+        useTestnet ? "Testnet" : "Mainnet"
+      })`
     );
   }
 
@@ -50,20 +51,18 @@ export class WebScheduledPaymentExecutor {
       return;
     }
 
-    console.log(
-      `🚀 Starting web-based scheduled payment executor (ID: ${this.executorId})`
-    );
+    console.log(`🚀 Starting payment executor (ID: ${this.executorId})`);
     this.isRunning = true;
 
     // Run immediately
     this.checkAndExecutePayments();
 
-    // Set up interval
+    // Set up interval - check every 15 seconds
     this.intervalId = setInterval(() => {
       this.checkAndExecutePayments();
     }, this.checkInterval);
 
-    console.log("✅ Executor started - checking every 30 seconds");
+    console.log("✅ Executor started - checking every 15 seconds");
   }
 
   stop() {
@@ -72,9 +71,7 @@ export class WebScheduledPaymentExecutor {
       return;
     }
 
-    console.log(
-      `🛑 Stopping web-based scheduled payment executor (ID: ${this.executorId})`
-    );
+    console.log(`🛑 Stopping payment executor (ID: ${this.executorId})`);
 
     if (this.intervalId) {
       clearInterval(this.intervalId);
@@ -87,26 +84,21 @@ export class WebScheduledPaymentExecutor {
     console.log("✅ Executor stopped");
   }
 
-  // Set the private key for execution (should be provided by user)
   setPrivateKey(privateKey: string) {
-    // Validate private key
     if (!this.isValidPrivateKey(privateKey)) {
       throw new Error("Invalid private key provided");
     }
     this.privateKey = privateKey;
+    console.log("🔑 Private key set for executor");
   }
-
-  private privateKey: string = "";
 
   private isValidPrivateKey(privateKey: string): boolean {
     try {
       const cleanKey = privateKey.startsWith("0x")
         ? privateKey.slice(2)
         : privateKey;
-
       if (cleanKey.length !== 64) return false;
       if (!/^[a-fA-F0-9]+$/.test(cleanKey)) return false;
-
       return true;
     } catch {
       return false;
@@ -117,7 +109,6 @@ export class WebScheduledPaymentExecutor {
     try {
       console.log(`🔍 [${this.executorId}] Checking for due payments...`);
 
-      // Fetch due payments from API
       const response = await fetch("/api/scheduled-payments/due", {
         credentials: "include",
       });
@@ -131,79 +122,57 @@ export class WebScheduledPaymentExecutor {
       const duePayments = data.duePayments || [];
 
       console.log(
-        `📊 [${this.executorId}] Found ${duePayments.length} payments due for execution`
+        `📊 [${this.executorId}] Found ${duePayments.length} payments due`
       );
 
       if (duePayments.length === 0) {
         return;
       }
 
-      // Check if private key is set
       if (!this.privateKey) {
-        console.warn(
-          "⚠️ No private key set for execution. Skipping payment execution."
-        );
+        console.warn("⚠️ No private key set for execution");
         return;
       }
 
-      // Filter out payments that are already being processed or already executed
+      // Filter available payments
       const availablePayments = duePayments.filter(
         (payment: ScheduledPaymentData) => {
           const scheduleId = payment.scheduleId;
-
-          // Skip if already processing
           if (this.processingPayments.has(scheduleId)) {
-            console.log(
-              `⏩ [${this.executorId}] Skipping ${scheduleId} - already processing`
-            );
             return false;
           }
-
-          // Skip if already executed in this session
           if (this.executedPayments.has(scheduleId)) {
-            console.log(
-              `⏩ [${this.executorId}] Skipping ${scheduleId} - already executed in this session`
-            );
             return false;
           }
-
           return true;
         }
       );
 
       console.log(
-        `📊 [${this.executorId}] ${availablePayments.length} payments available for processing`
+        `📊 [${this.executorId}] ${availablePayments.length} payments available`
       );
 
-      // Execute each available payment
+      // Execute each payment
       for (const payment of availablePayments) {
         try {
           await this.executePayment(payment);
         } catch (error) {
           console.error(
-            `💥 [${this.executorId}] Error executing payment ${payment.scheduleId}:`,
+            `💥 Error executing payment ${payment.scheduleId}:`,
             error
           );
-          // Remove from processing set on error
           this.processingPayments.delete(payment.scheduleId);
         }
       }
     } catch (error) {
-      console.error(
-        `💥 [${this.executorId}] Error checking scheduled payments:`,
-        error
-      );
+      console.error(`💥 Error in payment check:`, error);
     }
   }
 
   private async executePayment(paymentData: ScheduledPaymentData) {
     const scheduleId = paymentData.scheduleId;
 
-    // Mark as processing to prevent duplicate execution
     if (this.processingPayments.has(scheduleId)) {
-      console.log(
-        `⏩ [${this.executorId}] Payment ${scheduleId} already being processed`
-      );
       return;
     }
 
@@ -211,24 +180,34 @@ export class WebScheduledPaymentExecutor {
     console.log(`⚡ [${this.executorId}] Executing payment: ${scheduleId}`);
 
     try {
-      // STEP 1: Mark as processing in database
-      console.log(
-        `🔒 [${this.executorId}] Marking ${scheduleId} as processing...`
-      );
-      const processingResult = await this.markAsProcessing(scheduleId);
+      // STEP 1: Claim the payment (atomic lock)
+      console.log(`🔒 [${this.executorId}] Claiming payment ${scheduleId}...`);
 
-      if (!processingResult.success) {
+      const claimResult = await fetch(
+        `/api/scheduled-payments/${scheduleId}/claim`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            executorId: this.executorId,
+            claimedAt: new Date().toISOString(),
+          }),
+          credentials: "include",
+        }
+      );
+
+      const claimData = await claimResult.json();
+
+      if (!claimResult.ok || !claimData.success) {
         console.log(
-          `⏩ [${this.executorId}] Payment ${scheduleId} could not be marked as processing: ${processingResult.error}`
+          `⏩ [${this.executorId}] Could not claim ${scheduleId}: ${claimData.error}`
         );
         return;
       }
 
-      console.log(
-        `✅ [${this.executorId}] Payment ${scheduleId} marked as processing`
-      );
+      console.log(`✅ [${this.executorId}] Successfully claimed ${scheduleId}`);
 
-      // STEP 2: Execute the blockchain transaction
+      // STEP 2: Execute blockchain transaction
       const scheduleData = {
         id: paymentData.id,
         scheduleId: paymentData.scheduleId,
@@ -253,7 +232,7 @@ export class WebScheduledPaymentExecutor {
       };
 
       console.log(
-        `💰 [${this.executorId}] Starting blockchain transaction for ${scheduleId}`
+        `💰 [${this.executorId}] Executing blockchain transaction...`
       );
 
       const executionResult =
@@ -265,263 +244,173 @@ export class WebScheduledPaymentExecutor {
 
       if (executionResult.success) {
         console.log(
-          `✅ [${this.executorId}] Blockchain transaction successful for ${scheduleId}`
+          `✅ [${this.executorId}] Blockchain transaction successful!`
         );
         console.log(
-          `📤 [${this.executorId}] Transaction hash: ${executionResult.transactionHash}`
+          `📤 [${this.executorId}] TX: ${executionResult.transactionHash}`
         );
 
-        // STEP 3: Update database with execution results
-        console.log(
-          `📝 [${this.executorId}] Updating database for ${scheduleId}...`
-        );
-
-        const updateResult = await this.updateScheduleAfterExecutionWithRetry(
-          paymentData,
+        // STEP 3: Update database with MULTIPLE retry attempts
+        const updateSuccess = await this.updateDatabaseWithRetries(
+          scheduleId,
           executionResult,
-          3 // Retry up to 3 times
+          5 // 5 retries
         );
 
-        if (updateResult.success) {
-          console.log(
-            `✅ [${this.executorId}] Database updated successfully for ${scheduleId} - Final Status: ${updateResult.finalStatus}`
-          );
-
-          // Mark as executed in this session
+        if (updateSuccess) {
           this.executedPayments.add(scheduleId);
-
-          // Show success notification
           this.showNotification(
-            "Payment Executed Successfully!",
-            `${paymentData.amount} ${
-              paymentData.tokenInfo.symbol
-            } sent to ${paymentData.recipient.slice(0, 10)}... (Status: ${
-              updateResult.finalStatus
-            })`,
+            "✅ Payment Executed!",
+            `${paymentData.amount} ${paymentData.tokenInfo.symbol} sent successfully`,
             "success"
           );
         } else {
           console.error(
-            `❌ [${this.executorId}] Failed to update database for ${scheduleId}: ${updateResult.error}`
+            `❌ [${this.executorId}] All database update attempts failed for ${scheduleId}`
           );
-
-          // Try one more time with force update
-          console.log(
-            `🔄 [${this.executorId}] Attempting force update for ${scheduleId}...`
-          );
-          await this.forceUpdateSchedule(scheduleId, executionResult);
-
-          // Still mark as executed to prevent re-execution
-          this.executedPayments.add(scheduleId);
         }
       } else {
         console.error(
-          `❌ [${this.executorId}] Blockchain transaction failed for ${scheduleId}: ${executionResult.error}`
+          `❌ [${this.executorId}] Blockchain transaction failed: ${executionResult.error}`
         );
-
-        // Mark as failed in database
         await this.markScheduleAsFailed(scheduleId, executionResult.error);
 
-        // Show error notification
         this.showNotification(
-          "Payment Execution Failed",
-          `Failed to execute payment: ${executionResult.error}`,
+          "❌ Payment Failed",
+          `Transaction failed: ${executionResult.error}`,
           "error"
         );
       }
     } catch (error: any) {
-      console.error(
-        `💥 [${this.executorId}] Critical error executing payment ${scheduleId}:`,
-        error
-      );
+      console.error(`💥 [${this.executorId}] Critical error:`, error);
       await this.markScheduleAsFailed(scheduleId, error.message);
 
       this.showNotification(
-        "Payment Execution Error",
+        "💥 Payment Error",
         `Critical error: ${error.message}`,
         "error"
       );
     } finally {
-      // Always remove from processing set when done
       this.processingPayments.delete(scheduleId);
-      console.log(
-        `🔓 [${this.executorId}] Released payment ${scheduleId} from processing`
-      );
     }
   }
 
-  // Enhanced method with retry logic
-  private async updateScheduleAfterExecutionWithRetry(
-    paymentData: ScheduledPaymentData,
+  // ENHANCED: Multiple retry attempts with different strategies
+  private async updateDatabaseWithRetries(
+    scheduleId: string,
     executionResult: any,
-    maxRetries: number = 3
-  ): Promise<{ success: boolean; error?: string; finalStatus?: string }> {
+    maxRetries: number = 5
+  ): Promise<boolean> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       console.log(
-        `📝 [${this.executorId}] Database update attempt ${attempt}/${maxRetries} for ${paymentData.scheduleId}`
+        `📝 [${this.executorId}] DB update attempt ${attempt}/${maxRetries} for ${scheduleId}`
       );
 
       try {
-        const response = await fetch(
-          `/api/scheduled-payments/${paymentData.scheduleId}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              action: "update_after_execution",
-              executorId: this.executorId,
-              transactionHash: executionResult.transactionHash,
-              gasUsed: executionResult.gasUsed,
-              blockNumber: executionResult.blockNumber,
-              actualCostETH: executionResult.actualCostETH,
-              actualCostUSD: executionResult.actualCostUSD,
-              executedAt: executionResult.executedAt.toISOString(),
-            }),
-            credentials: "include",
+        // Strategy 1: Normal update (attempts 1-3)
+        if (attempt <= 3) {
+          const response = await fetch(
+            `/api/scheduled-payments/${scheduleId}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "update_after_execution",
+                executorId: this.executorId,
+                transactionHash: executionResult.transactionHash,
+                gasUsed: executionResult.gasUsed,
+                blockNumber: executionResult.blockNumber,
+                actualCostETH: executionResult.actualCostETH,
+                actualCostUSD: executionResult.actualCostUSD,
+                executedAt: executionResult.executedAt.toISOString(),
+              }),
+              credentials: "include",
+            }
+          );
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            console.log(
+              `✅ [${this.executorId}] DB update successful on attempt ${attempt}`
+            );
+            return true;
+          } else {
+            console.warn(
+              `⚠️ [${this.executorId}] Normal update failed: ${data.error}`
+            );
           }
-        );
+        }
 
-        const data = await response.json();
+        // Strategy 2: Force update (attempts 4-5)
+        if (attempt >= 4) {
+          console.log(`🔄 [${this.executorId}] Trying force update...`);
 
-        if (response.ok && data.success) {
+          const forceResponse = await fetch(
+            `/api/scheduled-payments/${scheduleId}/force-update`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                executorId: this.executorId,
+                transactionHash: executionResult.transactionHash,
+                gasUsed: executionResult.gasUsed,
+                blockNumber: executionResult.blockNumber,
+                actualCostETH: executionResult.actualCostETH,
+                actualCostUSD: executionResult.actualCostUSD,
+                executedAt: executionResult.executedAt.toISOString(),
+                forceUpdate: true,
+              }),
+              credentials: "include",
+            }
+          );
+
+          const forceData = await forceResponse.json();
+
+          if (forceResponse.ok && forceData.success) {
+            console.log(
+              `✅ [${this.executorId}] Force update successful on attempt ${attempt}`
+            );
+            return true;
+          } else {
+            console.warn(
+              `⚠️ [${this.executorId}] Force update failed: ${forceData.error}`
+            );
+          }
+        }
+
+        // Wait before retry (exponential backoff)
+        if (attempt < maxRetries) {
+          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
           console.log(
-            `✅ [${this.executorId}] Database update successful on attempt ${attempt} - Status: ${data.nextStatus}`
+            `⏳ [${this.executorId}] Waiting ${waitTime}ms before retry...`
           );
-          return {
-            success: true,
-            finalStatus: data.nextStatus,
-          };
-        } else {
-          console.warn(
-            `⚠️ [${this.executorId}] Database update failed on attempt ${attempt}: ${data.error}`
-          );
-
-          if (attempt === maxRetries) {
-            return {
-              success: false,
-              error: data.error || "Failed after all retries",
-            };
-          }
-
-          // Wait before retry
-          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
         }
       } catch (error: any) {
         console.error(
-          `💥 [${this.executorId}] Database update error on attempt ${attempt}:`,
+          `💥 [${this.executorId}] DB update attempt ${attempt} error:`,
           error
         );
 
-        if (attempt === maxRetries) {
-          return {
-            success: false,
-            error: error.message || "Network error after all retries",
-          };
+        if (attempt < maxRetries) {
+          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
         }
-
-        // Wait before retry
-        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
       }
     }
 
-    return { success: false, error: "Max retries exceeded" };
-  }
-
-  // Force update method that bypasses some checks
-  private async forceUpdateSchedule(scheduleId: string, executionResult: any) {
-    try {
-      console.log(
-        `🔄 [${this.executorId}] Force updating schedule ${scheduleId}...`
-      );
-
-      const response = await fetch(
-        `/api/scheduled-payments/${scheduleId}/force-update`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            executorId: this.executorId,
-            transactionHash: executionResult.transactionHash,
-            gasUsed: executionResult.gasUsed,
-            blockNumber: executionResult.blockNumber,
-            actualCostETH: executionResult.actualCostETH,
-            actualCostUSD: executionResult.actualCostUSD,
-            executedAt: executionResult.executedAt.toISOString(),
-            forceUpdate: true,
-          }),
-          credentials: "include",
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        console.log(
-          `✅ [${this.executorId}] Force update successful for ${scheduleId}`
-        );
-      } else {
-        console.error(
-          `❌ [${this.executorId}] Force update failed for ${scheduleId}: ${data.error}`
-        );
-      }
-    } catch (error) {
-      console.error(`💥 [${this.executorId}] Force update error:`, error);
-    }
-  }
-
-  private async markAsProcessing(scheduleId: string): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
-    try {
-      const response = await fetch(
-        `/api/scheduled-payments/${scheduleId}/process`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            executorId: this.executorId,
-            processingStarted: new Date().toISOString(),
-          }),
-          credentials: "include",
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        return { success: true };
-      } else {
-        return {
-          success: false,
-          error: data.error || "Failed to mark as processing",
-        };
-      }
-    } catch (error: any) {
-      console.error(
-        `💥 [${this.executorId}] Error marking as processing:`,
-        error
-      );
-      return {
-        success: false,
-        error: error.message || "Network error",
-      };
-    }
+    console.error(
+      `❌ [${this.executorId}] All ${maxRetries} database update attempts failed for ${scheduleId}`
+    );
+    return false;
   }
 
   private async markScheduleAsFailed(scheduleId: string, error: string) {
     try {
       const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "mark_failed",
           executorId: this.executorId,
@@ -530,20 +419,11 @@ export class WebScheduledPaymentExecutor {
         credentials: "include",
       });
 
-      if (!response.ok) {
-        console.error(
-          `❌ [${this.executorId}] Failed to mark schedule as failed`
-        );
-      } else {
-        console.log(
-          `✅ [${this.executorId}] Schedule marked as failed successfully`
-        );
+      if (response.ok) {
+        console.log(`✅ [${this.executorId}] Schedule marked as failed`);
       }
     } catch (error) {
-      console.error(
-        `💥 [${this.executorId}] Error marking schedule as failed:`,
-        error
-      );
+      console.error(`💥 [${this.executorId}] Error marking as failed:`, error);
     }
   }
 
@@ -552,27 +432,24 @@ export class WebScheduledPaymentExecutor {
     message: string,
     type: "success" | "error"
   ) {
-    // Create a browser notification if permission is granted
     if (typeof window !== "undefined" && "Notification" in window) {
       if (Notification.permission === "granted") {
         new Notification(title, {
           body: message,
-          icon: type === "success" ? "/icons/success.png" : "/icons/error.png",
+          icon: type === "success" ? "/favicon.ico" : "/favicon.ico",
         });
       } else if (Notification.permission !== "denied") {
         Notification.requestPermission().then((permission) => {
           if (permission === "granted") {
             new Notification(title, {
               body: message,
-              icon:
-                type === "success" ? "/icons/success.png" : "/icons/error.png",
+              icon: "/favicon.ico",
             });
           }
         });
       }
     }
 
-    // Also log to console with appropriate styling
     const style = type === "success" ? "color: green" : "color: red";
     console.log(`%c🔔 [${this.executorId}] ${title}: ${message}`, style);
   }
@@ -592,7 +469,6 @@ export class WebScheduledPaymentExecutor {
     };
   }
 
-  // Method to switch networks
   setNetwork(useTestnet: boolean) {
     this.useTestnet = useTestnet;
     console.log(
@@ -603,7 +479,7 @@ export class WebScheduledPaymentExecutor {
   }
 }
 
-// Create instances for both networks
+// Export singleton instances
 export const webScheduledPaymentExecutor = new WebScheduledPaymentExecutor(
   false
 ); // Mainnet

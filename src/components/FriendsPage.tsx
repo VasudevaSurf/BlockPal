@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - FIXED VERSION
+// src/components/FriendsPage.tsx - FIXED VERSION (decoded error fixed)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Bell,
   HelpCircle,
+  Copy,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
@@ -60,6 +61,11 @@ export default function FriendsPage() {
     (state: RootState) => state.wallet
   );
 
+  // FIXED: Add current user state to track the logged-in user
+  const [currentUser, setCurrentUser] = useState<{ username: string } | null>(
+    null
+  );
+
   const [activeTab, setActiveTab] = useState<
     "Friends" | "Requests" | "FundRequests"
   >("Friends");
@@ -86,6 +92,18 @@ export default function FriendsPage() {
     amount: "",
     message: "",
   });
+
+  // Track copied state for clipboard actions
+  const [copied, setCopied] = useState<string | null>(null);
+
+  // Copy to clipboard helper
+  const copyToClipboard = (value: string, key: string) => {
+    if (!value) return;
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  };
 
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
@@ -127,8 +145,9 @@ export default function FriendsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Load initial data and notifications
+  // FIXED: Load current user and initial data
   useEffect(() => {
+    loadCurrentUser();
     loadInitialData();
     fetchUnreadCount();
 
@@ -149,6 +168,25 @@ export default function FriendsPage() {
       }
     }
   }, [activeTab, initialLoading]);
+
+  // FIXED: Add function to get current user info
+  const loadCurrentUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me", {
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setCurrentUser({ username: userData.username });
+        console.log("✅ Current user loaded:", userData.username);
+      } else {
+        console.error("Failed to load current user");
+      }
+    } catch (error) {
+      console.error("Error loading current user:", error);
+    }
+  };
 
   const loadInitialData = async () => {
     try {
@@ -381,32 +419,63 @@ export default function FriendsPage() {
   };
 
   const sendFundRequest = async () => {
-    if (!selectedFriend || !fundRequestData.amount) return;
+    if (
+      !selectedFriend ||
+      !fundRequestData.amount ||
+      !activeWallet?.address ||
+      !currentUser
+    ) {
+      setError("Missing required information or no active wallet selected");
+      return;
+    }
 
     try {
       setLoading(true);
+      setError("");
+
+      // FIXED: Use currentUser.username instead of decoded.username
+      console.log("💰 Sending fund request:", {
+        from: currentUser.username, // Current user (requester)
+        to: selectedFriend.username, // Friend (who will send)
+        amount: fundRequestData.amount,
+        token: fundRequestData.tokenSymbol,
+        requesterWallet: activeWallet.address, // Current user's active wallet
+      });
+
       const response = await fetch("/api/friends/fund-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          friendUsername: selectedFriend.username,
+          friendUsername: selectedFriend.username, // Friend who will send funds
           tokenSymbol: fundRequestData.tokenSymbol,
           amount: fundRequestData.amount,
           message: fundRequestData.message,
+          requesterWalletAddress: activeWallet.address, // FIXED: Use current user's active wallet
         }),
         credentials: "include",
       });
 
+      const data = await response.json();
+
       if (response.ok) {
         setShowFundRequestModal(false);
         setSelectedFriend(null);
+        setFundRequestData({
+          tokenSymbol: tokens.length > 0 ? tokens[0].symbol : "ETH",
+          amount: "",
+          message: "",
+        });
+
         // Show success message
         console.log("✅ Fund request sent successfully");
+
+        // You could add a toast notification here
+        // toast.success("Fund request sent successfully!");
       } else {
-        const data = await response.json();
         setError(data.error || "Failed to send fund request");
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error("❌ Error sending fund request:", error);
       setError("Failed to send fund request");
     } finally {
       setLoading(false);
@@ -959,6 +1028,97 @@ export default function FriendsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* FIXED: Clear explanation of fund request flow */}
+              <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] mb-4">
+                <div className="text-sm font-satoshi mb-3">
+                  <span className="text-[#E2AF19] font-medium">
+                    💰 Fund Request Flow:
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 font-satoshi">
+                      You're asking:
+                    </span>
+                    <span className="text-white font-satoshi">
+                      @{selectedFriend.username}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 font-satoshi">
+                      To send funds to:
+                    </span>
+                    <span className="text-white font-satoshi font-mono text-xs">
+                      {activeWallet?.address
+                        ? `${activeWallet.address.slice(
+                            0,
+                            8
+                          )}...${activeWallet.address.slice(-6)}`
+                        : "Your wallet"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/50 rounded">
+                  <p className="text-blue-400 text-xs font-satoshi">
+                    ℹ️ {selectedFriend.displayName || selectedFriend.username}{" "}
+                    will send {fundRequestData.tokenSymbol} from their wallet to
+                    your currently selected wallet.
+                  </p>
+                </div>
+              </div>
+
+              {/* Current Active Wallet Display */}
+              {activeWallet && (
+                <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-green-400 text-sm font-satoshi font-medium">
+                        ✅ Active Wallet Selected
+                      </div>
+                      <div className="text-green-400 text-xs font-satoshi">
+                        Funds will be sent to: {activeWallet.name}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() =>
+                        copyToClipboard(activeWallet.address, "wallet")
+                      }
+                      className="text-green-400 hover:text-green-300 transition-colors"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
+                  {copied === "wallet" && (
+                    <p className="text-green-400 text-xs font-satoshi mt-1">
+                      Wallet address copied!
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Warning if no active wallet */}
+              {!activeWallet && (
+                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4">
+                  <div className="flex items-start">
+                    <AlertTriangle
+                      size={16}
+                      className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+                    />
+                    <div>
+                      <p className="text-red-400 text-sm font-satoshi font-medium">
+                        No Active Wallet Selected
+                      </p>
+                      <p className="text-red-400 text-xs font-satoshi">
+                        Please select an active wallet to receive funds.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -1035,7 +1195,7 @@ export default function FriendsPage() {
                 </button>
                 <button
                   onClick={sendFundRequest}
-                  disabled={loading || !fundRequestData.amount}
+                  disabled={loading || !fundRequestData.amount || !activeWallet}
                   className="flex-1 px-4 py-2 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "Sending..." : "Send Request"}

@@ -1,4 +1,4 @@
-// src/components/friends/FundRequestModal.tsx - FIXED VERSION
+// src/components/friends/FundRequestModal.tsx - FIXED VERSION (Use stored wallet address)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -33,6 +33,7 @@ interface FundRequestModalProps {
     status: "pending" | "fulfilled" | "declined" | "expired";
     requestedAt: string;
     expiresAt: string;
+    requesterWalletAddress?: string; // The wallet address where funds should be sent
   };
   onFulfilled?: () => void;
   onDeclined?: () => void;
@@ -87,10 +88,23 @@ export default function FundRequestModal({
       setTransferResult(null);
       setError("");
       setRequesterInfo(null);
-      // Fetch requester wallet address
-      fetchRequesterInfo();
+      // FIXED: Check if we have the wallet address in the fund request
+      if (fundRequest.requesterWalletAddress) {
+        console.log(
+          "✅ Using wallet address from fund request:",
+          fundRequest.requesterWalletAddress
+        );
+        setRequesterInfo({
+          username: fundRequest.requesterUsername,
+          walletAddress: fundRequest.requesterWalletAddress,
+          displayName: fundRequest.requesterUsername,
+        });
+      } else {
+        // Fallback: Fetch requester wallet address if not in fund request
+        fetchRequesterInfo();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, fundRequest]);
 
   const fetchRequesterInfo = async () => {
     try {
@@ -100,7 +114,7 @@ export default function FundRequestModal({
         fundRequest.requesterUsername
       );
 
-      // Call your API to get user wallet address by username
+      // Call the API to get user wallet address by username (as fallback)
       const response = await fetch(
         `/api/users/by-username/${fundRequest.requesterUsername}`,
         {
@@ -110,14 +124,23 @@ export default function FundRequestModal({
 
       if (response.ok) {
         const userData = await response.json();
-        setRequesterInfo({
-          username: userData.username,
-          walletAddress: userData.walletAddress,
-          displayName: userData.displayName,
-        });
-        console.log("✅ Requester info fetched:", userData.walletAddress);
+        console.log("✅ Requester user data:", userData);
+
+        if (userData.walletAddress) {
+          setRequesterInfo({
+            username: userData.username,
+            walletAddress: userData.walletAddress,
+            displayName: userData.displayName,
+          });
+          console.log(
+            "✅ Requester wallet address found:",
+            userData.walletAddress
+          );
+        } else {
+          console.warn("⚠️ No wallet address found for user");
+          setError("Requester doesn't have a wallet address configured");
+        }
       } else {
-        // Fallback: try to find the wallet address from friends or other sources
         console.warn("⚠️ Could not fetch user info, trying friends API...");
         await fetchRequesterFromFriends();
       }
@@ -131,7 +154,7 @@ export default function FundRequestModal({
 
   const fetchRequesterFromFriends = async () => {
     try {
-      // Try to get wallet address from friends list
+      // Try to get wallet address from friends list as fallback
       const response = await fetch("/api/friends?type=friends", {
         credentials: "include",
       });
@@ -216,7 +239,22 @@ export default function FundRequestModal({
       return;
     }
 
-    if (!requesterInfo?.walletAddress) {
+    // FIXED: Always use the wallet address from the fund request first
+    let recipientWalletAddress = null;
+
+    if (fundRequest.requesterWalletAddress) {
+      recipientWalletAddress = fundRequest.requesterWalletAddress;
+      console.log(
+        "✅ Using wallet address from fund request:",
+        recipientWalletAddress
+      );
+    } else if (requesterInfo?.walletAddress) {
+      recipientWalletAddress = requesterInfo.walletAddress;
+      console.log(
+        "✅ Using wallet address from user lookup:",
+        recipientWalletAddress
+      );
+    } else {
       setError("Could not determine requester's wallet address");
       return;
     }
@@ -229,23 +267,23 @@ export default function FundRequestModal({
       return;
     }
 
+    console.log("🚀 Fulfilling fund request:", {
+      from: activeWallet.address, // Current user's wallet (sender)
+      to: recipientWalletAddress, // Requester's wallet (recipient) - from fund request
+      amount: fundRequest.amount,
+      token: fundRequest.tokenSymbol,
+    });
+
     try {
       setLoading(true);
       setStep("sending");
 
-      console.log("🚀 Starting fund request fulfillment:", {
-        tokenSymbol: fundRequest.tokenSymbol,
-        amount: fundRequest.amount,
-        requesterWallet: requesterInfo.walletAddress,
-        senderWallet: activeWallet.address,
-      });
-
-      // First, get the private key
+      // Get the private key for the current user's wallet
       const keyResponse = await fetch("/api/wallets/private-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          walletAddress: activeWallet.address,
+          walletAddress: activeWallet.address, // Current user's wallet
         }),
         credentials: "include",
       });
@@ -265,7 +303,7 @@ export default function FundRequestModal({
 
       console.log("✅ Private key retrieved successfully");
 
-      // Execute the transfer
+      // Execute the transfer FROM current user TO requester
       const transferResponse = await fetch("/api/transfer/simple", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -278,9 +316,9 @@ export default function FundRequestModal({
             decimals: tokenInfo.decimals,
             isETH: tokenInfo.contractAddress === "native",
           },
-          recipientAddress: requesterInfo.walletAddress, // FIXED: Use actual wallet address
+          recipientAddress: recipientWalletAddress, // FIXED: Send TO the requester's wallet (from fund request)
           amount: fundRequest.amount,
-          fromAddress: activeWallet.address,
+          fromAddress: activeWallet.address, // Send FROM current user's wallet
           privateKey: keyData.privateKey,
           useStoredKey: true,
         }),
@@ -340,6 +378,10 @@ export default function FundRequestModal({
   const hasInsufficientBalance =
     tokenInfo &&
     parseFloat(tokenInfo.balanceFormatted) < parseFloat(fundRequest.amount);
+
+  // FIXED: Get the correct wallet address to display
+  const requesterWalletAddress =
+    fundRequest.requesterWalletAddress || requesterInfo?.walletAddress;
 
   if (!isOpen) return null;
 
@@ -434,42 +476,99 @@ export default function FundRequestModal({
                     </span>
                   </div>
 
-                  {/* FIXED: Show requester wallet address */}
-                  {loadingRequester && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-sm font-satoshi">
-                        Recipient Wallet:
-                      </span>
-                      <span className="text-gray-400 text-sm font-satoshi">
-                        Loading...
+                  {/* FIXED: Show transfer details with correct addresses */}
+                  <div className="bg-[#1A1A1A] rounded-lg p-3 border border-[#2C2C2C]">
+                    <div className="text-sm font-satoshi mb-2">
+                      <span className="text-[#E2AF19] font-medium">
+                        Transfer Details:
                       </span>
                     </div>
-                  )}
 
-                  {requesterInfo?.walletAddress && (
-                    <div className="flex justify-between items-center">
+                    {/* From (Current User) */}
+                    <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-400 text-sm font-satoshi">
-                        Recipient Wallet:
+                        From (You):
                       </span>
                       <div className="flex items-center">
                         <span className="text-white text-sm font-satoshi font-mono mr-2">
-                          {requesterInfo.walletAddress.slice(0, 8)}...
-                          {requesterInfo.walletAddress.slice(-6)}
+                          {activeWallet?.address
+                            ? `${activeWallet.address.slice(
+                                0,
+                                8
+                              )}...${activeWallet.address.slice(-6)}`
+                            : "No wallet selected"}
                         </span>
-                        <button
-                          onClick={() =>
-                            copyToClipboard(
-                              requesterInfo.walletAddress,
-                              "wallet"
-                            )
-                          }
-                          className="text-gray-400 hover:text-white transition-colors"
-                        >
-                          <Copy size={14} />
-                        </button>
+                        {activeWallet?.address && (
+                          <button
+                            onClick={() =>
+                              copyToClipboard(activeWallet.address, "sender")
+                            }
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <Copy size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
-                  )}
+
+                    {/* To (Requester) - FIXED: Always show the wallet address from fund request */}
+                    {loadingRequester && !requesterWalletAddress && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400 text-sm font-satoshi">
+                          To (Requester):
+                        </span>
+                        <span className="text-gray-400 text-sm font-satoshi">
+                          Loading...
+                        </span>
+                      </div>
+                    )}
+
+                    {requesterWalletAddress && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400 text-sm font-satoshi">
+                          To (Requester):
+                        </span>
+                        <div className="flex items-center">
+                          <span className="text-white text-sm font-satoshi font-mono mr-2">
+                            {requesterWalletAddress.slice(0, 8)}...
+                            {requesterWalletAddress.slice(-6)}
+                          </span>
+                          <button
+                            onClick={() =>
+                              copyToClipboard(
+                                requesterWalletAddress,
+                                "recipient"
+                              )
+                            }
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <Copy size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* FIXED: Add note about which wallet will receive funds */}
+                    {fundRequest.requesterWalletAddress && (
+                      <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/50 rounded">
+                        <p className="text-blue-400 text-xs font-satoshi">
+                          ℹ️ Funds will be sent to the wallet address that was
+                          specified when this request was created.
+                        </p>
+                      </div>
+                    )}
+
+                    {copied === "sender" && (
+                      <p className="text-green-400 text-xs font-satoshi mt-1">
+                        Your wallet address copied!
+                      </p>
+                    )}
+                    {copied === "recipient" && (
+                      <p className="text-green-400 text-xs font-satoshi mt-1">
+                        Requester's wallet address copied!
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -520,7 +619,7 @@ export default function FundRequestModal({
               )}
 
               {/* Address Resolution Error */}
-              {!loadingRequester && !requesterInfo?.walletAddress && (
+              {!loadingRequester && !requesterWalletAddress && (
                 <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
                   <div className="flex items-start">
                     <AlertTriangle
@@ -560,7 +659,8 @@ export default function FundRequestModal({
                     !tokenInfo ||
                     hasInsufficientBalance ||
                     loadingRequester ||
-                    !requesterInfo?.walletAddress
+                    !requesterWalletAddress ||
+                    !activeWallet?.address
                   }
                   className="flex-1"
                 >

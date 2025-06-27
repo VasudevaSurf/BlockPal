@@ -1,3 +1,4 @@
+// src/app/api/friends/fund-request/[requestId]/route.ts - UPDATED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -27,7 +28,7 @@ export async function PATCH(
     // Get the fund request
     const fundRequest = await db.collection("fund_requests").findOne({
       requestId,
-      recipientUsername: decoded.username,
+      recipientUsername: decoded.username, // Current user is the recipient (will send funds)
       status: "pending",
     });
 
@@ -63,6 +64,7 @@ export async function PATCH(
 
     if (action === "fulfill" && transactionHash) {
       updateData.transactionHash = transactionHash;
+      updateData.fulfilledBy = decoded.username;
     }
 
     // Update fund request
@@ -70,9 +72,17 @@ export async function PATCH(
       .collection("fund_requests")
       .updateOne({ requestId }, { $set: updateData });
 
+    console.log(`✅ Fund request ${action}ed:`, {
+      requestId,
+      requester: fundRequest.requesterUsername,
+      recipient: decoded.username,
+      amount: fundRequest.amount,
+      token: fundRequest.tokenSymbol,
+    });
+
     // Create notification for requester
     const notification = {
-      username: fundRequest.requesterUsername,
+      username: fundRequest.requesterUsername, // The person who requested funds
       type: "fund_request_response",
       title: `Fund Request ${action === "fulfill" ? "Fulfilled" : "Declined"}`,
       message: `${decoded.username} ${
@@ -82,9 +92,11 @@ export async function PATCH(
       relatedData: {
         requestId,
         recipientUsername: decoded.username,
+        requesterUsername: fundRequest.requesterUsername,
         amount: fundRequest.amount,
         tokenSymbol: fundRequest.tokenSymbol,
         transactionHash: transactionHash || null,
+        action: action,
       },
       createdAt: new Date(),
     };
@@ -125,8 +137,8 @@ export async function GET(
     const fundRequest = await db.collection("fund_requests").findOne({
       requestId,
       $or: [
-        { requesterUsername: decoded.username },
-        { recipientUsername: decoded.username },
+        { requesterUsername: decoded.username }, // User requested funds
+        { recipientUsername: decoded.username }, // User will send funds
       ],
     });
 

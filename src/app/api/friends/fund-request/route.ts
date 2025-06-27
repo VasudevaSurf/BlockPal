@@ -1,3 +1,4 @@
+// src/app/api/friends/fund-request/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -11,12 +12,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { friendUsername, tokenSymbol, amount, message } =
-      await request.json();
+    const {
+      friendUsername,
+      tokenSymbol,
+      amount,
+      message,
+      requesterWalletAddress,
+    } = await request.json();
 
     if (!friendUsername || !tokenSymbol || !amount) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // FIXED: Validate that requesterWalletAddress is provided (current user's active wallet)
+    if (!requesterWalletAddress) {
+      return NextResponse.json(
+        { error: "Requester wallet address is required" },
         { status: 400 }
       );
     }
@@ -46,13 +60,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create fund request
+    // FIXED: Create fund request with the current user's wallet address
     const fundRequest = {
       requestId: `fund_${Date.now()}_${Math.random()
         .toString(36)
         .substr(2, 9)}`,
-      requesterUsername: decoded.username,
-      recipientUsername: friendUsername,
+      requesterUsername: decoded.username, // Current user (who wants the funds)
+      requesterWalletAddress: requesterWalletAddress, // Current user's active wallet
+      recipientUsername: friendUsername, // Friend (who will send the funds)
       tokenSymbol,
       amount: amount.toString(),
       message: message || "",
@@ -61,9 +76,17 @@ export async function POST(request: NextRequest) {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
     };
 
+    console.log("💰 Creating fund request:", {
+      requester: decoded.username,
+      requesterWallet: requesterWalletAddress,
+      recipient: friendUsername,
+      amount: amount,
+      token: tokenSymbol,
+    });
+
     await db.collection("fund_requests").insertOne(fundRequest);
 
-    // Create notification for the recipient
+    // Create notification for the recipient (friend who will send funds)
     const notification = {
       username: friendUsername,
       type: "fund_request",
@@ -73,6 +96,7 @@ export async function POST(request: NextRequest) {
       relatedData: {
         requestId: fundRequest.requestId,
         requesterUsername: decoded.username,
+        requesterWalletAddress: requesterWalletAddress,
         amount,
         tokenSymbol,
       },
@@ -80,6 +104,8 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection("notifications").insertOne(notification);
+
+    console.log("✅ Fund request created successfully");
 
     return NextResponse.json({
       success: true,
@@ -111,8 +137,10 @@ export async function GET(request: NextRequest) {
 
     let query;
     if (type === "received") {
+      // Fund requests where current user is the recipient (will send funds)
       query = { recipientUsername: decoded.username };
     } else {
+      // Fund requests where current user is the requester (will receive funds)
       query = { requesterUsername: decoded.username };
     }
 

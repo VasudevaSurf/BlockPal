@@ -1,3 +1,4 @@
+// src/app/dashboard/layout.tsx - Updated with Global Payment Executor
 "use client";
 
 import { useSelector } from "react-redux";
@@ -5,6 +6,7 @@ import { useState } from "react";
 import { RootState } from "@/store";
 import Sidebar from "@/components/dashboard/Sidebar";
 import WalletSelector from "@/components/dashboard/WalletSelector";
+import GlobalPaymentExecutor from "@/components/payments/GlobalPaymentExecutor";
 import { Menu, X } from "lucide-react";
 
 export default function DashboardLayout({
@@ -57,10 +59,12 @@ export default function DashboardLayout({
         {children}
       </main>
 
+      {/* Global Payment Executor - Floating Button */}
+      <GlobalPaymentExecutor />
+
       {walletSelectorOpen && <WalletSelector />}
 
       <style jsx global>{`
-        /* Hide scrollbars globally for this layout */
         .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
@@ -69,7 +73,6 @@ export default function DashboardLayout({
           display: none;
         }
 
-        /* Ensure proper mobile behavior */
         @media (max-width: 1024px) {
           html,
           body {

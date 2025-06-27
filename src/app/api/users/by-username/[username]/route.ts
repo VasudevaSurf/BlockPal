@@ -1,4 +1,4 @@
-// src/app/api/users/by-username/[username]/route.ts
+// src/app/api/users/by-username/[username]/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -34,13 +34,25 @@ export async function GET(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Get user's primary wallet address
-    const wallet = await db
-      .collection("wallets")
-      .findOne(
-        { username, isDefault: true },
-        { projection: { walletAddress: 1 } }
-      );
+    console.log("🔍 Found user:", user.username);
+
+    // FIXED: Get user's primary/default wallet address
+    const wallet = await db.collection("wallets").findOne(
+      {
+        username,
+        $or: [{ isDefault: true }, { status: "active" }],
+      },
+      {
+        projection: { walletAddress: 1, isDefault: 1 },
+        sort: { isDefault: -1, createdAt: -1 }, // Prefer default wallet, then most recent
+      }
+    );
+
+    console.log("🏦 Found wallet for user:", {
+      username,
+      walletAddress: wallet?.walletAddress,
+      isDefault: wallet?.isDefault,
+    });
 
     const userData = {
       username: user.username,
@@ -49,9 +61,11 @@ export async function GET(
       walletAddress: wallet?.walletAddress || null,
     };
 
+    console.log("✅ Returning user data:", userData);
+
     return NextResponse.json(userData);
   } catch (error) {
-    console.error("Get user by username error:", error);
+    console.error("❌ Get user by username error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
