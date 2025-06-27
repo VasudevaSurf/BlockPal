@@ -228,7 +228,12 @@ export default function ScheduledPaymentsPage() {
   };
 
   const handleCreatePreview = async () => {
-    if (!validateForm() || !selectedToken || !activeWallet?.address) return;
+    console.log("🚀 Creating scheduled payment preview...");
+
+    if (!validateForm() || !selectedToken || !activeWallet?.address) {
+      console.log("❌ Validation failed");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -237,25 +242,32 @@ export default function ScheduledPaymentsPage() {
       const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
+      const requestBody = {
+        action: "preview",
+        tokenInfo: selectedToken,
+        fromAddress: activeWallet.address,
+        recipient: formData.recipient,
+        amount: formData.amount,
+        scheduledFor: scheduledDateTime.toISOString(),
+        frequency,
+        timezone: selectedTimezone.tz,
+      };
+
+      console.log("📡 Sending preview request:", requestBody);
+
       const response = await fetch("/api/scheduled-payments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          action: "preview",
-          tokenInfo: selectedToken,
-          fromAddress: activeWallet.address,
-          recipient: formData.recipient,
-          amount: formData.amount,
-          scheduledFor: scheduledDateTime.toISOString(),
-          frequency,
-          timezone: selectedTimezone.tz,
-        }),
+        body: JSON.stringify(requestBody),
         credentials: "include",
       });
 
+      console.log("📡 Response status:", response.status);
+
       const data = await response.json();
+      console.log("📡 Response data:", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to create preview");
@@ -263,7 +275,9 @@ export default function ScheduledPaymentsPage() {
 
       setPreview(data.preview);
       setShowPreview(true);
+      console.log("✅ Preview created successfully");
     } catch (err: any) {
+      console.error("❌ Preview error:", err);
       setError(err.message || "Failed to create preview");
     } finally {
       setLoading(false);
@@ -271,6 +285,8 @@ export default function ScheduledPaymentsPage() {
   };
 
   const handleCreateScheduledPayment = async () => {
+    console.log("🚀 Creating scheduled payment...");
+
     if (!preview || !activeWallet?.address) return;
 
     setCreating(true);
@@ -279,6 +295,7 @@ export default function ScheduledPaymentsPage() {
     try {
       // First handle approval if required
       if (preview.approvalRequired) {
+        console.log("🔐 Handling token approval...");
         const approvalResponse = await fetch("/api/scheduled-payments", {
           method: "POST",
           headers: {
@@ -297,32 +314,40 @@ export default function ScheduledPaymentsPage() {
         if (!approvalResponse.ok) {
           throw new Error(approvalData.error || "Token approval failed");
         }
+        console.log("✅ Token approval successful");
       }
 
       // Create the scheduled payment
       const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
+      const createBody = {
+        action: "create",
+        tokenInfo: selectedToken,
+        fromAddress: activeWallet.address,
+        recipient: formData.recipient,
+        amount: formData.amount,
+        scheduledFor: scheduledDateTime.toISOString(),
+        frequency,
+        timezone: selectedTimezone.tz,
+        description: formData.description,
+      };
+
+      console.log("📡 Sending create request:", createBody);
+
       const response = await fetch("/api/scheduled-payments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          action: "create",
-          tokenInfo: selectedToken,
-          fromAddress: activeWallet.address,
-          recipient: formData.recipient,
-          amount: formData.amount,
-          scheduledFor: scheduledDateTime.toISOString(),
-          frequency,
-          timezone: selectedTimezone.tz,
-          description: formData.description,
-        }),
+        body: JSON.stringify(createBody),
         credentials: "include",
       });
 
+      console.log("📡 Create response status:", response.status);
+
       const data = await response.json();
+      console.log("📡 Create response data:", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to create scheduled payment");
@@ -342,9 +367,12 @@ export default function ScheduledPaymentsPage() {
       });
       setRecurringEnabled(false);
 
+      console.log("✅ Scheduled payment created successfully");
+
       // Refresh the list
       fetchScheduledPayments();
     } catch (err: any) {
+      console.error("❌ Create error:", err);
       setError(err.message || "Failed to create scheduled payment");
     } finally {
       setCreating(false);

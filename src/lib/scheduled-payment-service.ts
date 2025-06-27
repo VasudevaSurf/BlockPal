@@ -1,4 +1,4 @@
-// src/lib/scheduled-payment-service.ts (PRODUCTION VERSION)
+// src/lib/scheduled-payment-service.ts - FIXED VERSION
 import { ethers } from "ethers";
 
 const SEPOLIA_SCHEDULED_CONTRACT_CONFIG = {
@@ -117,6 +117,8 @@ export class ScheduledPaymentService {
   private sepoliaContract: ethers.Contract;
 
   constructor() {
+    console.log("🔧 Initializing ScheduledPaymentService...");
+
     // Mainnet provider and contract
     this.provider = new ethers.JsonRpcProvider(
       `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
@@ -138,6 +140,8 @@ export class ScheduledPaymentService {
       SEPOLIA_SCHEDULED_CONTRACT_CONFIG.abi,
       this.sepoliaProvider
     );
+
+    console.log("✅ ScheduledPaymentService initialized");
   }
 
   // Get appropriate provider and contract based on network
@@ -159,9 +163,10 @@ export class ScheduledPaymentService {
 
   // Generate schedule ID
   generateScheduleId(tokenSymbol: string, timestamp: number): string {
-    return `${tokenSymbol}_${timestamp}_${Math.random()
-      .toString(36)
-      .substr(2, 8)}`;
+    const randomSuffix = Math.random().toString(36).substr(2, 8);
+    const scheduleId = `${tokenSymbol}_${timestamp}_${randomSuffix}`;
+    console.log(`📋 Generated schedule ID: ${scheduleId}`);
+    return scheduleId;
   }
 
   // Calculate next execution times based on frequency
@@ -170,6 +175,8 @@ export class ScheduledPaymentService {
     frequency: string,
     count: number = 5
   ): Date[] {
+    console.log(`⏰ Calculating next executions for frequency: ${frequency}`);
+
     const executions: Date[] = [];
     let currentDate = new Date(startDate);
 
@@ -190,10 +197,18 @@ export class ScheduledPaymentService {
           currentDate.setFullYear(currentDate.getFullYear() + 1);
           break;
         default:
+          // For "once", only return the start date
+          if (i === 0) {
+            executions.push(new Date(currentDate));
+          }
           break;
       }
+
+      // Don't continue for "once" frequency
+      if (frequency === "once") break;
     }
 
+    console.log(`⏰ Calculated ${executions.length} execution times`);
     return executions;
   }
 
@@ -209,6 +224,8 @@ export class ScheduledPaymentService {
     currentAllowance: string;
     requiredAllowance: string;
   }> {
+    console.log(`🔍 Checking token allowance for ${tokenAddress}`);
+
     try {
       const { provider } = this.getProviderAndContract(useTestnet);
 
@@ -230,13 +247,21 @@ export class ScheduledPaymentService {
         decimals
       );
 
+      const hasAllowance = allowance >= requiredAmount;
+
+      console.log(`✅ Allowance check result:`, {
+        hasAllowance,
+        currentAllowance: currentAllowanceFormatted,
+        requiredAllowance: requiredAllowanceFormatted,
+      });
+
       return {
-        hasAllowance: allowance >= requiredAmount,
+        hasAllowance,
         currentAllowance: currentAllowanceFormatted,
         requiredAllowance: requiredAllowanceFormatted,
       };
     } catch (error) {
-      console.error("Error checking token allowance:", error);
+      console.error("❌ Error checking token allowance:", error);
       return {
         hasAllowance: false,
         currentAllowance: "0",
@@ -255,59 +280,83 @@ export class ScheduledPaymentService {
     frequency: string,
     useTestnet: boolean = false
   ): Promise<ScheduledPaymentPreview> {
-    const isETH = tokenInfo.isETH || tokenInfo.contractAddress === "native";
+    console.log(`🔍 Creating scheduled payment preview:`, {
+      tokenSymbol: tokenInfo.symbol,
+      amount,
+      recipient: recipient.slice(0, 10) + "...",
+      scheduledFor: scheduledFor.toISOString(),
+      frequency,
+    });
 
-    // Calculate next executions
-    const nextExecutions =
-      frequency === "once"
-        ? [scheduledFor]
-        : this.calculateNextExecutions(scheduledFor, frequency);
+    try {
+      const isETH = tokenInfo.isETH || tokenInfo.contractAddress === "native";
 
-    const { provider } = this.getProviderAndContract(useTestnet);
-
-    // Get gas estimation
-    const gasPrice = await provider.getFeeData();
-    const estimatedGas = isETH ? "67000" : "70000";
-    const gasCostInWei = (
-      BigInt(gasPrice.gasPrice || "20000000000") * BigInt(estimatedGas)
-    ).toString();
-    const gasCostInEther = ethers.formatEther(gasCostInWei);
-    const ethPriceUSD = useTestnet ? 2000 : 2500; // Mock price for testnet
-    const gasCostInUSD = parseFloat(gasCostInEther) * ethPriceUSD;
-
-    // Check allowance for ERC20 tokens
-    let approvalRequired = false;
-    let currentAllowance = "0";
-    let requiredAllowance = "0";
-
-    if (!isETH) {
-      const allowanceCheck = await this.checkTokenAllowance(
-        tokenInfo.contractAddress,
-        fromAddress,
-        tokenInfo.decimals,
-        amount,
-        useTestnet
+      // Calculate next executions
+      const nextExecutions = this.calculateNextExecutions(
+        scheduledFor,
+        frequency
       );
 
-      approvalRequired = !allowanceCheck.hasAllowance;
-      currentAllowance = allowanceCheck.currentAllowance;
-      requiredAllowance = allowanceCheck.requiredAllowance;
-    }
+      const { provider } = this.getProviderAndContract(useTestnet);
 
-    return {
-      tokenInfo,
-      recipient,
-      amount,
-      scheduledFor,
-      frequency,
-      nextExecutions,
-      estimatedGas,
-      gasCostETH: gasCostInEther,
-      gasCostUSD: gasCostInUSD.toFixed(2),
-      approvalRequired,
-      currentAllowance,
-      requiredAllowance,
-    };
+      // Get gas estimation
+      console.log("⛽ Getting gas estimation...");
+      const gasPrice = await provider.getFeeData();
+      const estimatedGas = isETH ? "67000" : "70000";
+      const gasCostInWei = (
+        BigInt(gasPrice.gasPrice || "20000000000") * BigInt(estimatedGas)
+      ).toString();
+      const gasCostInEther = ethers.formatEther(gasCostInWei);
+      const ethPriceUSD = useTestnet ? 2000 : 2500; // Mock price for testnet
+      const gasCostInUSD = parseFloat(gasCostInEther) * ethPriceUSD;
+
+      console.log(`⛽ Gas estimation:`, {
+        estimatedGas,
+        gasCostInEther,
+        gasCostInUSD: gasCostInUSD.toFixed(2),
+      });
+
+      // Check allowance for ERC20 tokens
+      let approvalRequired = false;
+      let currentAllowance = "0";
+      let requiredAllowance = "0";
+
+      if (!isETH) {
+        console.log("🔍 Checking ERC20 token allowance...");
+        const allowanceCheck = await this.checkTokenAllowance(
+          tokenInfo.contractAddress,
+          fromAddress,
+          tokenInfo.decimals,
+          amount,
+          useTestnet
+        );
+
+        approvalRequired = !allowanceCheck.hasAllowance;
+        currentAllowance = allowanceCheck.currentAllowance;
+        requiredAllowance = allowanceCheck.requiredAllowance;
+      }
+
+      const preview: ScheduledPaymentPreview = {
+        tokenInfo,
+        recipient,
+        amount,
+        scheduledFor,
+        frequency,
+        nextExecutions,
+        estimatedGas,
+        gasCostETH: gasCostInEther,
+        gasCostUSD: gasCostInUSD.toFixed(2),
+        approvalRequired,
+        currentAllowance,
+        requiredAllowance,
+      };
+
+      console.log("✅ Preview created successfully");
+      return preview;
+    } catch (error) {
+      console.error("❌ Error creating preview:", error);
+      throw error;
+    }
   }
 
   // Approve token for scheduled payment
@@ -318,6 +367,8 @@ export class ScheduledPaymentService {
     privateKey: string,
     useTestnet: boolean = false
   ): Promise<{ success: boolean; transactionHash?: string; error?: string }> {
+    console.log(`🔐 Approving token for scheduling: ${tokenAddress}`);
+
     try {
       const { provider } = this.getProviderAndContract(useTestnet);
 
@@ -330,7 +381,7 @@ export class ScheduledPaymentService {
 
       const approvalAmount = ethers.parseUnits(amount, decimals);
 
-      console.log(`🔐 Approving ${amount} tokens for scheduling...`);
+      console.log(`🔐 Sending approval transaction for ${amount} tokens...`);
 
       const tx = await tokenContract.approve(
         SEPOLIA_SCHEDULED_CONTRACT_CONFIG.address,
@@ -365,10 +416,9 @@ export class ScheduledPaymentService {
     useTestnet: boolean = false
   ): Promise<ExecutionResult> {
     const executedAt = new Date();
+    console.log(`💰 Executing scheduled payment: ${scheduleData.scheduleId}`);
 
     try {
-      console.log(`💰 Executing scheduled payment: ${scheduleData.scheduleId}`);
-
       const { provider, contract, explorerUrl } =
         this.getProviderAndContract(useTestnet);
 
@@ -471,6 +521,8 @@ export class ScheduledPaymentService {
     frequency: string;
     tokenInfo: any;
   }): { isValid: boolean; errors: string[] } {
+    console.log("✅ Validating scheduled payment data");
+
     const errors: string[] = [];
 
     // Validate recipient address
@@ -500,6 +552,13 @@ export class ScheduledPaymentService {
       errors.push("Invalid token information");
     }
 
+    console.log(
+      `✅ Validation result: ${errors.length === 0 ? "PASSED" : "FAILED"}`
+    );
+    if (errors.length > 0) {
+      console.log("❌ Validation errors:", errors);
+    }
+
     return {
       isValid: errors.length === 0,
       errors,
@@ -508,6 +567,10 @@ export class ScheduledPaymentService {
 
   // Calculate next execution time for recurring payments
   calculateNextExecution(lastExecution: Date, frequency: string): Date {
+    console.log(
+      `⏰ Calculating next execution from ${lastExecution.toISOString()} with frequency: ${frequency}`
+    );
+
     const nextExecution = new Date(lastExecution);
 
     switch (frequency) {
@@ -529,6 +592,7 @@ export class ScheduledPaymentService {
         break;
     }
 
+    console.log(`⏰ Next execution calculated: ${nextExecution.toISOString()}`);
     return nextExecution;
   }
 
@@ -576,6 +640,7 @@ export class ScheduledPaymentService {
       const feeData = await provider.getFeeData();
       return ethers.formatUnits(feeData.gasPrice || "20000000000", "gwei");
     } catch (error) {
+      console.error("❌ Error getting gas price:", error);
       return "20";
     }
   }
@@ -591,6 +656,10 @@ export class ScheduledPaymentService {
     walletAddress: string,
     useTestnet: boolean = false
   ): Promise<{ sufficient: boolean; currentBalance: string; error?: string }> {
+    console.log(
+      `💰 Checking sufficient balance for ${scheduleData.tokenInfo.symbol}`
+    );
+
     try {
       const { provider } = this.getProviderAndContract(useTestnet);
 
@@ -603,6 +672,10 @@ export class ScheduledPaymentService {
         const balanceFormatted = ethers.formatEther(balance);
         const amountNeeded = parseFloat(scheduleData.amount);
         const currentBalance = parseFloat(balanceFormatted);
+
+        console.log(
+          `💰 ETH Balance check: ${currentBalance} >= ${amountNeeded}`
+        );
 
         return {
           sufficient: currentBalance >= amountNeeded,
@@ -623,12 +696,17 @@ export class ScheduledPaymentService {
         const amountNeeded = parseFloat(scheduleData.amount);
         const currentBalance = parseFloat(balanceFormatted);
 
+        console.log(
+          `💰 Token Balance check: ${currentBalance} >= ${amountNeeded}`
+        );
+
         return {
           sufficient: currentBalance >= amountNeeded,
           currentBalance: balanceFormatted,
         };
       }
     } catch (error: any) {
+      console.error("❌ Error checking balance:", error);
       return {
         sufficient: false,
         currentBalance: "0",
