@@ -2,7 +2,7 @@
 import { ethers } from "ethers";
 
 const SEPOLIA_SCHEDULED_CONTRACT_CONFIG = {
-  address: "0xe07F91365a5d537a7B20b47B7fD9AF6DD5FeF81D",
+  address: "0xf36aA894c9dA5CbD342Ec4C3574d876A0832b69b",
   abi: [
     {
       inputs: [
