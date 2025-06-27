@@ -1,30 +1,160 @@
-// src/app/api/transfer/batch/route.ts (Updated with DB private key retrieval)
+// src/app/api/transfer/batch/route.ts (FIXED - Updated with proper decryption)
+// Also update src/app/api/wallets/private-key/route.ts with the same decryption fix
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
 import { batchPaymentService, BatchPayment } from "@/lib/batch-payment-service";
 import crypto from "crypto";
 
-// Simple decryption function (implement proper encryption in production)
+// FIXED: Updated decryption function that handles both old and new formats
 function decryptPrivateKey(encryptedData: any): string {
   try {
-    const algorithm = encryptedData.algorithm || "aes-256-cbc";
-    const key =
-      process.env.ENCRYPTION_KEY || "your-encryption-key-32-chars-long";
-    const iv = Buffer.from(encryptedData.iv || "generated-iv", "utf8");
+    console.log("🔓 Attempting to decrypt private key...", {
+      dataType: typeof encryptedData,
+      hasEncryptedData: !!encryptedData?.encryptedData,
+      algorithm: encryptedData?.algorithm,
+      hasIv: !!encryptedData?.iv,
+    });
 
-    const decipher = crypto.createDecipher(algorithm, key);
-    let decrypted = decipher.update(
-      encryptedData.encryptedData,
-      "base64",
-      "utf8"
-    );
-    decrypted += decipher.final("utf8");
+    // Handle string format (old simple base64)
+    if (typeof encryptedData === "string") {
+      console.log("📜 Using legacy string format decryption");
+      return Buffer.from(encryptedData, "base64").toString("utf8");
+    }
 
-    return decrypted;
+    // Handle object format
+    if (encryptedData && typeof encryptedData === "object") {
+      // Method 1: Try simple base64 decode first (current wallet creation format)
+      if (encryptedData.encryptedData) {
+        try {
+          console.log("📋 Trying simple base64 decryption...");
+          const decoded = Buffer.from(
+            encryptedData.encryptedData,
+            "base64"
+          ).toString("utf8");
+
+          // Validate if it looks like a private key
+          if (
+            decoded.length === 64 ||
+            (decoded.startsWith("0x") && decoded.length === 66)
+          ) {
+            console.log("✅ Simple base64 decryption successful");
+            return decoded;
+          }
+        } catch (base64Error) {
+          console.log(
+            "⚠️ Simple base64 failed, trying AES...",
+            base64Error.message
+          );
+        }
+      }
+
+      // Method 2: Try AES decryption for properly encrypted data
+      if (
+        encryptedData.algorithm === "aes-256-cbc" &&
+        encryptedData.encryptedData
+      ) {
+        try {
+          console.log("🔐 Attempting AES-256-CBC decryption...");
+
+          const password =
+            process.env.ENCRYPTION_KEY || "your-encryption-key-32-chars-long";
+
+          // Create a proper 32-byte key from the password
+          const key = crypto.scryptSync(password, "salt", 32);
+
+          // Handle IV
+          let iv: Buffer;
+          if (encryptedData.iv && encryptedData.iv !== "generated-iv") {
+            // Try to parse IV as hex
+            try {
+              iv = Buffer.from(encryptedData.iv, "hex");
+              if (iv.length !== 16) {
+                throw new Error("Invalid IV length");
+              }
+            } catch {
+              // If hex parsing fails, try base64
+              try {
+                iv = Buffer.from(encryptedData.iv, "base64");
+                if (iv.length !== 16) {
+                  throw new Error("Invalid IV length");
+                }
+              } catch {
+                // Fallback to zero IV
+                iv = Buffer.alloc(16, 0);
+              }
+            }
+          } else {
+            // Default IV for backwards compatibility
+            iv = Buffer.alloc(16, 0);
+          }
+
+          console.log("🔑 Using IV:", iv.toString("hex"));
+
+          // Use createDecipheriv instead of deprecated createDecipher
+          const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+          let decrypted = decipher.update(
+            encryptedData.encryptedData,
+            "base64",
+            "utf8"
+          );
+          decrypted += decipher.final("utf8");
+
+          console.log("✅ AES decryption successful");
+          return decrypted;
+        } catch (aesError) {
+          console.log("⚠️ AES decryption failed:", aesError.message);
+        }
+      }
+
+      // Method 3: Try legacy crypto.createDecipher simulation
+      if (encryptedData.encryptedData) {
+        try {
+          console.log("🔄 Trying legacy decipher simulation...");
+
+          const password =
+            process.env.ENCRYPTION_KEY || "your-encryption-key-32-chars-long";
+
+          // Simulate the old createDecipher behavior
+          const hash = crypto.createHash("md5").update(password).digest();
+          const key = Buffer.concat([
+            hash,
+            crypto
+              .createHash("md5")
+              .update(Buffer.concat([hash, Buffer.from(password)]))
+              .digest(),
+          ]);
+          const iv = Buffer.alloc(16, 0); // Default IV
+
+          const decipher = crypto.createDecipheriv(
+            "aes-256-cbc",
+            key.slice(0, 32),
+            iv
+          );
+          decipher.setAutoPadding(true);
+
+          let decrypted = decipher.update(
+            encryptedData.encryptedData,
+            "base64",
+            "utf8"
+          );
+          decrypted += decipher.final("utf8");
+
+          console.log("✅ Legacy decipher simulation successful");
+          return decrypted;
+        } catch (legacyError) {
+          console.log(
+            "⚠️ Legacy decipher simulation failed:",
+            legacyError.message
+          );
+        }
+      }
+    }
+
+    throw new Error("All decryption methods failed");
   } catch (error) {
-    console.error("Failed to decrypt private key:", error);
-    throw new Error("Failed to decrypt wallet credentials");
+    console.error("💥 Complete decryption failure:", error);
+    throw new Error(`Failed to decrypt wallet credentials: ${error.message}`);
   }
 }
 
@@ -171,8 +301,13 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // Decrypt the private key
+          // Decrypt the private key using the fixed function
           executionPrivateKey = decryptPrivateKey(wallet.encryptedPrivateKey);
+
+          // Validate the decrypted private key
+          if (!executionPrivateKey || executionPrivateKey.length < 64) {
+            throw new Error("Decrypted private key appears invalid");
+          }
 
           // Log the access for security audit
           console.log(
@@ -200,6 +335,7 @@ export async function POST(request: NextRequest) {
               {
                 error:
                   "Failed to retrieve stored private key. Please provide private key manually.",
+                details: dbError.message,
               },
               { status: 500 }
             );
