@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - FIXED VERSION (decoded error fixed)
+// src/components/FriendsPage.tsx - FIXED VERSION (Complete Fund Request Fix)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -49,11 +49,29 @@ interface FundRequest {
   requesterUsername: string;
   recipientUsername: string;
   tokenSymbol: string;
+  tokenName?: string;
+  contractAddress?: string;
+  decimals?: number;
   amount: string;
   message: string;
   status: "pending" | "fulfilled" | "declined" | "expired";
   requestedAt: string;
   expiresAt: string;
+  requesterWalletAddress?: string;
+  transactionHash?: string;
+}
+
+// FIXED: Enhanced token info interface
+interface EnhancedTokenInfo {
+  id: string;
+  name: string;
+  symbol: string;
+  contractAddress: string;
+  decimals: number;
+  balance: number;
+  price: number;
+  image?: string;
+  isETH: boolean;
 }
 
 export default function FriendsPage() {
@@ -87,8 +105,10 @@ export default function FriendsPage() {
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [selectedFundRequest, setSelectedFundRequest] =
     useState<FundRequest | null>(null);
+
+  // FIXED: Enhanced fund request data with proper token info
   const [fundRequestData, setFundRequestData] = useState({
-    tokenSymbol: "ETH",
+    selectedToken: null as EnhancedTokenInfo | null,
     amount: "",
     message: "",
   });
@@ -107,6 +127,181 @@ export default function FriendsPage() {
 
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
+
+  // FIXED: Enhanced token processing with deduplication and proper formatting
+  const processTokensForDropdown = (): EnhancedTokenInfo[] => {
+    if (!tokens || tokens.length === 0) return [];
+
+    const processedTokens: EnhancedTokenInfo[] = [];
+    const seenTokens = new Set<string>();
+
+    // Process each token with enhanced information
+    tokens.forEach((token) => {
+      // Create unique identifier to prevent duplicates
+      const tokenKey = `${token.symbol}-${
+        token.contractAddress || "native"
+      }`.toLowerCase();
+
+      if (seenTokens.has(tokenKey)) {
+        return; // Skip duplicates
+      }
+      seenTokens.add(tokenKey);
+
+      const isETH =
+        token.symbol === "ETH" ||
+        token.contractAddress === "native" ||
+        !token.contractAddress;
+
+      // Enhanced token with proper image and formatting
+      const enhancedToken: EnhancedTokenInfo = {
+        id: token.id,
+        name: token.name || token.symbol,
+        symbol: token.symbol,
+        contractAddress: isETH ? "native" : token.contractAddress || "native",
+        decimals: token.decimals || 18,
+        balance:
+          typeof token.balance === "number"
+            ? token.balance
+            : parseFloat(token.balance?.toString() || "0"),
+        price:
+          typeof token.price === "number"
+            ? token.price
+            : parseFloat(token.price?.toString() || "0"),
+        image: token.image || getTokenImageUrl(token.symbol),
+        isETH,
+      };
+
+      processedTokens.push(enhancedToken);
+    });
+
+    // Sort tokens: ETH first, then by balance value (highest first)
+    return processedTokens.sort((a, b) => {
+      if (a.isETH && !b.isETH) return -1;
+      if (!a.isETH && b.isETH) return 1;
+
+      const aValue = a.balance * a.price;
+      const bValue = b.balance * b.price;
+      return bValue - aValue;
+    });
+  };
+
+  // FIXED: Enhanced token image URL helper
+  const getTokenImageUrl = (symbol: string): string => {
+    const tokenImages: Record<string, string> = {
+      ETH: "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
+      USDT: "https://coin-images.coingecko.com/coins/images/325/large/Tether.png",
+      USDC: "https://coin-images.coingecko.com/coins/images/6319/large/USD_Coin_icon.png",
+      DAI: "https://coin-images.coingecko.com/coins/images/9956/large/Badge_Dai.png",
+      UNI: "https://coin-images.coingecko.com/coins/images/12504/large/uni.jpg",
+      LINK: "https://coin-images.coingecko.com/coins/images/877/large/chainlink-new-logo.png",
+      WETH: "https://coin-images.coingecko.com/coins/images/2518/large/weth.png",
+      BTC: "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png",
+      MATIC:
+        "https://coin-images.coingecko.com/coins/images/4713/large/matic-token-icon.png",
+      AAVE: "https://coin-images.coingecko.com/coins/images/12645/large/AAVE.png",
+    };
+
+    return (
+      tokenImages[symbol?.toUpperCase()] ||
+      `https://via.placeholder.com/32/666/fff?text=${symbol?.charAt(0) || "?"}`
+    );
+  };
+
+  // FIXED: Enhanced token display component
+  const TokenDisplayCard = ({
+    token,
+    isSelected = false,
+    onClick,
+  }: {
+    token: EnhancedTokenInfo;
+    isSelected?: boolean;
+    onClick?: () => void;
+  }) => {
+    const tokenValue = token.balance * token.price;
+
+    return (
+      <div
+        onClick={onClick}
+        className={`flex items-center p-3 rounded-lg transition-all duration-200 cursor-pointer ${
+          isSelected
+            ? "bg-[#E2AF19] text-black border-[#E2AF19]"
+            : "bg-[#1A1A1A] hover:bg-[#2C2C2C] border-[#2C2C2C] text-white hover:border-[#E2AF19]"
+        } border`}
+      >
+        {/* Token Image */}
+        <div className="relative mr-3">
+          <img
+            src={token.image}
+            alt={token.symbol}
+            className="w-8 h-8 rounded-full"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = `https://via.placeholder.com/32/666/fff?text=${token.symbol.charAt(
+                0
+              )}`;
+            }}
+          />
+          {token.isETH && (
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border border-white"></div>
+          )}
+        </div>
+
+        {/* Token Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <span
+              className={`font-semibold font-satoshi ${
+                isSelected ? "text-black" : "text-white"
+              }`}
+            >
+              {token.symbol}
+            </span>
+            <span
+              className={`text-sm font-satoshi ${
+                isSelected ? "text-black/70" : "text-gray-400"
+              }`}
+            >
+              {token.balance.toFixed(4)}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span
+              className={`text-sm font-satoshi ${
+                isSelected ? "text-black/70" : "text-gray-400"
+              }`}
+            >
+              {token.name}
+            </span>
+            <span
+              className={`text-sm font-satoshi ${
+                isSelected ? "text-black/70" : "text-gray-400"
+              }`}
+            >
+              ${tokenValue.toFixed(2)}
+            </span>
+          </div>
+
+          {token.price > 0 && (
+            <div
+              className={`text-xs font-satoshi mt-1 ${
+                isSelected ? "text-black/60" : "text-gray-500"
+              }`}
+            >
+              ${token.price.toFixed(6)} per {token.symbol}
+            </div>
+          )}
+        </div>
+
+        {/* Selection Indicator */}
+        {isSelected && (
+          <div className="ml-2">
+            <Check size={16} className="text-black" />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Auto-search for user suggestions
   useEffect(() => {
@@ -344,7 +539,6 @@ export default function FriendsPage() {
         setSearchQuery("");
         setSuggestions([]);
         setShowSuggestions(false);
-        // Show success message or toast here
         console.log("✅ Friend request sent successfully");
       } else {
         setError(data.error || "Failed to send friend request");
@@ -408,24 +602,30 @@ export default function FriendsPage() {
     }
   };
 
+  // FIXED: Enhanced fund request modal opening
   const openFundRequestModal = (friend: Friend) => {
     setSelectedFriend(friend);
     setShowFundRequestModal(true);
+
+    // Get processed tokens and set first one as default
+    const availableTokens = processTokensForDropdown();
     setFundRequestData({
-      tokenSymbol: tokens.length > 0 ? tokens[0].symbol : "ETH",
+      selectedToken: availableTokens.length > 0 ? availableTokens[0] : null,
       amount: "",
       message: "",
     });
   };
 
+  // FIXED: Enhanced fund request sending with proper token data
   const sendFundRequest = async () => {
     if (
       !selectedFriend ||
+      !fundRequestData.selectedToken ||
       !fundRequestData.amount ||
       !activeWallet?.address ||
       !currentUser
     ) {
-      setError("Missing required information or no active wallet selected");
+      setError("Missing required information or no token/wallet selected");
       return;
     }
 
@@ -433,24 +633,27 @@ export default function FriendsPage() {
       setLoading(true);
       setError("");
 
-      // FIXED: Use currentUser.username instead of decoded.username
       console.log("💰 Sending fund request:", {
-        from: currentUser.username, // Current user (requester)
-        to: selectedFriend.username, // Friend (who will send)
+        from: currentUser.username,
+        to: selectedFriend.username,
         amount: fundRequestData.amount,
-        token: fundRequestData.tokenSymbol,
-        requesterWallet: activeWallet.address, // Current user's active wallet
+        token: fundRequestData.selectedToken.symbol,
+        contractAddress: fundRequestData.selectedToken.contractAddress,
+        requesterWallet: activeWallet.address,
       });
 
       const response = await fetch("/api/friends/fund-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          friendUsername: selectedFriend.username, // Friend who will send funds
-          tokenSymbol: fundRequestData.tokenSymbol,
+          friendUsername: selectedFriend.username,
+          tokenSymbol: fundRequestData.selectedToken.symbol,
+          tokenName: fundRequestData.selectedToken.name,
+          contractAddress: fundRequestData.selectedToken.contractAddress,
+          decimals: fundRequestData.selectedToken.decimals,
           amount: fundRequestData.amount,
           message: fundRequestData.message,
-          requesterWalletAddress: activeWallet.address, // FIXED: Use current user's active wallet
+          requesterWalletAddress: activeWallet.address,
         }),
         credentials: "include",
       });
@@ -461,16 +664,13 @@ export default function FriendsPage() {
         setShowFundRequestModal(false);
         setSelectedFriend(null);
         setFundRequestData({
-          tokenSymbol: tokens.length > 0 ? tokens[0].symbol : "ETH",
+          selectedToken: null,
           amount: "",
           message: "",
         });
 
-        // Show success message
         console.log("✅ Fund request sent successfully");
-
-        // You could add a toast notification here
-        // toast.success("Fund request sent successfully!");
+        // Show success message or refresh data
       } else {
         setError(data.error || "Failed to send fund request");
       }
@@ -480,6 +680,14 @@ export default function FriendsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // FIXED: Check if fund request can be processed (not already fulfilled)
+  const canProcessFundRequest = (fundRequest: FundRequest): boolean => {
+    return (
+      fundRequest.status === "pending" &&
+      new Date() <= new Date(fundRequest.expiresAt)
+    );
   };
 
   // Show initial loading state
@@ -943,10 +1151,15 @@ export default function FriendsPage() {
                   fundRequests.map((request) => (
                     <div
                       key={request._id}
-                      className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] cursor-pointer hover:bg-[#1A1A1A] transition-colors"
+                      className={`bg-[#0F0F0F] rounded-lg p-4 border transition-colors ${
+                        canProcessFundRequest(request)
+                          ? "border-[#2C2C2C] cursor-pointer hover:bg-[#1A1A1A] hover:border-[#E2AF19]"
+                          : "border-gray-600 opacity-60"
+                      }`}
                       onClick={() => {
-                        setSelectedFundRequest(request);
-                        // You could open a detailed modal here
+                        if (canProcessFundRequest(request)) {
+                          setSelectedFundRequest(request);
+                        }
                       }}
                     >
                       <div className="flex items-center justify-between mb-3">
@@ -975,14 +1188,58 @@ export default function FriendsPage() {
                                 ? "bg-yellow-500/20 text-yellow-400"
                                 : request.status === "fulfilled"
                                 ? "bg-green-500/20 text-green-400"
-                                : "bg-red-500/20 text-red-400"
+                                : request.status === "declined"
+                                ? "bg-red-500/20 text-red-400"
+                                : "bg-gray-500/20 text-gray-400"
                             }`}
                           >
                             {request.status.charAt(0).toUpperCase() +
                               request.status.slice(1)}
                           </span>
+
+                          {/* FIXED: Show action availability */}
+                          {!canProcessFundRequest(request) && (
+                            <span className="text-xs text-gray-500 font-satoshi text-center">
+                              {request.status === "fulfilled" && "✅ Completed"}
+                              {request.status === "declined" && "❌ Declined"}
+                              {request.status === "expired" && "⏰ Expired"}
+                              {request.status === "pending" &&
+                                new Date() > new Date(request.expiresAt) &&
+                                "⏰ Expired"}
+                            </span>
+                          )}
                         </div>
                       </div>
+
+                      {/* FIXED: Show transaction hash for fulfilled requests */}
+                      {request.status === "fulfilled" &&
+                        request.transactionHash && (
+                          <div className="mt-3 p-2 bg-green-900/20 border border-green-500/50 rounded">
+                            <div className="flex items-center justify-between">
+                              <span className="text-green-400 text-xs font-satoshi">
+                                Transaction Hash:
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyToClipboard(
+                                    request.transactionHash!,
+                                    "txHash"
+                                  );
+                                }}
+                                className="text-green-400 text-xs font-satoshi font-mono hover:text-green-300 transition-colors"
+                              >
+                                {request.transactionHash.slice(0, 10)}...
+                                {request.transactionHash.slice(-8)}
+                              </button>
+                            </div>
+                            {copied === "txHash" && (
+                              <p className="text-green-400 text-xs font-satoshi mt-1">
+                                Transaction hash copied!
+                              </p>
+                            )}
+                          </div>
+                        )}
                     </div>
                   ))
                 )}
@@ -992,11 +1249,11 @@ export default function FriendsPage() {
         </div>
       </div>
 
-      {/* Fund Request Modal */}
+      {/* FIXED: Enhanced Fund Request Modal */}
       {showFundRequestModal && selectedFriend && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
               <h3 className="text-lg font-semibold text-white font-satoshi">
                 Request Funds
               </h3>
@@ -1011,195 +1268,210 @@ export default function FriendsPage() {
               </button>
             </div>
 
-            <div className="mb-4">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-white text-sm font-medium">
-                    {selectedFriend.displayName?.[0]?.toUpperCase() ||
-                      selectedFriend.username[0]?.toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <div className="text-white font-satoshi">
-                    {selectedFriend.displayName || selectedFriend.username}
-                  </div>
-                  <div className="text-gray-400 text-sm font-satoshi">
-                    @{selectedFriend.username}
-                  </div>
-                </div>
-              </div>
-
-              {/* FIXED: Clear explanation of fund request flow */}
-              <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] mb-4">
-                <div className="text-sm font-satoshi mb-3">
-                  <span className="text-[#E2AF19] font-medium">
-                    💰 Fund Request Flow:
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 font-satoshi">
-                      You're asking:
+            <div className="p-6">
+              <div className="mb-4">
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-white text-sm font-medium">
+                      {selectedFriend.displayName?.[0]?.toUpperCase() ||
+                        selectedFriend.username[0]?.toUpperCase()}
                     </span>
-                    <span className="text-white font-satoshi">
+                  </div>
+                  <div>
+                    <div className="text-white font-satoshi">
+                      {selectedFriend.displayName || selectedFriend.username}
+                    </div>
+                    <div className="text-gray-400 text-sm font-satoshi">
                       @{selectedFriend.username}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 font-satoshi">
-                      To send funds to:
-                    </span>
-                    <span className="text-white font-satoshi font-mono text-xs">
-                      {activeWallet?.address
-                        ? `${activeWallet.address.slice(
-                            0,
-                            8
-                          )}...${activeWallet.address.slice(-6)}`
-                        : "Your wallet"}
-                    </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/50 rounded">
-                  <p className="text-blue-400 text-xs font-satoshi">
-                    ℹ️ {selectedFriend.displayName || selectedFriend.username}{" "}
-                    will send {fundRequestData.tokenSymbol} from their wallet to
-                    your currently selected wallet.
-                  </p>
-                </div>
-              </div>
+                {/* Fund Request Flow Explanation */}
+                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] mb-4">
+                  <div className="text-sm font-satoshi mb-3">
+                    <span className="text-[#E2AF19] font-medium">
+                      💰 Fund Request Flow:
+                    </span>
+                  </div>
 
-              {/* Current Active Wallet Display */}
-              {activeWallet && (
-                <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3 mb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-green-400 text-sm font-satoshi font-medium">
-                        ✅ Active Wallet Selected
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400 font-satoshi">
+                        You're asking:
+                      </span>
+                      <span className="text-white font-satoshi">
+                        @{selectedFriend.username}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400 font-satoshi">
+                        To send funds to:
+                      </span>
+                      <span className="text-white font-satoshi font-mono text-xs">
+                        {activeWallet?.address
+                          ? `${activeWallet.address.slice(
+                              0,
+                              8
+                            )}...${activeWallet.address.slice(-6)}`
+                          : "Your wallet"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/50 rounded">
+                    <p className="text-blue-400 text-xs font-satoshi">
+                      ℹ️ {selectedFriend.displayName || selectedFriend.username}{" "}
+                      will send the requested token from their wallet to your
+                      currently selected wallet.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Active Wallet Display */}
+                {activeWallet && (
+                  <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-green-400 text-sm font-satoshi font-medium">
+                          ✅ Active Wallet Selected
+                        </div>
+                        <div className="text-green-400 text-xs font-satoshi">
+                          Funds will be sent to: {activeWallet.name}
+                        </div>
                       </div>
-                      <div className="text-green-400 text-xs font-satoshi">
-                        Funds will be sent to: {activeWallet.name}
+                      <button
+                        onClick={() =>
+                          copyToClipboard(activeWallet.address, "wallet")
+                        }
+                        className="text-green-400 hover:text-green-300 transition-colors"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
+                    {copied === "wallet" && (
+                      <p className="text-green-400 text-xs font-satoshi mt-1">
+                        Wallet address copied!
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Warning if no active wallet */}
+                {!activeWallet && (
+                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4">
+                    <div className="flex items-start">
+                      <AlertCircle
+                        size={16}
+                        className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+                      />
+                      <div>
+                        <p className="text-red-400 text-sm font-satoshi font-medium">
+                          No Active Wallet Selected
+                        </p>
+                        <p className="text-red-400 text-xs font-satoshi">
+                          Please select an active wallet to receive funds.
+                        </p>
                       </div>
                     </div>
-                    <button
-                      onClick={() =>
-                        copyToClipboard(activeWallet.address, "wallet")
-                      }
-                      className="text-green-400 hover:text-green-300 transition-colors"
-                    >
-                      <Copy size={14} />
-                    </button>
                   </div>
-                  {copied === "wallet" && (
-                    <p className="text-green-400 text-xs font-satoshi mt-1">
-                      Wallet address copied!
-                    </p>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                {/* FIXED: Enhanced Token Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Select Token to Request
+                  </label>
+
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {processTokensForDropdown().map((token) => (
+                      <TokenDisplayCard
+                        key={`${token.symbol}-${token.contractAddress}`}
+                        token={token}
+                        isSelected={
+                          fundRequestData.selectedToken?.id === token.id
+                        }
+                        onClick={() =>
+                          setFundRequestData({
+                            ...fundRequestData,
+                            selectedToken: token,
+                          })
+                        }
+                      />
+                    ))}
+                  </div>
+
+                  {processTokensForDropdown().length === 0 && (
+                    <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-3">
+                      <p className="text-yellow-400 text-sm font-satoshi">
+                        ⚠️ No tokens available. Please ensure your wallet has
+                        some tokens.
+                      </p>
+                    </div>
                   )}
                 </div>
-              )}
 
-              {/* Warning if no active wallet */}
-              {!activeWallet && (
-                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4">
-                  <div className="flex items-start">
-                    <AlertTriangle
-                      size={16}
-                      className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
-                    />
-                    <div>
-                      <p className="text-red-400 text-sm font-satoshi font-medium">
-                        No Active Wallet Selected
-                      </p>
-                      <p className="text-red-400 text-xs font-satoshi">
-                        Please select an active wallet to receive funds.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Token
-                </label>
-                <div className="relative">
-                  <select
-                    value={fundRequestData.tokenSymbol}
-                    onChange={(e) =>
-                      setFundRequestData({
-                        ...fundRequestData,
-                        tokenSymbol: e.target.value,
-                      })
-                    }
-                    className="w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white font-satoshi appearance-none pr-10"
-                  >
-                    <option value="ETH">ETH</option>
-                    {tokens.map((token) => (
-                      <option key={token.id} value={token.symbol}>
-                        {token.symbol}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
-                  />
-                </div>
-              </div>
-
-              <Input
-                type="text"
-                label="Amount"
-                placeholder="0.0"
-                value={fundRequestData.amount}
-                onChange={(e) =>
-                  setFundRequestData({
-                    ...fundRequestData,
-                    amount: e.target.value,
-                  })
-                }
-                className="font-satoshi"
-              />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Message (optional)
-                </label>
-                <textarea
-                  placeholder="What's this request for?"
-                  value={fundRequestData.message}
+                {/* Amount Input */}
+                <Input
+                  type="text"
+                  label="Amount"
+                  placeholder="0.0"
+                  value={fundRequestData.amount}
                   onChange={(e) =>
                     setFundRequestData({
                       ...fundRequestData,
-                      message: e.target.value,
+                      amount: e.target.value,
                     })
                   }
-                  className="w-full p-3 bg-black border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi resize-none"
-                  rows={3}
+                  className="font-satoshi"
                 />
-              </div>
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => {
-                    setShowFundRequestModal(false);
-                    setSelectedFriend(null);
-                  }}
-                  className="flex-1 px-4 py-2 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={sendFundRequest}
-                  disabled={loading || !fundRequestData.amount || !activeWallet}
-                  className="flex-1 px-4 py-2 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? "Sending..." : "Send Request"}
-                </button>
+                {/* Message Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Message (optional)
+                  </label>
+                  <textarea
+                    placeholder="What's this request for?"
+                    value={fundRequestData.message}
+                    onChange={(e) =>
+                      setFundRequestData({
+                        ...fundRequestData,
+                        message: e.target.value,
+                      })
+                    }
+                    className="w-full p-3 bg-black border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => {
+                      setShowFundRequestModal(false);
+                      setSelectedFriend(null);
+                    }}
+                    className="flex-1 px-4 py-2 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={sendFundRequest}
+                    disabled={
+                      loading ||
+                      !fundRequestData.amount ||
+                      !activeWallet ||
+                      !fundRequestData.selectedToken
+                    }
+                    className="flex-1 px-4 py-2 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? "Sending..." : "Send Request"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1236,10 +1508,6 @@ export default function FriendsPage() {
         }
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
-        }
-
-        select {
-          background-image: none;
         }
 
         /* Mobile specific adjustments */

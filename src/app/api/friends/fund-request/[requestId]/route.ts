@@ -1,4 +1,4 @@
-// src/app/api/friends/fund-request/[requestId]/route.ts - UPDATED VERSION WITH ENHANCED SERVICE
+// src/app/api/friends/fund-request/[requestId]/route.ts - FIXED VERSION (Enhanced Token Support)
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -174,13 +174,20 @@ export async function PATCH(
     const { action, transactionHash, useEnhancedService } =
       await request.json();
 
+    console.log("🔄 Fund request action:", {
+      requestId,
+      action,
+      user: decoded.username,
+      useEnhancedService,
+    });
+
     if (!action || !["fulfill", "decline"].includes(action)) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
     const { db } = await connectToDatabase();
 
-    // Get the fund request
+    // Get the fund request with enhanced validation
     const fundRequest = await db.collection("fund_requests").findOne({
       requestId,
       recipientUsername: decoded.username, // Current user is the recipient (will send funds)
@@ -194,6 +201,17 @@ export async function PATCH(
       );
     }
 
+    console.log("💰 Processing fund request:", {
+      requestId: fundRequest.requestId,
+      requester: fundRequest.requesterUsername,
+      recipient: fundRequest.recipientUsername,
+      amount: fundRequest.amount,
+      token: `${fundRequest.tokenSymbol} (${
+        fundRequest.tokenName || fundRequest.tokenSymbol
+      })`,
+      contractAddress: fundRequest.contractAddress,
+    });
+
     // Check if request is expired
     if (new Date() > new Date(fundRequest.expiresAt)) {
       await db.collection("fund_requests").updateOne(
@@ -202,6 +220,7 @@ export async function PATCH(
           $set: {
             status: "expired",
             respondedAt: new Date(),
+            lastUpdated: new Date(),
           },
         }
       );
@@ -220,6 +239,8 @@ export async function PATCH(
           $set: {
             status: "declined",
             respondedAt: new Date(),
+            declinedBy: decoded.username,
+            lastUpdated: new Date(),
           },
         }
       );
@@ -237,12 +258,15 @@ export async function PATCH(
           requesterUsername: fundRequest.requesterUsername,
           amount: fundRequest.amount,
           tokenSymbol: fundRequest.tokenSymbol,
+          tokenName: fundRequest.tokenName,
           action: "declined",
         },
         createdAt: new Date(),
       };
 
       await db.collection("notifications").insertOne(notification);
+
+      console.log("❌ Fund request declined successfully");
 
       return NextResponse.json({
         success: true,
@@ -290,18 +314,22 @@ export async function PATCH(
             recipientWallet.encryptedPrivateKey
           );
 
-          // Get token information
+          // FIXED: Build enhanced token information from fund request
           const tokenInfo = {
-            name: fundRequest.tokenName || fundRequest.tokenSymbol,
-            symbol: fundRequest.tokenSymbol,
+            name:
+              fundRequest.tokenName ||
+              fundRequest.tokenSymbol ||
+              "Unknown Token",
+            symbol: fundRequest.tokenSymbol || "UNKNOWN",
             contractAddress: fundRequest.contractAddress || "native",
             decimals: fundRequest.decimals || 18,
             isETH:
+              fundRequest.contractAddress === "native" ||
               fundRequest.tokenSymbol === "ETH" ||
-              fundRequest.contractAddress === "native",
+              !fundRequest.contractAddress,
           };
 
-          // Get requester wallet address (where funds should be sent)
+          // FIXED: Get requester wallet address from fund request (where funds should be sent)
           const requesterWalletAddress = fundRequest.requesterWalletAddress;
           if (!requesterWalletAddress) {
             return NextResponse.json(
@@ -310,22 +338,25 @@ export async function PATCH(
             );
           }
 
-          console.log("💰 Fund request details:", {
+          console.log("💰 Enhanced fund request details:", {
             from: decoded.username,
             fromWallet: recipientWallet.walletAddress,
             to: fundRequest.requesterUsername,
             toWallet: requesterWalletAddress,
             amount: fundRequest.amount,
-            token: fundRequest.tokenSymbol,
+            token: `${tokenInfo.symbol} (${tokenInfo.name})`,
+            contractAddress: tokenInfo.contractAddress,
+            decimals: tokenInfo.decimals,
+            isETH: tokenInfo.isETH,
           });
 
-          // Execute the transfer using enhanced service
+          // FIXED: Execute the transfer using enhanced service with complete token info
           const transferResult =
             await enhancedFundRequestService.executeFundRequestTransfer(
               {
                 requestId: fundRequest.requestId,
                 requesterUsername: fundRequest.requesterUsername,
-                tokenSymbol: fundRequest.tokenSymbol,
+                tokenSymbol: tokenInfo.symbol,
                 amount: fundRequest.amount,
                 message: fundRequest.message,
                 requestedAt: fundRequest.requestedAt,
@@ -342,7 +373,7 @@ export async function PATCH(
               transferResult.transactionHash
             );
 
-            // Update fund request with transaction details
+            // FIXED: Update fund request with complete transaction details
             await db.collection("fund_requests").updateOne(
               { requestId },
               {
@@ -354,24 +385,38 @@ export async function PATCH(
                   gasUsed: transferResult.gasUsed,
                   blockNumber: transferResult.blockNumber,
                   enhancedService: true,
+                  actualCost: transferResult.actualGasCost,
+                  lastUpdated: new Date(),
+
+                  // Store complete token info for future reference
+                  tokenInfo: {
+                    name: tokenInfo.name,
+                    symbol: tokenInfo.symbol,
+                    contractAddress: tokenInfo.contractAddress,
+                    decimals: tokenInfo.decimals,
+                    isETH: tokenInfo.isETH,
+                  },
                 },
               }
             );
 
-            // Create notification for requester
+            // FIXED: Create enhanced notification for requester
             const notification = {
               username: fundRequest.requesterUsername,
               type: "fund_request_response",
               title: "Fund Request Fulfilled",
-              message: `${decoded.username} sent your request for ${fundRequest.amount} ${fundRequest.tokenSymbol}`,
+              message: `${decoded.username} sent your request for ${fundRequest.amount} ${tokenInfo.symbol}`,
               isRead: false,
               relatedData: {
                 requestId,
                 recipientUsername: decoded.username,
                 requesterUsername: fundRequest.requesterUsername,
                 amount: fundRequest.amount,
-                tokenSymbol: fundRequest.tokenSymbol,
+                tokenSymbol: tokenInfo.symbol,
+                tokenName: tokenInfo.name,
+                contractAddress: tokenInfo.contractAddress,
                 transactionHash: transferResult.transactionHash,
+                explorerUrl: transferResult.explorerUrl,
                 action: "fulfilled",
                 enhancedService: true,
               },
@@ -391,6 +436,8 @@ export async function PATCH(
               }
             );
 
+            console.log("🎉 Fund request fulfilled successfully!");
+
             return NextResponse.json({
               success: true,
               message: "Fund request fulfilled successfully",
@@ -399,12 +446,32 @@ export async function PATCH(
               gasUsed: transferResult.gasUsed,
               actualGasCost: transferResult.actualGasCost,
               enhancedService: true,
+              token: {
+                symbol: tokenInfo.symbol,
+                name: tokenInfo.name,
+                contractAddress: tokenInfo.contractAddress,
+              },
             });
           } else {
             console.error(
               "❌ Enhanced fund request transfer failed:",
               transferResult.error
             );
+
+            // FIXED: Mark as failed with error details
+            await db.collection("fund_requests").updateOne(
+              { requestId },
+              {
+                $set: {
+                  status: "failed",
+                  respondedAt: new Date(),
+                  error: transferResult.error,
+                  failedBy: decoded.username,
+                  lastUpdated: new Date(),
+                },
+              }
+            );
+
             return NextResponse.json(
               { error: transferResult.error || "Transfer failed" },
               { status: 500 }
@@ -412,6 +479,21 @@ export async function PATCH(
           }
         } catch (error: any) {
           console.error("💥 Enhanced fund request fulfillment error:", error);
+
+          // Mark as failed in database
+          await db.collection("fund_requests").updateOne(
+            { requestId },
+            {
+              $set: {
+                status: "failed",
+                respondedAt: new Date(),
+                error: error.message,
+                failedBy: decoded.username,
+                lastUpdated: new Date(),
+              },
+            }
+          );
+
           return NextResponse.json(
             { error: "Failed to process fund request: " + error.message },
             { status: 500 }
@@ -426,6 +508,7 @@ export async function PATCH(
           );
         }
 
+        // FIXED: Enhanced manual fulfillment update
         await db.collection("fund_requests").updateOne(
           { requestId },
           {
@@ -434,6 +517,8 @@ export async function PATCH(
               respondedAt: new Date(),
               transactionHash: transactionHash,
               fulfilledBy: decoded.username,
+              enhancedService: false,
+              lastUpdated: new Date(),
             },
           }
         );
@@ -451,8 +536,10 @@ export async function PATCH(
             requesterUsername: fundRequest.requesterUsername,
             amount: fundRequest.amount,
             tokenSymbol: fundRequest.tokenSymbol,
+            tokenName: fundRequest.tokenName,
             transactionHash: transactionHash,
             action: "fulfilled",
+            enhancedService: false,
           },
           createdAt: new Date(),
         };
@@ -462,6 +549,7 @@ export async function PATCH(
         return NextResponse.json({
           success: true,
           message: "Fund request fulfilled successfully",
+          transactionHash: transactionHash,
         });
       }
     }
@@ -474,9 +562,12 @@ export async function PATCH(
       token: fundRequest.tokenSymbol,
     });
   } catch (error) {
-    console.error("Update fund request error:", error);
+    console.error("💥 Update fund request error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -498,6 +589,7 @@ export async function GET(
     const { requestId } = resolvedParams;
     const { db } = await connectToDatabase();
 
+    // FIXED: Enhanced fund request retrieval with complete data
     const fundRequest = await db.collection("fund_requests").findOne({
       requestId,
       $or: [
@@ -513,11 +605,52 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ fundRequest });
+    // FIXED: Auto-expire if needed
+    if (
+      fundRequest.status === "pending" &&
+      new Date() > new Date(fundRequest.expiresAt)
+    ) {
+      await db.collection("fund_requests").updateOne(
+        { _id: fundRequest._id },
+        {
+          $set: {
+            status: "expired",
+            lastUpdated: new Date(),
+          },
+        }
+      );
+      fundRequest.status = "expired";
+    }
+
+    console.log("✅ Fund request retrieved:", {
+      requestId: fundRequest.requestId,
+      status: fundRequest.status,
+      token: `${fundRequest.tokenSymbol} (${
+        fundRequest.tokenName || "Unknown"
+      })`,
+      amount: fundRequest.amount,
+    });
+
+    return NextResponse.json({
+      fundRequest,
+      meta: {
+        canProcess:
+          fundRequest.status === "pending" &&
+          new Date() <= new Date(fundRequest.expiresAt),
+        isExpired: new Date() > new Date(fundRequest.expiresAt),
+        userRole:
+          fundRequest.requesterUsername === decoded.username
+            ? "requester"
+            : "recipient",
+      },
+    });
   } catch (error) {
-    console.error("Get fund request error:", error);
+    console.error("💥 Get fund request error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
