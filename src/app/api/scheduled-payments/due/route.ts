@@ -1,3 +1,4 @@
+// src/app/api/scheduled-payments/due/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -149,23 +150,36 @@ export async function GET(request: NextRequest) {
       `📊 After safety checks: ${safeDuePayments.length} payments ready for execution`
     );
 
-    // Transform the data to match expected format
+    // FIXED: Transform the data to match expected format with better error handling
     const transformedPayments = safeDuePayments.map((payment) => {
+      // FIXED: Better handling of tokenInfo structure
+      const isETH =
+        payment.contractAddress === "native" ||
+        payment.tokenSymbol === "ETH" ||
+        !payment.contractAddress;
+
       const transformed = {
         id: payment._id.toString(),
         scheduleId: payment.scheduleId,
         walletAddress: payment.walletAddress,
+
+        // FIXED: Consistent tokenInfo structure
         tokenInfo: {
-          name: payment.tokenName || payment.tokenSymbol,
-          symbol: payment.tokenSymbol,
-          contractAddress: payment.contractAddress,
+          name: payment.tokenName || payment.tokenSymbol || "Ethereum",
+          symbol: payment.tokenSymbol || "ETH",
+          contractAddress: payment.contractAddress || "native",
           decimals: payment.decimals || 18,
-          isETH:
-            payment.contractAddress === "native" ||
-            payment.tokenSymbol === "ETH",
+          isETH: isETH,
         },
+
+        // Fallback for API compatibility
+        tokenName: payment.tokenName || payment.tokenSymbol || "Ethereum",
+        tokenSymbol: payment.tokenSymbol || "ETH",
+        contractAddress: payment.contractAddress || "native",
+        decimals: payment.decimals || 18,
+
         recipient: payment.recipients?.[0] || payment.recipient,
-        amount: payment.amounts?.[0] || payment.totalAmount,
+        amount: payment.amounts?.[0] || payment.totalAmount || payment.amount,
         scheduledFor: payment.scheduledFor,
         frequency: payment.frequency || "once",
         status: payment.status,
@@ -184,7 +198,7 @@ export async function GET(request: NextRequest) {
       console.log(
         `✅ Ready for execution: ${transformed.scheduleId} - ${
           transformed.amount
-        } ${transformed.tokenInfo.symbol} to ${transformed.recipient.slice(
+        } ${transformed.tokenSymbol} to ${transformed.recipient?.slice(
           0,
           10
         )}... (due: ${new Date(

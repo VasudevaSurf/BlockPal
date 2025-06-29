@@ -1,4 +1,4 @@
-// src/lib/web-scheduled-payment-executor.ts - FIXED VERSION with better data handling
+// src/lib/web-scheduled-payment-executor.ts - FIXED VERSION
 import { enhancedScheduledPaymentService } from "./enhanced-scheduled-payment-service";
 
 interface ScheduledPaymentData {
@@ -29,7 +29,7 @@ interface ScheduledPaymentData {
 export class WebScheduledPaymentExecutor {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
-  private checkInterval = 15000; // Check every 15 seconds for faster execution
+  private checkInterval = 15000; // Check every 15 seconds
   private processingPayments = new Set<string>();
   private executorId = Math.random().toString(36).substr(2, 9);
   private executedPayments = new Set<string>();
@@ -57,7 +57,7 @@ export class WebScheduledPaymentExecutor {
     // Run immediately
     this.checkAndExecutePayments();
 
-    // Set up interval - check every 15 seconds
+    // Set up interval
     this.intervalId = setInterval(() => {
       this.checkAndExecutePayments();
     }, this.checkInterval);
@@ -95,7 +95,6 @@ export class WebScheduledPaymentExecutor {
   private isValidPrivateKey(privateKey: string): boolean {
     try {
       if (!privateKey) return false;
-
       const cleanKey = privateKey.startsWith("0x")
         ? privateKey.slice(2)
         : privateKey;
@@ -107,12 +106,19 @@ export class WebScheduledPaymentExecutor {
     }
   }
 
-  // Enhanced data validation and sanitization
+  // FIXED: Better payment data validation with detailed logging
   private validateAndSanitizePaymentData(
     paymentData: any
   ): ScheduledPaymentData {
     try {
-      // Validate required fields
+      console.log(`🔧 [${this.executorId}] Validating payment data:`, {
+        hasData: !!paymentData,
+        scheduleId: paymentData?.scheduleId,
+        recipient: paymentData?.recipient,
+        amount: paymentData?.amount,
+        tokenSymbol: paymentData?.tokenInfo?.symbol || paymentData?.tokenSymbol,
+      });
+
       if (!paymentData) {
         throw new Error("Payment data is required");
       }
@@ -133,37 +139,42 @@ export class WebScheduledPaymentExecutor {
         throw new Error("Wallet address is required");
       }
 
-      // Sanitize and validate data
+      // FIXED: Better handling of tokenInfo from API response
+      const tokenInfo = {
+        name: String(
+          paymentData.tokenInfo?.name || paymentData.tokenName || "Ethereum"
+        ).trim(),
+        symbol: String(
+          paymentData.tokenInfo?.symbol || paymentData.tokenSymbol || "ETH"
+        ).trim(),
+        contractAddress: String(
+          paymentData.tokenInfo?.contractAddress ||
+            paymentData.contractAddress ||
+            "native"
+        ).trim(),
+        decimals: Number(
+          paymentData.tokenInfo?.decimals || paymentData.decimals || 18
+        ),
+        isETH: Boolean(
+          paymentData.tokenInfo?.isETH ||
+            (paymentData.tokenInfo?.contractAddress ||
+              paymentData.contractAddress) === "native" ||
+            (paymentData.tokenInfo?.symbol || paymentData.tokenSymbol) === "ETH"
+        ),
+      };
+
+      console.log(`🔧 [${this.executorId}] Processed token info:`, tokenInfo);
+
       const sanitized: ScheduledPaymentData = {
         id: String(paymentData.id || paymentData.scheduleId),
         scheduleId: String(paymentData.scheduleId).trim(),
         walletAddress: String(paymentData.walletAddress).trim(),
-        tokenInfo: {
-          name: String(
-            paymentData.tokenInfo?.name || paymentData.tokenName || "Unknown"
-          ).trim(),
-          symbol: String(
-            paymentData.tokenInfo?.symbol ||
-              paymentData.tokenSymbol ||
-              "UNKNOWN"
-          ).trim(),
-          contractAddress: String(
-            paymentData.tokenInfo?.contractAddress ||
-              paymentData.contractAddress ||
-              "native"
-          ).trim(),
-          decimals: Number(paymentData.tokenInfo?.decimals || 18),
-          isETH: Boolean(
-            paymentData.tokenInfo?.isETH ||
-              paymentData.tokenInfo?.contractAddress === "native" ||
-              paymentData.contractAddress === "native" ||
-              paymentData.tokenInfo?.symbol === "ETH" ||
-              paymentData.tokenSymbol === "ETH"
-          ),
-        },
+        tokenInfo,
         recipient: String(paymentData.recipient).trim(),
         amount: String(paymentData.amount).trim(),
-        scheduledFor: new Date(paymentData.scheduledFor),
+        scheduledFor: new Date(
+          paymentData.scheduledFor || paymentData.nextExecution
+        ),
         frequency: String(paymentData.frequency || "once").trim(),
         status: String(paymentData.status || "active").trim(),
         nextExecution: paymentData.nextExecution
@@ -174,7 +185,7 @@ export class WebScheduledPaymentExecutor {
         description: paymentData.description
           ? String(paymentData.description).trim()
           : undefined,
-        createdAt: new Date(paymentData.createdAt),
+        createdAt: new Date(paymentData.createdAt || Date.now()),
         lastExecutionAt: paymentData.lastExecutionAt
           ? new Date(paymentData.lastExecutionAt)
           : undefined,
@@ -192,17 +203,31 @@ export class WebScheduledPaymentExecutor {
         throw new Error("Invalid recipient address");
       }
 
-      if (!sanitized.amount || parseFloat(sanitized.amount) <= 0) {
-        throw new Error("Invalid payment amount");
+      const amountNum = parseFloat(sanitized.amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        throw new Error(`Invalid payment amount: ${sanitized.amount}`);
       }
 
       if (!sanitized.walletAddress || sanitized.walletAddress.length < 10) {
         throw new Error("Invalid wallet address");
       }
 
+      console.log(
+        `✅ [${this.executorId}] Payment data validated successfully:`,
+        {
+          scheduleId: sanitized.scheduleId,
+          amount: sanitized.amount,
+          token: sanitized.tokenInfo.symbol,
+          isETH: sanitized.tokenInfo.isETH,
+        }
+      );
+
       return sanitized;
     } catch (error: any) {
-      console.error("Payment data validation failed:", error);
+      console.error(
+        `❌ [${this.executorId}] Payment data validation failed:`,
+        error
+      );
       throw new Error(`Payment validation failed: ${error.message}`);
     }
   }
@@ -240,32 +265,42 @@ export class WebScheduledPaymentExecutor {
       const availablePayments = duePayments.filter((payment: any) => {
         const scheduleId = payment.scheduleId;
         if (this.processingPayments.has(scheduleId)) {
+          console.log(
+            `⏩ [${this.executorId}] Skipping ${scheduleId} - already processing`
+          );
           return false;
         }
         if (this.executedPayments.has(scheduleId)) {
+          console.log(
+            `⏩ [${this.executorId}] Skipping ${scheduleId} - already executed`
+          );
           return false;
         }
         return true;
       });
 
       console.log(
-        `📊 [${this.executorId}] ${availablePayments.length} payments available`
+        `📊 [${this.executorId}] ${availablePayments.length} payments available for execution`
       );
 
       // Execute each payment
       for (const payment of availablePayments) {
         try {
+          console.log(
+            `🚀 [${this.executorId}] Starting execution of payment:`,
+            payment.scheduleId
+          );
           await this.executePayment(payment);
         } catch (error) {
           console.error(
-            `💥 Error executing payment ${payment.scheduleId}:`,
+            `💥 [${this.executorId}] Error executing payment ${payment.scheduleId}:`,
             error
           );
           this.processingPayments.delete(payment.scheduleId);
         }
       }
     } catch (error) {
-      console.error(`💥 Error in payment check:`, error);
+      console.error(`💥 [${this.executorId}] Error in payment check:`, error);
     }
   }
 
@@ -273,19 +308,33 @@ export class WebScheduledPaymentExecutor {
     let scheduleId = "";
 
     try {
+      // FIXED: Add detailed logging throughout execution
+      console.log(`⚡ [${this.executorId}] executePayment called with data:`, {
+        scheduleId: paymentData.scheduleId,
+        hasPrivateKey: !!this.privateKey,
+        paymentKeys: Object.keys(paymentData),
+      });
+
       // Validate and sanitize payment data first
       const validatedPayment = this.validateAndSanitizePaymentData(paymentData);
       scheduleId = validatedPayment.scheduleId;
 
       if (this.processingPayments.has(scheduleId)) {
+        console.log(
+          `⏩ [${this.executorId}] Payment ${scheduleId} already processing`
+        );
         return;
       }
 
       this.processingPayments.add(scheduleId);
-      console.log(`⚡ [${this.executorId}] Executing payment: ${scheduleId}`);
+      console.log(
+        `⚡ [${this.executorId}] Starting execution of payment: ${scheduleId}`
+      );
 
       // STEP 1: Claim the payment (atomic lock)
-      console.log(`🔒 [${this.executorId}] Claiming payment ${scheduleId}...`);
+      console.log(
+        `🔒 [${this.executorId}] Attempting to claim payment ${scheduleId}...`
+      );
 
       const claimResult = await fetch(
         `/api/scheduled-payments/${scheduleId}/claim`,
@@ -311,7 +360,38 @@ export class WebScheduledPaymentExecutor {
 
       console.log(`✅ [${this.executorId}] Successfully claimed ${scheduleId}`);
 
-      // STEP 2: Execute blockchain transaction with validated data
+      // STEP 2: Mark as processing
+      console.log(
+        `🔄 [${this.executorId}] Marking ${scheduleId} as processing...`
+      );
+
+      const processResult = await fetch(
+        `/api/scheduled-payments/${scheduleId}/process`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            executorId: this.executorId,
+            processingStarted: new Date().toISOString(),
+          }),
+          credentials: "include",
+        }
+      );
+
+      const processData = await processResult.json();
+
+      if (!processResult.ok || !processData.success) {
+        console.log(
+          `⏩ [${this.executorId}] Could not mark as processing ${scheduleId}: ${processData.error}`
+        );
+        return;
+      }
+
+      console.log(
+        `✅ [${this.executorId}] Successfully marked ${scheduleId} as processing`
+      );
+
+      // STEP 3: Execute blockchain transaction with validated data
       const scheduleData = {
         scheduleId: validatedPayment.scheduleId,
         username: "", // Will be filled by the service if needed
@@ -334,7 +414,13 @@ export class WebScheduledPaymentExecutor {
       };
 
       console.log(
-        `💰 [${this.executorId}] Executing blockchain transaction...`
+        `💰 [${this.executorId}] Executing blockchain transaction for ${scheduleId}...`,
+        {
+          amount: scheduleData.amount,
+          token: scheduleData.tokenSymbol,
+          recipient: scheduleData.recipient.slice(0, 10) + "...",
+          isETH: validatedPayment.tokenInfo.isETH,
+        }
       );
 
       const executionResult =
@@ -342,6 +428,12 @@ export class WebScheduledPaymentExecutor {
           scheduleData,
           this.privateKey
         );
+
+      console.log(`📋 [${this.executorId}] Blockchain execution result:`, {
+        success: executionResult.success,
+        hash: executionResult.transactionHash,
+        error: executionResult.error,
+      });
 
       if (executionResult.success) {
         console.log(
@@ -351,7 +443,7 @@ export class WebScheduledPaymentExecutor {
           `📤 [${this.executorId}] TX: ${executionResult.transactionHash}`
         );
 
-        // STEP 3: Update database with MULTIPLE retry attempts
+        // STEP 4: Update database with MULTIPLE retry attempts
         const updateSuccess = await this.updateDatabaseWithRetries(
           scheduleId,
           executionResult,
@@ -360,6 +452,10 @@ export class WebScheduledPaymentExecutor {
 
         if (updateSuccess) {
           this.executedPayments.add(scheduleId);
+          console.log(
+            `🎉 [${this.executorId}] Payment ${scheduleId} completed successfully!`
+          );
+
           this.showNotification(
             "✅ Payment Executed!",
             `${validatedPayment.amount} ${validatedPayment.tokenInfo.symbol} sent successfully`,
@@ -386,7 +482,15 @@ export class WebScheduledPaymentExecutor {
         );
       }
     } catch (error: any) {
-      console.error(`💥 [${this.executorId}] Critical error:`, error);
+      console.error(
+        `💥 [${this.executorId}] Critical error in executePayment:`,
+        {
+          scheduleId,
+          error: error.message,
+          stack: error.stack,
+        }
+      );
+
       if (scheduleId) {
         await this.markScheduleAsFailed(scheduleId, error.message);
       }
@@ -399,6 +503,9 @@ export class WebScheduledPaymentExecutor {
     } finally {
       if (scheduleId) {
         this.processingPayments.delete(scheduleId);
+        console.log(
+          `🧹 [${this.executorId}] Cleaned up processing state for ${scheduleId}`
+        );
       }
     }
   }
@@ -524,6 +631,10 @@ export class WebScheduledPaymentExecutor {
 
   private async markScheduleAsFailed(scheduleId: string, error: string) {
     try {
+      console.log(
+        `❌ [${this.executorId}] Marking schedule ${scheduleId} as failed: ${error}`
+      );
+
       const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -537,6 +648,11 @@ export class WebScheduledPaymentExecutor {
 
       if (response.ok) {
         console.log(`✅ [${this.executorId}] Schedule marked as failed`);
+      } else {
+        const data = await response.json();
+        console.error(
+          `❌ [${this.executorId}] Failed to mark as failed: ${data.error}`
+        );
       }
     } catch (error) {
       console.error(`💥 [${this.executorId}] Error marking as failed:`, error);
