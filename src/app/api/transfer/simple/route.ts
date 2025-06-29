@@ -340,6 +340,54 @@ export async function POST(request: NextRequest) {
             result.transactionHash
           );
 
+          // Save transaction to database
+          try {
+            const saveResult = await fetch("/api/transactions", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                action: "save_simple",
+                transactionData: {
+                  transactionHash: result.transactionHash,
+                  senderUsername: decoded.username,
+                  senderWallet: activeWallet.address,
+                  receiverWallet: recipientAddress,
+                  type:
+                    tokenInfo.isETH || tokenInfo.contractAddress === "native"
+                      ? "simple_eth"
+                      : "simple_erc20",
+                  category: "regular",
+                  direction: "sent",
+                  tokenSymbol: tokenInfo.symbol,
+                  contractAddress: tokenInfo.contractAddress,
+                  amount: amount,
+                  amountFormatted: `${amount} ${tokenInfo.symbol}`,
+                  valueUSD: tokenPrice
+                    ? parseFloat(amount) * tokenPrice
+                    : undefined,
+                  gasUsed: result.gasUsed?.toString(),
+                  gasFeeETH: result.actualCostETH,
+                  status: "confirmed",
+                  explorerLink: result.explorerUrl,
+                  blockNumber: result.blockNumber,
+                  actualCostETH: result.actualCostETH,
+                  actualCostUSD: result.actualCostUSD,
+                },
+              }),
+              credentials: "include",
+            });
+
+            if (saveResult.ok) {
+              console.log("✅ Transaction saved to database");
+            } else {
+              console.warn("⚠️ Failed to save transaction to database");
+            }
+          } catch (saveError) {
+            console.error("❌ Error saving transaction:", saveError);
+          }
+
           return NextResponse.json({
             success: true,
             result,

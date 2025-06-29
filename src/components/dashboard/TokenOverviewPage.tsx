@@ -71,6 +71,8 @@ export default function TokenOverviewPage() {
   const [selectedTimeframe, setSelectedTimeframe] = useState(7);
   const [copied, setCopied] = useState<string>("");
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
 
   const contractAddress = params.tokenId as string;
   const walletAddress = searchParams.get("wallet") || activeWallet?.address;

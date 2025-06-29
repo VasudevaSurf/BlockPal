@@ -32,6 +32,7 @@ interface SimpleTransferModalProps {
     };
   };
   walletAddress: string;
+  onTransactionComplete?: () => void; // Add callback for transaction completion
 }
 
 interface TransferPreview {

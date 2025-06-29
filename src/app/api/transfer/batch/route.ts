@@ -393,6 +393,52 @@ export async function POST(request: NextRequest) {
             result.actualGasSavings = actualCostUSD.toFixed(2);
           }
 
+          // Save batch transaction to database
+          try {
+            const saveResult = await fetch("/api/transactions", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                action: "save_batch",
+                batchData: {
+                  transactionHash: result.transactionHash,
+                  senderUsername: decoded.username,
+                  senderWallet: activeWallet.address,
+                  transferMode: result.transferMode || "BATCH",
+                  totalTransfers:
+                    result.totalTransfers || formattedPayments.length,
+                  totalValueUSD: formattedPayments.reduce(
+                    (sum, p) => sum + p.usdValue,
+                    0
+                  ),
+                  gasUsed: result.gasUsed,
+                  blockNumber: result.blockNumber,
+                  actualCostETH: result.actualCostETH,
+                  actualCostUSD: result.actualCostUSD,
+                  explorerUrl: result.explorerUrl,
+                  transfers: formattedPayments.map((payment) => ({
+                    recipient: payment.recipient,
+                    tokenSymbol: payment.tokenInfo.symbol,
+                    contractAddress: payment.tokenInfo.contractAddress,
+                    amount: payment.amount,
+                    usdValue: payment.usdValue,
+                  })),
+                },
+              }),
+              credentials: "include",
+            });
+
+            if (saveResult.ok) {
+              console.log("✅ Batch transaction saved to database");
+            } else {
+              console.warn("⚠️ Failed to save batch transaction to database");
+            }
+          } catch (saveError) {
+            console.error("❌ Error saving batch transaction:", saveError);
+          }
+
           return NextResponse.json({
             success: true,
             result,

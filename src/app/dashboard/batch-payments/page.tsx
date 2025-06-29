@@ -36,6 +36,7 @@ interface BatchPayment {
 
 interface Transaction {
   id: string;
+  _id?: string;
   username: string;
   token: string;
   amount: number;
@@ -43,6 +44,14 @@ interface Transaction {
   estimatedGas: number;
   hash?: string;
   status: "completed" | "pending" | "failed";
+  timestamp?: string;
+  transactionHash?: string;
+  direction?: "sent" | "received";
+  batchSize?: number;
+  amountFormatted?: string;
+  valueUSD?: number;
+  tokenSymbol?: string;
+  type?: string;
 }
 
 const mockTransactions: Transaction[] = [
