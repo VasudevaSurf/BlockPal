@@ -1,4 +1,4 @@
-// src/components/friends/FundRequestModal.tsx - ENHANCED VERSION (Complete Token Support)
+// Enhanced FundRequestModal.tsx - Fixed gas balance validation
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,10 +16,11 @@ import {
   User,
   ShieldAlert,
   AlertCircle as AlertIcon,
+  Fuel,
+  Info,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 
 interface FundRequestModalProps {
   isOpen: boolean;
@@ -48,26 +49,16 @@ interface FundRequestModalProps {
   onDeclined?: () => void;
 }
 
-interface TransferResult {
-  success: boolean;
-  transactionHash?: string;
-  gasUsed?: number;
-  blockNumber?: number;
-  explorerUrl?: string;
-  error?: string;
-  actualCostETH?: string;
-  actualCostUSD?: string;
-  token?: {
-    symbol: string;
-    name: string;
-    contractAddress: string;
-  };
-}
-
-interface RequesterInfo {
-  username: string;
-  walletAddress: string;
-  displayName?: string;
+interface BalanceCheck {
+  tokenBalance: number;
+  ethBalance: number;
+  estimatedGas: string;
+  gasCostETH: string;
+  gasCostUSD: string;
+  hasToken: boolean;
+  hasSufficientToken: boolean;
+  hasSufficientGas: boolean;
+  canExecute: boolean;
 }
 
 export default function FundRequestModal({
@@ -85,181 +76,158 @@ export default function FundRequestModal({
     "review"
   );
   const [loading, setLoading] = useState(false);
-  const [transferResult, setTransferResult] = useState<TransferResult | null>(
-    null
-  );
+  const [transferResult, setTransferResult] = useState<any>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<string>("");
-  const [requesterInfo, setRequesterInfo] = useState<RequesterInfo | null>(
-    null
-  );
-  const [loadingRequester, setLoadingRequester] = useState(false);
+  const [balanceCheck, setBalanceCheck] = useState<BalanceCheck | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
 
-  // FIXED: Enhanced token matching
-  const [userHasToken, setUserHasToken] = useState<boolean>(false);
-  const [userTokenBalance, setUserTokenBalance] = useState<string>("0");
-  const [tokenInfo, setTokenInfo] = useState<any>(null);
-
-  // Reset state when modal opens/closes
+  // Enhanced balance checking with gas estimation
   useEffect(() => {
-    if (isOpen) {
-      setStep("review");
-      setTransferResult(null);
-      setError("");
-      setRequesterInfo(null);
-      setUserHasToken(false);
-      setUserTokenBalance("0");
-      setTokenInfo(null);
+    if (isOpen && activeWallet && fundRequest) {
+      checkBalancesWithGas();
+    }
+  }, [isOpen, activeWallet, fundRequest, tokens]);
 
-      // Check if we have the wallet address in the fund request
-      if (fundRequest.requesterWalletAddress) {
-        console.log(
-          "✅ Using wallet address from fund request:",
-          fundRequest.requesterWalletAddress
-        );
-        setRequesterInfo({
-          username: fundRequest.requesterUsername,
-          walletAddress: fundRequest.requesterWalletAddress,
-          displayName: fundRequest.requesterUsername,
+  const checkBalancesWithGas = async () => {
+    if (!activeWallet || !tokens) return;
+
+    setLoadingBalance(true);
+    try {
+      console.log("🔍 Checking balances and gas for fund request:", {
+        token: fundRequest.tokenSymbol,
+        amount: fundRequest.amount,
+        contractAddress: fundRequest.contractAddress,
+      });
+
+      // FIXED: Use the same balance checking logic as the backend
+      const tokenInfo = {
+        name: fundRequest.tokenName || fundRequest.tokenSymbol,
+        symbol: fundRequest.tokenSymbol,
+        contractAddress: fundRequest.contractAddress || "native",
+        decimals: fundRequest.decimals || 18,
+        isETH:
+          fundRequest.tokenSymbol === "ETH" ||
+          fundRequest.contractAddress === "native" ||
+          !fundRequest.contractAddress,
+      };
+
+      // Call the backend balance check API for accuracy
+      const balanceResponse = await fetch("/api/transfer/balance-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tokenInfo,
+          walletAddress: activeWallet.address,
+          amount: fundRequest.amount,
+        }),
+        credentials: "include",
+      });
+
+      let tokenBalance = 0;
+      let hasSufficientToken = false;
+
+      if (balanceResponse.ok) {
+        const balanceData = await balanceResponse.json();
+        tokenBalance = parseFloat(balanceData.currentBalance || "0");
+        hasSufficientToken = balanceData.sufficient;
+        console.log("✅ Backend balance check:", {
+          available: balanceData.currentBalance,
+          required: fundRequest.amount,
+          sufficient: balanceData.sufficient,
         });
       } else {
-        // Fallback: Fetch requester wallet address if not in fund request
-        fetchRequesterInfo();
+        // Fallback to frontend token data
+        console.warn("Backend balance check failed, using frontend data");
+        const userToken = tokens.find((t) => {
+          if (tokenInfo.isETH) {
+            return t.symbol === "ETH" || t.contractAddress === "native";
+          } else {
+            return (
+              t.symbol === fundRequest.tokenSymbol &&
+              (t.contractAddress === fundRequest.contractAddress ||
+                t.id === fundRequest.contractAddress)
+            );
+          }
+        });
+        tokenBalance = userToken ? parseFloat(userToken.balance.toString()) : 0;
+        hasSufficientToken = tokenBalance >= parseFloat(fundRequest.amount);
       }
 
-      // FIXED: Check if user has the requested token
-      checkUserTokenBalance();
-    }
-  }, [isOpen, fundRequest, tokens]);
-
-  // FIXED: Enhanced token balance checking
-  const checkUserTokenBalance = () => {
-    if (!tokens || tokens.length === 0 || !fundRequest.tokenSymbol) {
-      setUserHasToken(false);
-      return;
-    }
-
-    console.log("🔍 Checking user token balance for:", {
-      requestedToken: fundRequest.tokenSymbol,
-      requestedContract: fundRequest.contractAddress,
-      userTokens: tokens.length,
-    });
-
-    // Find matching token with enhanced matching logic
-    let matchingToken = null;
-
-    // Method 1: Exact symbol and contract match
-    if (fundRequest.contractAddress) {
-      matchingToken = tokens.find(
-        (token) =>
-          token.symbol === fundRequest.tokenSymbol &&
-          (token.contractAddress === fundRequest.contractAddress ||
-            (token.contractAddress === "native" &&
-              fundRequest.contractAddress === "native") ||
-            token.id === fundRequest.contractAddress)
+      // Find user's ETH balance for gas
+      const ethToken = tokens.find(
+        (t) => t.symbol === "ETH" || t.contractAddress === "native"
       );
-    }
-
-    // Method 2: Symbol match for ETH/native tokens
-    if (
-      !matchingToken &&
-      (fundRequest.tokenSymbol === "ETH" ||
-        fundRequest.contractAddress === "native")
-    ) {
-      matchingToken = tokens.find(
-        (token) =>
-          token.symbol === "ETH" ||
-          token.contractAddress === "native" ||
-          !token.contractAddress
-      );
-    }
-
-    // Method 3: Fallback to symbol-only match
-    if (!matchingToken) {
-      matchingToken = tokens.find(
-        (token) => token.symbol === fundRequest.tokenSymbol
-      );
-    }
-
-    if (matchingToken) {
-      const balance =
-        typeof matchingToken.balance === "number"
-          ? matchingToken.balance
-          : parseFloat(matchingToken.balance?.toString() || "0");
+      const ethBalance = ethToken ? parseFloat(ethToken.balance.toString()) : 0;
 
       const requestedAmount = parseFloat(fundRequest.amount);
 
-      console.log("✅ Token found:", {
-        token: matchingToken.symbol,
-        userBalance: balance,
-        requestedAmount: requestedAmount,
-        hasSufficient: balance >= requestedAmount,
+      // Get gas estimation
+      let gasEstimation = {
+        estimatedGas: tokenInfo.isETH ? "21000" : "65000",
+        gasCostETH: tokenInfo.isETH ? "0.00042" : "0.0013",
+        gasCostUSD: tokenInfo.isETH ? "1.47" : "4.55",
+      };
+
+      try {
+        // Try to get real gas estimation
+        const gasResponse = await fetch("/api/transfer/simple", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "preview",
+            tokenInfo,
+            recipientAddress: fundRequest.requesterWalletAddress,
+            amount: fundRequest.amount,
+            fromAddress: activeWallet.address,
+          }),
+          credentials: "include",
+        });
+
+        if (gasResponse.ok) {
+          const gasData = await gasResponse.json();
+          gasEstimation = gasData.preview?.gasEstimation || gasEstimation;
+        }
+      } catch (error) {
+        console.warn("Could not get real gas estimation, using defaults");
+      }
+
+      const gasCostETH = parseFloat(gasEstimation.gasCostETH);
+
+      // For ETH transfers, we need amount + gas
+      // For ERC20 transfers, we need token amount + ETH for gas
+      const hasSufficientGas = tokenInfo.isETH
+        ? ethBalance >= requestedAmount + gasCostETH // ETH needs amount + gas
+        : ethBalance >= gasCostETH; // ERC20 just needs gas in ETH
+
+      const balanceResult: BalanceCheck = {
+        tokenBalance,
+        ethBalance,
+        estimatedGas: gasEstimation.estimatedGas,
+        gasCostETH: gasEstimation.gasCostETH,
+        gasCostUSD: gasEstimation.gasCostUSD,
+        hasToken: tokenBalance > 0,
+        hasSufficientToken,
+        hasSufficientGas,
+        canExecute: hasSufficientToken && hasSufficientGas,
+      };
+
+      console.log("✅ Balance check result:", {
+        tokenBalance,
+        ethBalance,
+        requestedAmount,
+        gasCostETH,
+        hasSufficientToken,
+        hasSufficientGas,
+        canExecute: balanceResult.canExecute,
+        isETH: tokenInfo.isETH,
       });
 
-      setUserHasToken(true);
-      setUserTokenBalance(balance.toString());
-      setTokenInfo(matchingToken);
-    } else {
-      console.log("❌ Token not found in user wallet");
-      setUserHasToken(false);
-      setUserTokenBalance("0");
-      setTokenInfo(null);
-    }
-  };
-
-  const fetchRequesterInfo = async () => {
-    try {
-      setLoadingRequester(true);
-      console.log(
-        "🔍 Fetching requester info for:",
-        fundRequest.requesterUsername
-      );
-
-      // Try to get user wallet address by username
-      const response = await fetch(
-        `/api/users/by-username/${fundRequest.requesterUsername}`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const userData = await response.json();
-        console.log("✅ Requester user data:", userData);
-
-        if (userData.walletAddress) {
-          setRequesterInfo({
-            username: userData.username,
-            walletAddress: userData.walletAddress,
-            displayName: userData.displayName,
-          });
-          console.log(
-            "✅ Requester wallet address found:",
-            userData.walletAddress
-          );
-        } else {
-          console.warn("⚠️ No wallet address found for user");
-          setError("Requester doesn't have a wallet address configured");
-        }
-      } else {
-        console.warn("⚠️ Could not fetch user info");
-        setError("Could not find requester's information");
-      }
+      setBalanceCheck(balanceResult);
     } catch (error) {
-      console.error("❌ Error fetching requester info:", error);
-      setError("Could not find requester's wallet address");
+      console.error("Error checking balances:", error);
     } finally {
-      setLoadingRequester(false);
-    }
-  };
-
-  const copyToClipboard = async (text: string, type: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(type);
-      setTimeout(() => setCopied(""), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
+      setLoadingBalance(false);
     }
   };
 
@@ -271,9 +239,7 @@ export default function FundRequestModal({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "decline",
-          }),
+          body: JSON.stringify({ action: "decline" }),
           credentials: "include",
         }
       );
@@ -293,55 +259,15 @@ export default function FundRequestModal({
   };
 
   const handleFulfill = async () => {
-    if (!userHasToken || !tokenInfo || !activeWallet) {
-      setError("Required token not found in wallet or no active wallet");
+    if (!balanceCheck?.canExecute) {
+      setError("Insufficient balance to fulfill this request");
       return;
     }
-
-    // FIXED: Check balance before proceeding
-    const userBalance = parseFloat(userTokenBalance);
-    const requestedAmount = parseFloat(fundRequest.amount);
-
-    if (userBalance < requestedAmount) {
-      setError(
-        `Insufficient ${fundRequest.tokenSymbol} balance. Need: ${requestedAmount}, Have: ${userBalance}`
-      );
-      return;
-    }
-
-    // FIXED: Use the wallet address from the fund request first
-    let recipientWalletAddress = null;
-
-    if (fundRequest.requesterWalletAddress) {
-      recipientWalletAddress = fundRequest.requesterWalletAddress;
-      console.log(
-        "✅ Using wallet address from fund request:",
-        recipientWalletAddress
-      );
-    } else if (requesterInfo?.walletAddress) {
-      recipientWalletAddress = requesterInfo.walletAddress;
-      console.log(
-        "✅ Using wallet address from user lookup:",
-        recipientWalletAddress
-      );
-    } else {
-      setError("Could not determine requester's wallet address");
-      return;
-    }
-
-    console.log("🚀 Fulfilling fund request:", {
-      from: activeWallet.address,
-      to: recipientWalletAddress,
-      amount: fundRequest.amount,
-      token: fundRequest.tokenSymbol,
-      contractAddress: fundRequest.contractAddress,
-    });
 
     try {
       setLoading(true);
       setStep("sending");
 
-      // FIXED: Use enhanced service for automatic fulfillment
       const response = await fetch(
         `/api/friends/fund-request/${fundRequest.requestId}`,
         {
@@ -349,7 +275,7 @@ export default function FundRequestModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "fulfill",
-            useEnhancedService: true, // Use enhanced service for automatic execution
+            useEnhancedService: true,
           }),
           credentials: "include",
         }
@@ -358,26 +284,14 @@ export default function FundRequestModal({
       const data = await response.json();
 
       if (response.ok && data.success) {
-        console.log("✅ Fund request fulfilled successfully:", data);
-
-        setTransferResult({
-          success: true,
-          transactionHash: data.transactionHash,
-          gasUsed: data.gasUsed,
-          explorerUrl: data.explorerUrl,
-          actualCostETH: data.actualGasCost?.actualCostETH,
-          actualCostUSD: data.actualGasCost?.actualCostUSD,
-          token: data.token,
-        });
+        setTransferResult(data);
         setStep("success");
         onFulfilled?.();
       } else {
-        console.error("❌ Fund request fulfillment failed:", data);
         setError(data.error || "Fund request fulfillment failed");
         setStep("error");
       }
     } catch (error: any) {
-      console.error("💥 Fund request fulfillment error:", error);
       setError(error.message || "Failed to fulfill request");
       setStep("error");
     } finally {
@@ -385,15 +299,18 @@ export default function FundRequestModal({
     }
   };
 
+  const copyToClipboard = async (text: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(type);
+      setTimeout(() => setCopied(""), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
   const isExpired = new Date() > new Date(fundRequest.expiresAt);
   const canProcess = fundRequest.status === "pending" && !isExpired;
-  const hasInsufficientBalance =
-    userHasToken &&
-    parseFloat(userTokenBalance) < parseFloat(fundRequest.amount);
-
-  // FIXED: Get the correct wallet address to display
-  const requesterWalletAddress =
-    fundRequest.requesterWalletAddress || requesterInfo?.walletAddress;
 
   if (!isOpen) return null;
 
@@ -428,7 +345,7 @@ export default function FundRequestModal({
         <div className="p-6">
           {step === "review" && (
             <div className="space-y-6">
-              {/* FIXED: Status warning for non-pending requests */}
+              {/* Status warning for non-pending requests */}
               {!canProcess && (
                 <div
                   className={`rounded-lg p-4 border ${
@@ -436,9 +353,7 @@ export default function FundRequestModal({
                       ? "bg-green-900/20 border-green-500/50"
                       : fundRequest.status === "declined"
                       ? "bg-red-900/20 border-red-500/50"
-                      : fundRequest.status === "expired"
-                      ? "bg-yellow-900/20 border-yellow-500/50"
-                      : "bg-gray-900/20 border-gray-500/50"
+                      : "bg-yellow-900/20 border-yellow-500/50"
                   }`}
                 >
                   <div className="flex items-start">
@@ -449,9 +364,7 @@ export default function FundRequestModal({
                           ? "text-green-400"
                           : fundRequest.status === "declined"
                           ? "text-red-400"
-                          : fundRequest.status === "expired"
-                          ? "text-yellow-400"
-                          : "text-gray-400"
+                          : "text-yellow-400"
                       }`}
                     />
                     <div>
@@ -461,9 +374,7 @@ export default function FundRequestModal({
                             ? "text-green-400"
                             : fundRequest.status === "declined"
                             ? "text-red-400"
-                            : fundRequest.status === "expired"
-                            ? "text-yellow-400"
-                            : "text-gray-400"
+                            : "text-yellow-400"
                         }`}
                       >
                         {fundRequest.status === "fulfilled" &&
@@ -474,18 +385,6 @@ export default function FundRequestModal({
                           "⏰ Request Has Expired"}
                         {fundRequest.status === "failed" && "💥 Request Failed"}
                       </p>
-                      {fundRequest.status === "fulfilled" &&
-                        fundRequest.transactionHash && (
-                          <p className="text-green-400 text-xs font-satoshi mt-1">
-                            Transaction:{" "}
-                            {fundRequest.transactionHash.slice(0, 20)}...
-                          </p>
-                        )}
-                      {fundRequest.error && (
-                        <p className="text-red-400 text-xs font-satoshi mt-1">
-                          Error: {fundRequest.error}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -512,23 +411,10 @@ export default function FundRequestModal({
                     <span className="text-gray-400 text-sm font-satoshi">
                       Token:
                     </span>
-                    <div className="flex items-center">
-                      {tokenInfo?.image && (
-                        <img
-                          src={tokenInfo.image}
-                          alt={fundRequest.tokenSymbol}
-                          className="w-5 h-5 rounded-full mr-2"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = "none";
-                          }}
-                        />
-                      )}
-                      <span className="text-white font-semibold font-satoshi">
-                        {fundRequest.tokenName || fundRequest.tokenSymbol} (
-                        {fundRequest.tokenSymbol})
-                      </span>
-                    </div>
+                    <span className="text-white font-semibold font-satoshi">
+                      {fundRequest.tokenName || fundRequest.tokenSymbol} (
+                      {fundRequest.tokenSymbol})
+                    </span>
                   </div>
 
                   <div className="flex justify-between items-center">
@@ -550,197 +436,150 @@ export default function FundRequestModal({
                       </p>
                     </div>
                   )}
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400 text-sm font-satoshi">
-                      Requested:
-                    </span>
-                    <span className="text-white text-sm font-satoshi">
-                      {new Date(fundRequest.requestedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400 text-sm font-satoshi">
-                      Expires:
-                    </span>
-                    <span
-                      className={`text-sm font-satoshi ${
-                        isExpired ? "text-red-400" : "text-white"
-                      }`}
-                    >
-                      {new Date(fundRequest.expiresAt).toLocaleDateString()}
-                      {isExpired && " (Expired)"}
-                    </span>
-                  </div>
-
-                  {/* FIXED: Show transfer details with correct addresses */}
-                  <div className="bg-[#1A1A1A] rounded-lg p-3 border border-[#2C2C2C]">
-                    <div className="text-sm font-satoshi mb-2">
-                      <span className="text-[#E2AF19] font-medium">
-                        Transfer Details:
-                      </span>
-                    </div>
-
-                    {/* From (Current User) */}
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-400 text-sm font-satoshi">
-                        From (You):
-                      </span>
-                      <div className="flex items-center">
-                        <span className="text-white text-sm font-satoshi font-mono mr-2">
-                          {activeWallet?.address
-                            ? `${activeWallet.address.slice(
-                                0,
-                                8
-                              )}...${activeWallet.address.slice(-6)}`
-                            : "No wallet selected"}
-                        </span>
-                        {activeWallet?.address && (
-                          <button
-                            onClick={() =>
-                              copyToClipboard(activeWallet.address, "sender")
-                            }
-                            className="text-gray-400 hover:text-white transition-colors"
-                          >
-                            <Copy size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* To (Requester) */}
-                    {loadingRequester && !requesterWalletAddress && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-sm font-satoshi">
-                          To (Requester):
-                        </span>
-                        <span className="text-gray-400 text-sm font-satoshi">
-                          Loading...
-                        </span>
-                      </div>
-                    )}
-
-                    {requesterWalletAddress && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-sm font-satoshi">
-                          To (Requester):
-                        </span>
-                        <div className="flex items-center">
-                          <span className="text-white text-sm font-satoshi font-mono mr-2">
-                            {requesterWalletAddress.slice(0, 8)}...
-                            {requesterWalletAddress.slice(-6)}
-                          </span>
-                          <button
-                            onClick={() =>
-                              copyToClipboard(
-                                requesterWalletAddress,
-                                "recipient"
-                              )
-                            }
-                            className="text-gray-400 hover:text-white transition-colors"
-                          >
-                            <Copy size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {copied === "sender" && (
-                      <p className="text-green-400 text-xs font-satoshi mt-1">
-                        Your wallet address copied!
-                      </p>
-                    )}
-                    {copied === "recipient" && (
-                      <p className="text-green-400 text-xs font-satoshi mt-1">
-                        Requester's wallet address copied!
-                      </p>
-                    )}
-                  </div>
                 </div>
               </div>
 
-              {/* FIXED: Enhanced Token Balance Check */}
-              <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-400 text-sm font-satoshi">
-                    Your {fundRequest.tokenSymbol} Balance:
-                  </span>
-                  <span
-                    className={`font-semibold font-satoshi ${
-                      userHasToken ? "text-white" : "text-red-400"
+              {/* Enhanced Balance Check Display */}
+              {loadingBalance ? (
+                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
+                  <div className="flex items-center">
+                    <RefreshCw
+                      size={16}
+                      className="animate-spin text-[#E2AF19] mr-2"
+                    />
+                    <span className="text-white font-satoshi">
+                      Checking balances...
+                    </span>
+                  </div>
+                </div>
+              ) : balanceCheck ? (
+                <div className="space-y-4">
+                  {/* Token Balance Check */}
+                  <div
+                    className={`rounded-lg p-4 border ${
+                      balanceCheck.hasSufficientToken
+                        ? "bg-green-900/20 border-green-500/50"
+                        : "bg-red-900/20 border-red-500/50"
                     }`}
                   >
-                    {userHasToken
-                      ? `${userTokenBalance} ${fundRequest.tokenSymbol}`
-                      : "Token not found"}
-                  </span>
+                    <div className="flex items-start">
+                      {balanceCheck.hasSufficientToken ? (
+                        <CheckCircle
+                          size={16}
+                          className="text-green-400 mr-2 mt-0.5 flex-shrink-0"
+                        />
+                      ) : (
+                        <AlertIcon
+                          size={16}
+                          className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p
+                          className={`text-sm font-satoshi font-medium ${
+                            balanceCheck.hasSufficientToken
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {fundRequest.tokenSymbol} Balance
+                        </p>
+                        <p
+                          className={`text-xs font-satoshi mt-1 ${
+                            balanceCheck.hasSufficientToken
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          Available: {balanceCheck.tokenBalance.toFixed(6)}{" "}
+                          {fundRequest.tokenSymbol}
+                          <br />
+                          Required: {fundRequest.amount}{" "}
+                          {fundRequest.tokenSymbol}
+                          {balanceCheck.hasSufficientToken
+                            ? " ✅ Sufficient"
+                            : ` ❌ Need ${(
+                                parseFloat(fundRequest.amount) -
+                                balanceCheck.tokenBalance
+                              ).toFixed(6)} more`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gas Balance Check */}
+                  <div
+                    className={`rounded-lg p-4 border ${
+                      balanceCheck.hasSufficientGas
+                        ? "bg-green-900/20 border-green-500/50"
+                        : "bg-red-900/20 border-red-500/50"
+                    }`}
+                  >
+                    <div className="flex items-start">
+                      {balanceCheck.hasSufficientGas ? (
+                        <CheckCircle
+                          size={16}
+                          className="text-green-400 mr-2 mt-0.5 flex-shrink-0"
+                        />
+                      ) : (
+                        <Fuel
+                          size={16}
+                          className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p
+                          className={`text-sm font-satoshi font-medium ${
+                            balanceCheck.hasSufficientGas
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          Gas Fee (ETH Balance)
+                        </p>
+                        <p
+                          className={`text-xs font-satoshi mt-1 ${
+                            balanceCheck.hasSufficientGas
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          Available: {balanceCheck.ethBalance.toFixed(6)} ETH
+                          <br />
+                          Required: {balanceCheck.gasCostETH} ETH ($
+                          {balanceCheck.gasCostUSD})
+                          {balanceCheck.hasSufficientGas
+                            ? " ✅ Sufficient for gas"
+                            : ` ❌ Need ${(
+                                parseFloat(balanceCheck.gasCostETH) -
+                                balanceCheck.ethBalance
+                              ).toFixed(6)} more ETH`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gas Explanation */}
+                  <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <Info
+                        size={16}
+                        className="text-blue-400 mr-2 mt-0.5 flex-shrink-0"
+                      />
+                      <div>
+                        <p className="text-blue-400 text-sm font-satoshi font-medium mb-1">
+                          Gas Fee Information
+                        </p>
+                        <p className="text-blue-400 text-xs font-satoshi">
+                          {fundRequest.tokenSymbol === "ETH"
+                            ? "For ETH transfers, you need enough ETH to cover both the transfer amount and gas fees."
+                            : `For ${fundRequest.tokenSymbol} transfers, you need enough ${fundRequest.tokenSymbol} for the transfer amount plus enough ETH to pay for gas fees.`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-
-                {!userHasToken && (
-                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mt-3">
-                    <div className="flex items-start">
-                      <AlertIcon
-                        size={16}
-                        className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
-                      />
-                      <p className="text-red-400 text-sm font-satoshi">
-                        You don't have {fundRequest.tokenSymbol} in your wallet.
-                        You need to acquire this token first to fulfill this
-                        request.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {userHasToken && hasInsufficientBalance && (
-                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mt-3">
-                    <div className="flex items-start">
-                      <AlertTriangle
-                        size={16}
-                        className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
-                      />
-                      <p className="text-red-400 text-sm font-satoshi">
-                        Insufficient balance. You need{" "}
-                        {parseFloat(fundRequest.amount) -
-                          parseFloat(userTokenBalance)}{" "}
-                        more {fundRequest.tokenSymbol}.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {userHasToken && !hasInsufficientBalance && (
-                  <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3 mt-3">
-                    <div className="flex items-start">
-                      <CheckCircle
-                        size={16}
-                        className="text-green-400 mr-2 mt-0.5 flex-shrink-0"
-                      />
-                      <p className="text-green-400 text-sm font-satoshi">
-                        ✅ You have sufficient balance to fulfill this request.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Address Resolution Error */}
-              {!loadingRequester && !requesterWalletAddress && canProcess && (
-                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <AlertTriangle
-                      size={16}
-                      className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
-                    />
-                    <p className="text-red-400 text-sm font-satoshi">
-                      Could not find wallet address for @
-                      {fundRequest.requesterUsername}. They may need to add
-                      their wallet to their profile.
-                    </p>
-                  </div>
-                </div>
-              )}
+              ) : null}
 
               {error && (
                 <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3">
@@ -763,18 +602,15 @@ export default function FundRequestModal({
                     onClick={handleFulfill}
                     disabled={
                       loading ||
-                      !userHasToken ||
-                      hasInsufficientBalance ||
-                      loadingRequester ||
-                      !requesterWalletAddress ||
+                      !balanceCheck?.canExecute ||
                       !activeWallet?.address
                     }
                     className="flex-1"
                   >
                     {loading
                       ? "Processing..."
-                      : loadingRequester
-                      ? "Loading..."
+                      : !balanceCheck?.canExecute
+                      ? "Insufficient Balance"
                       : `Send ${fundRequest.tokenSymbol}`}
                   </Button>
                 </div>
@@ -810,102 +646,40 @@ export default function FundRequestModal({
                 </p>
               </div>
 
-              {/* Transaction Details */}
-              <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400 text-sm font-satoshi">
-                      Transaction Hash:
-                    </span>
-                    <div className="flex items-center">
-                      <span className="text-white text-sm font-satoshi font-mono mr-2">
-                        {transferResult.transactionHash?.slice(0, 8)}...
-                        {transferResult.transactionHash?.slice(-6)}
-                      </span>
-                      <button
-                        onClick={() =>
-                          copyToClipboard(
-                            transferResult.transactionHash!,
-                            "hash"
-                          )
-                        }
-                        className="text-gray-400 hover:text-white transition-colors"
-                      >
-                        <Copy size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {transferResult.gasUsed && (
+              {transferResult.transactionHash && (
+                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400 text-sm font-satoshi">
-                        Gas Used:
+                        Transaction Hash:
                       </span>
-                      <span className="text-white text-sm font-satoshi">
-                        {transferResult.gasUsed.toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-
-                  {transferResult.blockNumber && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-sm font-satoshi">
-                        Block Number:
-                      </span>
-                      <span className="text-white text-sm font-satoshi">
-                        {transferResult.blockNumber.toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-
-                  {transferResult.actualCostETH && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-sm font-satoshi">
-                        Gas Fee (ETH):
-                      </span>
-                      <span className="text-white text-sm font-satoshi">
-                        {transferResult.actualCostETH}
-                      </span>
-                    </div>
-                  )}
-
-                  {transferResult.actualCostUSD && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400 text-sm font-satoshi">
-                        Gas Fee (USD):
-                      </span>
-                      <span className="text-white text-sm font-satoshi">
-                        {transferResult.actualCostUSD}
-                      </span>
-                    </div>
-                  )}
-
-                  {transferResult.token && (
-                    <div className="bg-[#1A1A1A] rounded-lg p-3 border border-[#2C2C2C]">
-                      <div className="text-sm font-satoshi mb-1">
-                        <span className="text-[#E2AF19] font-medium">
-                          Token Transferred:
+                      <div className="flex items-center">
+                        <span className="text-white text-sm font-satoshi font-mono mr-2">
+                          {transferResult.transactionHash.slice(0, 8)}...
+                          {transferResult.transactionHash.slice(-6)}
                         </span>
-                      </div>
-                      <div className="text-white text-sm font-satoshi">
-                        {transferResult.token.name} (
-                        {transferResult.token.symbol})
-                      </div>
-                      <div className="text-gray-400 text-xs font-satoshi font-mono mt-1">
-                        {transferResult.token.contractAddress}
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              transferResult.transactionHash,
+                              "hash"
+                            )
+                          }
+                          className="text-gray-400 hover:text-white transition-colors"
+                        >
+                          <Copy size={14} />
+                        </button>
                       </div>
                     </div>
-                  )}
-
-                  {copied === "hash" && (
-                    <p className="text-green-400 text-xs font-satoshi">
-                      Transaction hash copied!
-                    </p>
-                  )}
+                    {copied === "hash" && (
+                      <p className="text-green-400 text-xs font-satoshi">
+                        Hash copied!
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Action Buttons */}
               <div className="flex gap-3">
                 {transferResult.explorerUrl && (
                   <Button
@@ -919,22 +693,6 @@ export default function FundRequestModal({
                     View on Explorer
                   </Button>
                 )}
-                {!transferResult.explorerUrl &&
-                  transferResult.transactionHash && (
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        window.open(
-                          `https://etherscan.io/tx/${transferResult.transactionHash}`,
-                          "_blank"
-                        )
-                      }
-                      className="flex-1"
-                    >
-                      <ExternalLink size={16} className="mr-2" />
-                      View on Etherscan
-                    </Button>
-                  )}
                 <Button onClick={onClose} className="flex-1">
                   Done
                 </Button>
@@ -956,40 +714,11 @@ export default function FundRequestModal({
                 </p>
                 {error && (
                   <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4">
-                    <div className="flex items-start">
-                      <AlertTriangle
-                        size={16}
-                        className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
-                      />
-                      <div>
-                        <p className="text-red-400 text-sm font-satoshi font-medium mb-1">
-                          Error Details:
-                        </p>
-                        <p className="text-red-400 text-sm font-satoshi">
-                          {error}
-                        </p>
-                      </div>
-                    </div>
+                    <p className="text-red-400 text-sm font-satoshi">{error}</p>
                   </div>
                 )}
               </div>
 
-              {/* Troubleshooting Tips */}
-              <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                <div className="text-sm font-satoshi mb-2">
-                  <span className="text-[#E2AF19] font-medium">
-                    Troubleshooting Tips:
-                  </span>
-                </div>
-                <ul className="text-gray-400 text-sm font-satoshi space-y-1">
-                  <li>• Check your wallet balance and network connection</li>
-                  <li>• Ensure you have enough ETH for gas fees</li>
-                  <li>• Verify the recipient's wallet address is correct</li>
-                  <li>• Try refreshing your wallet balances</li>
-                </ul>
-              </div>
-
-              {/* Action Buttons */}
               <div className="flex gap-3">
                 <Button
                   variant="secondary"
