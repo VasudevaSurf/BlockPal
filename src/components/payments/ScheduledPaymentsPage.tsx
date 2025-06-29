@@ -1,3 +1,4 @@
+// src/components/payments/ScheduledPaymentsPage.tsx - FIXED VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -59,24 +60,47 @@ interface CreatePaymentData {
 }
 
 interface PaymentPreview {
-  tokenInfo: {
-    name: string;
-    symbol: string;
-    contractAddress: string;
-    decimals: number;
-    isETH: boolean;
+  // Core transfer info
+  network?: string;
+  tokenName?: string;
+  tokenSymbol?: string;
+  contractAddress?: string;
+  fromAddress?: string;
+  toAddress?: string;
+  amount?: string;
+  tokenPrice?: number;
+  valueUSD?: string;
+
+  // Gas estimation - make all properties optional and provide defaults
+  gasEstimation?: {
+    gasPrice?: string;
+    estimatedGas?: string;
+    gasCostETH?: string;
+    gasCostUSD?: string;
+    maxFeePerGas?: string;
+    priorityFee?: string;
+    baseFeePerGas?: string;
+    ethPrice?: number;
   };
-  recipient: string;
-  amount: string;
-  scheduledFor: Date;
-  frequency: string;
-  nextExecutions: Date[];
-  estimatedGas: string;
-  gasCostETH: string;
-  gasCostUSD: string;
-  approvalRequired: boolean;
+
+  // Token info object
+  tokenInfo?: {
+    name?: string;
+    symbol?: string;
+    contractAddress?: string;
+    decimals?: number;
+    isETH?: boolean;
+  };
+
+  // Scheduled payment specific info
+  recipient?: string;
+  scheduledFor?: Date;
+  frequency?: string;
+  nextExecutions?: Date[];
+  approvalRequired?: boolean;
   currentAllowance?: string;
   requiredAllowance?: string;
+  timezone?: string;
 }
 
 const getTokenIcon = (token: string) => {
@@ -227,8 +251,6 @@ export default function ScheduledPaymentsPage() {
     return true;
   };
 
-  // Add this debug logging to your ScheduledPaymentsPage.tsx in the handleCreatePreview function
-
   const handleCreatePreview = async () => {
     console.log("🚀 Creating scheduled payment preview...");
 
@@ -244,16 +266,23 @@ export default function ScheduledPaymentsPage() {
       const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
-      // FIXED: Ensure tokenInfo is properly formatted
+      // FIXED: Ensure tokenInfo is properly formatted with extra validation
       const tokenInfoForRequest = {
-        name: selectedToken.name || selectedToken.symbol || "Unknown Token",
-        symbol: selectedToken.symbol || "UNKNOWN",
-        contractAddress: selectedToken.contractAddress || "native",
-        decimals: selectedToken.decimals || 18,
-        isETH:
-          selectedToken.isETH ||
-          selectedToken.contractAddress === "native" ||
-          selectedToken.symbol === "ETH",
+        name: (
+          selectedToken?.name ||
+          selectedToken?.symbol ||
+          "Unknown Token"
+        ).toString(),
+        symbol: (selectedToken?.symbol || "UNKNOWN").toString(),
+        contractAddress: (
+          selectedToken?.contractAddress || "native"
+        ).toString(),
+        decimals: Number(selectedToken?.decimals) || 18,
+        isETH: Boolean(
+          selectedToken?.isETH ||
+            selectedToken?.contractAddress === "native" ||
+            selectedToken?.symbol === "ETH"
+        ),
       };
 
       console.log("🔧 Token info being sent:", tokenInfoForRequest);
@@ -262,11 +291,11 @@ export default function ScheduledPaymentsPage() {
         action: "preview",
         tokenInfo: tokenInfoForRequest,
         fromAddress: activeWallet.address,
-        recipient: formData.recipient,
-        amount: formData.amount,
+        recipient: formData.recipient.toString(),
+        amount: formData.amount.toString(),
         scheduledFor: scheduledDateTime.toISOString(),
-        frequency,
-        timezone: selectedTimezone.tz,
+        frequency: frequency.toString(),
+        timezone: selectedTimezone.tz.toString(),
       };
 
       console.log(
@@ -288,51 +317,95 @@ export default function ScheduledPaymentsPage() {
       const data = await response.json();
       console.log("📡 Full response data:", JSON.stringify(data, null, 2));
 
-      // DEBUG: Check the structure of data.preview
-      if (data.preview) {
-        console.log("🔍 Preview object:", data.preview);
-        console.log("🔍 Preview keys:", Object.keys(data.preview));
-        console.log("🔍 TokenInfo in preview:", data.preview.tokenInfo);
-        console.log("🔍 TokenName in preview:", data.preview.tokenName);
-        console.log("🔍 TokenSymbol in preview:", data.preview.tokenSymbol);
-      } else {
-        console.log("❌ No preview object in response");
-      }
-
       if (!response.ok) {
         throw new Error(data.error || "Failed to create preview");
       }
 
-      // SAFETY CHECK: Ensure preview has required properties before setting state
+      // SAFETY CHECK: Ensure preview has required properties and provide safe defaults
       if (data.preview) {
-        // Add missing properties if they don't exist
-        const safePreview = {
-          ...data.preview,
-          tokenInfo: data.preview.tokenInfo || {
-            name: data.preview.tokenName || tokenInfoForRequest.name,
-            symbol: data.preview.tokenSymbol || tokenInfoForRequest.symbol,
-            contractAddress:
-              data.preview.contractAddress ||
-              tokenInfoForRequest.contractAddress,
-            decimals: tokenInfoForRequest.decimals,
-            isETH: tokenInfoForRequest.isETH,
+        const safePreview: PaymentPreview = {
+          // Core transfer info with safe defaults and type checking
+          network: (data.preview.network || "Ethereum Mainnet").toString(),
+          tokenName: (
+            data.preview.tokenName || tokenInfoForRequest.name
+          ).toString(),
+          tokenSymbol: (
+            data.preview.tokenSymbol || tokenInfoForRequest.symbol
+          ).toString(),
+          contractAddress: (
+            data.preview.contractAddress || tokenInfoForRequest.contractAddress
+          ).toString(),
+          fromAddress: (
+            data.preview.fromAddress || activeWallet.address
+          ).toString(),
+          toAddress: (data.preview.toAddress || formData.recipient).toString(),
+          amount: (data.preview.amount || formData.amount).toString(),
+          tokenPrice: Number(data.preview.tokenPrice) || undefined,
+          valueUSD: (data.preview.valueUSD || "Not available").toString(),
+
+          // Gas estimation with safe defaults and type checking
+          gasEstimation: {
+            gasPrice: (data.preview.gasEstimation?.gasPrice || "20").toString(),
+            estimatedGas: (
+              data.preview.gasEstimation?.estimatedGas || "21000"
+            ).toString(),
+            gasCostETH: (
+              data.preview.gasEstimation?.gasCostETH || "0.00042"
+            ).toString(),
+            gasCostUSD: (
+              data.preview.gasEstimation?.gasCostUSD || "1.47"
+            ).toString(),
+            maxFeePerGas: (
+              data.preview.gasEstimation?.maxFeePerGas || "20000000000"
+            ).toString(),
+            priorityFee: (
+              data.preview.gasEstimation?.priorityFee || "2000000000"
+            ).toString(),
+            baseFeePerGas: (
+              data.preview.gasEstimation?.baseFeePerGas || "20000000000"
+            ).toString(),
+            ethPrice: Number(data.preview.gasEstimation?.ethPrice) || 3500,
           },
-          // Ensure all required preview properties exist
-          network: data.preview.network || "Ethereum Mainnet",
-          fromAddress: data.preview.fromAddress || activeWallet.address,
-          toAddress: data.preview.toAddress || formData.recipient,
-          amount: data.preview.amount || formData.amount,
-          gasEstimation: data.preview.gasEstimation || {
-            gasPrice: "20",
-            estimatedGas: "21000",
-            gasCostETH: "0.00042",
-            gasCostUSD: "1.47",
+
+          // Token info object with safe defaults and type checking
+          tokenInfo: {
+            name: (
+              data.preview.tokenInfo?.name || tokenInfoForRequest.name
+            ).toString(),
+            symbol: (
+              data.preview.tokenInfo?.symbol || tokenInfoForRequest.symbol
+            ).toString(),
+            contractAddress: (
+              data.preview.tokenInfo?.contractAddress ||
+              tokenInfoForRequest.contractAddress
+            ).toString(),
+            decimals:
+              Number(data.preview.tokenInfo?.decimals) ||
+              tokenInfoForRequest.decimals,
+            isETH: Boolean(
+              data.preview.tokenInfo?.isETH || tokenInfoForRequest.isETH
+            ),
           },
+
+          // Scheduled payment specific info with safe defaults and type checking
+          recipient: (
+            data.preview.recipient ||
+            data.preview.toAddress ||
+            formData.recipient
+          ).toString(),
           scheduledFor: scheduledDateTime,
-          frequency,
-          nextExecutions: data.preview.nextExecutions || [],
-          approvalRequired: data.preview.approvalRequired || false,
-          timezone: selectedTimezone.tz,
+          frequency: frequency.toString(),
+          nextExecutions: Array.isArray(data.preview.nextExecutions)
+            ? data.preview.nextExecutions
+            : [],
+          approvalRequired: Boolean(data.preview.approvalRequired),
+          currentAllowance: data.preview.currentAllowance
+            ? data.preview.currentAllowance.toString()
+            : undefined,
+          requiredAllowance: data.preview.requiredAllowance
+            ? data.preview.requiredAllowance.toString()
+            : undefined,
+          timezone: selectedTimezone.tz.toString(),
         };
 
         console.log("✅ Safe preview object:", safePreview);
@@ -372,6 +445,7 @@ export default function ScheduledPaymentsPage() {
             tokenAddress: selectedToken.contractAddress,
             amount: formData.amount,
             decimals: selectedToken.decimals,
+            fromAddress: activeWallet.address,
           }),
           credentials: "include",
         });
@@ -403,7 +477,7 @@ export default function ScheduledPaymentsPage() {
 
       const createBody = {
         action: "create",
-        tokenInfo: tokenInfoForRequest, // Use the properly formatted token info
+        tokenInfo: tokenInfoForRequest,
         fromAddress: activeWallet.address,
         recipient: formData.recipient,
         amount: formData.amount,
@@ -515,28 +589,52 @@ export default function ScheduledPaymentsPage() {
   };
 
   const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    try {
+      return new Date(dateString).toLocaleString();
+    } catch {
+      return "Invalid date";
+    }
   };
 
   const getTimeUntilExecution = (nextExecution?: string) => {
     if (!nextExecution) return "N/A";
 
-    const now = new Date();
-    const execution = new Date(nextExecution);
-    const diff = execution.getTime() - now.getTime();
+    try {
+      const now = new Date();
+      const execution = new Date(nextExecution);
+      const diff = execution.getTime() - now.getTime();
 
-    if (diff <= 0) return "Overdue";
+      if (diff <= 0) return "Overdue";
 
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor(
+        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+      );
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
-    if (days > 0) {
-      return `${days}d ${hours}h`;
-    } else if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else {
-      return `${minutes}m`;
+      if (days > 0) {
+        return `${days}d ${hours}h`;
+      } else if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      } else {
+        return `${minutes}m`;
+      }
+    } catch {
+      return "Invalid date";
+    }
+  };
+
+  // Safe helper functions
+  const safeSlice = (
+    str: string | undefined | null,
+    start: number,
+    end?: number
+  ): string => {
+    if (!str || typeof str !== "string" || str.length === 0) return "";
+    try {
+      return str.slice(start, end);
+    } catch {
+      return "";
     }
   };
 
@@ -579,11 +677,11 @@ export default function ScheduledPaymentsPage() {
             </span>
             <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
             <span className="text-gray-400 text-xs sm:text-sm font-satoshi mr-2 lg:mr-3 hidden sm:block truncate">
-              {activeWallet?.address
-                ? `${activeWallet.address.slice(
-                    0,
-                    11
-                  )}...${activeWallet.address.slice(-7)}`
+              {activeWallet?.address && typeof activeWallet.address === "string"
+                ? `${safeSlice(activeWallet.address, 0, 11)}...${safeSlice(
+                    activeWallet.address,
+                    -7
+                  )}`
                 : "0xAD7a4hw64...R8J6153"}
             </span>
           </div>
@@ -915,15 +1013,26 @@ export default function ScheduledPaymentsPage() {
                       <div className="flex items-center">
                         <div className="w-8 h-8 bg-gray-600 rounded-full mr-3 flex items-center justify-center">
                           <span className="text-white text-sm">
-                            {payment.recipient.startsWith("0x")
+                            {payment.recipient &&
+                            payment.recipient.startsWith &&
+                            payment.recipient.startsWith("0x")
                               ? "0"
-                              : payment.recipient[1]?.toUpperCase() || "?"}
+                              : payment.recipient &&
+                                payment.recipient[1]?.toUpperCase
+                              ? payment.recipient[1]?.toUpperCase() || "?"
+                              : "?"}
                           </span>
                         </div>
                         <div>
                           <div className="text-white font-medium text-sm font-satoshi">
-                            {payment.recipient.slice(0, 10)}...
-                            {payment.recipient.slice(-6)}
+                            {payment.recipient &&
+                            typeof payment.recipient === "string"
+                              ? `${safeSlice(
+                                  payment.recipient,
+                                  0,
+                                  10
+                                )}...${safeSlice(payment.recipient, -6)}`
+                              : "Unknown recipient"}
                           </div>
                           <div className="flex items-center mt-1">
                             <div
@@ -1389,14 +1498,21 @@ export default function ScheduledPaymentsPage() {
                       <div className="flex items-center min-w-0">
                         <div className="w-6 h-6 bg-gray-600 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
                           <span className="text-white text-xs">
-                            {payment.recipient.startsWith("0x")
+                            {payment.recipient &&
+                            payment.recipient.startsWith("0x")
                               ? "0"
-                              : payment.recipient[1]?.toUpperCase() || "?"}
+                              : payment.recipient?.[1]?.toUpperCase() || "?"}
                           </span>
                         </div>
                         <span className="text-white font-satoshi text-sm truncate">
-                          {payment.recipient.slice(0, 8)}...
-                          {payment.recipient.slice(-6)}
+                          {payment.recipient &&
+                          typeof payment.recipient === "string"
+                            ? `${safeSlice(
+                                payment.recipient,
+                                0,
+                                8
+                              )}...${safeSlice(payment.recipient, -6)}`
+                            : "Unknown"}
                         </span>
                       </div>
 
@@ -1529,7 +1645,14 @@ export default function ScheduledPaymentsPage() {
                         Token
                       </div>
                       <div className="text-white font-bold font-satoshi">
-                        {preview.tokenInfo.name} ({preview.tokenInfo.symbol})
+                        {preview.tokenInfo?.name ||
+                          preview.tokenName ||
+                          "Unknown"}{" "}
+                        (
+                        {preview.tokenInfo?.symbol ||
+                          preview.tokenSymbol ||
+                          "Unknown"}
+                        )
                       </div>
                     </div>
                     <div>
@@ -1537,7 +1660,10 @@ export default function ScheduledPaymentsPage() {
                         Amount
                       </div>
                       <div className="text-white font-bold font-satoshi">
-                        {preview.amount} {preview.tokenInfo.symbol}
+                        {preview.amount || "0"}{" "}
+                        {preview.tokenInfo?.symbol ||
+                          preview.tokenSymbol ||
+                          "Unknown"}
                       </div>
                     </div>
                     <div>
@@ -1545,8 +1671,21 @@ export default function ScheduledPaymentsPage() {
                         Recipient
                       </div>
                       <div className="text-white font-bold font-satoshi">
-                        {preview.recipient.slice(0, 10)}...
-                        {preview.recipient.slice(-6)}
+                        {preview.recipient &&
+                        typeof preview.recipient === "string"
+                          ? `${safeSlice(
+                              preview.recipient,
+                              0,
+                              10
+                            )}...${safeSlice(preview.recipient, -6)}`
+                          : preview.toAddress &&
+                            typeof preview.toAddress === "string"
+                          ? `${safeSlice(
+                              preview.toAddress,
+                              0,
+                              10
+                            )}...${safeSlice(preview.toAddress, -6)}`
+                          : "Unknown"}
                       </div>
                     </div>
                     <div>
@@ -1556,7 +1695,7 @@ export default function ScheduledPaymentsPage() {
                       <div className="text-white font-bold font-satoshi">
                         {preview.frequency === "once"
                           ? "One-time"
-                          : preview.frequency}
+                          : preview.frequency || "Unknown"}
                       </div>
                     </div>
                   </div>
@@ -1573,33 +1712,36 @@ export default function ScheduledPaymentsPage() {
                         First Execution:
                       </span>
                       <span className="text-white font-satoshi">
-                        {preview.scheduledFor.toLocaleString()}
+                        {preview.scheduledFor
+                          ? preview.scheduledFor.toLocaleString()
+                          : "Not specified"}
                       </span>
                     </div>
-                    {preview.nextExecutions.length > 1 && (
-                      <div>
-                        <div className="text-gray-400 text-sm font-satoshi mb-2">
-                          Next Executions:
-                        </div>
-                        <div className="space-y-1">
-                          {preview.nextExecutions
-                            .slice(1, 4)
-                            .map((date, index) => (
-                              <div
-                                key={index}
-                                className="text-white text-sm font-satoshi"
-                              >
-                                {date.toLocaleString()}
+                    {preview.nextExecutions &&
+                      preview.nextExecutions.length > 1 && (
+                        <div>
+                          <div className="text-gray-400 text-sm font-satoshi mb-2">
+                            Next Executions:
+                          </div>
+                          <div className="space-y-1">
+                            {preview.nextExecutions
+                              .slice(1, 4)
+                              .map((date, index) => (
+                                <div
+                                  key={index}
+                                  className="text-white text-sm font-satoshi"
+                                >
+                                  {date.toLocaleString()}
+                                </div>
+                              ))}
+                            {preview.nextExecutions.length > 4 && (
+                              <div className="text-gray-400 text-sm font-satoshi">
+                                ...and more
                               </div>
-                            ))}
-                          {preview.nextExecutions.length > 4 && (
-                            <div className="text-gray-400 text-sm font-satoshi">
-                              ...and more
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 </div>
 
@@ -1614,7 +1756,12 @@ export default function ScheduledPaymentsPage() {
                         Estimated Gas:
                       </span>
                       <span className="text-white font-satoshi">
-                        {parseInt(preview.estimatedGas).toLocaleString()} gas
+                        {preview.gasEstimation?.estimatedGas
+                          ? parseInt(
+                              preview.gasEstimation.estimatedGas
+                            ).toLocaleString()
+                          : "21,000"}{" "}
+                        gas
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -1622,7 +1769,8 @@ export default function ScheduledPaymentsPage() {
                         Estimated Cost:
                       </span>
                       <span className="text-white font-satoshi">
-                        {preview.gasCostETH} ETH (${preview.gasCostUSD})
+                        {preview.gasEstimation?.gasCostETH || "0.00042"} ETH ($
+                        {preview.gasEstimation?.gasCostUSD || "1.47"})
                       </span>
                     </div>
                   </div>
@@ -1641,11 +1789,18 @@ export default function ScheduledPaymentsPage() {
                           Token Approval Required
                         </p>
                         <p className="text-yellow-400 text-xs font-satoshi">
-                          Current allowance: {preview.currentAllowance}{" "}
-                          {preview.tokenInfo.symbol}
+                          Current allowance: {preview.currentAllowance || "0"}{" "}
+                          {preview.tokenInfo?.symbol ||
+                            preview.tokenSymbol ||
+                            "Unknown"}
                           <br />
-                          Required allowance: {preview.requiredAllowance}{" "}
-                          {preview.tokenInfo.symbol}
+                          Required allowance:{" "}
+                          {preview.requiredAllowance ||
+                            preview.amount ||
+                            "0"}{" "}
+                          {preview.tokenInfo?.symbol ||
+                            preview.tokenSymbol ||
+                            "Unknown"}
                         </p>
                       </div>
                     </div>
@@ -1721,17 +1876,26 @@ export default function ScheduledPaymentsPage() {
                       <span className="text-gray-400">Schedule ID:</span>
                       <div className="flex items-center">
                         <span className="text-white mr-2 font-mono text-xs">
-                          {result.scheduleId?.slice(0, 10)}...
-                          {result.scheduleId?.slice(-8)}
+                          {result.scheduleId &&
+                          typeof result.scheduleId === "string"
+                            ? `${safeSlice(
+                                result.scheduleId,
+                                0,
+                                10
+                              )}...${safeSlice(result.scheduleId, -8)}`
+                            : "Unknown"}
                         </span>
-                        <button
-                          onClick={() =>
-                            copyToClipboard(result.scheduleId!, "schedule")
-                          }
-                          className="text-gray-400 hover:text-white transition-colors"
-                        >
-                          <Copy size={14} />
-                        </button>
+                        {result.scheduleId &&
+                          typeof result.scheduleId === "string" && (
+                            <button
+                              onClick={() =>
+                                copyToClipboard(result.scheduleId, "schedule")
+                              }
+                              className="text-gray-400 hover:text-white transition-colors"
+                            >
+                              <Copy size={14} />
+                            </button>
+                          )}
                       </div>
                     </div>
                     <div className="flex justify-between">

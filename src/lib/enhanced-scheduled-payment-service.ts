@@ -1,4 +1,4 @@
-// src/lib/enhanced-scheduled-payment-service.ts (NEW VERSION WITH API INTEGRATION)
+// src/lib/enhanced-scheduled-payment-service.ts - FIXED VERSION
 import { ethers } from "ethers";
 
 const ALCHEMY_API_KEY =
@@ -64,6 +64,7 @@ export interface ScheduledPaymentExecution {
   blockNumber?: string;
   explorerUrl?: string;
   error?: string;
+  executedAt: Date;
   actualGasCost?: {
     actualGasUsed: string;
     actualCostETH: string;
@@ -147,7 +148,48 @@ export class EnhancedScheduledPaymentService {
     this.coinList = [];
   }
 
-  // API call methods from the external JS
+  // Safe value validation helper
+  private validateAndSanitize(
+    value: any,
+    type: "string" | "number" | "address",
+    defaultValue?: any
+  ): any {
+    try {
+      if (value === null || value === undefined) {
+        if (defaultValue !== undefined) {
+          return defaultValue;
+        }
+        throw new Error(`Required ${type} value is null or undefined`);
+      }
+
+      if (type === "string") {
+        return String(value).trim();
+      }
+
+      if (type === "number") {
+        const num = Number(value);
+        if (isNaN(num)) {
+          throw new Error(`Invalid number: ${value}`);
+        }
+        return num;
+      }
+
+      if (type === "address") {
+        const addr = String(value).trim();
+        if (!ethers.isAddress(addr)) {
+          throw new Error(`Invalid address: ${addr}`);
+        }
+        return addr;
+      }
+
+      return value;
+    } catch (error) {
+      console.error(`Validation failed for ${type}:`, error);
+      throw error;
+    }
+  }
+
+  // API call methods
   private async makeAlchemyCall(
     method: string,
     params: any[],
@@ -304,16 +346,72 @@ export class EnhancedScheduledPaymentService {
     }
   }
 
-  // Execute scheduled ETH payment
+  // Execute scheduled ETH payment with enhanced validation
   private async executeScheduledETHPayment(
     payment: ScheduledPayment,
     privateKey: string
   ): Promise<ScheduledPaymentExecution> {
+    const executedAt = new Date();
+
     try {
       console.log(`💎 Executing scheduled ETH payment: ${payment.scheduleId}`);
 
-      const wallet = new ethers.Wallet(privateKey, this.provider);
-      const amountInWei = ethers.parseEther(payment.amount);
+      // Validate and sanitize all inputs
+      const validatedPrivateKey = this.validateAndSanitize(
+        privateKey,
+        "string"
+      );
+      const validatedRecipient = this.validateAndSanitize(
+        payment.recipient,
+        "address"
+      );
+      const validatedAmount = this.validateAndSanitize(
+        payment.amount,
+        "string"
+      );
+      const validatedWalletAddress = this.validateAndSanitize(
+        payment.walletAddress,
+        "address"
+      );
+
+      // Validate private key format
+      if (
+        !validatedPrivateKey.startsWith("0x") &&
+        validatedPrivateKey.length === 64
+      ) {
+        // Add 0x prefix if missing
+        privateKey = "0x" + validatedPrivateKey;
+      } else if (
+        !validatedPrivateKey.startsWith("0x") ||
+        validatedPrivateKey.length !== 66
+      ) {
+        throw new Error("Invalid private key format");
+      }
+
+      // Validate amount can be parsed
+      const amountInWei = ethers.parseEther(validatedAmount);
+      if (amountInWei <= 0n) {
+        throw new Error("Invalid payment amount: must be greater than 0");
+      }
+
+      const wallet = new ethers.Wallet(validatedPrivateKey, this.provider);
+
+      // Verify wallet address matches
+      if (
+        wallet.address.toLowerCase() !== validatedWalletAddress.toLowerCase()
+      ) {
+        throw new Error("Private key does not match wallet address");
+      }
+
+      // Check ETH balance
+      const balance = await this.provider.getBalance(wallet.address);
+      if (balance < amountInWei) {
+        throw new Error(
+          `Insufficient ETH balance. Required: ${validatedAmount}, Available: ${ethers.formatEther(
+            balance
+          )}`
+        );
+      }
 
       // Get current gas settings
       const block = await this.provider.getBlock("latest");
@@ -327,7 +425,7 @@ export class EnhancedScheduledPaymentService {
 
       const gasEstimate = await this.provider.estimateGas({
         from: wallet.address,
-        to: payment.recipient,
+        to: validatedRecipient,
         value: amountInWei,
       });
 
@@ -337,7 +435,7 @@ export class EnhancedScheduledPaymentService {
       );
 
       const transaction = {
-        to: payment.recipient,
+        to: validatedRecipient,
         value: amountInWei,
         gasLimit: gasEstimate,
         maxFeePerGas: maxFeePerGas.toString(),
@@ -348,8 +446,8 @@ export class EnhancedScheduledPaymentService {
       };
 
       console.log(`📤 Sending ETH transaction:`, {
-        to: payment.recipient,
-        amount: payment.amount,
+        to: validatedRecipient,
+        amount: validatedAmount,
         gasLimit: gasEstimate.toString(),
       });
 
@@ -374,6 +472,7 @@ export class EnhancedScheduledPaymentService {
         gasUsed: receipt.gasUsed.toString(),
         blockNumber: receipt.blockNumber.toString(),
         explorerUrl: `https://etherscan.io/tx/${receipt.hash}`,
+        executedAt,
         actualGasCost,
       };
     } catch (error: any) {
@@ -384,38 +483,89 @@ export class EnhancedScheduledPaymentService {
       return {
         success: false,
         error: error.message || "Scheduled ETH payment failed",
+        executedAt,
       };
     }
   }
 
-  // Execute scheduled ERC20 payment
+  // Execute scheduled ERC20 payment with enhanced validation
   private async executeScheduledERC20Payment(
     payment: ScheduledPayment,
     privateKey: string
   ): Promise<ScheduledPaymentExecution> {
+    const executedAt = new Date();
+
     try {
       console.log(
         `🪙 Executing scheduled ERC20 payment: ${payment.scheduleId}`
       );
 
-      const wallet = new ethers.Wallet(privateKey, this.provider);
-      const tokenContract = new ethers.Contract(
+      // Validate and sanitize all inputs
+      const validatedPrivateKey = this.validateAndSanitize(
+        privateKey,
+        "string"
+      );
+      const validatedRecipient = this.validateAndSanitize(
+        payment.recipient,
+        "address"
+      );
+      const validatedAmount = this.validateAndSanitize(
+        payment.amount,
+        "string"
+      );
+      const validatedWalletAddress = this.validateAndSanitize(
+        payment.walletAddress,
+        "address"
+      );
+      const validatedContractAddress = this.validateAndSanitize(
         payment.contractAddress,
+        "address"
+      );
+
+      // Validate private key format
+      if (
+        !validatedPrivateKey.startsWith("0x") &&
+        validatedPrivateKey.length === 64
+      ) {
+        privateKey = "0x" + validatedPrivateKey;
+      } else if (
+        !validatedPrivateKey.startsWith("0x") ||
+        validatedPrivateKey.length !== 66
+      ) {
+        throw new Error("Invalid private key format");
+      }
+
+      const wallet = new ethers.Wallet(validatedPrivateKey, this.provider);
+
+      // Verify wallet address matches
+      if (
+        wallet.address.toLowerCase() !== validatedWalletAddress.toLowerCase()
+      ) {
+        throw new Error("Private key does not match wallet address");
+      }
+
+      const tokenContract = new ethers.Contract(
+        validatedContractAddress,
         ERC20_ABI,
         wallet
       );
 
       // Get token decimals
       const decimals = await tokenContract.decimals();
-      const amountInWei = ethers.parseUnits(payment.amount, decimals);
+      const amountInWei = ethers.parseUnits(validatedAmount, decimals);
+
+      if (amountInWei <= 0n) {
+        throw new Error("Invalid payment amount: must be greater than 0");
+      }
 
       // Check balance
       const balance = await tokenContract.balanceOf(wallet.address);
       if (BigInt(balance.toString()) < BigInt(amountInWei.toString())) {
         throw new Error(
-          `Insufficient token balance. Required: ${
-            payment.amount
-          }, Available: ${ethers.formatUnits(balance, decimals)}`
+          `Insufficient token balance. Required: ${validatedAmount}, Available: ${ethers.formatUnits(
+            balance,
+            decimals
+          )}`
         );
       }
 
@@ -430,7 +580,7 @@ export class EnhancedScheduledPaymentService {
         baseFeePerGas + priorityFee + baseFeePerGas / BigInt(4);
 
       const gasEstimate = await tokenContract.transfer.estimateGas(
-        payment.recipient,
+        validatedRecipient,
         amountInWei
       );
       const nonce = await this.provider.getTransactionCount(
@@ -439,7 +589,7 @@ export class EnhancedScheduledPaymentService {
       );
 
       const transaction = await tokenContract.transfer.populateTransaction(
-        payment.recipient,
+        validatedRecipient,
         amountInWei
       );
 
@@ -455,8 +605,8 @@ export class EnhancedScheduledPaymentService {
 
       console.log(`📤 Sending ERC20 transaction:`, {
         token: payment.tokenSymbol,
-        to: payment.recipient,
-        amount: payment.amount,
+        to: validatedRecipient,
+        amount: validatedAmount,
         gasLimit: gasEstimate.toString(),
       });
 
@@ -481,6 +631,7 @@ export class EnhancedScheduledPaymentService {
         gasUsed: receipt.gasUsed.toString(),
         blockNumber: receipt.blockNumber.toString(),
         explorerUrl: `https://etherscan.io/tx/${receipt.hash}`,
+        executedAt,
         actualGasCost,
       };
     } catch (error: any) {
@@ -491,6 +642,7 @@ export class EnhancedScheduledPaymentService {
       return {
         success: false,
         error: error.message || "Scheduled ERC20 payment failed",
+        executedAt,
       };
     }
   }
@@ -502,13 +654,50 @@ export class EnhancedScheduledPaymentService {
   ): Promise<ScheduledPaymentExecution> {
     console.log(`🚀 Executing scheduled payment: ${payment.scheduleId}`);
 
-    const isETH =
-      payment.contractAddress === "native" || payment.tokenSymbol === "ETH";
+    try {
+      // Validate payment data structure
+      if (!payment) {
+        throw new Error("Payment data is required");
+      }
 
-    if (isETH) {
-      return this.executeScheduledETHPayment(payment, privateKey);
-    } else {
-      return this.executeScheduledERC20Payment(payment, privateKey);
+      if (!payment.scheduleId) {
+        throw new Error("Schedule ID is required");
+      }
+
+      if (!payment.recipient) {
+        throw new Error("Recipient address is required");
+      }
+
+      if (!payment.amount) {
+        throw new Error("Payment amount is required");
+      }
+
+      if (!payment.walletAddress) {
+        throw new Error("Wallet address is required");
+      }
+
+      if (!privateKey) {
+        throw new Error("Private key is required");
+      }
+
+      const isETH =
+        payment.contractAddress === "native" ||
+        payment.tokenSymbol === "ETH" ||
+        !payment.contractAddress ||
+        payment.contractAddress.toLowerCase() === "native";
+
+      if (isETH) {
+        return this.executeScheduledETHPayment(payment, privateKey);
+      } else {
+        return this.executeScheduledERC20Payment(payment, privateKey);
+      }
+    } catch (error: any) {
+      console.error(`💥 Critical error in executeScheduledPayment:`, error);
+      return {
+        success: false,
+        error: error.message || "Critical execution error",
+        executedAt: new Date(),
+      };
     }
   }
 
