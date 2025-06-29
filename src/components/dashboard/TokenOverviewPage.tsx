@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenOverviewPage.tsx (ENHANCED WITH CHARTS AND FULL UI)
+// src/components/dashboard/TokenOverviewPage.tsx (ENHANCED WITH CHARTS AND FULL UI + TRANSACTION HISTORY)
 "use client";
 
 import { useEffect, useState } from "react";
@@ -20,9 +20,12 @@ import {
   BarChart3,
   RefreshCw,
   Calendar,
+  Activity,
+  MoreHorizontal,
 } from "lucide-react";
 import { RootState } from "@/store";
 import SimpleTransferModal from "@/components/transfer/SimpleTransferModal";
+import TransactionHistory from "@/components/transactions/TransactionHistory";
 
 interface TokenInfo {
   name: string;
@@ -221,6 +224,17 @@ export default function TokenOverviewPage() {
     });
 
     return `M ${points.join(" L ")}`;
+  };
+
+  const getContractAddressForTransactions = () => {
+    if (!tokenInfo) return undefined;
+
+    // For ETH, return undefined to get all transactions
+    if (tokenInfo.contractAddress === "native" || tokenInfo.symbol === "ETH") {
+      return undefined;
+    }
+
+    return tokenInfo.contractAddress;
   };
 
   if (loading) {
@@ -678,6 +692,28 @@ export default function TokenOverviewPage() {
           </div>
         </div>
 
+        {/* Transaction History - Mobile */}
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white font-satoshi">
+              <Activity size={20} className="inline mr-2" />
+              Transaction History
+            </h3>
+            <button className="text-gray-400 hover:text-white transition-colors">
+              <MoreHorizontal size={16} />
+            </button>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            <TransactionHistory
+              walletAddress={walletAddress}
+              tokenFilter={getContractAddressForTransactions()}
+              limit={20}
+              showFilter={false}
+              compact={true}
+            />
+          </div>
+        </div>
+
         {/* About Token - Mobile */}
         {tokenInfo.priceData?.description && (
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
@@ -1086,7 +1122,7 @@ export default function TokenOverviewPage() {
           </div>
         </div>
 
-        {/* Right Column - Portfolio */}
+        {/* Right Column - Portfolio and Transaction History */}
         <div className="w-[400px] flex-shrink-0 h-full">
           <div className="bg-black rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-6">
             {/* Portfolio Header */}
@@ -1165,48 +1201,28 @@ export default function TokenOverviewPage() {
               </div>
             </div>
 
-            {/* Price History Table - Desktop */}
-            {chartData && chartData.prices.length > 0 && (
-              <div className="flex-1 min-h-0 flex flex-col">
-                <h3 className="text-lg font-semibold text-white font-satoshi mb-4 flex-shrink-0">
-                  📊 Price History
+            {/* Transaction History - Desktop */}
+            <div className="flex-1 min-h-0 flex flex-col">
+              <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                <h3 className="text-lg font-semibold text-white font-satoshi">
+                  <Activity size={20} className="inline mr-2" />
+                  Transaction History
                 </h3>
-
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-hide">
-                  {chartData.prices
-                    .filter(
-                      (_, index) =>
-                        index %
-                          Math.max(
-                            1,
-                            Math.floor(chartData.prices.length / 12)
-                          ) ===
-                        0
-                    )
-                    .slice(-12)
-                    .map((point, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between py-2 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors flex-shrink-0"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-white font-medium text-sm font-satoshi">
-                            {point.date}
-                          </div>
-                          <div className="text-gray-400 text-xs font-satoshi">
-                            {point.time}
-                          </div>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className="text-white font-medium text-sm font-satoshi">
-                            {formatCurrency(point.price)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
+                <button className="text-gray-400 hover:text-white transition-colors">
+                  <MoreHorizontal size={16} />
+                </button>
               </div>
-            )}
+
+              <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
+                <TransactionHistory
+                  walletAddress={walletAddress}
+                  tokenFilter={getContractAddressForTransactions()}
+                  limit={50}
+                  showFilter={false}
+                  compact={true}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

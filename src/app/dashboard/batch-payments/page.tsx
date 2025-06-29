@@ -1,3 +1,4 @@
+// src/app/dashboard/batch-payments/page.tsx - UPDATED WITH REAL TRANSACTION HISTORY
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,6 +20,7 @@ import {
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import TransactionHistory from "@/components/transactions/TransactionHistory";
 
 interface BatchPayment {
   id: string;
@@ -33,89 +35,6 @@ interface BatchPayment {
   amount: string;
   usdValue: number;
 }
-
-interface Transaction {
-  id: string;
-  _id?: string;
-  username: string;
-  token: string;
-  amount: number;
-  date: string;
-  estimatedGas: number;
-  hash?: string;
-  status: "completed" | "pending" | "failed";
-  timestamp?: string;
-  transactionHash?: string;
-  direction?: "sent" | "received";
-  batchSize?: number;
-  amountFormatted?: string;
-  valueUSD?: number;
-  tokenSymbol?: string;
-  type?: string;
-}
-
-const mockTransactions: Transaction[] = [
-  {
-    id: "1",
-    username: "@theweb3guy",
-    token: "Ethereum",
-    amount: 300,
-    date: "4/20/2025",
-    estimatedGas: 2.34,
-    hash: "0x1234567890abcdef",
-    status: "completed",
-  },
-  {
-    id: "2",
-    username: "0xAD7a4hw64...R8J6153",
-    token: "USDT",
-    amount: 300,
-    date: "4/20/2025",
-    estimatedGas: 2.34,
-    hash: "0xabcdef1234567890",
-    status: "completed",
-  },
-  {
-    id: "3",
-    username: "@theweb3guy",
-    token: "Ethereum",
-    amount: 300,
-    date: "4/20/2025",
-    estimatedGas: 2.34,
-    hash: "0x1234567890abcdef",
-    status: "completed",
-  },
-  {
-    id: "4",
-    username: "0xAD7a4hw64...R8J6153",
-    token: "Solana",
-    amount: 300,
-    date: "4/20/2025",
-    estimatedGas: 2.34,
-    hash: "0xabcdef1234567890",
-    status: "completed",
-  },
-  {
-    id: "5",
-    username: "@theweb3guy",
-    token: "Polkadot",
-    amount: 300,
-    date: "4/20/2025",
-    estimatedGas: 2.34,
-    hash: "0x1234567890abcdef",
-    status: "completed",
-  },
-  {
-    id: "6",
-    username: "0xAD7a4hw64...R8J6153",
-    token: "XRP",
-    amount: 300,
-    date: "4/20/2025",
-    estimatedGas: 2.34,
-    hash: "0xabcdef1234567890",
-    status: "completed",
-  },
-];
 
 const getTokenIcon = (token: string) => {
   const icons: Record<string, { bg: string; symbol: string }> = {
@@ -673,71 +592,15 @@ export default function BatchPaymentsPage() {
           </div>
         )}
 
-        {/* Transaction History - Mobile */}
+        {/* UPDATED: Real Transaction History - Mobile */}
         <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          <h3 className="text-lg font-semibold text-white font-satoshi mb-4">
-            Recent Transactions
-          </h3>
-
-          <div className="space-y-3">
-            {mockTransactions.slice(0, 8).map((transaction) => {
-              const tokenIcon = getTokenIcon(transaction.token);
-              return (
-                <div
-                  key={transaction.id}
-                  className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 bg-gray-600 rounded-full mr-3 flex items-center justify-center">
-                        <span className="text-white text-sm">
-                          {transaction.username.startsWith("@")
-                            ? transaction.username[1].toUpperCase()
-                            : "0"}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="text-white font-medium text-sm font-satoshi">
-                          {transaction.username}
-                        </div>
-                        <div className="flex items-center mt-1">
-                          <div
-                            className={`w-4 h-4 ${tokenIcon.bg} rounded-full flex items-center justify-center mr-1`}
-                          >
-                            <span className="text-white text-xs font-bold">
-                              {tokenIcon.symbol}
-                            </span>
-                          </div>
-                          <span className="text-gray-400 text-xs font-satoshi">
-                            {transaction.token}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-white font-bold font-satoshi">
-                        ${transaction.amount}
-                      </div>
-                      <div className="text-gray-400 text-xs font-satoshi">
-                        {transaction.date}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-center space-x-3 pt-2 border-t border-[#2C2C2C]">
-                    <button className="text-[#E2AF19] text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center">
-                      <ExternalLink size={12} className="mr-1" />
-                      Explorer
-                    </button>
-                    <button className="text-[#E2AF19] text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center">
-                      <Hash size={12} className="mr-1" />
-                      Hash
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <TransactionHistory
+            walletAddress={activeWallet?.address}
+            limit={20}
+            title="Transaction History"
+            showRefresh={true}
+            className="min-h-0"
+          />
         </div>
       </div>
 
@@ -967,98 +830,19 @@ export default function BatchPaymentsPage() {
           )}
         </div>
 
-        {/* Transaction History */}
+        {/* UPDATED: Real Transaction History - Desktop */}
         <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-1 flex flex-col min-h-0">
-          <h2 className="text-lg font-semibold text-white font-satoshi mb-6">
-            Transaction History
-          </h2>
-
-          {/* Table Header */}
-          <div className="bg-[#0F0F0F] rounded-lg mb-2">
-            <div className="grid grid-cols-5 gap-2 px-3 py-3">
-              <div className="text-gray-400 text-sm font-satoshi text-left">
-                Username/Address
-              </div>
-              <div className="text-gray-400 text-sm font-satoshi text-left">
-                Token Name
-              </div>
-              <div className="text-gray-400 text-sm font-satoshi text-left">
-                Amount
-              </div>
-              <div className="text-gray-400 text-sm font-satoshi text-left">
-                Date
-              </div>
-              <div className="text-gray-400 text-sm font-satoshi text-center">
-                Actions
-              </div>
-            </div>
-          </div>
-
-          {/* Transaction List */}
-          <div className="flex-1 overflow-y-auto scrollbar-hide">
-            {mockTransactions.map((transaction, index) => {
-              const tokenIcon = getTokenIcon(transaction.token);
-              return (
-                <div key={transaction.id}>
-                  <div className="grid grid-cols-5 gap-2 items-center py-2 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors">
-                    <div className="flex items-center min-w-0">
-                      <div className="w-6 h-6 bg-gray-600 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
-                        <span className="text-white text-xs">
-                          {transaction.username.startsWith("@")
-                            ? transaction.username[1].toUpperCase()
-                            : "0"}
-                        </span>
-                      </div>
-                      <span className="text-white font-satoshi text-sm truncate">
-                        {transaction.username}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center min-w-0">
-                      <div
-                        className={`w-5 h-5 ${tokenIcon.bg} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
-                      >
-                        <span className="text-white text-xs font-bold">
-                          {tokenIcon.symbol}
-                        </span>
-                      </div>
-                      <span className="text-white font-satoshi text-sm truncate">
-                        {transaction.token}
-                      </span>
-                    </div>
-
-                    <div className="text-white font-satoshi text-sm">
-                      ${transaction.amount}
-                    </div>
-
-                    <div className="text-white font-satoshi text-sm">
-                      {transaction.date}
-                    </div>
-
-                    <div className="text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <button className="text-[#E2AF19] px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center">
-                          <ExternalLink size={10} className="mr-1" />
-                          Explorer
-                        </button>
-                        <button className="text-[#E2AF19] px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center">
-                          <Hash size={10} className="mr-1" />
-                          Hash
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {index < mockTransactions.length - 1 && (
-                    <div className="border-b border-[#2C2C2C] mx-3 my-1"></div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <TransactionHistory
+            walletAddress={activeWallet?.address}
+            limit={50}
+            title="Transaction History"
+            showRefresh={true}
+            className="flex-1 min-h-0"
+          />
         </div>
       </div>
 
+      {/* Modals remain the same... */}
       {/* Preview Modal */}
       {showPreview && preview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
