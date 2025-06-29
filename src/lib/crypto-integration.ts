@@ -480,7 +480,7 @@ export class CryptoIntegrationService {
       console.log(`🔍 Getting token info for contract: ${contractAddress}`);
 
       if (contractAddress === "native" || contractAddress === "ETH") {
-        // Handle ETH
+        // Handle ETH with proper icon URL
         const balance = await this.getETHBalance(walletAddress, useTestnet);
         const priceData = useTestnet
           ? null
@@ -500,11 +500,17 @@ export class CryptoIntegrationService {
             total_volume: 15000000000,
             description:
               "Ethereum is a decentralized platform for smart contracts.",
-            image: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+            // FIXED: Use proper ETH icon URL that matches what's in the token overview
+            image:
+              "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
+            homepage: "https://ethereum.org",
+            whitepaper: "https://ethereum.org/en/whitepaper/",
+            blockchain_site: "https://etherscan.io",
           },
         };
       }
 
+      // ... rest of existing method
       if (!this.isValidAddress(contractAddress)) {
         throw new Error(`Invalid contract address: ${contractAddress}`);
       }

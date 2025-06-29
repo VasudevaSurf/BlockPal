@@ -1,4 +1,4 @@
-// src/app/api/wallets/sync/route.ts (FIXED - Better Token Storage)
+// src/app/api/wallets/sync/route.ts - FIXED ETH ICON STORAGE
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { verifyToken } from "@/lib/auth";
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     console.log("🗑️ Cleared existing wallet tokens");
 
-    // Save ETH balance
+    // FIXED: Save ETH balance with proper icon URL
     const ethToken = {
       username: decoded.username,
       walletAddress,
@@ -67,8 +67,9 @@ export async function POST(request: NextRequest) {
       balanceFormatted: portfolioData.ethBalance.toFixed(6),
       decimals: 18,
       priceUSD: portfolioData.ethPriceUSD,
-      valueUSD: portfolioData.ethValueUSD,
+      valueUSD: portfolioData.ethValueUSD, // CRITICAL: Include USD value
       change24h: 0,
+      // FIXED: Use the correct ETH icon URL that matches token overview
       logoUrl:
         "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
       isFavorite: false,
@@ -77,11 +78,17 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection("wallet_tokens").insertOne(ethToken);
-    console.log("✅ Saved ETH token");
+    console.log(
+      "✅ Saved ETH token with value:",
+      portfolioData.ethValueUSD,
+      "and icon:",
+      ethToken.logoUrl
+    );
 
     // Save ERC-20 tokens if any
+    let tokenDocuments = [];
     if (portfolioData.tokens.length > 0) {
-      const tokenDocuments = portfolioData.tokens.map((token) => {
+      tokenDocuments = portfolioData.tokens.map((token) => {
         console.log("💾 Preparing token for storage:", {
           contractAddress: token.contractAddress,
           symbol: token.symbol,
@@ -89,6 +96,7 @@ export async function POST(request: NextRequest) {
           balanceFormatted: token.balanceFormatted,
           priceUSD: token.priceUSD,
           valueUSD: token.valueUSD,
+          logoUrl: token.logoUrl,
         });
 
         return {
@@ -101,9 +109,9 @@ export async function POST(request: NextRequest) {
           balanceFormatted: token.balanceFormatted || "0",
           decimals: token.decimals || 18,
           priceUSD: token.priceUSD || 0,
-          valueUSD: token.valueUSD || 0,
+          valueUSD: token.valueUSD || 0, // CRITICAL: Include USD value
           change24h: token.change24h || 0,
-          logoUrl: token.logoUrl || null,
+          logoUrl: token.logoUrl || null, // Keep original logoUrl from API
           isFavorite: false,
           isHidden: false,
           lastUpdated: new Date(),
@@ -145,16 +153,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // FIXED: Calculate total tokens including ETH
+    const totalTokens = 1 + portfolioData.tokens.length; // +1 for ETH
+
     console.log(
-      `✅ Synced ${portfolioData.tokens.length} tokens for wallet ${walletAddress}`
+      `✅ Synced ${totalTokens} tokens (including ETH) for wallet ${walletAddress}`
     );
 
     return NextResponse.json({
       success: true,
-      tokensCount: portfolioData.tokens.length + 1, // +1 for ETH
+      tokensCount: totalTokens,
       totalValue: portfolioData.totalValueUSD,
       ethBalance: portfolioData.ethBalance,
       ethValueUSD: portfolioData.ethValueUSD,
+      erc20TokensCount: portfolioData.tokens.length,
+      message: `Successfully synced ${totalTokens} tokens including ETH`,
     });
   } catch (error) {
     console.error("💥 Sync wallet tokens error:", error);

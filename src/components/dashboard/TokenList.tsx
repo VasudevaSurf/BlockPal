@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx (Production Ready)
+// src/components/dashboard/TokenList.tsx - FIXED VERSION WITH PROPER ICONS
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -22,6 +22,7 @@ export default function TokenList() {
     console.log("🪙 TokenList - Effect triggered", {
       activeWalletAddress: activeWallet?.address,
       tokensLoadedFor: tokensLoaded.current,
+      tokensLength: tokens.length,
       shouldFetch:
         activeWallet?.address && tokensLoaded.current !== activeWallet.address,
     });
@@ -45,6 +46,7 @@ export default function TokenList() {
       style: "currency",
       currency: "USD",
       minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
     }).format(value);
   };
 
@@ -53,9 +55,11 @@ export default function TokenList() {
     return `${sign}${value.toFixed(2)}%`;
   };
 
-  const getTokenIcon = (symbol: string) => {
+  // FIXED: Proper ETH icon handling and fallback colors
+  const getTokenIcon = (symbol: string, contractAddress?: string) => {
     const colors: Record<string, string> = {
       ETH: "bg-blue-500",
+      ETHEREUM: "bg-blue-500",
       SOL: "bg-purple-500",
       BTC: "bg-orange-500",
       SUI: "bg-cyan-500",
@@ -70,12 +74,23 @@ export default function TokenList() {
       LINK: "bg-blue-700",
     };
 
+    // Special handling for ETH/native token
+    if (
+      symbol === "ETH" ||
+      contractAddress === "native" ||
+      symbol === "ETHEREUM"
+    ) {
+      return colors.ETH || "bg-blue-500";
+    }
+
     return colors[symbol] || "bg-gray-500";
   };
 
-  const getTokenLetter = (symbol: string) => {
+  // FIXED: Proper ETH symbol handling
+  const getTokenLetter = (symbol: string, contractAddress?: string) => {
     const letters: Record<string, string> = {
       ETH: "Ξ",
+      ETHEREUM: "Ξ",
       SOL: "◎",
       BTC: "₿",
       SUI: "~",
@@ -90,7 +105,29 @@ export default function TokenList() {
       LINK: "⛓",
     };
 
+    // Special handling for ETH/native token
+    if (
+      symbol === "ETH" ||
+      contractAddress === "native" ||
+      symbol === "ETHEREUM"
+    ) {
+      return letters.ETH || "Ξ";
+    }
+
     return letters[symbol] || symbol.charAt(0);
+  };
+
+  // FIXED: Better icon URL validation
+  const isValidImageUrl = (url: string | null | undefined): boolean => {
+    if (!url || url === "null" || url === "undefined" || url === "") {
+      return false;
+    }
+    return (
+      url.startsWith("http") &&
+      (url.includes("coingecko") ||
+        url.includes("coinbase") ||
+        url.includes("cdn"))
+    );
   };
 
   const handleTokenClick = (token: any) => {
@@ -103,44 +140,34 @@ export default function TokenList() {
       activeWallet: activeWallet?.address,
     });
 
-    // Proper contract address handling with better error handling
-    let routeContractAddress: string;
-
     if (!activeWallet?.address) {
       console.error("❌ No active wallet found");
       alert("Please select an active wallet first.");
       return;
     }
 
-    if (token.contractAddress === "native" || token.symbol === "ETH") {
-      // For native ETH, use "ETH" as the route parameter
+    // FIXED: Better ETH/native token detection
+    let routeContractAddress: string;
+    if (
+      token.contractAddress === "native" ||
+      token.symbol === "ETH" ||
+      token.symbol === "ETHEREUM" ||
+      !token.contractAddress ||
+      token.contractAddress === "undefined" ||
+      token.contractAddress === ""
+    ) {
       routeContractAddress = "ETH";
       console.log("📍 Routing to ETH (native token)");
-    } else if (
-      token.contractAddress &&
-      token.contractAddress !== "undefined" &&
-      token.contractAddress !== ""
-    ) {
-      // For ERC-20 tokens, use the actual contract address
+    } else {
       routeContractAddress = token.contractAddress;
       console.log("📍 Routing to ERC-20 token:", routeContractAddress);
-    } else {
-      // Fallback: try to use token.id or show error
-      console.error("❌ Invalid contract address for token:", token);
-      alert(
-        `Unable to view details for ${token.symbol}. Contract address not available.`
-      );
-      return;
     }
 
     try {
-      // Navigate to token details page
       const url = `/dashboard/token/${encodeURIComponent(
         routeContractAddress
       )}?wallet=${encodeURIComponent(activeWallet.address)}`;
       console.log("🔗 Navigating to:", url);
-
-      // Use router.push with error handling
       router.push(url);
     } catch (error) {
       console.error("❌ Navigation error:", error);
@@ -148,7 +175,22 @@ export default function TokenList() {
     }
   };
 
-  // Only use real tokens from database
+  // Debug current tokens
+  useEffect(() => {
+    if (tokens.length > 0) {
+      console.log(
+        "🔍 Current tokens in TokenList:",
+        tokens.map((t) => ({
+          symbol: t.symbol,
+          balance: t.balance,
+          value: t.value,
+          icon: t.icon,
+          contractAddress: t.contractAddress,
+        }))
+      );
+    }
+  }, [tokens]);
+
   const displayTokens = tokens;
 
   if (loading && tokens.length === 0) {
@@ -156,7 +198,7 @@ export default function TokenList() {
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         <div className="flex items-center justify-between mb-4 lg:mb-6">
           <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
-            Token Holdings
+            Token Holdings ({tokens.length})
           </h2>
           <WalletRefreshButton />
         </div>
@@ -184,7 +226,7 @@ export default function TokenList() {
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         <div className="flex items-center justify-between mb-4 lg:mb-6">
           <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
-            Token Holdings
+            Token Holdings (0)
           </h2>
           <WalletRefreshButton />
         </div>
@@ -208,7 +250,7 @@ export default function TokenList() {
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         <div className="flex items-center justify-between mb-4 lg:mb-6">
           <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
-            Token Holdings
+            Token Holdings (0)
           </h2>
           <WalletRefreshButton />
         </div>
@@ -238,7 +280,7 @@ export default function TokenList() {
     <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between mb-4 lg:mb-6">
         <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
-          Token Holdings
+          Token Holdings ({displayTokens.length})
         </h2>
         <WalletRefreshButton />
       </div>
@@ -254,32 +296,41 @@ export default function TokenList() {
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
-                  {token.icon && token.icon.startsWith("http") ? (
+                  {/* FIXED: Better icon handling - check API icon first */}
+                  {isValidImageUrl(token.icon) ? (
                     <img
                       src={token.icon}
                       alt={token.symbol}
                       className="w-8 h-8 rounded-full mr-3 flex-shrink-0"
                       onError={(e) => {
+                        console.log(
+                          `❌ Image load failed for ${token.symbol}: ${token.icon}`
+                        );
                         // Fallback to colored circle if image fails
                         const target = e.target as HTMLImageElement;
                         target.style.display = "none";
-                        target.nextElementSibling?.classList.remove("hidden");
+                        const fallback =
+                          target.nextElementSibling as HTMLElement;
+                        if (fallback) {
+                          fallback.classList.remove("hidden");
+                        }
                       }}
                     />
                   ) : null}
+
                   <div
                     className={`w-8 h-8 ${getTokenIcon(
-                      token.symbol
+                      token.symbol,
+                      token.contractAddress
                     )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
-                      token.icon && token.icon.startsWith("http")
-                        ? "hidden"
-                        : ""
+                      isValidImageUrl(token.icon) ? "hidden" : ""
                     }`}
                   >
                     <span className="text-white text-sm font-medium">
-                      {getTokenLetter(token.symbol)}
+                      {getTokenLetter(token.symbol, token.contractAddress)}
                     </span>
                   </div>
+
                   <div className="min-w-0">
                     <div className="text-white font-medium font-satoshi">
                       {token.name}
@@ -317,33 +368,51 @@ export default function TokenList() {
               className="flex items-center justify-between p-3 hover:bg-[#1A1A1A] rounded-lg transition-colors cursor-pointer active:bg-[#2A2A2A]"
             >
               <div className="flex items-center min-w-0 flex-1">
-                {token.icon && token.icon.startsWith("http") ? (
+                {/* FIXED: Better icon handling - check API icon first */}
+                {isValidImageUrl(token.icon) ? (
                   <img
                     src={token.icon}
                     alt={token.symbol}
                     className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-3 flex-shrink-0"
                     onError={(e) => {
+                      console.log(
+                        `❌ Image load failed for ${token.symbol}: ${token.icon}`
+                      );
                       // Fallback to colored circle if image fails
                       const target = e.target as HTMLImageElement;
                       target.style.display = "none";
-                      target.nextElementSibling?.classList.remove("hidden");
+                      const fallback = target.nextElementSibling as HTMLElement;
+                      if (fallback) {
+                        fallback.classList.remove("hidden");
+                      }
                     }}
                   />
                 ) : null}
+
                 <div
                   className={`w-8 h-8 sm:w-10 sm:h-10 ${getTokenIcon(
-                    token.symbol
+                    token.symbol,
+                    token.contractAddress
                   )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
-                    token.icon && token.icon.startsWith("http") ? "hidden" : ""
+                    isValidImageUrl(token.icon) ? "hidden" : ""
                   }`}
                 >
                   <span className="text-white text-sm font-medium">
-                    {getTokenLetter(token.symbol)}
+                    {getTokenLetter(token.symbol, token.contractAddress)}
                   </span>
                 </div>
+
                 <div className="min-w-0 flex-1">
                   <div className="text-white font-medium font-satoshi text-sm sm:text-base flex items-center">
                     {token.name}
+                    {/* Debug indicator */}
+                    {process.env.NODE_ENV === "development" && (
+                      <span className="ml-2 text-xs text-gray-500">
+                        {token.contractAddress === "native"
+                          ? "(ETH)"
+                          : "(ERC20)"}
+                      </span>
+                    )}
                   </div>
                   <div className="text-gray-400 text-xs sm:text-sm font-satoshi">
                     {token.balance.toFixed(4)} {token.symbol}
