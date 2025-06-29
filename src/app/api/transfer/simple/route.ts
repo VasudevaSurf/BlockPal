@@ -1,8 +1,8 @@
-// src/app/api/transfer/simple/route.ts (FIXED - Updated with proper decryption)
+// src/app/api/transfer/simple/route.ts - UPDATED WITH ENHANCED API
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
-import { simpleTransferService } from "@/lib/simple-transfer-service";
+import { enhancedSimpleTransferService } from "@/lib/enhanced-simple-transfer-service";
 import crypto from "crypto";
 
 // FIXED: Updated decryption function that handles both old and new formats
@@ -178,10 +178,11 @@ export async function POST(request: NextRequest) {
       useStoredKey,
     } = body;
 
-    console.log("🔄 Simple transfer API request:", {
+    console.log("🔄 Enhanced Simple transfer API request:", {
       action,
       tokenSymbol: tokenInfo?.symbol,
       useStoredKey,
+      useEnhancedAPI: true,
     });
 
     // Validate required fields
@@ -193,14 +194,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate addresses
-    if (!simpleTransferService.isValidAddress(recipientAddress)) {
+    if (!enhancedSimpleTransferService.isValidAddress(recipientAddress)) {
       return NextResponse.json(
         { error: "Invalid recipient address" },
         { status: 400 }
       );
     }
 
-    if (!simpleTransferService.isValidAddress(fromAddress)) {
+    if (!enhancedSimpleTransferService.isValidAddress(fromAddress)) {
       return NextResponse.json(
         { error: "Invalid sender address" },
         { status: 400 }
@@ -214,29 +215,34 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "preview") {
-      // Create transfer preview
+      // Create transfer preview using enhanced API
       try {
-        const preview = await simpleTransferService.createTransferPreview(
-          tokenInfo,
-          fromAddress,
-          recipientAddress,
-          amount,
-          tokenPrice
-        );
+        console.log("📊 Creating enhanced transfer preview...");
+
+        const preview =
+          await enhancedSimpleTransferService.createTransferPreview(
+            tokenInfo,
+            fromAddress,
+            recipientAddress,
+            amount,
+            tokenPrice
+          );
+
+        console.log("✅ Enhanced preview created successfully");
 
         return NextResponse.json({
           success: true,
           preview,
         });
       } catch (error: any) {
-        console.error("❌ Preview creation error:", error);
+        console.error("❌ Enhanced preview creation error:", error);
         return NextResponse.json(
           { error: "Failed to create preview: " + error.message },
           { status: 500 }
         );
       }
     } else if (action === "execute") {
-      // Execute transfer
+      // Execute transfer using enhanced API
       let executionPrivateKey = privateKey;
 
       // If no private key provided or useStoredKey is true, try to get from database
@@ -277,7 +283,7 @@ export async function POST(request: NextRequest) {
 
           // Log the access for security audit
           console.log(
-            `🔑 Private key retrieved for transfer from wallet ${fromAddress} by user ${decoded.username}`
+            `🔑 Private key retrieved for enhanced transfer from wallet ${fromAddress} by user ${decoded.username}`
           );
 
           // Update last used timestamp
@@ -319,7 +325,9 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const result = await simpleTransferService.executeTransfer(
+        console.log("🚀 Executing enhanced transfer...");
+
+        const result = await enhancedSimpleTransferService.executeTransfer(
           tokenInfo,
           recipientAddress,
           amount,
@@ -327,46 +335,24 @@ export async function POST(request: NextRequest) {
         );
 
         if (result.success) {
-          console.log("✅ Transfer successful:", result.transactionHash);
-
-          // Calculate actual costs
-          if (result.gasUsed) {
-            const gasPrice = await simpleTransferService.getCurrentGasPrice();
-
-            let gasPriceWei: bigint;
-
-            if (typeof gasPrice === "string" || typeof gasPrice === "number") {
-              const gasPriceGwei = parseFloat(gasPrice.toString());
-              gasPriceWei = BigInt(Math.floor(gasPriceGwei * 1e9));
-            } else {
-              gasPriceWei = BigInt(gasPrice);
-            }
-
-            const actualCostETH = (
-              BigInt(result.gasUsed) * gasPriceWei
-            ).toString();
-
-            const actualCostInEther = parseFloat(actualCostETH) / 1e18;
-            const ethPriceUSD = 2000; // Get from price API
-            const actualCostUSD = actualCostInEther * ethPriceUSD;
-
-            result.actualCostETH = actualCostInEther.toFixed(8);
-            result.actualCostUSD = "$" + actualCostUSD.toFixed(2);
-          }
+          console.log(
+            "✅ Enhanced transfer successful:",
+            result.transactionHash
+          );
 
           return NextResponse.json({
             success: true,
             result,
           });
         } else {
-          console.error("❌ Transfer failed:", result.error);
+          console.error("❌ Enhanced transfer failed:", result.error);
           return NextResponse.json(
             { error: result.error || "Transfer execution failed" },
             { status: 500 }
           );
         }
       } catch (error: any) {
-        console.error("❌ Transfer execution error:", error);
+        console.error("❌ Enhanced transfer execution error:", error);
         return NextResponse.json(
           { error: "Transfer execution failed: " + error.message },
           { status: 500 }
@@ -379,7 +365,7 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error: any) {
-    console.error("💥 Simple transfer API error:", error);
+    console.error("💥 Enhanced Simple transfer API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
