@@ -1,4 +1,4 @@
-// src/app/api/transfer/simple/route.ts - UPDATED WITH ENHANCED API
+// src/app/api/transfer/simple/route.ts - FIXED: activeWallet reference error
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -183,12 +183,24 @@ export async function POST(request: NextRequest) {
       tokenSymbol: tokenInfo?.symbol,
       useStoredKey,
       useEnhancedAPI: true,
+      fromAddress: fromAddress?.slice(0, 10) + "...", // FIXED: Log fromAddress for debugging
     });
 
     // Validate required fields
     if (!action || !tokenInfo || !recipientAddress || !amount) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        {
+          error:
+            "Missing required fields: action, tokenInfo, recipientAddress, amount",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate fromAddress separately for better error messaging
+    if (!fromAddress) {
+      return NextResponse.json(
+        { error: "Missing fromAddress parameter" },
         { status: 400 }
       );
     }
@@ -340,52 +352,55 @@ export async function POST(request: NextRequest) {
             result.transactionHash
           );
 
-          // Save transaction to database
+          // FIXED: Save transaction to database directly using transactionService
           try {
-            const saveResult = await fetch("/api/transactions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                action: "save_simple",
-                transactionData: {
-                  transactionHash: result.transactionHash,
-                  senderUsername: decoded.username,
-                  senderWallet: activeWallet.address,
-                  receiverWallet: recipientAddress,
-                  type:
-                    tokenInfo.isETH || tokenInfo.contractAddress === "native"
-                      ? "simple_eth"
-                      : "simple_erc20",
-                  category: "regular",
-                  direction: "sent",
-                  tokenSymbol: tokenInfo.symbol,
-                  contractAddress: tokenInfo.contractAddress,
-                  amount: amount,
-                  amountFormatted: `${amount} ${tokenInfo.symbol}`,
-                  valueUSD: tokenPrice
-                    ? parseFloat(amount) * tokenPrice
-                    : undefined,
-                  gasUsed: result.gasUsed?.toString(),
-                  gasFeeETH: result.actualCostETH,
-                  status: "confirmed",
-                  explorerLink: result.explorerUrl,
-                  blockNumber: result.blockNumber,
-                  actualCostETH: result.actualCostETH,
-                  actualCostUSD: result.actualCostUSD,
-                },
-              }),
-              credentials: "include",
-            });
+            const { transactionService } = await import(
+              "@/lib/transaction-service"
+            );
 
-            if (saveResult.ok) {
+            const transactionData = {
+              transactionHash: result.transactionHash,
+              senderUsername: decoded.username,
+              senderWallet: fromAddress,
+              receiverWallet: recipientAddress,
+              type:
+                tokenInfo.isETH || tokenInfo.contractAddress === "native"
+                  ? "simple_eth"
+                  : "simple_erc20",
+              category: "regular",
+              direction: "sent",
+              tokenSymbol: tokenInfo.symbol,
+              contractAddress: tokenInfo.contractAddress,
+              amount: amount,
+              amountFormatted: `${amount} ${tokenInfo.symbol}`,
+              valueUSD: tokenPrice
+                ? parseFloat(amount) * tokenPrice
+                : undefined,
+              gasUsed: result.gasUsed?.toString(),
+              gasFeeETH: result.actualCostETH,
+              status: "confirmed",
+              explorerLink: result.explorerUrl,
+              blockNumber: result.blockNumber,
+              actualCostETH: result.actualCostETH,
+              actualCostUSD: result.actualCostUSD,
+            };
+
+            const saveResult = await transactionService.saveSimpleTransaction(
+              transactionData,
+              decoded.username
+            );
+
+            if (saveResult.success) {
               console.log("✅ Transaction saved to database");
             } else {
-              console.warn("⚠️ Failed to save transaction to database");
+              console.warn(
+                "⚠️ Failed to save transaction to database:",
+                saveResult.error
+              );
             }
           } catch (saveError) {
             console.error("❌ Error saving transaction:", saveError);
+            // Don't fail the whole transaction for this
           }
 
           return NextResponse.json({

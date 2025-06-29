@@ -1,74 +1,82 @@
 // src/lib/transaction-service.ts
 import { connectToDatabase } from "./mongodb";
 
-export interface TransactionData {
-  transactionHash: string;
+export interface SimpleTransactionData {
+  transactionHash?: string;
   senderUsername: string;
   senderWallet: string;
   receiverWallet: string;
-  receiverUsername?: string;
-  type:
-    | "simple_eth"
-    | "simple_erc20"
-    | "batch_eth"
-    | "batch_erc20"
-    | "batch_mixed";
-  category: "regular" | "scheduled" | "friend" | "fund_request";
-  direction: "sent" | "received";
+  type: string;
+  category: string;
+  direction: string;
   tokenSymbol: string;
-  contractAddress?: string;
+  contractAddress: string;
   amount: string;
-  amountFormatted?: string;
+  amountFormatted: string;
   valueUSD?: number;
-  batchSize?: number;
-  isFriendTransaction?: boolean;
   gasUsed?: string;
   gasFeeETH?: string;
-  status: "pending" | "confirmed" | "failed";
+  status: string;
   explorerLink?: string;
   blockNumber?: number;
   actualCostETH?: string;
   actualCostUSD?: string;
 }
 
+export interface BatchTransactionData {
+  transactionHash?: string;
+  senderUsername: string;
+  senderWallet: string;
+  transferMode: string;
+  totalTransfers: number;
+  totalValueUSD: number;
+  gasUsed?: number;
+  blockNumber?: number;
+  actualCostETH?: string;
+  actualCostUSD?: string;
+  explorerUrl?: string;
+  transfers: Array<{
+    recipient: string;
+    tokenSymbol: string;
+    contractAddress: string;
+    amount: string;
+    usdValue: number;
+  }>;
+}
+
+export interface TransactionFilter {
+  type?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+  walletAddress?: string;
+}
+
 export class TransactionService {
-  // Save a simple transfer transaction
-  static async saveSimpleTransaction(
-    transactionData: TransactionData,
+  // Save simple transaction
+  async saveSimpleTransaction(
+    transactionData: SimpleTransactionData,
     username: string
   ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     try {
-      console.log("💾 Saving simple transaction to database...", {
-        hash: transactionData.transactionHash,
-        type: transactionData.type,
-        amount: transactionData.amount,
-        token: transactionData.tokenSymbol,
-      });
-
       const { db } = await connectToDatabase();
 
       const transaction = {
         ...transactionData,
-        senderUsername: username,
+        username,
         timestamp: new Date(),
-        confirmedAt: transactionData.status === "confirmed" ? new Date() : null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
       const result = await db.collection("transactions").insertOne(transaction);
 
-      console.log(
-        "✅ Simple transaction saved successfully:",
-        result.insertedId
-      );
-
       return {
         success: true,
         transactionId: result.insertedId.toString(),
       };
     } catch (error: any) {
-      console.error("❌ Error saving simple transaction:", error);
+      console.error("Error saving simple transaction:", error);
       return {
         success: false,
         error: error.message || "Failed to save transaction",
@@ -76,123 +84,33 @@ export class TransactionService {
     }
   }
 
-  // Save a batch transfer transaction
-  static async saveBatchTransaction(
-    batchData: {
-      transactionHash: string;
-      senderUsername: string;
-      senderWallet: string;
-      transferMode: "BATCH" | "MIXED";
-      totalTransfers: number;
-      totalValueUSD: number;
-      gasUsed?: number;
-      blockNumber?: number;
-      actualCostETH?: string;
-      actualCostUSD?: string;
-      explorerUrl?: string;
-      transfers: Array<{
-        recipient: string;
-        tokenSymbol: string;
-        contractAddress: string;
-        amount: string;
-        usdValue: number;
-      }>;
-    },
+  // Save batch transaction
+  async saveBatchTransaction(
+    batchData: BatchTransactionData,
     username: string
   ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     try {
-      console.log("💾 Saving batch transaction to database...", {
-        hash: batchData.transactionHash,
-        mode: batchData.transferMode,
-        transfers: batchData.totalTransfers,
-        totalValue: batchData.totalValueUSD,
-      });
-
       const { db } = await connectToDatabase();
 
-      // Determine transaction type based on transfer mode and tokens
-      let transactionType: string;
-      const uniqueTokens = new Set(
-        batchData.transfers.map((t) => t.contractAddress)
-      );
-
-      if (batchData.transferMode === "MIXED") {
-        transactionType = "batch_mixed";
-      } else if (uniqueTokens.size === 1) {
-        const isETH =
-          batchData.transfers[0].contractAddress === "native" ||
-          batchData.transfers[0].tokenSymbol === "ETH";
-        transactionType = isETH ? "batch_eth" : "batch_erc20";
-      } else {
-        transactionType = "batch_mixed";
-      }
-
-      // Create summary of tokens and amounts
-      const tokenSummary = batchData.transfers.reduce((acc, transfer) => {
-        const key = transfer.tokenSymbol;
-        if (acc[key]) {
-          acc[key].amount += parseFloat(transfer.amount);
-          acc[key].count += 1;
-        } else {
-          acc[key] = {
-            amount: parseFloat(transfer.amount),
-            count: 1,
-            contractAddress: transfer.contractAddress,
-          };
-        }
-        return acc;
-      }, {} as Record<string, any>);
-
       const transaction = {
-        transactionHash: batchData.transactionHash,
-        senderUsername: username,
-        senderWallet: batchData.senderWallet,
-        receiverWallet: "multiple", // Batch has multiple receivers
-        type: transactionType,
-        category: "regular" as const,
-        direction: "sent" as const,
-        tokenSymbol: Object.keys(tokenSummary).join(", "), // Multiple tokens summary
-        contractAddress:
-          batchData.transferMode === "BATCH"
-            ? batchData.transfers[0].contractAddress
-            : "multiple",
-        amount: batchData.totalValueUSD.toString(),
-        amountFormatted: `$${batchData.totalValueUSD.toFixed(2)}`,
-        valueUSD: batchData.totalValueUSD,
-        batchSize: batchData.totalTransfers,
-        gasUsed: batchData.gasUsed?.toString(),
-        gasFeeETH: batchData.actualCostETH,
-        status: "confirmed" as const,
-        explorerLink: batchData.explorerUrl,
-        blockNumber: batchData.blockNumber,
-        actualCostETH: batchData.actualCostETH,
-        actualCostUSD: batchData.actualCostUSD,
-
-        // Batch-specific fields
-        transferMode: batchData.transferMode,
-        totalTransfers: batchData.totalTransfers,
-        tokenSummary,
-        transfers: batchData.transfers,
-
+        ...batchData,
+        username,
+        type: "batch",
+        category: "batch_transfer",
+        direction: "sent",
         timestamp: new Date(),
-        confirmedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
       const result = await db.collection("transactions").insertOne(transaction);
 
-      console.log(
-        "✅ Batch transaction saved successfully:",
-        result.insertedId
-      );
-
       return {
         success: true,
         transactionId: result.insertedId.toString(),
       };
     } catch (error: any) {
-      console.error("❌ Error saving batch transaction:", error);
+      console.error("Error saving batch transaction:", error);
       return {
         success: false,
         error: error.message || "Failed to save batch transaction",
@@ -200,16 +118,10 @@ export class TransactionService {
     }
   }
 
-  // Get transactions for a user
-  static async getUserTransactions(
+  // Get user transactions
+  async getUserTransactions(
     username: string,
-    filters?: {
-      type?: string;
-      status?: string;
-      limit?: number;
-      offset?: number;
-      walletAddress?: string;
-    }
+    filter: TransactionFilter = {}
   ): Promise<{
     success: boolean;
     transactions?: any[];
@@ -217,45 +129,38 @@ export class TransactionService {
     error?: string;
   }> {
     try {
-      console.log("🔍 Fetching user transactions...", { username, filters });
-
       const { db } = await connectToDatabase();
 
-      // Build query
-      const query: any = {
-        $or: [{ senderUsername: username }, { receiverUsername: username }],
-      };
+      const query: any = { username };
 
-      if (filters?.type) {
-        query.type = filters.type;
+      if (filter.type) {
+        query.type = filter.type;
       }
 
-      if (filters?.status) {
-        query.status = filters.status;
+      if (filter.status) {
+        query.status = filter.status;
       }
 
-      if (filters?.walletAddress) {
+      if (filter.walletAddress) {
         query.$or = [
-          { senderWallet: filters.walletAddress },
-          { receiverWallet: filters.walletAddress },
+          { senderWallet: filter.walletAddress },
+          { receiverWallet: filter.walletAddress },
         ];
       }
 
-      // Get total count
-      const total = await db.collection("transactions").countDocuments(query);
+      const limit = filter.limit || 50;
+      const offset = filter.offset || 0;
 
-      // Get transactions with pagination
-      const transactions = await db
-        .collection("transactions")
-        .find(query)
-        .sort({ timestamp: -1 })
-        .limit(filters?.limit || 50)
-        .skip(filters?.offset || 0)
-        .toArray();
-
-      console.log(
-        `✅ Found ${transactions.length} transactions (total: ${total})`
-      );
+      const [transactions, total] = await Promise.all([
+        db
+          .collection("transactions")
+          .find(query)
+          .sort({ timestamp: -1 })
+          .skip(offset)
+          .limit(limit)
+          .toArray(),
+        db.collection("transactions").countDocuments(query),
+      ]);
 
       return {
         success: true,
@@ -263,16 +168,16 @@ export class TransactionService {
         total,
       };
     } catch (error: any) {
-      console.error("❌ Error fetching user transactions:", error);
+      console.error("Error getting user transactions:", error);
       return {
         success: false,
-        error: error.message || "Failed to fetch transactions",
+        error: error.message || "Failed to get transactions",
       };
     }
   }
 
-  // Get transactions for a specific token
-  static async getTokenTransactions(
+  // Get token transactions
+  async getTokenTransactions(
     username: string,
     contractAddress: string,
     walletAddress?: string
@@ -282,92 +187,40 @@ export class TransactionService {
     error?: string;
   }> {
     try {
-      console.log("🔍 Fetching token transactions...", {
-        username,
-        contractAddress,
-        walletAddress,
-      });
-
       const { db } = await connectToDatabase();
 
       const query: any = {
-        $or: [{ senderUsername: username }, { receiverUsername: username }],
-        $and: [
-          {
-            $or: [
-              { contractAddress: contractAddress },
-              { "transfers.contractAddress": contractAddress }, // For batch transactions
-            ],
-          },
-        ],
+        username,
+        contractAddress,
       };
 
       if (walletAddress) {
-        query.$and.push({
-          $or: [
-            { senderWallet: walletAddress },
-            { receiverWallet: walletAddress },
-          ],
-        });
+        query.$or = [
+          { senderWallet: walletAddress },
+          { receiverWallet: walletAddress },
+        ];
       }
 
       const transactions = await db
         .collection("transactions")
         .find(query)
         .sort({ timestamp: -1 })
-        .limit(20)
+        .limit(100)
         .toArray();
-
-      console.log(`✅ Found ${transactions.length} token transactions`);
 
       return {
         success: true,
         transactions,
       };
     } catch (error: any) {
-      console.error("❌ Error fetching token transactions:", error);
+      console.error("Error getting token transactions:", error);
       return {
         success: false,
-        error: error.message || "Failed to fetch token transactions",
-      };
-    }
-  }
-
-  // Update transaction status
-  static async updateTransactionStatus(
-    transactionHash: string,
-    status: "pending" | "confirmed" | "failed",
-    additionalData?: any
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { db } = await connectToDatabase();
-
-      const updateData: any = {
-        status,
-        updatedAt: new Date(),
-      };
-
-      if (status === "confirmed") {
-        updateData.confirmedAt = new Date();
-      }
-
-      if (additionalData) {
-        Object.assign(updateData, additionalData);
-      }
-
-      const result = await db
-        .collection("transactions")
-        .updateOne({ transactionHash }, { $set: updateData });
-
-      return { success: result.modifiedCount > 0 };
-    } catch (error: any) {
-      console.error("❌ Error updating transaction status:", error);
-      return {
-        success: false,
-        error: error.message || "Failed to update transaction status",
+        error: error.message || "Failed to get token transactions",
       };
     }
   }
 }
 
-export const transactionService = TransactionService;
+// Export singleton instance
+export const transactionService = new TransactionService();

@@ -1,4 +1,3 @@
-// src/components/dashboard/TokenOverviewPage.tsx (ENHANCED WITH CHARTS AND FULL UI + TRANSACTION HISTORY)
 "use client";
 
 import { useEffect, useState } from "react";
@@ -74,8 +73,6 @@ export default function TokenOverviewPage() {
   const [selectedTimeframe, setSelectedTimeframe] = useState(7);
   const [copied, setCopied] = useState<string>("");
   const [transferModalOpen, setTransferModalOpen] = useState(false);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [transactionsLoading, setTransactionsLoading] = useState(false);
 
   const contractAddress = params.tokenId as string;
   const walletAddress = searchParams.get("wallet") || activeWallet?.address;
@@ -226,15 +223,30 @@ export default function TokenOverviewPage() {
     return `M ${points.join(" L ")}`;
   };
 
-  const getContractAddressForTransactions = () => {
+  // FIXED: Proper token filter for transaction history
+  const getTokenFilterForTransactions = () => {
     if (!tokenInfo) return undefined;
 
-    // For ETH, return undefined to get all transactions
+    // For ETH (native token), use "ETH" as the filter instead of contract address
     if (tokenInfo.contractAddress === "native" || tokenInfo.symbol === "ETH") {
-      return undefined;
+      return "ETH"; // This will filter for ETH transactions specifically
     }
 
+    // For ERC20 tokens, use the contract address
     return tokenInfo.contractAddress;
+  };
+
+  // FIXED: Get transaction type filter
+  const getTransactionTypeFilter = () => {
+    if (!tokenInfo) return undefined;
+
+    // For ETH, filter by ETH transaction types
+    if (tokenInfo.contractAddress === "native" || tokenInfo.symbol === "ETH") {
+      return "simple_eth"; // This will show only ETH transactions
+    }
+
+    // For ERC20 tokens, filter by ERC20 transaction types
+    return "simple_erc20"; // This will show only ERC20 transactions
   };
 
   if (loading) {
@@ -697,7 +709,7 @@ export default function TokenOverviewPage() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-white font-satoshi">
               <Activity size={20} className="inline mr-2" />
-              Transaction History
+              {tokenInfo.symbol} Transaction History
             </h3>
             <button className="text-gray-400 hover:text-white transition-colors">
               <MoreHorizontal size={16} />
@@ -706,10 +718,12 @@ export default function TokenOverviewPage() {
           <div className="max-h-64 overflow-y-auto">
             <TransactionHistory
               walletAddress={walletAddress}
-              tokenFilter={getContractAddressForTransactions()}
+              tokenFilter={getTokenFilterForTransactions()} // FIXED: Use proper token filter
+              transactionTypeFilter={getTransactionTypeFilter()} // FIXED: Add transaction type filter
               limit={20}
               showFilter={false}
               compact={true}
+              className="min-h-0"
             />
           </div>
         </div>
@@ -1122,7 +1136,6 @@ export default function TokenOverviewPage() {
           </div>
         </div>
 
-        {/* Right Column - Portfolio and Transaction History */}
         <div className="w-[400px] flex-shrink-0 h-full">
           <div className="bg-black rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-6">
             {/* Portfolio Header */}
@@ -1201,12 +1214,12 @@ export default function TokenOverviewPage() {
               </div>
             </div>
 
-            {/* Transaction History - Desktop */}
+            {/* FIXED: Transaction History - Desktop with proper filtering */}
             <div className="flex-1 min-h-0 flex flex-col">
               <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <h3 className="text-lg font-semibold text-white font-satoshi">
                   <Activity size={20} className="inline mr-2" />
-                  Transaction History
+                  {tokenInfo.symbol} Transactions
                 </h3>
                 <button className="text-gray-400 hover:text-white transition-colors">
                   <MoreHorizontal size={16} />
@@ -1216,10 +1229,12 @@ export default function TokenOverviewPage() {
               <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
                 <TransactionHistory
                   walletAddress={walletAddress}
-                  tokenFilter={getContractAddressForTransactions()}
+                  tokenFilter={getTokenFilterForTransactions()} // FIXED: Use proper token filter
+                  transactionTypeFilter={getTransactionTypeFilter()} // FIXED: Add transaction type filter
                   limit={50}
                   showFilter={false}
                   compact={true}
+                  className="flex-1 min-h-0"
                 />
               </div>
             </div>

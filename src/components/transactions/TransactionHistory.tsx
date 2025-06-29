@@ -1,4 +1,4 @@
-// src/components/transactions/TransactionHistory.tsx
+// src/components/transactions/TransactionHistory.tsx - FIXED: Batch transaction display
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,6 +9,7 @@ import {
   Copy,
   Calendar,
   Clock,
+  Users,
 } from "lucide-react";
 
 interface Transaction {
@@ -18,24 +19,43 @@ interface Transaction {
   hash?: string;
   direction?: "sent" | "received";
   type?: string;
+  category?: string;
   tokenSymbol?: string;
   token?: string;
   amount?: string | number;
   amountFormatted?: string;
   valueUSD?: number;
   batchSize?: number;
+  transferMode?: string;
+  totalTransfers?: number; // FIXED: Add totalTransfers for batch
+  totalValueUSD?: number; // FIXED: Add totalValueUSD for batch
   timestamp?: string;
   date?: string;
   status?: string;
   username?: string;
+  contractAddress?: string;
+  senderWallet?: string;
+  receiverWallet?: string;
+  // FIXED: Add transfers array for batch transactions
+  transfers?: Array<{
+    recipient: string;
+    tokenSymbol: string;
+    contractAddress: string;
+    amount: string;
+    usdValue: number;
+  }>;
 }
 
 interface TransactionHistoryProps {
   walletAddress?: string;
   contractAddress?: string;
+  tokenFilter?: string;
+  transactionTypeFilter?: string;
   limit?: number;
   title?: string;
   showRefresh?: boolean;
+  showFilter?: boolean;
+  compact?: boolean;
   className?: string;
 }
 
@@ -56,12 +76,60 @@ const getTokenIcon = (token: string) => {
   return icons[token] || { bg: "bg-gray-500", symbol: "?" };
 };
 
+// FIXED: Helper function to extract batch transaction info
+const getBatchTransactionInfo = (tx: Transaction) => {
+  if (tx.type === "batch" || tx.category === "batch_transfer" || tx.transfers) {
+    // Count unique tokens in the batch
+    const uniqueTokens = new Set(tx.transfers?.map((t) => t.tokenSymbol) || []);
+    const tokenCount = uniqueTokens.size;
+    const transferCount = tx.totalTransfers || tx.transfers?.length || 0;
+    const totalValue =
+      tx.totalValueUSD ||
+      tx.transfers?.reduce((sum, t) => sum + t.usdValue, 0) ||
+      0;
+
+    if (tokenCount === 1) {
+      // Single token batch
+      const tokenSymbol = Array.from(uniqueTokens)[0] || "Unknown";
+      return {
+        isBatch: true,
+        displaySymbol: tokenSymbol,
+        displayAmount: `${transferCount} transfers`,
+        displayValue: totalValue,
+        batchInfo: `${transferCount} ${tokenSymbol} transfers`,
+      };
+    } else if (tokenCount > 1) {
+      // Multi-token batch
+      return {
+        isBatch: true,
+        displaySymbol: "MIXED",
+        displayAmount: `${transferCount} transfers`,
+        displayValue: totalValue,
+        batchInfo: `${transferCount} transfers (${tokenCount} tokens)`,
+      };
+    }
+  }
+
+  return {
+    isBatch: false,
+    displaySymbol: tx.tokenSymbol || tx.token || "Unknown",
+    displayAmount:
+      typeof tx.amount === "string" ? tx.amount : `${tx.amount || "0"}`,
+    displayValue: tx.valueUSD || 0,
+    batchInfo: null,
+  };
+};
+
 export default function TransactionHistory({
   walletAddress,
   contractAddress,
+  tokenFilter,
+  transactionTypeFilter,
   limit = 20,
   title = "Transaction History",
   showRefresh = true,
+  showFilter = true,
+  compact = false,
   className = "",
 }: TransactionHistoryProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -70,10 +138,10 @@ export default function TransactionHistory({
 
   useEffect(() => {
     fetchTransactions();
-  }, [walletAddress, contractAddress]);
+  }, [walletAddress, contractAddress, tokenFilter, transactionTypeFilter]);
 
   const fetchTransactions = async () => {
-    if (!walletAddress && !contractAddress) return;
+    if (!walletAddress) return;
 
     try {
       setLoading(true);
@@ -81,16 +149,26 @@ export default function TransactionHistory({
       let url = "/api/transactions";
       const params = new URLSearchParams();
 
+      params.append("walletAddress", walletAddress);
+      params.append("limit", limit.toString());
+
       if (contractAddress) {
         url = "/api/transactions/token";
         params.append("contractAddress", contractAddress);
+      } else if (tokenFilter) {
+        if (tokenFilter === "ETH") {
+          params.append("type", "simple_eth");
+        } else {
+          url = "/api/transactions/token";
+          params.append("contractAddress", tokenFilter);
+        }
       }
 
-      if (walletAddress) {
-        params.append("walletAddress", walletAddress);
+      if (transactionTypeFilter && !contractAddress && tokenFilter !== "ETH") {
+        params.append("type", transactionTypeFilter);
       }
 
-      params.append("limit", limit.toString());
+      console.log(`🔍 Fetching transactions: ${url}?${params.toString()}`);
 
       const response = await fetch(`${url}?${params.toString()}`, {
         credentials: "include",
@@ -98,10 +176,63 @@ export default function TransactionHistory({
 
       if (response.ok) {
         const data = await response.json();
-        setTransactions(data.transactions || []);
+        let fetchedTransactions = data.transactions || [];
+
+        if (tokenFilter) {
+          fetchedTransactions = fetchedTransactions.filter(
+            (tx: Transaction) => {
+              if (tokenFilter === "ETH") {
+                return (
+                  tx.tokenSymbol === "ETH" ||
+                  tx.token === "ETH" ||
+                  tx.type === "simple_eth" ||
+                  tx.contractAddress === "native" ||
+                  (!tx.contractAddress &&
+                    (tx.tokenSymbol === "ETH" || tx.token === "ETH"))
+                );
+              }
+
+              return (
+                tx.contractAddress === tokenFilter ||
+                tx.tokenSymbol === tokenFilter ||
+                tx.token === tokenFilter
+              );
+            }
+          );
+        }
+
+        if (transactionTypeFilter) {
+          fetchedTransactions = fetchedTransactions.filter(
+            (tx: Transaction) => {
+              if (transactionTypeFilter === "batch") {
+                return (
+                  tx.type === "batch" ||
+                  tx.category === "batch_transfer" ||
+                  tx.batchSize > 0 ||
+                  tx.transferMode === "BATCH" ||
+                  tx.transferMode === "MIXED" ||
+                  tx.transfers?.length > 0
+                );
+              }
+
+              return tx.type === transactionTypeFilter;
+            }
+          );
+        }
+
+        if (walletAddress) {
+          fetchedTransactions = fetchedTransactions.filter(
+            (tx: Transaction) =>
+              tx.senderWallet?.toLowerCase() === walletAddress.toLowerCase() ||
+              tx.receiverWallet?.toLowerCase() === walletAddress.toLowerCase()
+          );
+        }
+
+        setTransactions(fetchedTransactions);
         console.log(
-          "✅ Transaction history fetched:",
-          data.transactions?.length || 0
+          `✅ Transaction history fetched: ${
+            fetchedTransactions.length
+          } transactions for ${tokenFilter || "all tokens"}`
         );
       } else {
         console.error("❌ Failed to fetch transaction history");
@@ -139,9 +270,24 @@ export default function TransactionHistory({
     }
   };
 
+  const getTransactionDirection = (tx: Transaction): "sent" | "received" => {
+    if (tx.direction) return tx.direction;
+
+    if (walletAddress) {
+      if (tx.senderWallet?.toLowerCase() === walletAddress.toLowerCase()) {
+        return "sent";
+      } else if (
+        tx.receiverWallet?.toLowerCase() === walletAddress.toLowerCase()
+      ) {
+        return "received";
+      }
+    }
+
+    return "sent";
+  };
+
   return (
     <div className={`flex flex-col min-h-0 ${className}`}>
-      {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h3 className="text-lg font-semibold text-white font-satoshi">
           {title}
@@ -157,7 +303,13 @@ export default function TransactionHistory({
         )}
       </div>
 
-      {/* Transaction List */}
+      {(tokenFilter || transactionTypeFilter) && !compact && (
+        <div className="mb-4 text-sm text-gray-400 font-satoshi">
+          Showing {tokenFilter || "all"} transactions
+          {transactionTypeFilter && ` (${transactionTypeFilter})`}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {loading ? (
           <div className="flex items-center justify-center py-8">
@@ -172,14 +324,17 @@ export default function TransactionHistory({
               <Calendar size={20} className="text-gray-400" />
             </div>
             <p className="text-gray-400 text-sm font-satoshi">
-              No transactions found
+              No {tokenFilter ? `${tokenFilter} ` : ""}transactions found
             </p>
           </div>
         ) : (
           <div className="space-y-2">
             {transactions.map((tx, index) => {
-              const tokenIcon = getTokenIcon(tx.tokenSymbol || tx.token || "");
+              // FIXED: Use the helper function to get transaction info
+              const txInfo = getBatchTransactionInfo(tx);
+              const tokenIcon = getTokenIcon(txInfo.displaySymbol);
               const hash = tx.transactionHash || tx.hash;
+              const direction = getTransactionDirection(tx);
 
               return (
                 <div
@@ -190,19 +345,28 @@ export default function TransactionHistory({
                     <div className="flex items-center mb-1">
                       <div
                         className={`w-2 h-2 rounded-full mr-2 ${
-                          tx.direction === "sent"
-                            ? "bg-red-400"
-                            : "bg-green-400"
+                          direction === "sent" ? "bg-red-400" : "bg-green-400"
                         }`}
                       />
                       <div className="text-white font-medium text-sm font-satoshi">
-                        {tx.direction === "sent" ? "Sent" : "Received"}
+                        {direction === "sent" ? "Sent" : "Received"}
                       </div>
-                      {tx.batchSize && (
-                        <span className="ml-2 px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
-                          Batch ({tx.batchSize})
-                        </span>
+
+                      {/* FIXED: Better batch indicators */}
+                      {txInfo.isBatch && (
+                        <div className="flex items-center ml-2 space-x-1">
+                          <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full flex items-center">
+                            <Users size={10} className="mr-1" />
+                            Batch
+                          </span>
+                          {tx.transferMode && (
+                            <span className="px-2 py-0.5 bg-purple-500 text-white text-xs rounded-full">
+                              {tx.transferMode}
+                            </span>
+                          )}
+                        </div>
                       )}
+
                       {tx.type?.includes("scheduled") && (
                         <span className="ml-2 px-2 py-0.5 bg-purple-500 text-white text-xs rounded-full">
                           Scheduled
@@ -211,15 +375,25 @@ export default function TransactionHistory({
                     </div>
 
                     <div className="flex items-center mb-1">
-                      <div
-                        className={`w-4 h-4 ${tokenIcon.bg} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
-                      >
-                        <span className="text-white text-xs font-bold">
-                          {tokenIcon.symbol}
-                        </span>
-                      </div>
+                      {/* FIXED: Special icon for mixed token batches */}
+                      {txInfo.displaySymbol === "MIXED" ? (
+                        <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-green-500 rounded-full flex items-center justify-center mr-2 flex-shrink-0">
+                          <span className="text-white text-xs font-bold">
+                            M
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          className={`w-4 h-4 ${tokenIcon.bg} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
+                        >
+                          <span className="text-white text-xs font-bold">
+                            {tokenIcon.symbol}
+                          </span>
+                        </div>
+                      )}
+
                       <span className="text-gray-400 text-sm font-satoshi">
-                        {tx.tokenSymbol || tx.token}
+                        {txInfo.batchInfo || txInfo.displaySymbol}
                       </span>
                     </div>
 
@@ -251,21 +425,53 @@ export default function TransactionHistory({
                         )}
                       </div>
                     )}
+
+                    {/* FIXED: Show transfer details for batch transactions */}
+                    {txInfo.isBatch &&
+                      tx.transfers &&
+                      tx.transfers.length > 0 && (
+                        <div className="mt-2 text-xs text-gray-400">
+                          <div className="space-y-1">
+                            {tx.transfers.slice(0, 3).map((transfer, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center space-x-2"
+                              >
+                                <span>→</span>
+                                <span>{transfer.recipient.slice(0, 8)}...</span>
+                                <span>
+                                  {transfer.amount} {transfer.tokenSymbol}
+                                </span>
+                              </div>
+                            ))}
+                            {tx.transfers.length > 3 && (
+                              <div className="text-gray-500">
+                                +{tx.transfers.length - 3} more transfers
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                   </div>
 
                   <div className="text-right flex-shrink-0 ml-4">
                     <div className="text-white font-medium text-sm font-satoshi">
-                      {tx.batchSize
-                        ? tx.amountFormatted ||
-                          `$${tx.valueUSD?.toFixed(2) || "0.00"}`
-                        : typeof tx.amount === "string"
-                        ? tx.amount
-                        : `$${tx.amount || tx.valueUSD?.toFixed(2) || "0"}`}
+                      {txInfo.isBatch
+                        ? // FIXED: Show total value for batch transactions
+                          `$${txInfo.displayValue.toFixed(2)}`
+                        : // Regular transaction display
+                          `${txInfo.displayAmount} ${txInfo.displaySymbol}`}
                     </div>
 
-                    {tx.valueUSD && !tx.batchSize && (
+                    {!txInfo.isBatch && txInfo.displayValue > 0 && (
                       <div className="text-gray-400 text-xs font-satoshi">
-                        ${tx.valueUSD.toFixed(2)}
+                        ${txInfo.displayValue.toFixed(2)}
+                      </div>
+                    )}
+
+                    {txInfo.isBatch && (
+                      <div className="text-gray-400 text-xs font-satoshi">
+                        {txInfo.displayAmount}
                       </div>
                     )}
 

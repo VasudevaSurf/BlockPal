@@ -1,4 +1,4 @@
-// src/app/dashboard/batch-payments/page.tsx - UPDATED WITH REAL TRANSACTION HISTORY
+// src/app/dashboard/batch-payments/page.tsx - FIXED: Show only batch transactions
 "use client";
 
 import { useState, useEffect } from "react";
@@ -592,12 +592,13 @@ export default function BatchPaymentsPage() {
           </div>
         )}
 
-        {/* UPDATED: Real Transaction History - Mobile */}
+        {/* FIXED: Real Transaction History - Mobile - ONLY BATCH TRANSACTIONS */}
         <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
           <TransactionHistory
             walletAddress={activeWallet?.address}
+            transactionTypeFilter="batch" // FIXED: Only show batch transactions
             limit={20}
-            title="Transaction History"
+            title="Batch Transaction History"
             showRefresh={true}
             className="min-h-0"
           />
@@ -830,12 +831,13 @@ export default function BatchPaymentsPage() {
           )}
         </div>
 
-        {/* UPDATED: Real Transaction History - Desktop */}
+        {/* FIXED: Real Transaction History - Desktop - ONLY BATCH TRANSACTIONS */}
         <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-1 flex flex-col min-h-0">
           <TransactionHistory
             walletAddress={activeWallet?.address}
+            transactionTypeFilter="batch" // FIXED: Only show batch transactions
             limit={50}
-            title="Transaction History"
+            title="Batch Transaction History"
             showRefresh={true}
             className="flex-1 min-h-0"
           />

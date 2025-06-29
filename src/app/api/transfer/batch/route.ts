@@ -1,5 +1,4 @@
-// src/app/api/transfer/batch/route.ts (FIXED - Updated with proper decryption)
-// Also update src/app/api/wallets/private-key/route.ts with the same decryption fix
+// src/app/api/transfer/batch/route.ts - FIXED: activeWallet reference error
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -173,7 +172,7 @@ export async function POST(request: NextRequest) {
     console.log("🔄 Batch transfer API request:", {
       action,
       paymentsCount: payments?.length,
-      fromAddress: fromAddress?.slice(0, 10) + "...",
+      fromAddress: fromAddress?.slice(0, 10) + "...", // FIXED: Log fromAddress for debugging
       useStoredKey,
     });
 
@@ -182,10 +181,14 @@ export async function POST(request: NextRequest) {
       !action ||
       !payments ||
       !Array.isArray(payments) ||
-      payments.length === 0
+      payments.length === 0 ||
+      !fromAddress // FIXED: Ensure fromAddress is provided
     ) {
       return NextResponse.json(
-        { error: "Missing required fields: action and payments array" },
+        {
+          error:
+            "Missing required fields: action, payments array, and fromAddress",
+        },
         { status: 400 }
       );
     }
@@ -393,50 +396,52 @@ export async function POST(request: NextRequest) {
             result.actualGasSavings = actualCostUSD.toFixed(2);
           }
 
-          // Save batch transaction to database
+          // FIXED: Save batch transaction to database directly using transactionService
           try {
-            const saveResult = await fetch("/api/transactions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                action: "save_batch",
-                batchData: {
-                  transactionHash: result.transactionHash,
-                  senderUsername: decoded.username,
-                  senderWallet: activeWallet.address,
-                  transferMode: result.transferMode || "BATCH",
-                  totalTransfers:
-                    result.totalTransfers || formattedPayments.length,
-                  totalValueUSD: formattedPayments.reduce(
-                    (sum, p) => sum + p.usdValue,
-                    0
-                  ),
-                  gasUsed: result.gasUsed,
-                  blockNumber: result.blockNumber,
-                  actualCostETH: result.actualCostETH,
-                  actualCostUSD: result.actualCostUSD,
-                  explorerUrl: result.explorerUrl,
-                  transfers: formattedPayments.map((payment) => ({
-                    recipient: payment.recipient,
-                    tokenSymbol: payment.tokenInfo.symbol,
-                    contractAddress: payment.tokenInfo.contractAddress,
-                    amount: payment.amount,
-                    usdValue: payment.usdValue,
-                  })),
-                },
-              }),
-              credentials: "include",
-            });
+            const { transactionService } = await import(
+              "@/lib/transaction-service"
+            );
 
-            if (saveResult.ok) {
+            const batchData = {
+              transactionHash: result.transactionHash,
+              senderUsername: decoded.username,
+              senderWallet: fromAddress,
+              transferMode: result.transferMode || "BATCH",
+              totalTransfers: result.totalTransfers || formattedPayments.length,
+              totalValueUSD: formattedPayments.reduce(
+                (sum, p) => sum + p.usdValue,
+                0
+              ),
+              gasUsed: result.gasUsed,
+              blockNumber: result.blockNumber,
+              actualCostETH: result.actualCostETH,
+              actualCostUSD: result.actualCostUSD,
+              explorerUrl: result.explorerUrl,
+              transfers: formattedPayments.map((payment) => ({
+                recipient: payment.recipient,
+                tokenSymbol: payment.tokenInfo.symbol,
+                contractAddress: payment.tokenInfo.contractAddress,
+                amount: payment.amount,
+                usdValue: payment.usdValue,
+              })),
+            };
+
+            const saveResult = await transactionService.saveBatchTransaction(
+              batchData,
+              decoded.username
+            );
+
+            if (saveResult.success) {
               console.log("✅ Batch transaction saved to database");
             } else {
-              console.warn("⚠️ Failed to save batch transaction to database");
+              console.warn(
+                "⚠️ Failed to save batch transaction to database:",
+                saveResult.error
+              );
             }
           } catch (saveError) {
             console.error("❌ Error saving batch transaction:", saveError);
+            // Don't fail the whole transaction for this
           }
 
           return NextResponse.json({

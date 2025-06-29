@@ -1,4 +1,4 @@
-// src/components/transfer/SimpleTransferModal.tsx
+// src/components/transfer/SimpleTransferModal.tsx - FIXED: Missing fromAddress parameter
 "use client";
 
 import { useState, useEffect } from "react";
@@ -132,8 +132,22 @@ export default function SimpleTransferModal({
   const handleCreatePreview = async () => {
     if (!validateForm()) return;
 
+    // FIXED: Validate that we have the required parameters
+    if (!walletAddress) {
+      setErrors({ general: "Wallet address not available" });
+      return;
+    }
+
     setIsLoading(true);
     try {
+      console.log("📊 Creating transfer preview with:", {
+        tokenInfo,
+        recipientAddress: formData.recipientAddress,
+        amount: formData.amount,
+        fromAddress: walletAddress, // FIXED: Log to verify we have this
+        tokenPrice: tokenInfo.priceData?.current_price,
+      });
+
       const response = await fetch("/api/transfer/simple", {
         method: "POST",
         headers: {
@@ -144,7 +158,7 @@ export default function SimpleTransferModal({
           tokenInfo,
           recipientAddress: formData.recipientAddress,
           amount: formData.amount,
-          fromAddress: walletAddress,
+          fromAddress: walletAddress, // FIXED: Use walletAddress prop
           tokenPrice: tokenInfo.priceData?.current_price,
         }),
         credentials: "include",
@@ -171,10 +185,24 @@ export default function SimpleTransferModal({
   const handleExecuteTransfer = async () => {
     if (!preview || !activeWallet) return;
 
+    // FIXED: Validate that we have the required parameters
+    if (!walletAddress) {
+      setErrors({ general: "Wallet address not available" });
+      return;
+    }
+
     setStep("processing");
     setIsLoading(true);
 
     try {
+      console.log("🚀 Executing transfer with:", {
+        tokenInfo,
+        recipientAddress: formData.recipientAddress,
+        amount: formData.amount,
+        fromAddress: walletAddress, // FIXED: Log to verify we have this
+        tokenPrice: tokenInfo.priceData?.current_price,
+      });
+
       const response = await fetch("/api/transfer/simple", {
         method: "POST",
         headers: {
@@ -185,8 +213,9 @@ export default function SimpleTransferModal({
           tokenInfo,
           recipientAddress: formData.recipientAddress,
           amount: formData.amount,
-          fromAddress: walletAddress,
+          fromAddress: walletAddress, // FIXED: Use walletAddress prop
           tokenPrice: tokenInfo.priceData?.current_price,
+          useStoredKey: true, // Use stored private key
         }),
         credentials: "include",
       });
@@ -393,7 +422,7 @@ export default function SimpleTransferModal({
 
               <Button
                 onClick={handleCreatePreview}
-                disabled={isLoading}
+                disabled={isLoading || !walletAddress} // FIXED: Disable if no wallet address
                 className="w-full font-satoshi"
               >
                 {isLoading ? "Creating Preview..." : "Review Transfer"}
