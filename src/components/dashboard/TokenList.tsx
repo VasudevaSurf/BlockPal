@@ -1,4 +1,6 @@
-// src/components/dashboard/TokenList.tsx - FIXED VERSION WITH PROPER ICONS
+// Add this to TokenList.tsx temporarily for debugging the 24h change issue
+
+// src/components/dashboard/TokenList.tsx - DEBUG VERSION
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -175,19 +177,25 @@ export default function TokenList() {
     }
   };
 
-  // Debug current tokens
+  // DEBUG: Log token 24h changes
   useEffect(() => {
     if (tokens.length > 0) {
-      console.log(
-        "🔍 Current tokens in TokenList:",
-        tokens.map((t) => ({
-          symbol: t.symbol,
-          balance: t.balance,
-          value: t.value,
-          icon: t.icon,
-          contractAddress: t.contractAddress,
-        }))
-      );
+      console.log("📊 Token 24h Changes Debug:");
+      tokens.forEach((token) => {
+        console.log(
+          `  ${token.symbol}: ${token.change24h?.toFixed(2)}% (raw: ${
+            token.change24h
+          })`
+        );
+        if (token.symbol === "ETH") {
+          console.log(`  🔷 ETH 24h change details:`, {
+            change24h: token.change24h,
+            type: typeof token.change24h,
+            isZero: token.change24h === 0,
+            formatted: formatPercentage(token.change24h || 0),
+          });
+        }
+      });
     }
   }, [tokens]);
 
@@ -350,6 +358,13 @@ export default function TokenList() {
                     }`}
                   >
                     {formatPercentage(token.change24h)}
+                    {/* DEBUG: Show raw value for ETH */}
+                    {process.env.NODE_ENV === "development" &&
+                      token.symbol === "ETH" && (
+                        <span className="ml-1 text-xs text-gray-500">
+                          (raw: {token.change24h})
+                        </span>
+                      )}
                   </div>
                 </div>
               </div>
@@ -430,6 +445,13 @@ export default function TokenList() {
                   }`}
                 >
                   {formatPercentage(token.change24h)}
+                  {/* DEBUG: Show raw value for ETH */}
+                  {process.env.NODE_ENV === "development" &&
+                    token.symbol === "ETH" && (
+                      <span className="ml-1 text-xs text-gray-500">
+                        (raw: {token.change24h})
+                      </span>
+                    )}
                 </div>
               </div>
             </div>

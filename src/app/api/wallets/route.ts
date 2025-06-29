@@ -1,4 +1,4 @@
-// src/app/api/wallets/route.ts (UPDATED)
+// src/app/api/wallets/route.ts - FIXED ETH 24H CHANGE ON CREATION
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { verifyToken } from "@/lib/auth";
@@ -124,6 +124,18 @@ export async function POST(request: NextRequest) {
         walletAddress
       );
 
+      // FIXED: Get ETH price data to include proper 24h change
+      let ethPriceData = null;
+      try {
+        ethPriceData = await cryptoService.getTokenPrice("ethereum");
+        console.log("📈 ETH price data for new wallet:", {
+          price: ethPriceData?.current_price,
+          change24h: ethPriceData?.price_change_percentage_24h,
+        });
+      } catch (error) {
+        console.error("⚠️ Failed to get ETH price data:", error);
+      }
+
       // Save ETH balance if any
       if (portfolioData.ethBalance > 0) {
         const ethToken = {
@@ -137,7 +149,8 @@ export async function POST(request: NextRequest) {
           decimals: 18,
           priceUSD: portfolioData.ethPriceUSD,
           valueUSD: portfolioData.ethValueUSD,
-          change24h: 0, // Will be updated by price service
+          // FIXED: Use real 24h change from price API
+          change24h: ethPriceData?.price_change_percentage_24h || 0,
           logoUrl:
             "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
           isFavorite: false,
@@ -146,6 +159,10 @@ export async function POST(request: NextRequest) {
         };
 
         await db.collection("wallet_tokens").insertOne(ethToken);
+        console.log(
+          "✅ Saved ETH token for new wallet with 24h change:",
+          ethToken.change24h
+        );
       }
 
       // Save ERC-20 tokens if any
@@ -161,7 +178,7 @@ export async function POST(request: NextRequest) {
           decimals: token.decimals,
           priceUSD: token.priceUSD,
           valueUSD: token.valueUSD,
-          change24h: token.change24h,
+          change24h: token.change24h, // This should already have real data from API
           logoUrl: token.logoUrl,
           isFavorite: false,
           isHidden: false,
@@ -195,7 +212,7 @@ export async function POST(request: NextRequest) {
       }
 
       console.log(
-        `✅ Initialized wallet ${walletAddress} with ${portfolioData.tokens.length} tokens`
+        `✅ Initialized wallet ${walletAddress} with ${portfolioData.tokens.length} tokens and proper ETH 24h change`
       );
     } catch (error) {
       console.error("Error initializing wallet tokens:", error);

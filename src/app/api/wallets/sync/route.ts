@@ -1,4 +1,4 @@
-// src/app/api/wallets/sync/route.ts - FIXED ETH ICON STORAGE
+// src/app/api/wallets/sync/route.ts - FIXED ETH 24H CHANGE
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { verifyToken } from "@/lib/auth";
@@ -48,6 +48,18 @@ export async function POST(request: NextRequest) {
       totalValueUSD: portfolioData.totalValueUSD,
     });
 
+    // FIXED: Get ETH price data to include proper 24h change
+    let ethPriceData = null;
+    try {
+      ethPriceData = await cryptoService.getTokenPrice("ethereum");
+      console.log("📈 ETH price data:", {
+        price: ethPriceData?.current_price,
+        change24h: ethPriceData?.price_change_percentage_24h,
+      });
+    } catch (error) {
+      console.error("⚠️ Failed to get ETH price data:", error);
+    }
+
     // Clear existing tokens for this wallet
     await db.collection("wallet_tokens").deleteMany({
       walletAddress,
@@ -56,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     console.log("🗑️ Cleared existing wallet tokens");
 
-    // FIXED: Save ETH balance with proper icon URL
+    // FIXED: Save ETH balance with proper 24h change from API
     const ethToken = {
       username: decoded.username,
       walletAddress,
@@ -67,9 +79,9 @@ export async function POST(request: NextRequest) {
       balanceFormatted: portfolioData.ethBalance.toFixed(6),
       decimals: 18,
       priceUSD: portfolioData.ethPriceUSD,
-      valueUSD: portfolioData.ethValueUSD, // CRITICAL: Include USD value
-      change24h: 0,
-      // FIXED: Use the correct ETH icon URL that matches token overview
+      valueUSD: portfolioData.ethValueUSD,
+      // FIXED: Use real 24h change from price API instead of 0
+      change24h: ethPriceData?.price_change_percentage_24h || 0,
       logoUrl:
         "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
       isFavorite: false,
@@ -78,12 +90,11 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection("wallet_tokens").insertOne(ethToken);
-    console.log(
-      "✅ Saved ETH token with value:",
-      portfolioData.ethValueUSD,
-      "and icon:",
-      ethToken.logoUrl
-    );
+    console.log("✅ Saved ETH token:", {
+      value: portfolioData.ethValueUSD,
+      change24h: ethToken.change24h,
+      icon: ethToken.logoUrl,
+    });
 
     // Save ERC-20 tokens if any
     let tokenDocuments = [];
@@ -96,6 +107,7 @@ export async function POST(request: NextRequest) {
           balanceFormatted: token.balanceFormatted,
           priceUSD: token.priceUSD,
           valueUSD: token.valueUSD,
+          change24h: token.change24h,
           logoUrl: token.logoUrl,
         });
 
@@ -109,9 +121,9 @@ export async function POST(request: NextRequest) {
           balanceFormatted: token.balanceFormatted || "0",
           decimals: token.decimals || 18,
           priceUSD: token.priceUSD || 0,
-          valueUSD: token.valueUSD || 0, // CRITICAL: Include USD value
-          change24h: token.change24h || 0,
-          logoUrl: token.logoUrl || null, // Keep original logoUrl from API
+          valueUSD: token.valueUSD || 0,
+          change24h: token.change24h || 0, // This should already have real data from API
+          logoUrl: token.logoUrl || null,
           isFavorite: false,
           isHidden: false,
           lastUpdated: new Date(),
@@ -153,11 +165,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // FIXED: Calculate total tokens including ETH
+    // Calculate total tokens including ETH
     const totalTokens = 1 + portfolioData.tokens.length; // +1 for ETH
 
     console.log(
-      `✅ Synced ${totalTokens} tokens (including ETH) for wallet ${walletAddress}`
+      `✅ Synced ${totalTokens} tokens (including ETH) for wallet ${walletAddress}`,
+      `ETH 24h change: ${ethToken.change24h?.toFixed(2)}%`
     );
 
     return NextResponse.json({
@@ -166,8 +179,9 @@ export async function POST(request: NextRequest) {
       totalValue: portfolioData.totalValueUSD,
       ethBalance: portfolioData.ethBalance,
       ethValueUSD: portfolioData.ethValueUSD,
+      ethChange24h: ethToken.change24h,
       erc20TokensCount: portfolioData.tokens.length,
-      message: `Successfully synced ${totalTokens} tokens including ETH`,
+      message: `Successfully synced ${totalTokens} tokens including ETH with real 24h changes`,
     });
   } catch (error) {
     console.error("💥 Sync wallet tokens error:", error);
