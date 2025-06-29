@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - FIXED VERSION (decoded error fixed)
+// src/components/FriendsPage.tsx - COMPLETE VERSION WITH STRICT STATUS CHECKING
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -15,6 +15,12 @@ import {
   Bell,
   HelpCircle,
   Copy,
+  CheckCircle,
+  XCircle,
+  Ban,
+  ExternalLink,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
@@ -51,9 +57,12 @@ interface FundRequest {
   tokenSymbol: string;
   amount: string;
   message: string;
-  status: "pending" | "fulfilled" | "declined" | "expired";
+  status: "pending" | "fulfilled" | "declined" | "expired" | "cancelled";
   requestedAt: string;
   expiresAt: string;
+  respondedAt?: string;
+  transactionHash?: string;
+  fulfilledBy?: string;
 }
 
 export default function FriendsPage() {
@@ -300,17 +309,43 @@ export default function FriendsPage() {
     }
   };
 
+  // STRICT: Enhanced fund requests loading with status validation
   const loadFundRequests = async () => {
     try {
       setLoading(true);
+      console.log("🔄 Loading fund requests with strict status checking...");
+
       const response = await fetch("/api/friends/fund-request?type=received", {
         credentials: "include",
       });
 
       if (response.ok) {
         const data = await response.json();
-        setFundRequests(data.fundRequests || []);
-        console.log("✅ Fund requests loaded:", data.fundRequests?.length || 0);
+        const requests = data.fundRequests || [];
+
+        // STRICT: Filter and validate statuses
+        const validatedRequests = requests.map((request: FundRequest) => {
+          // Check if expired
+          const isExpired = new Date() > new Date(request.expiresAt);
+          if (isExpired && request.status === "pending") {
+            // Mark as expired in memory (API should handle this too)
+            return { ...request, status: "expired" as const };
+          }
+          return request;
+        });
+
+        setFundRequests(validatedRequests);
+        console.log("✅ Fund requests loaded with validation:", {
+          total: validatedRequests.length,
+          pending: validatedRequests.filter((r) => r.status === "pending")
+            .length,
+          fulfilled: validatedRequests.filter((r) => r.status === "fulfilled")
+            .length,
+          declined: validatedRequests.filter((r) => r.status === "declined")
+            .length,
+          expired: validatedRequests.filter((r) => r.status === "expired")
+            .length,
+        });
       } else {
         console.error("Load fund requests failed:", response.status);
         setError("Failed to load fund requests");
@@ -480,6 +515,103 @@ export default function FriendsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // STRICT: Enhanced fund request status display
+  const getFundRequestStatusInfo = (request: FundRequest) => {
+    const isExpired = new Date() > new Date(request.expiresAt);
+
+    switch (request.status) {
+      case "pending":
+        if (isExpired) {
+          return {
+            icon: <Clock size={16} className="text-yellow-400" />,
+            label: "Expired",
+            color: "text-yellow-400",
+            bgColor: "bg-yellow-500/20",
+            canAction: false,
+          };
+        }
+        return {
+          icon: <Clock size={16} className="text-blue-400" />,
+          label: "Pending",
+          color: "text-blue-400",
+          bgColor: "bg-blue-500/20",
+          canAction: true,
+        };
+      case "fulfilled":
+        return {
+          icon: <CheckCircle size={16} className="text-green-400" />,
+          label: "Fulfilled",
+          color: "text-green-400",
+          bgColor: "bg-green-500/20",
+          canAction: false,
+        };
+      case "declined":
+        return {
+          icon: <XCircle size={16} className="text-red-400" />,
+          label: "Declined",
+          color: "text-red-400",
+          bgColor: "bg-red-500/20",
+          canAction: false,
+        };
+      case "expired":
+        return {
+          icon: <Clock size={16} className="text-yellow-400" />,
+          label: "Expired",
+          color: "text-yellow-400",
+          bgColor: "bg-yellow-500/20",
+          canAction: false,
+        };
+      case "cancelled":
+        return {
+          icon: <Ban size={16} className="text-gray-400" />,
+          label: "Cancelled",
+          color: "text-gray-400",
+          bgColor: "bg-gray-500/20",
+          canAction: false,
+        };
+      default:
+        return {
+          icon: <AlertCircle size={16} className="text-gray-400" />,
+          label: "Unknown",
+          color: "text-gray-400",
+          bgColor: "bg-gray-500/20",
+          canAction: false,
+        };
+    }
+  };
+
+  // STRICT: Enhanced fund request click handler
+  const handleFundRequestClick = (request: FundRequest) => {
+    const statusInfo = getFundRequestStatusInfo(request);
+
+    console.log("🔔 Fund request clicked:", {
+      requestId: request.requestId,
+      status: request.status,
+      canAction: statusInfo.canAction,
+      hasTransactionHash: !!request.transactionHash,
+    });
+
+    if (!statusInfo.canAction) {
+      // STRICT: For processed requests, show different behavior based on status
+      if (request.status === "fulfilled" && request.transactionHash) {
+        // Open transaction explorer for fulfilled requests
+        window.open(
+          `https://etherscan.io/tx/${request.transactionHash}`,
+          "_blank"
+        );
+        return;
+      } else {
+        // For other processed statuses, show info modal or just ignore
+        console.log(`ℹ️ Request is ${request.status} - no action available`);
+        // Could show a toast here: "This request has been {status}"
+        return;
+      }
+    }
+
+    // Only open modal for pending requests
+    setSelectedFundRequest(request);
   };
 
   // Show initial loading state
@@ -916,7 +1048,7 @@ export default function FriendsPage() {
             )}
 
             {activeTab === "FundRequests" && (
-              <div className="space-y-3">
+              <div className="space-y-0">
                 {loading && fundRequests.length === 0 ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
@@ -940,51 +1072,233 @@ export default function FriendsPage() {
                     </p>
                   </div>
                 ) : (
-                  fundRequests.map((request) => (
-                    <div
-                      key={request._id}
-                      className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] cursor-pointer hover:bg-[#1A1A1A] transition-colors"
-                      onClick={() => {
-                        setSelectedFundRequest(request);
-                        // You could open a detailed modal here
-                      }}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <div className="text-white font-satoshi">
-                            Fund Request from @{request.requesterUsername}
-                          </div>
-                          <div className="text-[#E2AF19] font-bold text-lg">
-                            {request.amount} {request.tokenSymbol}
-                          </div>
-                          {request.message && (
-                            <div className="text-gray-400 text-sm font-satoshi mt-1">
-                              "{request.message}"
+                  fundRequests.map((request, index) => {
+                    const statusInfo = getFundRequestStatusInfo(request);
+                    return (
+                      <div key={request._id}>
+                        {/* Mobile Card Layout */}
+                        <div className="block lg:hidden">
+                          <div
+                            className={`bg-[#0F0F0F] rounded-lg p-4 mb-3 border border-[#2C2C2C] transition-all ${
+                              statusInfo.canAction
+                                ? "cursor-pointer hover:bg-[#1A1A1A] hover:border-[#E2AF19]"
+                                : "opacity-75"
+                            }`}
+                            onClick={() =>
+                              statusInfo.canAction &&
+                              handleFundRequestClick(request)
+                            }
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center">
+                                <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                                  <span className="text-white text-sm font-medium">
+                                    {request.requesterUsername[0]?.toUpperCase() ||
+                                      "?"}
+                                  </span>
+                                </div>
+                                <div>
+                                  <div className="text-white font-satoshi">
+                                    @{request.requesterUsername}
+                                  </div>
+                                  <div className="text-gray-400 text-xs font-satoshi">
+                                    {new Date(
+                                      request.requestedAt
+                                    ).toLocaleDateString()}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* STRICT: Status indicator */}
+                              <div
+                                className={`px-2 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
+                              >
+                                {statusInfo.icon}
+                                <span
+                                  className={`ml-1 text-xs font-satoshi font-medium ${statusInfo.color}`}
+                                >
+                                  {statusInfo.label}
+                                </span>
+                              </div>
                             </div>
-                          )}
-                          <div className="flex items-center text-gray-400 text-xs font-satoshi mt-2">
-                            <Clock size={12} className="mr-1" />
-                            Requested{" "}
-                            {new Date(request.requestedAt).toLocaleDateString()}
+
+                            <div className="mb-3">
+                              <div className="text-[#E2AF19] font-bold text-lg">
+                                {request.amount} {request.tokenSymbol}
+                              </div>
+                              {request.message && (
+                                <div className="text-gray-400 text-sm font-satoshi mt-1">
+                                  "{request.message}"
+                                </div>
+                              )}
+                            </div>
+
+                            {/* STRICT: Different actions based on status */}
+                            <div className="flex items-center justify-between pt-3 border-t border-[#2C2C2C]">
+                              <div className="flex items-center text-gray-400 text-xs font-satoshi">
+                                <Clock size={12} className="mr-1" />
+                                {statusInfo.canAction ? (
+                                  <>
+                                    Expires{" "}
+                                    {new Date(
+                                      request.expiresAt
+                                    ).toLocaleDateString()}
+                                  </>
+                                ) : (
+                                  <>
+                                    {request.respondedAt
+                                      ? `Responded ${new Date(
+                                          request.respondedAt
+                                        ).toLocaleDateString()}`
+                                      : `${statusInfo.label} ${new Date(
+                                          request.requestedAt
+                                        ).toLocaleDateString()}`}
+                                  </>
+                                )}
+                              </div>
+
+                              {/* STRICT: Action indicators */}
+                              {statusInfo.canAction ? (
+                                <div className="text-[#E2AF19] text-xs font-satoshi">
+                                  Tap to respond
+                                </div>
+                              ) : request.status === "fulfilled" &&
+                                request.transactionHash ? (
+                                <div className="text-green-400 text-xs font-satoshi flex items-center">
+                                  <ExternalLink size={12} className="mr-1" />
+                                  View Transaction
+                                </div>
+                              ) : (
+                                <div
+                                  className={`text-xs font-satoshi ${statusInfo.color}`}
+                                >
+                                  {statusInfo.label}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Transaction hash for fulfilled requests */}
+                            {request.status === "fulfilled" &&
+                              request.transactionHash && (
+                                <div className="mt-2 p-2 bg-green-900/20 border border-green-500/50 rounded">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-green-400 text-xs font-satoshi">
+                                      Tx: {request.transactionHash.slice(0, 10)}
+                                      ...{request.transactionHash.slice(-8)}
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        copyToClipboard(
+                                          request.transactionHash!,
+                                          `tx-${request._id}`
+                                        );
+                                      }}
+                                      className="text-green-400 hover:text-green-300 transition-colors"
+                                    >
+                                      <Copy size={12} />
+                                    </button>
+                                  </div>
+                                  {copied === `tx-${request._id}` && (
+                                    <p className="text-green-400 text-xs font-satoshi mt-1">
+                                      Transaction hash copied!
+                                    </p>
+                                  )}
+                                </div>
+                              )}
                           </div>
                         </div>
-                        <div className="flex flex-col space-y-2">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-satoshi text-center ${
-                              request.status === "pending"
-                                ? "bg-yellow-500/20 text-yellow-400"
-                                : request.status === "fulfilled"
-                                ? "bg-green-500/20 text-green-400"
-                                : "bg-red-500/20 text-red-400"
+
+                        {/* Desktop Row Layout */}
+                        <div className="hidden lg:block">
+                          <div
+                            className={`flex items-center justify-between py-3 px-4 rounded-lg transition-colors ${
+                              statusInfo.canAction
+                                ? "cursor-pointer hover:bg-[#1A1A1A]"
+                                : "opacity-75"
                             }`}
+                            onClick={() =>
+                              statusInfo.canAction &&
+                              handleFundRequestClick(request)
+                            }
                           >
-                            {request.status.charAt(0).toUpperCase() +
-                              request.status.slice(1)}
-                          </span>
+                            <div className="flex items-center flex-1">
+                              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                                <span className="text-white text-sm font-medium">
+                                  {request.requesterUsername[0]?.toUpperCase() ||
+                                    "?"}
+                                </span>
+                              </div>
+                              <div className="flex-1">
+                                <span className="text-white font-satoshi">
+                                  @{request.requesterUsername}
+                                </span>
+                                <div className="text-gray-400 text-sm font-satoshi">
+                                  {new Date(
+                                    request.requestedAt
+                                  ).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-4">
+                              <div className="text-[#E2AF19] font-bold font-satoshi">
+                                {request.amount} {request.tokenSymbol}
+                              </div>
+
+                              {/* STRICT: Status display */}
+                              <div
+                                className={`px-3 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
+                              >
+                                {statusInfo.icon}
+                                <span
+                                  className={`ml-2 text-sm font-satoshi font-medium ${statusInfo.color}`}
+                                >
+                                  {statusInfo.label}
+                                </span>
+                              </div>
+
+                              {/* STRICT: Action indicators */}
+                              {statusInfo.canAction ? (
+                                <div className="text-[#E2AF19] text-sm font-satoshi">
+                                  Click to respond
+                                </div>
+                              ) : request.status === "fulfilled" &&
+                                request.transactionHash ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(
+                                      `https://etherscan.io/tx/${request.transactionHash}`,
+                                      "_blank"
+                                    );
+                                  }}
+                                  className="text-green-400 text-sm font-satoshi hover:opacity-80 transition-opacity flex items-center"
+                                >
+                                  <ExternalLink size={14} className="mr-1" />
+                                  Explorer
+                                </button>
+                              ) : (
+                                <div
+                                  className={`text-sm font-satoshi ${statusInfo.color}`}
+                                >
+                                  {request.respondedAt
+                                    ? new Date(
+                                        request.respondedAt
+                                      ).toLocaleDateString()
+                                    : "—"}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {index < fundRequests.length - 1 && (
+                            <div className="border-b border-[#2C2C2C] mx-4"></div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -1206,7 +1520,7 @@ export default function FriendsPage() {
         </div>
       )}
 
-      {/* Fund Request Detail Modal */}
+      {/* Fund Request Detail Modal - STRICT: Only opens for pending requests */}
       {selectedFundRequest && (
         <FundRequestModal
           isOpen={!!selectedFundRequest}
@@ -1214,11 +1528,11 @@ export default function FriendsPage() {
           fundRequest={selectedFundRequest}
           onFulfilled={() => {
             setSelectedFundRequest(null);
-            loadFundRequests();
+            loadFundRequests(); // Refresh the list
           }}
           onDeclined={() => {
             setSelectedFundRequest(null);
-            loadFundRequests();
+            loadFundRequests(); // Refresh the list
           }}
         />
       )}

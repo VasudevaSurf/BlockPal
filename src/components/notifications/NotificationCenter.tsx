@@ -1,4 +1,4 @@
-// src/components/notifications/NotificationCenter.tsx
+// src/components/notifications/NotificationCenter.tsx - FIXED VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -13,13 +13,20 @@ import {
   AlertCircle,
   ExternalLink,
   Trash2,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { RootState } from "@/store";
 
 interface Notification {
   _id: string;
   username: string;
-  type: "fund_request" | "fund_request_response" | "friend_request" | "general";
+  type:
+    | "fund_request"
+    | "fund_request_response"
+    | "friend_request"
+    | "friend_request_response"
+    | "general";
   title: string;
   message: string;
   isRead: boolean;
@@ -30,6 +37,10 @@ interface Notification {
     amount?: string;
     tokenSymbol?: string;
     transactionHash?: string;
+    action?: "fulfill" | "decline"; // ADDED: Action type for fund request responses
+    acceptedBy?: string;
+    declinedBy?: string;
+    originalRequester?: string;
   };
   createdAt: string;
   readAt?: string;
@@ -114,14 +125,22 @@ export default function NotificationCenter({
     }
   };
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
+  const getNotificationIcon = (notification: Notification) => {
+    switch (notification.type) {
       case "fund_request":
         return <DollarSign size={20} className="text-green-400" />;
       case "fund_request_response":
-        return <Check size={20} className="text-blue-400" />;
+        // FIXED: Show different icons based on action
+        if (notification.relatedData?.action === "fulfill") {
+          return <CheckCircle size={20} className="text-green-400" />;
+        } else if (notification.relatedData?.action === "decline") {
+          return <XCircle size={20} className="text-red-400" />;
+        }
+        return <DollarSign size={20} className="text-blue-400" />;
       case "friend_request":
         return <UserPlus size={20} className="text-purple-400" />;
+      case "friend_request_response":
+        return <Check size={20} className="text-blue-400" />;
       default:
         return <Bell size={20} className="text-gray-400" />;
     }
@@ -141,7 +160,14 @@ export default function NotificationCenter({
     return date.toLocaleDateString();
   };
 
+  // FIXED: Enhanced notification click handler
   const handleNotificationClick = async (notification: Notification) => {
+    console.log("🔔 Notification clicked:", {
+      type: notification.type,
+      action: notification.relatedData?.action,
+      transactionHash: notification.relatedData?.transactionHash,
+    });
+
     // Mark as read if not already read
     if (!notification.isRead) {
       await markAsRead(notification._id);
@@ -150,25 +176,123 @@ export default function NotificationCenter({
     // Handle different notification types
     switch (notification.type) {
       case "fund_request":
-        // Navigate to friends page or open fund request modal
+        // Only navigate to friends page for pending fund requests
+        console.log("📍 Navigating to friends page for fund request");
         window.location.href = "/dashboard/friends";
         break;
+
       case "fund_request_response":
-        if (notification.relatedData?.transactionHash) {
-          // Open transaction in explorer
+        // FIXED: Handle fund request responses based on action
+        if (
+          notification.relatedData?.action === "fulfill" &&
+          notification.relatedData?.transactionHash
+        ) {
+          // Only open transaction explorer if fulfilled and has transaction hash
+          console.log("🔗 Opening transaction explorer for fulfilled request");
           window.open(
             `https://etherscan.io/tx/${notification.relatedData.transactionHash}`,
             "_blank"
           );
+        } else if (notification.relatedData?.action === "decline") {
+          // For declined requests, just show info (no action needed)
+          console.log("❌ Fund request was declined - no action available");
+          // Could show a toast message here if needed
+        } else {
+          // Fallback: navigate to friends page
+          console.log(
+            "📍 Navigating to friends page for fund request response"
+          );
+          window.location.href = "/dashboard/friends";
         }
         break;
+
       case "friend_request":
+      case "friend_request_response":
         // Navigate to friends page
+        console.log("📍 Navigating to friends page for friend request");
         window.location.href = "/dashboard/friends";
         break;
+
       default:
+        console.log("ℹ️ No specific action for this notification type");
         break;
     }
+  };
+
+  // FIXED: Enhanced notification action display
+  const getNotificationAction = (notification: Notification) => {
+    switch (notification.type) {
+      case "fund_request":
+        return (
+          <div className="flex items-center text-xs text-[#E2AF19]">
+            <Clock size={12} className="mr-1" />
+            View Request
+          </div>
+        );
+
+      case "fund_request_response":
+        if (
+          notification.relatedData?.action === "fulfill" &&
+          notification.relatedData?.transactionHash
+        ) {
+          return (
+            <div className="flex items-center text-xs text-green-400">
+              <ExternalLink size={12} className="mr-1" />
+              View Transaction
+            </div>
+          );
+        } else if (notification.relatedData?.action === "decline") {
+          return (
+            <div className="flex items-center text-xs text-red-400">
+              <XCircle size={12} className="mr-1" />
+              Declined
+            </div>
+          );
+        }
+        return (
+          <div className="flex items-center text-xs text-blue-400">
+            <DollarSign size={12} className="mr-1" />
+            Response
+          </div>
+        );
+
+      case "friend_request":
+        return (
+          <div className="flex items-center text-xs text-purple-400">
+            <UserPlus size={12} className="mr-1" />
+            View Request
+          </div>
+        );
+
+      case "friend_request_response":
+        return (
+          <div className="flex items-center text-xs text-blue-400">
+            <Check size={12} className="mr-1" />
+            View Friends
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // FIXED: Enhanced notification styling based on status
+  const getNotificationStyles = (notification: Notification) => {
+    const baseStyles = "p-4 rounded-lg mb-3 cursor-pointer transition-colors";
+    const readStyles = notification.isRead
+      ? "bg-[#0F0F0F] border border-[#2C2C2C] hover:bg-[#1A1A1A]"
+      : "bg-[#E2AF19]/10 border border-[#E2AF19]/30 hover:bg-[#E2AF19]/20";
+
+    // Special styling for declined fund requests
+    if (
+      notification.type === "fund_request_response" &&
+      notification.relatedData?.action === "decline"
+    ) {
+      return `${baseStyles} ${readStyles} opacity-75`;
+    }
+
+    return `${baseStyles} ${readStyles}`;
   };
 
   if (!isOpen) return null;
@@ -236,15 +360,11 @@ export default function NotificationCenter({
                 <div
                   key={notification._id}
                   onClick={() => handleNotificationClick(notification)}
-                  className={`p-4 rounded-lg mb-3 cursor-pointer transition-colors ${
-                    notification.isRead
-                      ? "bg-[#0F0F0F] border border-[#2C2C2C] hover:bg-[#1A1A1A]"
-                      : "bg-[#E2AF19]/10 border border-[#E2AF19]/30 hover:bg-[#E2AF19]/20"
-                  }`}
+                  className={getNotificationStyles(notification)}
                 >
                   <div className="flex items-start space-x-3">
                     <div className="flex-shrink-0 mt-1">
-                      {getNotificationIcon(notification.type)}
+                      {getNotificationIcon(notification)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between mb-1">
@@ -255,20 +375,53 @@ export default function NotificationCenter({
                           <div className="w-2 h-2 bg-[#E2AF19] rounded-full flex-shrink-0 ml-2 mt-1"></div>
                         )}
                       </div>
+
                       <p className="text-gray-400 text-sm font-satoshi mb-2">
                         {notification.message}
                       </p>
+
+                      {/* FIXED: Enhanced notification details */}
+                      {notification.type === "fund_request_response" &&
+                        notification.relatedData && (
+                          <div className="bg-[#1A1A1A] rounded p-2 mb-2 border border-[#2C2C2C]">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-400 font-satoshi">
+                                Amount: {notification.relatedData.amount}{" "}
+                                {notification.relatedData.tokenSymbol}
+                              </span>
+                              <span
+                                className={`font-satoshi font-medium ${
+                                  notification.relatedData.action === "fulfill"
+                                    ? "text-green-400"
+                                    : "text-red-400"
+                                }`}
+                              >
+                                {notification.relatedData.action === "fulfill"
+                                  ? "✅ Fulfilled"
+                                  : "❌ Declined"}
+                              </span>
+                            </div>
+                            {notification.relatedData.transactionHash && (
+                              <div className="text-xs text-gray-400 font-satoshi mt-1">
+                                Tx:{" "}
+                                {notification.relatedData.transactionHash.slice(
+                                  0,
+                                  10
+                                )}
+                                ...
+                                {notification.relatedData.transactionHash.slice(
+                                  -8
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                       <div className="flex items-center justify-between">
                         <span className="text-gray-500 text-xs font-satoshi">
                           {getTimeAgo(notification.createdAt)}
                         </span>
-                        {notification.type === "fund_request_response" &&
-                          notification.relatedData?.transactionHash && (
-                            <div className="flex items-center text-xs text-[#E2AF19]">
-                              <ExternalLink size={12} className="mr-1" />
-                              View Transaction
-                            </div>
-                          )}
+                        {getNotificationAction(notification)}
                       </div>
                     </div>
                   </div>

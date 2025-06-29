@@ -1,4 +1,4 @@
-// src/components/friends/FundRequestModal.tsx - UPDATED WITH ENHANCED API
+// src/components/friends/FundRequestModal.tsx - STRICT STATUS CHECKING
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,6 +15,8 @@ import {
   DollarSign,
   User,
   Zap,
+  XCircle,
+  Ban,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
@@ -31,10 +33,13 @@ interface FundRequestModalProps {
     tokenSymbol: string;
     amount: string;
     message: string;
-    status: "pending" | "fulfilled" | "declined" | "expired";
+    status: "pending" | "fulfilled" | "declined" | "expired" | "cancelled";
     requestedAt: string;
     expiresAt: string;
-    requesterWalletAddress?: string; // The wallet address where funds should be sent
+    requesterWalletAddress?: string;
+    transactionHash?: string; // ADDED: Transaction hash for fulfilled requests
+    respondedAt?: string; // ADDED: When it was responded to
+    fulfilledBy?: string; // ADDED: Who fulfilled it
   };
   onFulfilled?: () => void;
   onDeclined?: () => void;
@@ -69,9 +74,9 @@ export default function FundRequestModal({
     (state: RootState) => state.wallet
   );
 
-  const [step, setStep] = useState<"review" | "sending" | "success" | "error">(
-    "review"
-  );
+  const [step, setStep] = useState<
+    "review" | "sending" | "success" | "error" | "completed"
+  >("review");
   const [loading, setLoading] = useState(false);
   const [transferResult, setTransferResult] = useState<TransferResult | null>(
     null
@@ -82,15 +87,77 @@ export default function FundRequestModal({
     null
   );
   const [loadingRequester, setLoadingRequester] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(fundRequest.status);
 
-  // Reset state when modal opens/closes
+  // STRICT: Check if fund request is already processed
+  const isProcessed = [
+    "fulfilled",
+    "declined",
+    "expired",
+    "cancelled",
+  ].includes(currentStatus);
+  const canTakeAction = currentStatus === "pending" && !isExpired();
+
+  function isExpired(): boolean {
+    return new Date() > new Date(fundRequest.expiresAt);
+  }
+
+  // STRICT: Fetch current status from server to ensure accuracy
+  const fetchCurrentStatus = async () => {
+    try {
+      console.log("🔍 Fetching current fund request status...");
+      const response = await fetch(
+        `/api/friends/fund-request/${fundRequest.requestId}`,
+        {
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const latestStatus = data.fundRequest?.status || fundRequest.status;
+
+        console.log("📊 Current status check:", {
+          originalStatus: fundRequest.status,
+          latestStatus,
+          hasChanged: latestStatus !== fundRequest.status,
+        });
+
+        setCurrentStatus(latestStatus);
+
+        // If status changed, we need to update the display
+        if (latestStatus !== fundRequest.status) {
+          console.log("⚠️ Status changed! Updating display...");
+          if (latestStatus === "fulfilled" || latestStatus === "declined") {
+            setStep("completed");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error fetching current status:", error);
+    }
+  };
+
+  // Reset state when modal opens/closes and fetch current status
   useEffect(() => {
     if (isOpen) {
+      console.log("🔄 Fund request modal opened - checking status...");
       setStep("review");
       setTransferResult(null);
       setError("");
       setRequesterInfo(null);
-      // Check if we have the wallet address in the fund request
+      setCurrentStatus(fundRequest.status);
+
+      // STRICT: Always fetch current status first
+      fetchCurrentStatus();
+
+      // Set initial step based on status
+      if (isProcessed) {
+        console.log("🚫 Fund request already processed:", currentStatus);
+        setStep("completed");
+      }
+
+      // Handle wallet address
       if (fundRequest.requesterWalletAddress) {
         console.log(
           "✅ Using wallet address from fund request:",
@@ -102,7 +169,6 @@ export default function FundRequestModal({
           displayName: fundRequest.requesterUsername,
         });
       } else {
-        // Fallback: Fetch requester wallet address if not in fund request
         fetchRequesterInfo();
       }
     }
@@ -116,7 +182,6 @@ export default function FundRequestModal({
         fundRequest.requesterUsername
       );
 
-      // Call the API to get user wallet address by username (as fallback)
       const response = await fetch(
         `/api/users/by-username/${fundRequest.requesterUsername}`,
         {
@@ -156,7 +221,6 @@ export default function FundRequestModal({
 
   const fetchRequesterFromFriends = async () => {
     try {
-      // Try to get wallet address from friends list as fallback
       const response = await fetch("/api/friends?type=friends", {
         credentials: "include",
       });
@@ -200,14 +264,24 @@ export default function FundRequestModal({
   };
 
   const getTokenInfo = () => {
-    // Find the token in user's wallet
     const token = tokens.find((t) => t.symbol === fundRequest.tokenSymbol);
     return token || null;
   };
 
+  // STRICT: Block decline action if already processed
   const handleDecline = async () => {
+    // STRICT: Double-check status before proceeding
+    await fetchCurrentStatus();
+
+    if (!canTakeAction) {
+      setError(`Cannot decline: Fund request is already ${currentStatus}`);
+      return;
+    }
+
     try {
       setLoading(true);
+      console.log("🚫 Declining fund request:", fundRequest.requestId);
+
       const response = await fetch(
         `/api/friends/fund-request/${fundRequest.requestId}`,
         {
@@ -220,12 +294,25 @@ export default function FundRequestModal({
         }
       );
 
+      const data = await response.json();
+
       if (response.ok) {
+        console.log("✅ Fund request declined successfully");
+        setCurrentStatus("declined");
+        setStep("completed");
         onDeclined?.();
-        onClose();
       } else {
-        const data = await response.json();
-        setError(data.error || "Failed to decline request");
+        if (
+          data.error?.includes("already processed") ||
+          data.error?.includes("not found")
+        ) {
+          // Fund request already processed by someone else
+          setError("This fund request has already been processed");
+          setCurrentStatus("declined");
+          setStep("completed");
+        } else {
+          setError(data.error || "Failed to decline request");
+        }
       }
     } catch (error) {
       setError("Failed to decline request");
@@ -234,14 +321,22 @@ export default function FundRequestModal({
     }
   };
 
+  // STRICT: Block fulfill action if already processed
   const handleFulfill = async () => {
+    // STRICT: Double-check status before proceeding
+    await fetchCurrentStatus();
+
+    if (!canTakeAction) {
+      setError(`Cannot fulfill: Fund request is already ${currentStatus}`);
+      return;
+    }
+
     const tokenInfo = getTokenInfo();
     if (!tokenInfo || !activeWallet) {
       setError("Token not found in wallet or no active wallet");
       return;
     }
 
-    // Use the wallet address from the fund request first
     let recipientWalletAddress = null;
 
     if (fundRequest.requesterWalletAddress) {
@@ -270,8 +365,8 @@ export default function FundRequestModal({
     }
 
     console.log("🚀 Fulfilling fund request with Enhanced API:", {
-      from: activeWallet.address, // Current user's wallet (sender)
-      to: recipientWalletAddress, // Requester's wallet (recipient) - from fund request
+      from: activeWallet.address,
+      to: recipientWalletAddress,
       amount: fundRequest.amount,
       token: fundRequest.tokenSymbol,
       usingEnhancedAPI: true,
@@ -281,7 +376,6 @@ export default function FundRequestModal({
       setLoading(true);
       setStep("sending");
 
-      // ENHANCED: Use the new enhanced simple transfer API
       const transferResponse = await fetch("/api/transfer/simple", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -296,10 +390,10 @@ export default function FundRequestModal({
               tokenInfo.contractAddress === "native" ||
               tokenInfo.symbol === "ETH",
           },
-          recipientAddress: recipientWalletAddress, // Send TO the requester's wallet (from fund request)
+          recipientAddress: recipientWalletAddress,
           amount: fundRequest.amount,
-          fromAddress: activeWallet.address, // Send FROM current user's wallet
-          useStoredKey: true, // Use stored private key
+          fromAddress: activeWallet.address,
+          useStoredKey: true,
         }),
         credentials: "include",
       });
@@ -320,7 +414,6 @@ export default function FundRequestModal({
           "✅ Enhanced transfer successful, updating fund request status..."
         );
 
-        // Update the fund request status
         const updateResponse = await fetch(
           `/api/friends/fund-request/${fundRequest.requestId}`,
           {
@@ -336,9 +429,20 @@ export default function FundRequestModal({
 
         if (updateResponse.ok) {
           console.log("✅ Fund request status updated");
+          setCurrentStatus("fulfilled");
           onFulfilled?.();
         } else {
-          console.warn("⚠️ Failed to update fund request status");
+          const updateData = await updateResponse.json();
+          if (updateData.error?.includes("already processed")) {
+            console.warn(
+              "⚠️ Fund request was already processed by someone else"
+            );
+            setError("This fund request was already processed by someone else");
+            setCurrentStatus("fulfilled");
+            setStep("completed");
+          } else {
+            console.warn("⚠️ Failed to update fund request status");
+          }
         }
       } else {
         console.error("❌ Enhanced transfer failed:", transferData.error);
@@ -354,13 +458,53 @@ export default function FundRequestModal({
     }
   };
 
-  const isExpired = new Date() > new Date(fundRequest.expiresAt);
+  const getStatusDisplay = () => {
+    switch (currentStatus) {
+      case "fulfilled":
+        return {
+          icon: <CheckCircle size={24} className="text-green-400" />,
+          title: "Fund Request Fulfilled",
+          message: "This fund request has been successfully fulfilled",
+          color: "text-green-400",
+          bgColor: "bg-green-900/20",
+          borderColor: "border-green-500/50",
+        };
+      case "declined":
+        return {
+          icon: <XCircle size={24} className="text-red-400" />,
+          title: "Fund Request Declined",
+          message: "This fund request has been declined",
+          color: "text-red-400",
+          bgColor: "bg-red-900/20",
+          borderColor: "border-red-500/50",
+        };
+      case "expired":
+        return {
+          icon: <Clock size={24} className="text-yellow-400" />,
+          title: "Fund Request Expired",
+          message: "This fund request has expired",
+          color: "text-yellow-400",
+          bgColor: "bg-yellow-900/20",
+          borderColor: "border-yellow-500/50",
+        };
+      case "cancelled":
+        return {
+          icon: <Ban size={24} className="text-gray-400" />,
+          title: "Fund Request Cancelled",
+          message: "This fund request has been cancelled",
+          color: "text-gray-400",
+          bgColor: "bg-gray-900/20",
+          borderColor: "border-gray-500/50",
+        };
+      default:
+        return null;
+    }
+  };
+
   const tokenInfo = getTokenInfo();
   const hasInsufficientBalance =
     tokenInfo &&
     parseFloat(tokenInfo.balanceFormatted) < parseFloat(fundRequest.amount);
-
-  // Get the correct wallet address to display
   const requesterWalletAddress =
     fundRequest.requesterWalletAddress || requesterInfo?.walletAddress;
 
@@ -383,10 +527,12 @@ export default function FundRequestModal({
                 Fund Request {step === "sending" && "(Enhanced API)"}
               </h3>
               <p className="text-gray-400 text-sm font-satoshi">
-                {step === "review" && "Review request details"}
+                {step === "review" && !canTakeAction && "Already processed"}
+                {step === "review" && canTakeAction && "Review request details"}
                 {step === "sending" && "Processing with enhanced API..."}
                 {step === "success" && "Transfer completed!"}
                 {step === "error" && "Transfer failed"}
+                {step === "completed" && "Request completed"}
               </p>
             </div>
           </div>
@@ -400,7 +546,104 @@ export default function FundRequestModal({
 
         {/* Content */}
         <div className="p-6">
-          {step === "review" && (
+          {/* STRICT: Show completed status for processed requests */}
+          {(step === "completed" || isProcessed) && (
+            <div className="space-y-6">
+              {(() => {
+                const statusDisplay = getStatusDisplay();
+                if (!statusDisplay) return null;
+
+                return (
+                  <div className="text-center">
+                    <div
+                      className={`w-16 h-16 ${statusDisplay.bgColor} rounded-full flex items-center justify-center mx-auto mb-4 border ${statusDisplay.borderColor}`}
+                    >
+                      {statusDisplay.icon}
+                    </div>
+                    <h4
+                      className={`${statusDisplay.color} font-semibold font-satoshi mb-2`}
+                    >
+                      {statusDisplay.title}
+                    </h4>
+                    <p className="text-gray-400 text-sm font-satoshi">
+                      {statusDisplay.message}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Request Details */}
+              <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 text-sm font-satoshi">
+                      Amount:
+                    </span>
+                    <span className="text-white font-semibold font-satoshi">
+                      {fundRequest.amount} {fundRequest.tokenSymbol}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 text-sm font-satoshi">
+                      Requester:
+                    </span>
+                    <span className="text-white font-semibold font-satoshi">
+                      @{fundRequest.requesterUsername}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 text-sm font-satoshi">
+                      Status:
+                    </span>
+                    <span
+                      className={`font-semibold font-satoshi ${
+                        getStatusDisplay()?.color || "text-white"
+                      }`}
+                    >
+                      {currentStatus.charAt(0).toUpperCase() +
+                        currentStatus.slice(1)}
+                    </span>
+                  </div>
+                  {fundRequest.respondedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        Responded:
+                      </span>
+                      <span className="text-white text-sm font-satoshi">
+                        {new Date(fundRequest.respondedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {fundRequest.transactionHash && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        Transaction:
+                      </span>
+                      <button
+                        onClick={() =>
+                          window.open(
+                            `https://etherscan.io/tx/${fundRequest.transactionHash}`,
+                            "_blank"
+                          )
+                        }
+                        className="text-[#E2AF19] text-sm font-satoshi hover:opacity-80 transition-opacity flex items-center"
+                      >
+                        <ExternalLink size={12} className="mr-1" />
+                        View on Explorer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Button onClick={onClose} className="w-full">
+                Close
+              </Button>
+            </div>
+          )}
+
+          {/* Original review step - only show if pending and can take action */}
+          {step === "review" && canTakeAction && (
             <div className="space-y-6">
               {/* Enhanced API Badge */}
               <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3">
@@ -469,11 +712,11 @@ export default function FundRequestModal({
                     </span>
                     <span
                       className={`text-sm font-satoshi ${
-                        isExpired ? "text-red-400" : "text-white"
+                        isExpired() ? "text-red-400" : "text-white"
                       }`}
                     >
                       {new Date(fundRequest.expiresAt).toLocaleDateString()}
-                      {isExpired && " (Expired)"}
+                      {isExpired() && " (Expired)"}
                     </span>
                   </div>
 
@@ -640,21 +883,21 @@ export default function FundRequestModal({
                 </div>
               )}
 
-              {/* Action Buttons */}
+              {/* Action Buttons - Only show if can take action */}
               <div className="flex gap-3 pt-4">
                 <Button
                   variant="secondary"
                   onClick={handleDecline}
-                  disabled={loading}
+                  disabled={loading || !canTakeAction}
                   className="flex-1"
                 >
-                  Decline
+                  {!canTakeAction ? "Cannot Decline" : "Decline"}
                 </Button>
                 <Button
                   onClick={handleFulfill}
                   disabled={
                     loading ||
-                    isExpired ||
+                    !canTakeAction ||
                     !tokenInfo ||
                     hasInsufficientBalance ||
                     loadingRequester ||
@@ -667,12 +910,52 @@ export default function FundRequestModal({
                     ? "Processing..."
                     : loadingRequester
                     ? "Loading..."
+                    : !canTakeAction
+                    ? "Cannot Send"
                     : `Send ${fundRequest.tokenSymbol} (Enhanced)`}
                 </Button>
               </div>
             </div>
           )}
 
+          {/* STRICT: Show warning if trying to access processed request */}
+          {step === "review" && !canTakeAction && (
+            <div className="space-y-6">
+              {(() => {
+                const statusDisplay = getStatusDisplay();
+                if (!statusDisplay) return null;
+
+                return (
+                  <div
+                    className={`${statusDisplay.bgColor} border ${statusDisplay.borderColor} rounded-lg p-4`}
+                  >
+                    <div className="flex items-start">
+                      {statusDisplay.icon}
+                      <div className="ml-3">
+                        <p
+                          className={`${statusDisplay.color} text-sm font-satoshi font-medium mb-1`}
+                        >
+                          {statusDisplay.title}
+                        </p>
+                        <p
+                          className={`${statusDisplay.color} text-xs font-satoshi`}
+                        >
+                          {statusDisplay.message}. No further action can be
+                          taken on this request.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <Button onClick={onClose} className="w-full">
+                Close
+              </Button>
+            </div>
+          )}
+
+          {/* Rest of the existing steps (sending, success, error) remain the same */}
           {step === "sending" && (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19] mx-auto mb-4"></div>
