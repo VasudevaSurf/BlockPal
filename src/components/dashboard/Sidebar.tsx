@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx (UPDATED - Added User Profile)
+// src/components/dashboard/Sidebar.tsx (UPDATED - Added Navigation Loading)
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -12,9 +12,11 @@ import {
   User,
   ExternalLink,
   Moon,
+  RefreshCw,
 } from "lucide-react";
 import { RootState } from "@/store";
 import { toggleTheme } from "@/store/slices/uiSlice";
+import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 
 const menuItems = [
   {
@@ -61,10 +63,29 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { isLoading, startLoading } = useNavigationLoading();
 
-  const handleNavigation = (href: string) => {
-    router.push(href);
-    onItemClick?.();
+  const handleNavigation = (href: string, event?: React.MouseEvent) => {
+    // Prevent navigation if already loading
+    if (isLoading) {
+      event?.preventDefault();
+      return;
+    }
+
+    // Don't show loading if we're already on this page
+    if (pathname === href) {
+      onItemClick?.();
+      return;
+    }
+
+    // Start loading and navigate
+    startLoading();
+
+    // Small delay to ensure loading state is visible
+    setTimeout(() => {
+      router.push(href);
+      onItemClick?.();
+    }, 100);
   };
 
   return (
@@ -137,14 +158,22 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
             return (
               <button
                 key={item.label}
-                onClick={() => handleNavigation(item.href)}
+                onClick={(e) => handleNavigation(item.href, e)}
+                disabled={isLoading}
                 className={`w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
                   isActive
                     ? "bg-[#E2AF19] text-black font-medium"
                     : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
-                }`}
+                } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                <item.icon size={18} className="mr-3 flex-shrink-0" />
+                {isLoading && pathname !== item.href ? (
+                  <RefreshCw
+                    size={18}
+                    className="mr-3 flex-shrink-0 animate-spin"
+                  />
+                ) : (
+                  <item.icon size={18} className="mr-3 flex-shrink-0" />
+                )}
                 <span className={isActive ? "font-medium" : ""}>
                   {item.label}
                 </span>
@@ -174,14 +203,22 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
             return (
               <button
                 key={item.label}
-                onClick={() => handleNavigation(item.href)}
+                onClick={(e) => handleNavigation(item.href, e)}
+                disabled={isLoading}
                 className={`w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
                   isActive
                     ? "bg-[#E2AF19] text-black font-medium"
                     : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
-                }`}
+                } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                <item.icon size={18} className="mr-3 flex-shrink-0" />
+                {isLoading && pathname !== item.href ? (
+                  <RefreshCw
+                    size={18}
+                    className="mr-3 flex-shrink-0 animate-spin"
+                  />
+                ) : (
+                  <item.icon size={18} className="mr-3 flex-shrink-0" />
+                )}
                 <span className={isActive ? "font-medium" : ""}>
                   {item.label}
                 </span>
@@ -189,7 +226,10 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
             );
           })}
 
-          <button className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base">
+          <button
+            className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
+            disabled={isLoading}
+          >
             <ExternalLink size={18} className="mr-3 flex-shrink-0" />
             <span className="truncate">Go to website</span>
             <div className="ml-auto flex-shrink-0">
@@ -199,6 +239,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
           <button
             onClick={() => dispatch(toggleTheme())}
+            disabled={isLoading}
             className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
           >
             <Moon size={18} className="mr-3 flex-shrink-0" />

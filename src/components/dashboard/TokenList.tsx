@@ -1,6 +1,4 @@
-// Add this to TokenList.tsx temporarily for debugging the 24h change issue
-
-// src/components/dashboard/TokenList.tsx - DEBUG VERSION
+// src/components/dashboard/TokenList.tsx - UPDATED WITH NAVIGATION LOADING
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -8,7 +6,9 @@ import { useSelector, useDispatch } from "react-redux";
 import { useEffect, useRef } from "react";
 import { RootState, AppDispatch } from "@/store";
 import { fetchWalletTokens } from "@/store/slices/walletSlice";
+import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import WalletRefreshButton from "@/components/wallet/WalletRefreshButton";
+import { RefreshCw } from "lucide-react";
 
 export default function TokenList() {
   const router = useRouter();
@@ -16,6 +16,7 @@ export default function TokenList() {
   const { tokens, activeWallet, loading } = useSelector(
     (state: RootState) => state.wallet
   );
+  const { isLoading: isNavigating, startLoading } = useNavigationLoading();
 
   // Use ref to prevent duplicate API calls
   const tokensLoaded = useRef<string | null>(null);
@@ -133,6 +134,11 @@ export default function TokenList() {
   };
 
   const handleTokenClick = (token: any) => {
+    // Prevent navigation if already navigating
+    if (isNavigating) {
+      return;
+    }
+
     // Debug logging
     console.log("🔍 Token clicked:", {
       tokenId: token.id,
@@ -170,7 +176,14 @@ export default function TokenList() {
         routeContractAddress
       )}?wallet=${encodeURIComponent(activeWallet.address)}`;
       console.log("🔗 Navigating to:", url);
-      router.push(url);
+
+      // Start loading state before navigation
+      startLoading();
+
+      // Small delay to ensure loading state is visible
+      setTimeout(() => {
+        router.push(url);
+      }, 100);
     } catch (error) {
       console.error("❌ Navigation error:", error);
       alert("Failed to navigate to token details. Please try again.");
@@ -300,44 +313,55 @@ export default function TokenList() {
             <div
               key={token.id}
               onClick={() => handleTokenClick(token)}
-              className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] cursor-pointer hover:bg-[#1A1A1A] transition-colors active:bg-[#2A2A2A]"
+              className={`bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] cursor-pointer transition-colors ${
+                isNavigating
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+              }`}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
-                  {/* FIXED: Better icon handling - check API icon first */}
-                  {isValidImageUrl(token.icon) ? (
-                    <img
-                      src={token.icon}
-                      alt={token.symbol}
-                      className="w-8 h-8 rounded-full mr-3 flex-shrink-0"
-                      onError={(e) => {
-                        console.log(
-                          `❌ Image load failed for ${token.symbol}: ${token.icon}`
-                        );
-                        // Fallback to colored circle if image fails
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = "none";
-                        const fallback =
-                          target.nextElementSibling as HTMLElement;
-                        if (fallback) {
-                          fallback.classList.remove("hidden");
-                        }
-                      }}
-                    />
-                  ) : null}
+                  {/* Show loading spinner if navigating */}
+                  {isNavigating ? (
+                    <RefreshCw className="w-8 h-8 text-[#E2AF19] animate-spin mr-3 flex-shrink-0" />
+                  ) : (
+                    <>
+                      {/* FIXED: Better icon handling - check API icon first */}
+                      {isValidImageUrl(token.icon) ? (
+                        <img
+                          src={token.icon}
+                          alt={token.symbol}
+                          className="w-8 h-8 rounded-full mr-3 flex-shrink-0"
+                          onError={(e) => {
+                            console.log(
+                              `❌ Image load failed for ${token.symbol}: ${token.icon}`
+                            );
+                            // Fallback to colored circle if image fails
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = "none";
+                            const fallback =
+                              target.nextElementSibling as HTMLElement;
+                            if (fallback) {
+                              fallback.classList.remove("hidden");
+                            }
+                          }}
+                        />
+                      ) : null}
 
-                  <div
-                    className={`w-8 h-8 ${getTokenIcon(
-                      token.symbol,
-                      token.contractAddress
-                    )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
-                      isValidImageUrl(token.icon) ? "hidden" : ""
-                    }`}
-                  >
-                    <span className="text-white text-sm font-medium">
-                      {getTokenLetter(token.symbol, token.contractAddress)}
-                    </span>
-                  </div>
+                      <div
+                        className={`w-8 h-8 ${getTokenIcon(
+                          token.symbol,
+                          token.contractAddress
+                        )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
+                          isValidImageUrl(token.icon) ? "hidden" : ""
+                        }`}
+                      >
+                        <span className="text-white text-sm font-medium">
+                          {getTokenLetter(token.symbol, token.contractAddress)}
+                        </span>
+                      </div>
+                    </>
+                  )}
 
                   <div className="min-w-0">
                     <div className="text-white font-medium font-satoshi">
@@ -358,13 +382,6 @@ export default function TokenList() {
                     }`}
                   >
                     {formatPercentage(token.change24h)}
-                    {/* DEBUG: Show raw value for ETH */}
-                    {process.env.NODE_ENV === "development" &&
-                      token.symbol === "ETH" && (
-                        <span className="ml-1 text-xs text-gray-500">
-                          (raw: {token.change24h})
-                        </span>
-                      )}
                   </div>
                 </div>
               </div>
@@ -380,54 +397,58 @@ export default function TokenList() {
             <div
               key={token.id}
               onClick={() => handleTokenClick(token)}
-              className="flex items-center justify-between p-3 hover:bg-[#1A1A1A] rounded-lg transition-colors cursor-pointer active:bg-[#2A2A2A]"
+              className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                isNavigating
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-[#1A1A1A] cursor-pointer active:bg-[#2A2A2A]"
+              }`}
             >
               <div className="flex items-center min-w-0 flex-1">
-                {/* FIXED: Better icon handling - check API icon first */}
-                {isValidImageUrl(token.icon) ? (
-                  <img
-                    src={token.icon}
-                    alt={token.symbol}
-                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-3 flex-shrink-0"
-                    onError={(e) => {
-                      console.log(
-                        `❌ Image load failed for ${token.symbol}: ${token.icon}`
-                      );
-                      // Fallback to colored circle if image fails
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                      const fallback = target.nextElementSibling as HTMLElement;
-                      if (fallback) {
-                        fallback.classList.remove("hidden");
-                      }
-                    }}
-                  />
-                ) : null}
+                {/* Show loading spinner if navigating */}
+                {isNavigating ? (
+                  <RefreshCw className="w-10 h-10 text-[#E2AF19] animate-spin mr-3 flex-shrink-0" />
+                ) : (
+                  <>
+                    {/* FIXED: Better icon handling - check API icon first */}
+                    {isValidImageUrl(token.icon) ? (
+                      <img
+                        src={token.icon}
+                        alt={token.symbol}
+                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-3 flex-shrink-0"
+                        onError={(e) => {
+                          console.log(
+                            `❌ Image load failed for ${token.symbol}: ${token.icon}`
+                          );
+                          // Fallback to colored circle if image fails
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          const fallback =
+                            target.nextElementSibling as HTMLElement;
+                          if (fallback) {
+                            fallback.classList.remove("hidden");
+                          }
+                        }}
+                      />
+                    ) : null}
 
-                <div
-                  className={`w-8 h-8 sm:w-10 sm:h-10 ${getTokenIcon(
-                    token.symbol,
-                    token.contractAddress
-                  )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
-                    isValidImageUrl(token.icon) ? "hidden" : ""
-                  }`}
-                >
-                  <span className="text-white text-sm font-medium">
-                    {getTokenLetter(token.symbol, token.contractAddress)}
-                  </span>
-                </div>
+                    <div
+                      className={`w-8 h-8 sm:w-10 sm:h-10 ${getTokenIcon(
+                        token.symbol,
+                        token.contractAddress
+                      )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
+                        isValidImageUrl(token.icon) ? "hidden" : ""
+                      }`}
+                    >
+                      <span className="text-white text-sm font-medium">
+                        {getTokenLetter(token.symbol, token.contractAddress)}
+                      </span>
+                    </div>
+                  </>
+                )}
 
                 <div className="min-w-0 flex-1">
                   <div className="text-white font-medium font-satoshi text-sm sm:text-base flex items-center">
                     {token.name}
-                    {/* Debug indicator */}
-                    {process.env.NODE_ENV === "development" && (
-                      <span className="ml-2 text-xs text-gray-500">
-                        {token.contractAddress === "native"
-                          ? "(ETH)"
-                          : "(ERC20)"}
-                      </span>
-                    )}
                   </div>
                   <div className="text-gray-400 text-xs sm:text-sm font-satoshi">
                     {token.balance.toFixed(4)} {token.symbol}
@@ -445,13 +466,6 @@ export default function TokenList() {
                   }`}
                 >
                   {formatPercentage(token.change24h)}
-                  {/* DEBUG: Show raw value for ETH */}
-                  {process.env.NODE_ENV === "development" &&
-                    token.symbol === "ETH" && (
-                      <span className="ml-1 text-xs text-gray-500">
-                        (raw: {token.change24h})
-                      </span>
-                    )}
                 </div>
               </div>
             </div>
