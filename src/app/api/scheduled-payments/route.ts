@@ -1,4 +1,4 @@
-// src/app/api/scheduled-payments/route.ts (FIXED FOR ERC20 TOKEN APPROVAL)
+// src/app/api/scheduled-payments/route.ts (FIXED FOR API INTEGRATION)
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -310,6 +310,7 @@ export async function POST(request: NextRequest) {
 
     if (action === "preview") {
       console.log("📊 Creating scheduled payment preview");
+      console.log("🔍 Raw request body:", JSON.stringify(body, null, 2));
 
       const {
         tokenInfo,
@@ -321,28 +322,87 @@ export async function POST(request: NextRequest) {
         timezone,
       } = body;
 
-      if (
-        !tokenInfo ||
-        !fromAddress ||
-        !recipient ||
-        !amount ||
-        !scheduledFor
-      ) {
+      console.log("🔍 Extracted tokenInfo:", tokenInfo);
+      console.log("🔍 TokenInfo type:", typeof tokenInfo);
+      console.log(
+        "🔍 TokenInfo properties:",
+        tokenInfo ? Object.keys(tokenInfo) : "tokenInfo is null/undefined"
+      );
+
+      // Enhanced validation with detailed error messages
+      if (!tokenInfo) {
+        console.error("❌ tokenInfo is missing from request");
         return NextResponse.json(
-          { error: "Missing required fields for preview" },
+          { error: "tokenInfo is required for preview" },
+          { status: 400 }
+        );
+      }
+
+      if (!fromAddress) {
+        console.error("❌ fromAddress is missing from request");
+        return NextResponse.json(
+          { error: "fromAddress is required for preview" },
+          { status: 400 }
+        );
+      }
+
+      if (!recipient) {
+        console.error("❌ recipient is missing from request");
+        return NextResponse.json(
+          { error: "recipient is required for preview" },
+          { status: 400 }
+        );
+      }
+
+      if (!amount) {
+        console.error("❌ amount is missing from request");
+        return NextResponse.json(
+          { error: "amount is required for preview" },
+          { status: 400 }
+        );
+      }
+
+      if (!scheduledFor) {
+        console.error("❌ scheduledFor is missing from request");
+        return NextResponse.json(
+          { error: "scheduledFor is required for preview" },
           { status: 400 }
         );
       }
 
       try {
+        // FIXED: More robust tokenInfo formatting with extensive validation
+        const formattedTokenInfo = {
+          name:
+            (tokenInfo && tokenInfo.name) ||
+            (tokenInfo && tokenInfo.symbol) ||
+            "Unknown Token",
+          symbol: (tokenInfo && tokenInfo.symbol) || "UNKNOWN",
+          contractAddress: (tokenInfo && tokenInfo.contractAddress) || "native",
+          decimals:
+            tokenInfo && typeof tokenInfo.decimals === "number"
+              ? tokenInfo.decimals
+              : 18,
+          isETH: !!(
+            tokenInfo &&
+            (tokenInfo.isETH ||
+              tokenInfo.contractAddress === "native" ||
+              tokenInfo.symbol === "ETH")
+          ),
+        };
+
+        console.log("🔧 Formatted token info:", formattedTokenInfo);
+
         // Create preview using enhanced service
         const preview =
           await enhancedSimpleTransferService.createTransferPreview(
-            tokenInfo,
+            formattedTokenInfo,
             fromAddress,
             recipient,
             amount
           );
+
+        console.log("🔍 Enhanced service preview result:", preview);
 
         // Add scheduled payment specific information
         const scheduledDate = new Date(scheduledFor);
@@ -376,11 +436,36 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if approval is required for ERC20 tokens
-        const isETH = tokenInfo.isETH || tokenInfo.contractAddress === "native";
+        const isETH =
+          formattedTokenInfo.isETH ||
+          formattedTokenInfo.contractAddress === "native";
         const approvalRequired = !isETH;
 
+        // FIXED: Ensure preview structure is consistent and safe
         const scheduledPreview = {
-          ...preview,
+          // Core transfer info from enhanced service
+          network: preview.network || "Ethereum Mainnet",
+          tokenName: preview.tokenName || formattedTokenInfo.name,
+          tokenSymbol: preview.tokenSymbol || formattedTokenInfo.symbol,
+          contractAddress:
+            preview.contractAddress || formattedTokenInfo.contractAddress,
+          fromAddress: preview.fromAddress || fromAddress,
+          toAddress: preview.toAddress || recipient,
+          amount: preview.amount || amount,
+          tokenPrice: preview.tokenPrice,
+          valueUSD: preview.valueUSD,
+          gasEstimation: preview.gasEstimation || {
+            gasPrice: "20",
+            estimatedGas: isETH ? "21000" : "65000",
+            gasCostETH: isETH ? "0.00042" : "0.0013",
+            gasCostUSD: isETH ? "1.47" : "4.55",
+            maxFeePerGas: "20000000000",
+            priorityFee: "2000000000",
+            baseFeePerGas: "20000000000",
+            ethPrice: 3500,
+          },
+
+          // Scheduled payment specific info
           scheduledFor: scheduledDate,
           frequency,
           nextExecutions,
@@ -388,7 +473,21 @@ export async function POST(request: NextRequest) {
           currentAllowance: approvalRequired ? "0" : undefined,
           requiredAllowance: approvalRequired ? amount : undefined,
           timezone,
+
+          // Add tokenInfo object for frontend compatibility
+          tokenInfo: {
+            name: formattedTokenInfo.name,
+            symbol: formattedTokenInfo.symbol,
+            contractAddress: formattedTokenInfo.contractAddress,
+            decimals: formattedTokenInfo.decimals,
+            isETH: formattedTokenInfo.isETH,
+          },
         };
+
+        console.log(
+          "✅ Final scheduled preview structure:",
+          JSON.stringify(scheduledPreview, null, 2)
+        );
 
         return NextResponse.json({
           success: true,
@@ -405,6 +504,10 @@ export async function POST(request: NextRequest) {
 
     if (action === "create") {
       console.log("🚀 Creating scheduled payment");
+      console.log(
+        "🔍 Raw request body for create:",
+        JSON.stringify(body, null, 2)
+      );
 
       const {
         tokenInfo,
@@ -417,20 +520,80 @@ export async function POST(request: NextRequest) {
         description,
       } = body;
 
-      if (
-        !tokenInfo ||
-        !fromAddress ||
-        !recipient ||
-        !amount ||
-        !scheduledFor
-      ) {
+      console.log("🔍 Create - Extracted tokenInfo:", tokenInfo);
+      console.log("🔍 Create - TokenInfo type:", typeof tokenInfo);
+      console.log(
+        "🔍 Create - TokenInfo properties:",
+        tokenInfo ? Object.keys(tokenInfo) : "tokenInfo is null/undefined"
+      );
+
+      // Enhanced validation for create action
+      if (!tokenInfo) {
+        console.error("❌ tokenInfo is missing from create request");
         return NextResponse.json(
-          { error: "Missing required fields for creation" },
+          { error: "tokenInfo is required for creation" },
+          { status: 400 }
+        );
+      }
+
+      if (!fromAddress) {
+        console.error("❌ fromAddress is missing from create request");
+        return NextResponse.json(
+          { error: "fromAddress is required for creation" },
+          { status: 400 }
+        );
+      }
+
+      if (!recipient) {
+        console.error("❌ recipient is missing from create request");
+        return NextResponse.json(
+          { error: "recipient is required for creation" },
+          { status: 400 }
+        );
+      }
+
+      if (!amount) {
+        console.error("❌ amount is missing from create request");
+        return NextResponse.json(
+          { error: "amount is required for creation" },
+          { status: 400 }
+        );
+      }
+
+      if (!scheduledFor) {
+        console.error("❌ scheduledFor is missing from create request");
+        return NextResponse.json(
+          { error: "scheduledFor is required for creation" },
           { status: 400 }
         );
       }
 
       try {
+        // FIXED: More robust tokenInfo formatting for creation
+        const formattedTokenInfo = {
+          name:
+            (tokenInfo && tokenInfo.name) ||
+            (tokenInfo && tokenInfo.symbol) ||
+            "Unknown Token",
+          symbol: (tokenInfo && tokenInfo.symbol) || "UNKNOWN",
+          contractAddress: (tokenInfo && tokenInfo.contractAddress) || "native",
+          decimals:
+            tokenInfo && typeof tokenInfo.decimals === "number"
+              ? tokenInfo.decimals
+              : 18,
+          isETH: !!(
+            tokenInfo &&
+            (tokenInfo.isETH ||
+              tokenInfo.contractAddress === "native" ||
+              tokenInfo.symbol === "ETH")
+          ),
+        };
+
+        console.log(
+          "🔧 Formatted token info for creation:",
+          formattedTokenInfo
+        );
+
         // Generate unique schedule ID
         const scheduleId = `sched_${Date.now()}_${Math.random()
           .toString(36)
@@ -441,33 +604,36 @@ export async function POST(request: NextRequest) {
         const nextExecution =
           frequency === "once" ? scheduledDate : scheduledDate;
 
-        // Save to database
+        // Save to database with enhanced collection structure
         const { db } = await connectToDatabase();
 
         const scheduledPayment = {
           scheduleId,
           username: decoded.username,
           walletAddress: fromAddress,
-          tokenSymbol: tokenInfo.symbol,
-          tokenName: tokenInfo.name,
-          contractAddress: tokenInfo.contractAddress,
+          tokenSymbol: formattedTokenInfo.symbol,
+          tokenName: formattedTokenInfo.name,
+          contractAddress: formattedTokenInfo.contractAddress,
+          decimals: formattedTokenInfo.decimals,
           recipient,
           amount: amount.toString(),
           frequency: frequency || "once",
           status: "active",
           scheduledFor: scheduledDate,
-          nextExecution: nextExecution,
+          nextExecutionAt: nextExecution, // Use consistent field name
           executionCount: 0,
           maxExecutions: frequency === "once" ? 1 : 999, // Large number for recurring
           description: description || "",
           timezone: timezone || "UTC",
           createdAt: new Date(),
-          estimatedGas: "65000", // Default estimation
-          gasCostETH: "0.003", // Default estimation
-          gasCostUSD: "7.50", // Default estimation
+          updatedAt: new Date(),
+          // Enhanced service specific fields
+          isETH: formattedTokenInfo.isETH,
+          enhancedService: true,
         };
 
-        await db.collection("scheduled_payments").insertOne(scheduledPayment);
+        // Insert into schedules collection (consistent with other APIs)
+        await db.collection("schedules").insertOne(scheduledPayment);
 
         console.log("✅ Scheduled payment created:", scheduleId);
 
@@ -524,16 +690,42 @@ export async function GET(request: NextRequest) {
       query.walletAddress = walletAddress;
     }
 
+    // Query from schedules collection for consistency
     const scheduledPayments = await db
-      .collection("scheduled_payments")
+      .collection("schedules")
       .find(query)
       .sort({ createdAt: -1 })
       .limit(50)
       .toArray();
 
+    // Transform the data to match expected format
+    const transformedPayments = scheduledPayments.map((payment) => ({
+      id: payment._id.toString(),
+      scheduleId: payment.scheduleId,
+      walletAddress: payment.walletAddress,
+      tokenSymbol: payment.tokenSymbol,
+      tokenName: payment.tokenName,
+      contractAddress: payment.contractAddress,
+      recipient: payment.recipient,
+      amount: payment.amount,
+      frequency: payment.frequency || "once",
+      status: payment.status,
+      scheduledFor: payment.scheduledFor,
+      nextExecution: payment.nextExecutionAt,
+      executionCount: payment.executionCount || 0,
+      maxExecutions: payment.maxExecutions || 1,
+      description: payment.description,
+      createdAt: payment.createdAt,
+      lastExecutionAt: payment.lastExecutionAt,
+      timezone: payment.timezone,
+      estimatedGas: payment.estimatedGas || "65000",
+      gasCostETH: payment.gasCostETH || "0.003",
+      gasCostUSD: payment.gasCostUSD || "7.50",
+    }));
+
     return NextResponse.json({
       success: true,
-      scheduledPayments,
+      scheduledPayments: transformedPayments,
     });
   } catch (error: any) {
     console.error("💥 Get scheduled payments error:", error);

@@ -227,6 +227,8 @@ export default function ScheduledPaymentsPage() {
     return true;
   };
 
+  // Add this debug logging to your ScheduledPaymentsPage.tsx in the handleCreatePreview function
+
   const handleCreatePreview = async () => {
     console.log("🚀 Creating scheduled payment preview...");
 
@@ -242,9 +244,23 @@ export default function ScheduledPaymentsPage() {
       const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
+      // FIXED: Ensure tokenInfo is properly formatted
+      const tokenInfoForRequest = {
+        name: selectedToken.name || selectedToken.symbol || "Unknown Token",
+        symbol: selectedToken.symbol || "UNKNOWN",
+        contractAddress: selectedToken.contractAddress || "native",
+        decimals: selectedToken.decimals || 18,
+        isETH:
+          selectedToken.isETH ||
+          selectedToken.contractAddress === "native" ||
+          selectedToken.symbol === "ETH",
+      };
+
+      console.log("🔧 Token info being sent:", tokenInfoForRequest);
+
       const requestBody = {
         action: "preview",
-        tokenInfo: selectedToken,
+        tokenInfo: tokenInfoForRequest,
         fromAddress: activeWallet.address,
         recipient: formData.recipient,
         amount: formData.amount,
@@ -253,7 +269,10 @@ export default function ScheduledPaymentsPage() {
         timezone: selectedTimezone.tz,
       };
 
-      console.log("📡 Sending preview request:", requestBody);
+      console.log(
+        "📡 Sending preview request:",
+        JSON.stringify(requestBody, null, 2)
+      );
 
       const response = await fetch("/api/scheduled-payments", {
         method: "POST",
@@ -267,15 +286,62 @@ export default function ScheduledPaymentsPage() {
       console.log("📡 Response status:", response.status);
 
       const data = await response.json();
-      console.log("📡 Response data:", data);
+      console.log("📡 Full response data:", JSON.stringify(data, null, 2));
+
+      // DEBUG: Check the structure of data.preview
+      if (data.preview) {
+        console.log("🔍 Preview object:", data.preview);
+        console.log("🔍 Preview keys:", Object.keys(data.preview));
+        console.log("🔍 TokenInfo in preview:", data.preview.tokenInfo);
+        console.log("🔍 TokenName in preview:", data.preview.tokenName);
+        console.log("🔍 TokenSymbol in preview:", data.preview.tokenSymbol);
+      } else {
+        console.log("❌ No preview object in response");
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to create preview");
       }
 
-      setPreview(data.preview);
-      setShowPreview(true);
-      console.log("✅ Preview created successfully");
+      // SAFETY CHECK: Ensure preview has required properties before setting state
+      if (data.preview) {
+        // Add missing properties if they don't exist
+        const safePreview = {
+          ...data.preview,
+          tokenInfo: data.preview.tokenInfo || {
+            name: data.preview.tokenName || tokenInfoForRequest.name,
+            symbol: data.preview.tokenSymbol || tokenInfoForRequest.symbol,
+            contractAddress:
+              data.preview.contractAddress ||
+              tokenInfoForRequest.contractAddress,
+            decimals: tokenInfoForRequest.decimals,
+            isETH: tokenInfoForRequest.isETH,
+          },
+          // Ensure all required preview properties exist
+          network: data.preview.network || "Ethereum Mainnet",
+          fromAddress: data.preview.fromAddress || activeWallet.address,
+          toAddress: data.preview.toAddress || formData.recipient,
+          amount: data.preview.amount || formData.amount,
+          gasEstimation: data.preview.gasEstimation || {
+            gasPrice: "20",
+            estimatedGas: "21000",
+            gasCostETH: "0.00042",
+            gasCostUSD: "1.47",
+          },
+          scheduledFor: scheduledDateTime,
+          frequency,
+          nextExecutions: data.preview.nextExecutions || [],
+          approvalRequired: data.preview.approvalRequired || false,
+          timezone: selectedTimezone.tz,
+        };
+
+        console.log("✅ Safe preview object:", safePreview);
+        setPreview(safePreview);
+        setShowPreview(true);
+        console.log("✅ Preview created successfully");
+      } else {
+        throw new Error("Invalid preview response structure");
+      }
     } catch (err: any) {
       console.error("❌ Preview error:", err);
       setError(err.message || "Failed to create preview");
@@ -321,9 +387,23 @@ export default function ScheduledPaymentsPage() {
       const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
+      // FIXED: Ensure tokenInfo is properly formatted for creation too
+      const tokenInfoForRequest = {
+        name: selectedToken.name || selectedToken.symbol || "Unknown Token",
+        symbol: selectedToken.symbol || "UNKNOWN",
+        contractAddress: selectedToken.contractAddress || "native",
+        decimals: selectedToken.decimals || 18,
+        isETH:
+          selectedToken.isETH ||
+          selectedToken.contractAddress === "native" ||
+          selectedToken.symbol === "ETH",
+      };
+
+      console.log("🔧 Token info for creation:", tokenInfoForRequest);
+
       const createBody = {
         action: "create",
-        tokenInfo: selectedToken,
+        tokenInfo: tokenInfoForRequest, // Use the properly formatted token info
         fromAddress: activeWallet.address,
         recipient: formData.recipient,
         amount: formData.amount,
@@ -333,7 +413,10 @@ export default function ScheduledPaymentsPage() {
         description: formData.description,
       };
 
-      console.log("📡 Sending create request:", createBody);
+      console.log(
+        "📡 Sending create request:",
+        JSON.stringify(createBody, null, 2)
+      );
 
       const response = await fetch("/api/scheduled-payments", {
         method: "POST",
