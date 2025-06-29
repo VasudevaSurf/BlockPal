@@ -1,4 +1,4 @@
-// src/lib/enhanced-web-scheduled-payment-executor.ts (NEW - Enhanced Payment Executor)
+// src/lib/enhanced-web-scheduled-payment-executor.ts (FIXED - API Integration)
 import { enhancedScheduledPaymentsService } from "./enhanced-scheduled-payments-service";
 
 interface ScheduledPayment {
@@ -132,7 +132,7 @@ class EnhancedWebScheduledPaymentExecutor {
     console.log("🔍 Enhanced executor checking for due payments...");
 
     try {
-      // Fetch due payments from the API
+      // FIXED: Fetch due payments from the corrected API
       const duePayments = await this.fetchDuePayments();
 
       if (duePayments.length === 0) {
@@ -161,21 +161,29 @@ class EnhancedWebScheduledPaymentExecutor {
     }
   }
 
-  // Fetch due payments from the server
+  // FIXED: Fetch due payments from the corrected server endpoint
   private async fetchDuePayments(): Promise<ScheduledPayment[]> {
     try {
-      const response = await fetch("/api/scheduled-payments?status=active", {
+      // FIXED: Use the due payments endpoint
+      const response = await fetch("/api/scheduled-payments/due", {
         credentials: "include",
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          `❌ HTTP ${response.status}: ${response.statusText}`,
+          errorText
+        );
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+
+      // FIXED: Use correct field name from the API response
       const allPayments = data.scheduledPayments || [];
 
-      // Filter for due payments
+      // Additional client-side filtering for due payments
       const now = new Date();
       const duePayments = allPayments.filter((payment: ScheduledPayment) => {
         const executionTime = new Date(
@@ -183,10 +191,22 @@ class EnhancedWebScheduledPaymentExecutor {
         );
         const timeDiff = executionTime.getTime() - now.getTime();
 
-        // Execute if due within 5 minutes
-        return timeDiff <= 5 * 60 * 1000 && timeDiff >= -5 * 60 * 1000;
+        // Execute if due within 5 minutes or overdue
+        const isDue = timeDiff <= 5 * 60 * 1000;
+
+        if (isDue) {
+          console.log(`⏰ Payment ${payment.scheduleId} is due for execution`, {
+            executionTime: executionTime.toISOString(),
+            timeDiff: Math.round(timeDiff / 60000) + " minutes",
+            amount: payment.amount,
+            token: payment.tokenSymbol,
+          });
+        }
+
+        return isDue;
       });
 
+      console.log(`🎯 Filtered to ${duePayments.length} actually due payments`);
       return duePayments;
     } catch (error) {
       console.error("❌ Error fetching due payments (Enhanced API):", error);
@@ -207,7 +227,7 @@ class EnhancedWebScheduledPaymentExecutor {
     console.log(`🚀 Executing scheduled payment (Enhanced API): ${scheduleId}`);
 
     try {
-      // Execute using enhanced API
+      // FIXED: Execute using enhanced API with proper tokenInfo structure
       const result =
         await enhancedScheduledPaymentsService.executeScheduledPayment(
           {
@@ -234,12 +254,15 @@ class EnhancedWebScheduledPaymentExecutor {
 
         this.executedPayments.push(scheduleId);
 
-        // Update the payment status via API
-        await this.updatePaymentStatus(scheduleId, "executed", {
+        // FIXED: Update the payment status via the correct API
+        await this.updatePaymentStatus(scheduleId, "update_after_execution", {
           transactionHash: result.transactionHash,
           gasUsed: result.gasUsed,
-          actualCostETH: result.actualCostETH,
-          actualCostUSD: result.actualCostUSD,
+          blockNumber: result.blockNumber,
+          actualCostETH: result.actualCostETH?.replace("$", "") || "0",
+          actualCostUSD: result.actualCostUSD?.replace("$", "") || "0",
+          executedAt: new Date().toISOString(),
+          executorId: this.executorId,
           enhancedAPI: true,
         });
 
@@ -255,8 +278,9 @@ class EnhancedWebScheduledPaymentExecutor {
         );
         this.failedPayments.push(scheduleId);
 
-        await this.updatePaymentStatus(scheduleId, "failed", {
+        await this.updatePaymentStatus(scheduleId, "mark_failed", {
           error: result.error,
+          executorId: this.executorId,
           enhancedAPI: true,
         });
 
@@ -272,8 +296,9 @@ class EnhancedWebScheduledPaymentExecutor {
       );
       this.failedPayments.push(scheduleId);
 
-      await this.updatePaymentStatus(scheduleId, "failed", {
+      await this.updatePaymentStatus(scheduleId, "mark_failed", {
         error: error.message,
+        executorId: this.executorId,
         enhancedAPI: true,
       });
 
@@ -286,10 +311,10 @@ class EnhancedWebScheduledPaymentExecutor {
     }
   }
 
-  // Update payment status via API
+  // FIXED: Update payment status via the correct API endpoint
   private async updatePaymentStatus(
     scheduleId: string,
-    status: string,
+    action: string,
     details: any
   ) {
     try {
@@ -299,21 +324,21 @@ class EnhancedWebScheduledPaymentExecutor {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          action: "update_status",
-          status,
-          executionDetails: {
-            ...details,
-            executedAt: new Date().toISOString(),
-            executorId: this.executorId,
-          },
+          action,
+          executorId: this.executorId,
+          ...details,
         }),
         credentials: "include",
       });
 
       if (!response.ok) {
-        console.warn(`⚠️ Failed to update payment status for ${scheduleId}`);
+        const errorData = await response.json();
+        console.warn(
+          `⚠️ Failed to update payment status for ${scheduleId}:`,
+          errorData.error
+        );
       } else {
-        console.log(`✅ Payment status updated for ${scheduleId}: ${status}`);
+        console.log(`✅ Payment status updated for ${scheduleId}: ${action}`);
       }
     } catch (error) {
       console.error(

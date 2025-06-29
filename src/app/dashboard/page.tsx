@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - Add this to your existing dashboard
+// src/app/dashboard/page.tsx - UPDATED TO USE ENHANCED EXECUTOR
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Play,
   Pause,
+  Zap,
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
@@ -22,8 +23,8 @@ import SwapSection from "@/components/dashboard/SwapSection";
 import WalletSwitcher from "@/components/wallet/WalletSwitcher";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
 
-// Import the payment executor
-import { webScheduledPaymentExecutor } from "@/lib/web-scheduled-payment-executor";
+// UPDATED: Import the enhanced payment executor
+import { enhancedWebScheduledPaymentExecutor } from "@/lib/enhanced-web-scheduled-payment-executor";
 
 export default function DashboardPage() {
   const {
@@ -39,7 +40,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
-  // Payment executor state
+  // UPDATED: Enhanced payment executor state
   const [executorRunning, setExecutorRunning] = useState(false);
   const [executorStatus, setExecutorStatus] = useState<any>(null);
   const executorInitialized = useRef(false);
@@ -53,28 +54,28 @@ export default function DashboardPage() {
   const walletsLoaded = useRef(false);
   const activeWalletSet = useRef(false);
 
-  // Initialize payment executor when user is authenticated and has wallets
+  // UPDATED: Initialize enhanced payment executor when user is authenticated and has wallets
   useEffect(() => {
-    console.log("🔧 Payment executor initialization effect", {
+    console.log("🔧 Enhanced Payment executor initialization effect", {
       isAuthenticated,
       hasActiveWallet: !!activeWallet,
       executorInitialized: executorInitialized.current,
     });
 
     if (isAuthenticated && activeWallet && !executorInitialized.current) {
-      console.log("🚀 Initializing payment executor...");
+      console.log("🚀 Initializing enhanced payment executor...");
 
-      // Get private key from the wallet and start executor
-      initializePaymentExecutor();
+      // Get private key from the wallet and start enhanced executor
+      initializeEnhancedPaymentExecutor();
       executorInitialized.current = true;
     }
   }, [isAuthenticated, activeWallet]);
 
-  // Update executor status periodically
+  // UPDATED: Update enhanced executor status periodically
   useEffect(() => {
     if (executorRunning) {
       const statusInterval = setInterval(() => {
-        const status = webScheduledPaymentExecutor.getStatus();
+        const status = enhancedWebScheduledPaymentExecutor.getStatus();
         setExecutorStatus(status);
       }, 5000); // Update every 5 seconds
 
@@ -82,14 +83,15 @@ export default function DashboardPage() {
     }
   }, [executorRunning]);
 
-  const initializePaymentExecutor = async () => {
+  // UPDATED: Initialize enhanced payment executor
+  const initializeEnhancedPaymentExecutor = async () => {
     try {
       if (!activeWallet?.address) {
-        console.log("❌ No active wallet found for executor");
+        console.log("❌ No active wallet found for enhanced executor");
         return;
       }
 
-      console.log("🔑 Getting private key for payment executor...");
+      console.log("🔑 Getting private key for enhanced payment executor...");
 
       // Get the private key from your wallet API
       const response = await fetch("/api/wallets/private-key", {
@@ -106,29 +108,29 @@ export default function DashboardPage() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        console.log("✅ Private key retrieved, starting executor...");
+        console.log("✅ Private key retrieved, starting enhanced executor...");
 
-        // Set the private key and start the executor
-        webScheduledPaymentExecutor.setPrivateKey(data.privateKey);
-        webScheduledPaymentExecutor.start();
+        // Set the private key and start the enhanced executor
+        enhancedWebScheduledPaymentExecutor.setPrivateKey(data.privateKey);
+        enhancedWebScheduledPaymentExecutor.start();
 
         setExecutorRunning(true);
-        setExecutorStatus(webScheduledPaymentExecutor.getStatus());
+        setExecutorStatus(enhancedWebScheduledPaymentExecutor.getStatus());
 
-        console.log("✅ Payment executor started successfully!");
+        console.log("✅ Enhanced payment executor started successfully!");
 
         // Show notification
         if ("Notification" in window && Notification.permission !== "denied") {
           if (Notification.permission === "granted") {
-            new Notification("Payment Executor Started", {
-              body: "Scheduled payments will now be executed automatically",
+            new Notification("Enhanced Auto-Payment System Started", {
+              body: "Scheduled payments will now be executed automatically with 30% lower gas fees",
               icon: "/favicon.ico",
             });
           } else {
             Notification.requestPermission().then((permission) => {
               if (permission === "granted") {
-                new Notification("Payment Executor Started", {
-                  body: "Scheduled payments will now be executed automatically",
+                new Notification("Enhanced Auto-Payment System Started", {
+                  body: "Scheduled payments will now be executed automatically with 30% lower gas fees",
                   icon: "/favicon.ico",
                 });
               }
@@ -139,28 +141,29 @@ export default function DashboardPage() {
         console.error("❌ Failed to get private key:", data.error);
       }
     } catch (error) {
-      console.error("💥 Error initializing payment executor:", error);
+      console.error("💥 Error initializing enhanced payment executor:", error);
     }
   };
 
-  const toggleExecutor = () => {
+  // UPDATED: Toggle enhanced executor
+  const toggleEnhancedExecutor = () => {
     if (executorRunning) {
-      console.log("🛑 Stopping payment executor...");
-      webScheduledPaymentExecutor.stop();
+      console.log("🛑 Stopping enhanced payment executor...");
+      enhancedWebScheduledPaymentExecutor.stop();
       setExecutorRunning(false);
       setExecutorStatus(null);
     } else {
-      console.log("🚀 Starting payment executor...");
-      initializePaymentExecutor();
+      console.log("🚀 Starting enhanced payment executor...");
+      initializeEnhancedPaymentExecutor();
     }
   };
 
-  // Cleanup executor on unmount
+  // UPDATED: Cleanup enhanced executor on unmount
   useEffect(() => {
     return () => {
       if (executorRunning) {
-        console.log("🧹 Cleaning up payment executor...");
-        webScheduledPaymentExecutor.stop();
+        console.log("🧹 Cleaning up enhanced payment executor...");
+        enhancedWebScheduledPaymentExecutor.stop();
       }
     };
   }, []);
@@ -239,9 +242,9 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     try {
-      // Stop executor before logout
+      // UPDATED: Stop enhanced executor before logout
       if (executorRunning) {
-        webScheduledPaymentExecutor.stop();
+        enhancedWebScheduledPaymentExecutor.stop();
         setExecutorRunning(false);
       }
 
@@ -318,18 +321,21 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
-          {/* Payment Executor Status */}
+          {/* UPDATED: Enhanced Payment Executor Status */}
           {wallets.length > 0 && (
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3">
               <button
-                onClick={toggleExecutor}
+                onClick={toggleEnhancedExecutor}
                 className="flex items-center space-x-2"
-                title={`Payment Executor: ${
+                title={`Enhanced Auto-Payment System: ${
                   executorRunning ? "Running" : "Stopped"
                 }`}
               >
                 {executorRunning ? (
-                  <Pause size={16} className="text-green-400 lg:w-5 lg:h-5" />
+                  <Zap
+                    size={16}
+                    className="text-green-400 lg:w-5 lg:h-5 animate-pulse"
+                  />
                 ) : (
                   <Play size={16} className="text-gray-400 lg:w-5 lg:h-5" />
                 )}
@@ -338,7 +344,7 @@ export default function DashboardPage() {
                     executorRunning ? "text-green-400" : "text-gray-400"
                   }`}
                 >
-                  Auto-Pay {executorRunning ? "ON" : "OFF"}
+                  Enhanced Auto-Pay {executorRunning ? "ON" : "OFF"}
                 </span>
               </button>
 

@@ -1,3 +1,4 @@
+// src/app/api/scheduled-payments/due/route.ts - FIXED FOR ENHANCED EXECUTOR
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -15,8 +16,12 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const oneMinuteAgo = new Date(now.getTime() - 60000);
     const twoMinutesAgo = new Date(now.getTime() - 120000);
+    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
 
-    console.log("🔍 Fetching due payments at:", now.toISOString());
+    console.log(
+      "🔍 Enhanced executor checking for due payments at:",
+      now.toISOString()
+    );
 
     // ULTRA-STRICT QUERY: Only get payments that are definitely ready for execution
     const duePayments = await db
@@ -25,8 +30,11 @@ export async function GET(request: NextRequest) {
         // Must be active
         status: "active",
 
-        // Must be due for execution
-        nextExecutionAt: { $lte: now },
+        // Must be due for execution (including buffer for upcoming payments)
+        $or: [
+          { nextExecutionAt: { $lte: fiveMinutesFromNow } },
+          { scheduledFor: { $lte: fiveMinutesFromNow } },
+        ],
 
         // Must NOT be currently processing
         $and: [
@@ -80,7 +88,7 @@ export async function GET(request: NextRequest) {
           },
         ],
       })
-      .sort({ nextExecutionAt: 1 })
+      .sort({ nextExecutionAt: 1, scheduledFor: 1 })
       .limit(10)
       .toArray();
 
@@ -96,16 +104,29 @@ export async function GET(request: NextRequest) {
       const skipReasons = [];
 
       // Check 1: Verify execution count hasn't exceeded maximum
-      if (payment.executedCount >= (payment.maxExecutions || 1)) {
+      if ((payment.executionCount || 0) >= (payment.maxExecutions || 1)) {
         skipReasons.push("execution count exceeded");
         skipPayment = true;
       }
 
-      // Check 2: For recurring payments, verify next execution time is actually due
-      if (payment.frequency && payment.frequency !== "once") {
-        const nextExec = new Date(payment.nextExecutionAt);
-        if (nextExec > now) {
-          skipReasons.push("not yet due for execution");
+      // Check 2: Determine which execution time to use
+      let executionTime = null;
+      if (payment.nextExecutionAt) {
+        executionTime = new Date(payment.nextExecutionAt);
+      } else if (payment.scheduledFor) {
+        executionTime = new Date(payment.scheduledFor);
+      }
+
+      if (!executionTime) {
+        skipReasons.push("no execution time found");
+        skipPayment = true;
+      } else {
+        // Check if it's actually due (within 5 minute buffer)
+        const timeDiff = executionTime.getTime() - now.getTime();
+        if (timeDiff > 5 * 60 * 1000) {
+          skipReasons.push(
+            `not yet due (${Math.round(timeDiff / 60000)} minutes early)`
+          );
           skipPayment = true;
         }
       }
@@ -129,7 +150,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Check 5: For one-time payments, ensure they haven't been executed yet
-      if (payment.frequency === "once" && payment.executedCount > 0) {
+      if (payment.frequency === "once" && (payment.executionCount || 0) > 0) {
         skipReasons.push("one-time payment already executed");
         skipPayment = true;
       }
@@ -149,29 +170,25 @@ export async function GET(request: NextRequest) {
       `📊 After safety checks: ${safeDuePayments.length} payments ready for execution`
     );
 
-    // Transform the data to match expected format
+    // FIXED: Transform the data to match expected format for enhanced executor
     const transformedPayments = safeDuePayments.map((payment) => {
       const transformed = {
         id: payment._id.toString(),
         scheduleId: payment.scheduleId,
+        username: payment.username,
         walletAddress: payment.walletAddress,
-        tokenInfo: {
-          name: payment.tokenName || payment.tokenSymbol,
-          symbol: payment.tokenSymbol,
-          contractAddress: payment.contractAddress,
-          decimals: payment.decimals || 18,
-          isETH:
-            payment.contractAddress === "native" ||
-            payment.tokenSymbol === "ETH",
-        },
-        recipient: payment.recipients?.[0] || payment.recipient,
-        amount: payment.amounts?.[0] || payment.totalAmount,
-        scheduledFor: payment.scheduledFor,
+        tokenSymbol: payment.tokenSymbol,
+        tokenName: payment.tokenName,
+        contractAddress: payment.contractAddress,
+        recipient: payment.recipient,
+        amount: payment.amount,
         frequency: payment.frequency || "once",
         status: payment.status,
-        nextExecution: payment.nextExecutionAt,
-        executionCount: payment.executedCount || 0,
+        scheduledFor: payment.scheduledFor,
+        nextExecution: payment.nextExecutionAt || payment.scheduledFor,
+        executionCount: payment.executionCount || 0,
         maxExecutions: payment.maxExecutions || 1,
+        decimals: payment.decimals || 18,
         description: payment.description,
         createdAt: payment.createdAt,
         lastExecutionAt: payment.lastExecutionAt,
@@ -179,12 +196,13 @@ export async function GET(request: NextRequest) {
         processingBy: payment.processingBy,
         processingStarted: payment.processingStarted,
         updatedAt: payment.updatedAt,
+        useEnhancedAPI: payment.useEnhancedAPI || false,
       };
 
       console.log(
         `✅ Ready for execution: ${transformed.scheduleId} - ${
           transformed.amount
-        } ${transformed.tokenInfo.symbol} to ${transformed.recipient.slice(
+        } ${transformed.tokenSymbol} to ${transformed.recipient.slice(
           0,
           10
         )}... (due: ${new Date(
@@ -217,7 +235,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      duePayments: uniquePayments,
+      scheduledPayments: uniquePayments, // FIXED: Use correct field name
       count: uniquePayments.length,
       timestamp: now.toISOString(),
       debug: {

@@ -1,3 +1,4 @@
+// src/app/api/scheduled-payments/[scheduleId]/route.ts - FIXED FOR ENHANCED API
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -27,7 +28,7 @@ export async function PATCH(
     );
 
     if (action === "update_after_execution") {
-      // Update schedule after successful execution
+      // FIXED: Update schedule after successful execution using enhanced API
       const {
         transactionHash,
         gasUsed,
@@ -35,10 +36,11 @@ export async function PATCH(
         actualCostETH,
         actualCostUSD,
         executedAt,
+        enhancedAPI,
       } = body;
 
       console.log(
-        `📝 Updating schedule ${scheduleId} after successful execution`
+        `📝 Updating schedule ${scheduleId} after successful enhanced execution`
       );
 
       // STEP 1: Get the current schedule with flexible matching
@@ -64,7 +66,7 @@ export async function PATCH(
       );
 
       // STEP 2: Calculate new execution count and next execution
-      const newExecutionCount = (currentSchedule.executedCount || 0) + 1;
+      const newExecutionCount = (currentSchedule.executionCount || 0) + 1;
       let finalStatus = "completed";
       let nextExecutionAt = null;
       let completedAt = new Date(executedAt);
@@ -85,27 +87,29 @@ export async function PATCH(
           finalStatus = "completed";
           completedAt = new Date(executedAt);
           console.log(
-            `🏁 Recurring schedule ${scheduleId} completed after ${newExecutionCount} executions`
+            `🏁 Recurring schedule ${scheduleId} completed after ${newExecutionCount} executions (Enhanced API)`
           );
         } else {
           finalStatus = "active";
           nextExecutionAt = nextExecution;
           completedAt = null;
           console.log(
-            `🔄 Recurring schedule ${scheduleId} next execution: ${nextExecution.toISOString()}`
+            `🔄 Recurring schedule ${scheduleId} next execution: ${nextExecution.toISOString()} (Enhanced API)`
           );
         }
       } else {
         // One-time payment completed
         finalStatus = "completed";
         completedAt = new Date(executedAt);
-        console.log(`🏁 One-time schedule ${scheduleId} completed`);
+        console.log(
+          `🏁 One-time schedule ${scheduleId} completed (Enhanced API)`
+        );
       }
 
-      // STEP 3: Prepare update data
+      // STEP 3: Prepare update data with enhanced API markers
       const updateData: any = {
         status: finalStatus,
-        executedCount: newExecutionCount,
+        executionCount: newExecutionCount,
         lastExecutionAt: new Date(executedAt),
         updatedAt: now,
         // Clear processing data
@@ -113,10 +117,13 @@ export async function PATCH(
         processingStarted: null,
         // Add execution details
         lastTransactionHash: transactionHash,
-        lastGasUsed: gasUsed,
-        lastBlockNumber: blockNumber,
-        lastActualCostETH: actualCostETH,
-        lastActualCostUSD: actualCostUSD,
+        lastGasUsed: parseInt(gasUsed) || 0,
+        lastBlockNumber: parseInt(blockNumber) || 0,
+        lastActualCostETH: parseFloat(actualCostETH) || 0,
+        lastActualCostUSD: parseFloat(actualCostUSD) || 0,
+        // FIXED: Add enhanced API markers
+        lastExecutedWithEnhancedAPI: enhancedAPI || false,
+        lastExecutorId: executorId,
       };
 
       if (nextExecutionAt) {
@@ -129,7 +136,7 @@ export async function PATCH(
 
       // STEP 4: Perform the update with flexible matching
       console.log(
-        `💾 Updating schedule ${scheduleId} to status: ${finalStatus}`
+        `💾 Updating schedule ${scheduleId} to status: ${finalStatus} (Enhanced API)`
       );
 
       const updateResult = await db.collection("schedules").updateOne(
@@ -169,17 +176,21 @@ export async function PATCH(
             { status: 404 }
           );
         } else {
-          console.log(`✅ Broader update successful for ${scheduleId}`);
+          console.log(
+            `✅ Broader update successful for ${scheduleId} (Enhanced API)`
+          );
         }
       } else {
-        console.log(`✅ Primary update successful for ${scheduleId}`);
+        console.log(
+          `✅ Primary update successful for ${scheduleId} (Enhanced API)`
+        );
       }
 
       console.log(
-        `✅ Schedule ${scheduleId} updated successfully - Status: ${finalStatus}`
+        `✅ Schedule ${scheduleId} updated successfully - Status: ${finalStatus} (Enhanced API)`
       );
 
-      // STEP 5: Store execution record with unique ID
+      // STEP 5: Store execution record with unique ID and enhanced API flag
       const executionRecordId = `${scheduleId}_exec_${newExecutionCount}_${Date.now()}`;
       const executionRecord = {
         _id: executionRecordId,
@@ -187,18 +198,19 @@ export async function PATCH(
         username: currentSchedule.username,
         walletAddress: currentSchedule.walletAddress,
         transactionHash,
-        gasUsed,
-        blockNumber,
-        actualCostETH,
-        actualCostUSD,
+        gasUsed: parseInt(gasUsed) || 0,
+        blockNumber: parseInt(blockNumber) || 0,
+        actualCostETH: parseFloat(actualCostETH) || 0,
+        actualCostUSD: parseFloat(actualCostUSD) || 0,
         executedAt: new Date(executedAt),
         status: "completed",
         tokenSymbol: currentSchedule.tokenSymbol,
         contractAddress: currentSchedule.contractAddress,
-        recipient: currentSchedule.recipients?.[0] || currentSchedule.recipient,
-        amount: currentSchedule.amounts?.[0] || currentSchedule.totalAmount,
+        recipient: currentSchedule.recipient,
+        amount: currentSchedule.amount,
         executionCount: newExecutionCount,
         executorId: executorId,
+        enhancedAPI: enhancedAPI || false,
         createdAt: now,
       };
 
@@ -211,7 +223,9 @@ export async function PATCH(
             { $setOnInsert: executionRecord },
             { upsert: true }
           );
-        console.log(`✅ Execution record stored for schedule ${scheduleId}`);
+        console.log(
+          `✅ Execution record stored for schedule ${scheduleId} (Enhanced API)`
+        );
       } catch (recordError) {
         console.error(
           `⚠️ Failed to store execution record for ${scheduleId}:`,
@@ -222,19 +236,20 @@ export async function PATCH(
 
       return NextResponse.json({
         success: true,
-        message: "Schedule updated successfully",
+        message: "Schedule updated successfully with Enhanced API",
         nextStatus: finalStatus,
         nextExecution: nextExecutionAt,
         executionCount: newExecutionCount,
         transactionHash: transactionHash,
         updateMethod: updateResult.matchedCount > 0 ? "primary" : "broader",
+        enhancedAPI: true,
       });
     } else if (action === "mark_failed") {
-      // Mark schedule as failed
-      const { error: errorMessage } = body;
+      // FIXED: Mark schedule as failed with enhanced API context
+      const { error: errorMessage, enhancedAPI } = body;
 
       console.log(
-        `❌ Marking schedule ${scheduleId} as failed: ${errorMessage}`
+        `❌ Marking schedule ${scheduleId} as failed: ${errorMessage} (Enhanced API: ${enhancedAPI})`
       );
 
       // Get current schedule with flexible matching
@@ -274,12 +289,15 @@ export async function PATCH(
               // Clear processing data
               processingBy: null,
               processingStarted: null,
+              // Add enhanced API context
+              failedWithEnhancedAPI: enhancedAPI || false,
+              lastExecutorId: executorId,
             },
           }
         );
 
         console.log(
-          `❌ Schedule ${scheduleId} marked as permanently failed after ${retryCount} retries`
+          `❌ Schedule ${scheduleId} marked as permanently failed after ${retryCount} retries (Enhanced API)`
         );
       } else {
         // RETRY
@@ -296,12 +314,15 @@ export async function PATCH(
               // Clear processing data for retry
               processingBy: null,
               processingStarted: null,
+              // Add enhanced API context
+              lastRetryWithEnhancedAPI: enhancedAPI || false,
+              lastExecutorId: executorId,
             },
           }
         );
 
         console.log(
-          `⏰ Schedule ${scheduleId} scheduled for retry in 5 minutes (attempt ${retryCount}/${maxRetries})`
+          `⏰ Schedule ${scheduleId} scheduled for retry in 5 minutes (attempt ${retryCount}/${maxRetries}) (Enhanced API)`
         );
       }
 
@@ -317,6 +338,7 @@ export async function PATCH(
             ? new Date(now.getTime() + 5 * 60 * 1000)
             : null,
         retryCount,
+        enhancedAPI: enhancedAPI || false,
       });
     } else if (action === "cancel") {
       // Cancel schedule
@@ -333,6 +355,7 @@ export async function PATCH(
             // Clear any processing data
             processingBy: null,
             processingStarted: null,
+            cancelledBy: executorId || "user",
           },
         }
       );

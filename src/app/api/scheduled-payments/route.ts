@@ -1,4 +1,4 @@
-// src/app/api/scheduled-payments/route.ts - UPDATED WITH ENHANCED API
+// src/app/api/scheduled-payments/route.ts - FIXED COLLECTION NAME AND ENHANCED API
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
                 timezone
               );
 
-        // Create scheduled payment document
+        // FIXED: Create scheduled payment document with correct field names
         const scheduledPayment = {
           scheduleId,
           username: decoded.username,
@@ -131,12 +131,13 @@ export async function POST(request: NextRequest) {
           tokenSymbol: tokenInfo.symbol,
           tokenName: tokenInfo.name,
           contractAddress: tokenInfo.contractAddress,
+          decimals: tokenInfo.decimals || 18,
           recipient,
           amount,
           frequency,
           status: "active",
           scheduledFor: firstExecution,
-          nextExecution: nextExecution,
+          nextExecutionAt: firstExecution, // FIXED: Use correct field name
           executionCount: 0,
           maxExecutions: frequency === "once" ? 1 : 100, // Default max for recurring
           description: description || "",
@@ -144,11 +145,12 @@ export async function POST(request: NextRequest) {
           useEnhancedAPI: true, // Flag to use enhanced API
           createdAt: new Date(),
           lastExecutionAt: null,
+          updatedAt: new Date(),
         };
 
-        // Save to database
+        // FIXED: Save to correct collection name "schedules"
         const result = await db
-          .collection("scheduled_payments")
+          .collection("schedules")
           .insertOne(scheduledPayment);
 
         console.log(
@@ -160,7 +162,7 @@ export async function POST(request: NextRequest) {
           success: true,
           scheduleId,
           scheduledFor: firstExecution.toISOString(),
-          nextExecution: nextExecution?.toISOString() || null,
+          nextExecution: firstExecution.toISOString(), // For one-time or first execution
           enhancedAPI: true,
           message:
             "Scheduled payment created with Enhanced API for better gas efficiency",
@@ -186,14 +188,12 @@ export async function POST(request: NextRequest) {
 
         const { db } = await connectToDatabase();
 
-        // Get the scheduled payment
-        const scheduledPayment = await db
-          .collection("scheduled_payments")
-          .findOne({
-            scheduleId,
-            username: decoded.username,
-            status: "active",
-          });
+        // FIXED: Get the scheduled payment from correct collection
+        const scheduledPayment = await db.collection("schedules").findOne({
+          scheduleId,
+          username: decoded.username,
+          status: "active",
+        });
 
         if (!scheduledPayment) {
           return NextResponse.json(
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
 
         if (executionResult.success) {
           // Update scheduled payment status
-          const executionCount = scheduledPayment.executionCount + 1;
+          const executionCount = (scheduledPayment.executionCount || 0) + 1;
           const nextExecution =
             enhancedScheduledPaymentsService.calculateNextExecution(
               new Date(),
@@ -242,14 +242,15 @@ export async function POST(request: NextRequest) {
             nextExecution
           );
 
-          await db.collection("scheduled_payments").updateOne(
+          await db.collection("schedules").updateOne(
             { scheduleId },
             {
               $set: {
                 executionCount,
-                nextExecution,
+                nextExecutionAt: nextExecution,
                 status: newStatus,
                 lastExecutionAt: new Date(),
+                updatedAt: new Date(),
               },
               $push: {
                 executionHistory: {
@@ -277,7 +278,7 @@ export async function POST(request: NextRequest) {
           });
         } else {
           // Mark as failed
-          await db.collection("scheduled_payments").updateOne(
+          await db.collection("schedules").updateOne(
             { scheduleId },
             {
               $set: {
@@ -287,6 +288,7 @@ export async function POST(request: NextRequest) {
                   error: executionResult.error,
                   enhancedAPI: true,
                 },
+                updatedAt: new Date(),
               },
             }
           );
@@ -346,7 +348,7 @@ export async function GET(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Get scheduled payments
+    // FIXED: Get scheduled payments from correct collection
     const query: any = {
       username: decoded.username,
       walletAddress,
@@ -357,7 +359,7 @@ export async function GET(request: NextRequest) {
     }
 
     const scheduledPayments = await db
-      .collection("scheduled_payments")
+      .collection("schedules")
       .find(query)
       .sort({ createdAt: -1 })
       .limit(100)
@@ -368,6 +370,8 @@ export async function GET(request: NextRequest) {
       ...payment,
       id: payment._id.toString(),
       enhancedAPI: payment.useEnhancedAPI || false,
+      // FIXED: Map field names for frontend compatibility
+      nextExecution: payment.nextExecutionAt,
     }));
 
     console.log(`✅ Retrieved ${enrichedPayments.length} scheduled payments`);
