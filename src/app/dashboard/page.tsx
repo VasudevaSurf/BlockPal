@@ -322,7 +322,7 @@ export default function DashboardPage() {
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
           {/* UPDATED: Enhanced Payment Executor Status */}
-          {wallets.length > 0 && (
+          {/* {wallets.length > 0 && (
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3">
               <button
                 onClick={toggleEnhancedExecutor}
@@ -354,7 +354,7 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-          )}
+          )} */}
 
           {/* Wallet Selector */}
           {wallets.length > 0 && (

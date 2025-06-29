@@ -19,32 +19,7 @@ export default function AIChatPage() {
     {
       id: "welcome",
       type: "assistant",
-      content: `🤖 **Production-Level Crypto AI Assistant with GoPlus Security** initialized successfully!
-
-══════════════════════════════════════════════════════════════════════
-🎯 **AI-POWERED CAPABILITIES:**
-- 🔧 **Smart Contract Generation**: "create an ERC-20 token"
-- 🛡️ **Token Security Analysis**: "check security 0x..." or "is ETH safe?"
-- 🔍 **Honeypot Detection**: "is this token a honeypot?"
-- 📊 **Token Analysis**: "tell me about Ethereum"
-- 🔄 **Comparative Analysis**: "compare Bitcoin vs Ethereum"
-- 📚 **Educational Content**: "explain DeFi protocols"
-- 💰 **Investment Guidance**: "should I invest in this token?"
-- 💬 **General Crypto Chat**: Ask anything crypto-related!
-
-🛡️ **SECURITY FEATURES** (Powered by GoPlus Labs):
-- Real-time honeypot detection
-- Smart contract vulnerability analysis
-- Token tax and ownership checks
-- Blacklist and whitelist verification
-- Risk scoring and recommendations
-
-🎮 **COMMANDS:**
-- Type "clear" to clear conversation context
-- Try asking about token prices, security checks, or smart contracts!
-══════════════════════════════════════════════════════════════════════
-
-How can I assist you today with your crypto needs?`,
+      content: `Hello`,
       timestamp: new Date(),
     },
   ]);
