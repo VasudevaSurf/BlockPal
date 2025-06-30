@@ -1,4 +1,4 @@
-// src/components/transfer/SimpleTransferModal.tsx - FIXED: Missing fromAddress parameter
+// src/components/transfer/SimpleTransferModal.tsx - FIXED VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -32,7 +32,7 @@ interface SimpleTransferModalProps {
     };
   };
   walletAddress: string;
-  onTransactionComplete?: () => void; // Add callback for transaction completion
+  onTransactionComplete?: () => void;
 }
 
 interface TransferPreview {
@@ -69,6 +69,7 @@ export default function SimpleTransferModal({
   onClose,
   tokenInfo,
   walletAddress,
+  onTransactionComplete,
 }: SimpleTransferModalProps) {
   const { activeWallet } = useSelector((state: RootState) => state.wallet);
 
@@ -130,21 +131,33 @@ export default function SimpleTransferModal({
   };
 
   const handleCreatePreview = async () => {
-    if (!validateForm()) return;
+    console.log("📊 Creating transfer preview...");
 
-    // FIXED: Validate that we have the required parameters
+    if (!validateForm()) {
+      console.log("❌ Form validation failed");
+      return;
+    }
+
+    // FIXED: Validate required parameters
     if (!walletAddress) {
       setErrors({ general: "Wallet address not available" });
       return;
     }
 
+    if (!activeWallet?.address) {
+      setErrors({ general: "No active wallet found" });
+      return;
+    }
+
     setIsLoading(true);
+    setErrors({}); // Clear previous errors
+
     try {
-      console.log("📊 Creating transfer preview with:", {
+      console.log("📡 Sending preview request with:", {
         tokenInfo,
         recipientAddress: formData.recipientAddress,
         amount: formData.amount,
-        fromAddress: walletAddress, // FIXED: Log to verify we have this
+        fromAddress: walletAddress,
         tokenPrice: tokenInfo.priceData?.current_price,
       });
 
@@ -155,25 +168,40 @@ export default function SimpleTransferModal({
         },
         body: JSON.stringify({
           action: "preview",
-          tokenInfo,
+          tokenInfo: {
+            ...tokenInfo,
+            isETH:
+              tokenInfo.contractAddress === "native" ||
+              tokenInfo.symbol === "ETH",
+          },
           recipientAddress: formData.recipientAddress,
           amount: formData.amount,
-          fromAddress: walletAddress, // FIXED: Use walletAddress prop
+          fromAddress: walletAddress, // FIXED: Ensure this is passed
           tokenPrice: tokenInfo.priceData?.current_price,
         }),
         credentials: "include",
       });
 
-      const data = await response.json();
+      console.log("📡 Preview response status:", response.status);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Preview response error:", errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("📡 Preview response data:", data);
+
+      if (!data.success) {
         throw new Error(data.error || "Failed to create preview");
       }
 
       setPreview(data.preview);
       setStep("preview");
+      console.log("✅ Preview created successfully");
     } catch (error: any) {
-      console.error("Error creating preview:", error);
+      console.error("❌ Preview creation error:", error);
       setErrors({
         general: error.message || "Failed to create transfer preview",
       });
@@ -183,9 +211,14 @@ export default function SimpleTransferModal({
   };
 
   const handleExecuteTransfer = async () => {
-    if (!preview || !activeWallet) return;
+    console.log("🚀 Executing transfer...");
 
-    // FIXED: Validate that we have the required parameters
+    if (!preview || !activeWallet) {
+      setErrors({ general: "Missing preview or wallet information" });
+      return;
+    }
+
+    // FIXED: Validate required parameters
     if (!walletAddress) {
       setErrors({ general: "Wallet address not available" });
       return;
@@ -193,13 +226,14 @@ export default function SimpleTransferModal({
 
     setStep("processing");
     setIsLoading(true);
+    setErrors({}); // Clear previous errors
 
     try {
-      console.log("🚀 Executing transfer with:", {
+      console.log("📡 Sending execution request with:", {
         tokenInfo,
         recipientAddress: formData.recipientAddress,
         amount: formData.amount,
-        fromAddress: walletAddress, // FIXED: Log to verify we have this
+        fromAddress: walletAddress,
         tokenPrice: tokenInfo.priceData?.current_price,
       });
 
@@ -210,26 +244,46 @@ export default function SimpleTransferModal({
         },
         body: JSON.stringify({
           action: "execute",
-          tokenInfo,
+          tokenInfo: {
+            ...tokenInfo,
+            isETH:
+              tokenInfo.contractAddress === "native" ||
+              tokenInfo.symbol === "ETH",
+          },
           recipientAddress: formData.recipientAddress,
           amount: formData.amount,
-          fromAddress: walletAddress, // FIXED: Use walletAddress prop
+          fromAddress: walletAddress, // FIXED: Ensure this is passed
           tokenPrice: tokenInfo.priceData?.current_price,
           useStoredKey: true, // Use stored private key
         }),
         credentials: "include",
       });
 
-      const data = await response.json();
+      console.log("📡 Execution response status:", response.status);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Execution response error:", errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("📡 Execution response data:", data);
+
+      if (!data.success) {
         throw new Error(data.error || "Transfer execution failed");
       }
 
       setTransactionResult(data.result);
       setStep("success");
+      console.log("✅ Transfer executed successfully");
+
+      // Call the completion callback if provided
+      if (onTransactionComplete) {
+        onTransactionComplete();
+      }
     } catch (error: any) {
-      console.error("Transfer execution error:", error);
+      console.error("❌ Transfer execution error:", error);
       setTransactionResult({
         success: false,
         error: error.message || "Transaction failed. Please try again.",
@@ -422,10 +476,17 @@ export default function SimpleTransferModal({
 
               <Button
                 onClick={handleCreatePreview}
-                disabled={isLoading || !walletAddress} // FIXED: Disable if no wallet address
+                disabled={isLoading || !walletAddress}
                 className="w-full font-satoshi"
               >
-                {isLoading ? "Creating Preview..." : "Review Transfer"}
+                {isLoading ? (
+                  <>
+                    <RefreshCw size={16} className="mr-2 animate-spin" />
+                    Creating Preview...
+                  </>
+                ) : (
+                  "Review Transfer"
+                )}
               </Button>
             </div>
           )}
@@ -514,9 +575,17 @@ export default function SimpleTransferModal({
                 </Button>
                 <Button
                   onClick={handleExecuteTransfer}
+                  disabled={isLoading}
                   className="flex-1 font-satoshi"
                 >
-                  Send Transfer
+                  {isLoading ? (
+                    <>
+                      <RefreshCw size={16} className="mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Send Transfer"
+                  )}
                 </Button>
               </div>
             </div>
@@ -535,6 +604,9 @@ export default function SimpleTransferModal({
                 Please wait while your transfer is being processed on the
                 blockchain...
               </p>
+              <div className="mt-4 text-xs text-gray-500 font-satoshi">
+                This may take a few moments. Do not close this window.
+              </div>
             </div>
           )}
 
@@ -579,25 +651,32 @@ export default function SimpleTransferModal({
                       </button>
                     </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Gas Used:</span>
-                    <span className="text-white">
-                      {transactionResult.gasUsed?.toLocaleString()} gas
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Block Number:</span>
-                    <span className="text-white">
-                      {transactionResult.blockNumber?.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Actual Cost:</span>
-                    <span className="text-white">
-                      {transactionResult.actualCostETH} ETH (
-                      {transactionResult.actualCostUSD})
-                    </span>
-                  </div>
+                  {transactionResult.gasUsed && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Gas Used:</span>
+                      <span className="text-white">
+                        {transactionResult.gasUsed?.toLocaleString()} gas
+                      </span>
+                    </div>
+                  )}
+                  {transactionResult.blockNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Block Number:</span>
+                      <span className="text-white">
+                        {transactionResult.blockNumber?.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {transactionResult.actualCostETH && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Actual Cost:</span>
+                      <span className="text-white">
+                        {transactionResult.actualCostETH} ETH
+                        {transactionResult.actualCostUSD &&
+                          ` (${transactionResult.actualCostUSD})`}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {copied === "hash" && (
@@ -637,9 +716,11 @@ export default function SimpleTransferModal({
                 <h3 className="text-white text-lg font-semibold font-satoshi mb-2">
                   Transfer Failed
                 </h3>
-                <p className="text-gray-400 font-satoshi">
-                  {transactionResult.error}
-                </p>
+                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 text-left">
+                  <p className="text-red-400 text-sm font-satoshi">
+                    {transactionResult.error}
+                  </p>
+                </div>
               </div>
 
               <div className="flex space-x-3">

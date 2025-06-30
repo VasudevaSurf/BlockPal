@@ -1,9 +1,36 @@
-// src/app/api/transfer/simple/route.ts - FIXED: activeWallet reference error
+// src/app/api/transfer/simple/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
 import { enhancedSimpleTransferService } from "@/lib/enhanced-simple-transfer-service";
 import crypto from "crypto";
+
+// Helper function to safely convert BigInt values to strings for JSON serialization
+function serializeBigInt(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === "bigint") {
+    return obj.toString();
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(serializeBigInt);
+  }
+
+  if (typeof obj === "object") {
+    const result: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        result[key] = serializeBigInt(obj[key]);
+      }
+    }
+    return result;
+  }
+
+  return obj;
+}
 
 // FIXED: Updated decryption function that handles both old and new formats
 function decryptPrivateKey(encryptedData: any): string {
@@ -178,15 +205,15 @@ export async function POST(request: NextRequest) {
       useStoredKey,
     } = body;
 
-    console.log("🔄 Enhanced Simple transfer API request:", {
+    console.log("🔄 Simple transfer API request:", {
       action,
       tokenSymbol: tokenInfo?.symbol,
       useStoredKey,
-      useEnhancedAPI: true,
-      fromAddress: fromAddress?.slice(0, 10) + "...", // FIXED: Log fromAddress for debugging
+      hasFromAddress: !!fromAddress,
+      fromAddressPrefix: fromAddress?.slice(0, 10),
     });
 
-    // Validate required fields
+    // FIXED: Validate required fields more thoroughly
     if (!action || !tokenInfo || !recipientAddress || !amount) {
       return NextResponse.json(
         {
@@ -197,7 +224,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate fromAddress separately for better error messaging
+    // FIXED: Validate fromAddress for both preview and execute
     if (!fromAddress) {
       return NextResponse.json(
         { error: "Missing fromAddress parameter" },
@@ -244,12 +271,15 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          preview,
+          preview: serializeBigInt(preview),
         });
       } catch (error: any) {
         console.error("❌ Enhanced preview creation error:", error);
         return NextResponse.json(
-          { error: "Failed to create preview: " + error.message },
+          {
+            success: false,
+            error: "Failed to create preview: " + error.message,
+          },
           { status: 500 }
         );
       }
@@ -270,7 +300,10 @@ export async function POST(request: NextRequest) {
 
           if (!wallet) {
             return NextResponse.json(
-              { error: "Wallet not found or access denied" },
+              {
+                success: false,
+                error: "Wallet not found or access denied",
+              },
               { status: 404 }
             );
           }
@@ -278,6 +311,7 @@ export async function POST(request: NextRequest) {
           if (!wallet.encryptedPrivateKey) {
             return NextResponse.json(
               {
+                success: false,
                 error:
                   "No private key stored for this wallet. Please provide private key manually.",
               },
@@ -317,6 +351,7 @@ export async function POST(request: NextRequest) {
           if (!privateKey) {
             return NextResponse.json(
               {
+                success: false,
                 error:
                   "Failed to retrieve stored private key. Please provide private key manually.",
                 details: dbError.message,
@@ -331,7 +366,10 @@ export async function POST(request: NextRequest) {
 
       if (!executionPrivateKey) {
         return NextResponse.json(
-          { error: "Private key required for execution" },
+          {
+            success: false,
+            error: "Private key required for execution",
+          },
           { status: 400 }
         );
       }
@@ -352,7 +390,7 @@ export async function POST(request: NextRequest) {
             result.transactionHash
           );
 
-          // FIXED: Save transaction to database directly using transactionService
+          // Save transaction to database
           try {
             const { transactionService } = await import(
               "@/lib/transaction-service"
@@ -405,32 +443,45 @@ export async function POST(request: NextRequest) {
 
           return NextResponse.json({
             success: true,
-            result,
+            result: serializeBigInt(result),
           });
         } else {
           console.error("❌ Enhanced transfer failed:", result.error);
           return NextResponse.json(
-            { error: result.error || "Transfer execution failed" },
+            {
+              success: false,
+              error: result.error || "Transfer execution failed",
+            },
             { status: 500 }
           );
         }
       } catch (error: any) {
         console.error("❌ Enhanced transfer execution error:", error);
         return NextResponse.json(
-          { error: "Transfer execution failed: " + error.message },
+          {
+            success: false,
+            error: "Transfer execution failed: " + error.message,
+          },
           { status: 500 }
         );
       }
     } else {
       return NextResponse.json(
-        { error: "Invalid action. Must be 'preview' or 'execute'" },
+        {
+          success: false,
+          error: "Invalid action. Must be 'preview' or 'execute'",
+        },
         { status: 400 }
       );
     }
   } catch (error: any) {
-    console.error("💥 Enhanced Simple transfer API error:", error);
+    console.error("💥 Simple transfer API error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        success: false,
+        error: "Internal server error",
+        details: error.message,
+      },
       { status: 500 }
     );
   }
