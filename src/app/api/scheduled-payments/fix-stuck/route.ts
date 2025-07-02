@@ -1,4 +1,3 @@
-// src/app/api/scheduled-payments/fix-stuck/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -18,7 +17,6 @@ export async function POST(request: NextRequest) {
 
     console.log("🔍 Looking for stuck processing payments...");
 
-    // Find payments that have been in "processing" status for more than 5 minutes
     const stuckPayments = await db
       .collection("schedules")
       .find({
@@ -36,12 +34,7 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`🔧 Fixing stuck payment: ${payment.scheduleId}`);
 
-        // Check if this payment was actually executed by looking for transaction records
-        // You can check blockchain directly or look for execution patterns
-
-        // For now, let's assume one-time payments that have been processing for >5 minutes should be completed
         if (payment.frequency === "once") {
-          // Mark as completed
           const updateResult = await db.collection("schedules").updateOne(
             { _id: payment._id },
             {
@@ -51,10 +44,8 @@ export async function POST(request: NextRequest) {
                 lastExecutionAt: payment.processingStarted,
                 completedAt: now,
                 updatedAt: now,
-                // Clear processing data
                 processingBy: null,
                 processingStarted: null,
-                // Add fix marker
                 fixedStuckProcessing: true,
                 fixedAt: now,
               },
@@ -73,7 +64,6 @@ export async function POST(request: NextRequest) {
             });
           }
         } else {
-          // For recurring payments, mark as active for next execution
           const nextExecution = calculateNextExecution(
             payment.processingStarted,
             payment.frequency
@@ -88,10 +78,8 @@ export async function POST(request: NextRequest) {
                 lastExecutionAt: payment.processingStarted,
                 nextExecutionAt: nextExecution,
                 updatedAt: now,
-                // Clear processing data
                 processingBy: null,
                 processingStarted: null,
-                // Add fix marker
                 fixedStuckProcessing: true,
                 fixedAt: now,
               },
@@ -139,7 +127,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Also add a GET endpoint to just check for stuck payments without fixing
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("auth-token")?.value;
@@ -153,7 +140,6 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
-    // Find stuck payments
     const stuckPayments = await db
       .collection("schedules")
       .find({

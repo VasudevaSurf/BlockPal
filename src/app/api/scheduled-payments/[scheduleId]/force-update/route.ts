@@ -1,4 +1,3 @@
-// src/app/api/scheduled-payments/[scheduleId]/force-update/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -43,7 +42,6 @@ export async function POST(
       `🔄 Force updating schedule ${scheduleId} by executor ${executorId}`
     );
 
-    // Get the current schedule (with less strict checking)
     const currentSchedule = await db.collection("schedules").findOne({
       scheduleId,
     });
@@ -60,7 +58,6 @@ export async function POST(
       `📋 Current schedule status: ${currentSchedule.status}, processingBy: ${currentSchedule.processingBy}`
     );
 
-    // Calculate new execution count and final status
     const newExecutionCount = (currentSchedule.executedCount || 0) + 1;
     let finalStatus = "completed";
     let nextExecutionAt = null;
@@ -73,7 +70,6 @@ export async function POST(
         currentSchedule.frequency
       );
 
-      // Check if we've reached max executions
       const maxExecutions = currentSchedule.maxExecutions || 999999;
       if (
         newExecutionCount >= maxExecutions ||
@@ -93,28 +89,23 @@ export async function POST(
         );
       }
     } else {
-      // One-time payment completed
       finalStatus = "completed";
       completedAt = new Date(executedAt);
       console.log(`🏁 Force update: One-time schedule ${scheduleId} completed`);
     }
 
-    // FORCE UPDATE - Update regardless of current status
     const updateData: any = {
       status: finalStatus,
       executedCount: newExecutionCount,
       lastExecutionAt: new Date(executedAt),
       updatedAt: now,
-      // Clear processing data
       processingBy: null,
       processingStarted: null,
-      // Add execution details
       lastTransactionHash: transactionHash,
       lastGasUsed: gasUsed,
       lastBlockNumber: blockNumber,
       lastActualCostETH: actualCostETH,
       lastActualCostUSD: actualCostUSD,
-      // Add force update marker
       forceUpdatedBy: executorId,
       forceUpdatedAt: now,
     };
@@ -127,11 +118,9 @@ export async function POST(
       updateData.completedAt = completedAt;
     }
 
-    // Perform the force update (no status checks)
-    const updateResult = await db.collection("schedules").updateOne(
-      { scheduleId }, // Just match by scheduleId, ignore current status
-      { $set: updateData }
-    );
+    const updateResult = await db
+      .collection("schedules")
+      .updateOne({ scheduleId }, { $set: updateData });
 
     if (updateResult.matchedCount === 0) {
       console.log(`❌ Force update failed: Schedule ${scheduleId} not found`);
@@ -145,7 +134,6 @@ export async function POST(
       `✅ Force update successful: Schedule ${scheduleId} updated to status: ${finalStatus}`
     );
 
-    // Store execution record with unique ID
     const executionRecordId = `${scheduleId}_force_exec_${newExecutionCount}_${Date.now()}`;
     const executionRecord = {
       _id: executionRecordId,
@@ -166,10 +154,9 @@ export async function POST(
       executionCount: newExecutionCount,
       executorId: executorId,
       createdAt: now,
-      isForceUpdate: true, // Mark as force update
+      isForceUpdate: true,
     };
 
-    // Store execution record
     await db
       .collection("executed_transactions")
       .updateOne(
@@ -217,7 +204,6 @@ function calculateNextExecution(lastExecution: Date, frequency: string): Date {
       nextExecution.setFullYear(nextExecution.getFullYear() + 1);
       break;
     default:
-      // For "once", return a far future date to indicate completion
       nextExecution.setFullYear(nextExecution.getFullYear() + 100);
       break;
   }

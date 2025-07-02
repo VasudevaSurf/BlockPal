@@ -1,4 +1,3 @@
-// src/app/api/scheduled-payments/due/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -23,14 +22,14 @@ export async function GET(request: NextRequest) {
       now.toISOString()
     );
 
-    // ULTRA-STRICT QUERY: Only get payments that are definitely ready for execution
+    // FIXED: Exclude failed payments from execution
     const duePayments = await db
       .collection("schedules")
       .find({
-        // Must be active
+        // Must be active (NOT failed)
         status: "active",
 
-        // Must be due for execution (including buffer for upcoming payments)
+        // Must be due for execution
         $or: [
           { nextExecutionAt: { $lte: fiveMinutesFromNow } },
           { scheduledFor: { $lte: fiveMinutesFromNow } },
@@ -96,20 +95,25 @@ export async function GET(request: NextRequest) {
       `📊 Found ${duePayments.length} payments that passed initial filtering`
     );
 
-    // ADDITIONAL SAFETY CHECKS on each payment
     const safeDuePayments = [];
 
     for (const payment of duePayments) {
       let skipPayment = false;
       const skipReasons = [];
 
-      // Check 1: Verify execution count hasn't exceeded maximum
+      // FIXED: Skip failed payments
+      if (payment.status === "failed") {
+        skipReasons.push("payment has failed");
+        skipPayment = true;
+      }
+
+      // Check execution count hasn't exceeded maximum
       if ((payment.executionCount || 0) >= (payment.maxExecutions || 1)) {
         skipReasons.push("execution count exceeded");
         skipPayment = true;
       }
 
-      // Check 2: Determine which execution time to use
+      // Determine execution time
       let executionTime = null;
       if (payment.nextExecutionAt) {
         executionTime = new Date(payment.nextExecutionAt);
@@ -121,7 +125,6 @@ export async function GET(request: NextRequest) {
         skipReasons.push("no execution time found");
         skipPayment = true;
       } else {
-        // Check if it's actually due (within 5 minute buffer)
         const timeDiff = executionTime.getTime() - now.getTime();
         if (timeDiff > 5 * 60 * 1000) {
           skipReasons.push(
@@ -131,7 +134,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Check 3: Verify payment hasn't been executed in the last 2 minutes
+      // Verify payment hasn't been executed recently
       if (payment.lastExecutionAt) {
         const timeSinceLastExecution =
           now.getTime() - new Date(payment.lastExecutionAt).getTime();
@@ -143,13 +146,13 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Check 4: Verify payment is not in a processing state
+      // Verify payment is not in a processing state
       if (payment.status === "processing" || payment.processingBy) {
         skipReasons.push("currently being processed");
         skipPayment = true;
       }
 
-      // Check 5: For one-time payments, ensure they haven't been executed yet
+      // For one-time payments, ensure they haven't been executed yet
       if (payment.frequency === "once" && (payment.executionCount || 0) > 0) {
         skipReasons.push("one-time payment already executed");
         skipPayment = true;
@@ -162,7 +165,6 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Payment passed all safety checks
       safeDuePayments.push(payment);
     }
 
@@ -170,7 +172,6 @@ export async function GET(request: NextRequest) {
       `📊 After safety checks: ${safeDuePayments.length} payments ready for execution`
     );
 
-    // Transform the data to match expected format for enhanced executor
     const transformedPayments = safeDuePayments.map((payment) => {
       const transformed = {
         id: payment._id.toString(),
@@ -215,7 +216,6 @@ export async function GET(request: NextRequest) {
       return transformed;
     });
 
-    // Final safety check: Ensure no duplicates based on scheduleId
     const uniquePayments = transformedPayments.filter(
       (payment, index, self) =>
         index === self.findIndex((p) => p.scheduleId === payment.scheduleId)

@@ -1,4 +1,3 @@
-// src/app/api/scheduled-payments/[scheduleId]/claim/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -33,12 +32,11 @@ export async function POST(
       `🔒 Attempting to claim payment ${scheduleId} for executor ${executorId}`
     );
 
-    // Try to claim the payment atomically using MongoDB's findOneAndUpdate
-    // This ensures only one executor can claim a payment at a time
+    // FIXED: Only active payments can be claimed (exclude failed)
     const result = await db.collection("schedules").findOneAndUpdate(
       {
         scheduleId,
-        status: "active",
+        status: "active", // ONLY active payments
         $or: [
           { claimedBy: { $exists: false } },
           { claimedBy: null },
@@ -74,19 +72,19 @@ export async function POST(
         claimedAt: new Date(claimedAt),
       });
     } else {
-      // Payment was not available for claiming
       console.log(
-        `❌ Payment ${scheduleId} could not be claimed by executor ${executorId} - already claimed or not due`
+        `❌ Payment ${scheduleId} could not be claimed by executor ${executorId}`
       );
 
-      // Check the current status
       const currentSchedule = await db
         .collection("schedules")
         .findOne({ scheduleId });
 
       let reason = "Payment not available for claiming";
       if (currentSchedule) {
-        if (currentSchedule.status !== "active") {
+        if (currentSchedule.status === "failed") {
+          reason = "Payment has failed and cannot be executed";
+        } else if (currentSchedule.status !== "active") {
           reason = `Payment status is ${currentSchedule.status}`;
         } else if (
           currentSchedule.claimedBy &&

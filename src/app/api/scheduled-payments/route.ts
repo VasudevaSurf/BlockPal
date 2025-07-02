@@ -1,4 +1,3 @@
-// src/app/api/scheduled-payments/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -34,11 +33,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (action === "preview") {
-      // Create preview using enhanced API
       try {
         console.log("📊 Creating enhanced scheduled payment preview...");
 
-        // Validate input
         const validation =
           enhancedScheduledPaymentsService.validateScheduledPayment(
             tokenInfo,
@@ -84,11 +81,9 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (action === "create") {
-      // Create scheduled payment using enhanced API
       try {
         console.log("🚀 Creating enhanced scheduled payment...");
 
-        // Validate input
         const validation =
           enhancedScheduledPaymentsService.validateScheduledPayment(
             tokenInfo,
@@ -107,12 +102,10 @@ export async function POST(request: NextRequest) {
 
         const { db } = await connectToDatabase();
 
-        // Generate unique schedule ID
         const scheduleId = `sched_${Date.now()}_${Math.random()
           .toString(36)
           .substr(2, 9)}`;
 
-        // Calculate next execution time
         const firstExecution = new Date(scheduledFor);
         const nextExecution =
           frequency === "once"
@@ -123,7 +116,6 @@ export async function POST(request: NextRequest) {
                 timezone
               );
 
-        // Create scheduled payment document
         const scheduledPayment = {
           scheduleId,
           username: decoded.username,
@@ -146,6 +138,9 @@ export async function POST(request: NextRequest) {
           createdAt: new Date(),
           lastExecutionAt: null,
           updatedAt: new Date(),
+          // NO RETRY FIELDS
+          failedAt: null,
+          lastError: null,
         };
 
         const result = await db
@@ -174,7 +169,6 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (action === "execute") {
-      // Execute a scheduled payment manually using enhanced API
       try {
         const { scheduleId, privateKey } = body;
 
@@ -205,7 +199,6 @@ export async function POST(request: NextRequest) {
           scheduleId
         );
 
-        // Execute using enhanced API
         const executionResult =
           await enhancedScheduledPaymentsService.executeScheduledPayment(
             {
@@ -224,7 +217,6 @@ export async function POST(request: NextRequest) {
           );
 
         if (executionResult.success) {
-          // Update scheduled payment status
           const executionCount = (scheduledPayment.executionCount || 0) + 1;
           const nextExecution =
             enhancedScheduledPaymentsService.calculateNextExecution(
@@ -275,17 +267,14 @@ export async function POST(request: NextRequest) {
             newStatus,
           });
         } else {
-          // Mark as failed
+          // FIXED: Mark as failed permanently (NO RETRY)
           await db.collection("schedules").updateOne(
             { scheduleId },
             {
               $set: {
                 status: "failed",
-                lastFailure: {
-                  failedAt: new Date(),
-                  error: executionResult.error,
-                  enhancedAPI: true,
-                },
+                failedAt: new Date(),
+                lastError: executionResult.error,
                 updatedAt: new Date(),
               },
             }
@@ -362,7 +351,6 @@ export async function GET(request: NextRequest) {
       .limit(100)
       .toArray();
 
-    // Add enhanced API flag for display
     const enrichedPayments = scheduledPayments.map((payment) => ({
       ...payment,
       id: payment._id.toString(),

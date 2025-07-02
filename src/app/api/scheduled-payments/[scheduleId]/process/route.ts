@@ -1,4 +1,3 @@
-// src/app/api/scheduled-payments/[scheduleId]/process/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -33,11 +32,11 @@ export async function POST(
       `🔒 Attempting to mark payment ${scheduleId} as processing by executor ${executorId}`
     );
 
-    // ATOMIC OPERATION: Mark as processing only if it's available
+    // FIXED: Only active payments can be processed (exclude failed)
     const result = await db.collection("schedules").findOneAndUpdate(
       {
         scheduleId,
-        status: "active",
+        status: "active", // ONLY active payments
         $or: [
           { processingBy: { $exists: false } },
           { processingBy: null },
@@ -48,7 +47,6 @@ export async function POST(
           },
         ],
         nextExecutionAt: { $lte: now },
-        // Additional safety: avoid payments that were just executed
         $and: [
           {
             $or: [
@@ -56,7 +54,7 @@ export async function POST(
               { lastExecutionAt: null },
               {
                 lastExecutionAt: {
-                  $lt: new Date(now.getTime() - 60000), // 1 minute since last execution
+                  $lt: new Date(now.getTime() - 60000),
                 },
               },
             ],
@@ -89,19 +87,19 @@ export async function POST(
         status: "processing",
       });
     } else {
-      // Payment was not available for processing
       console.log(
         `❌ Payment ${scheduleId} could not be marked as processing by executor ${executorId}`
       );
 
-      // Check the current status
       const currentSchedule = await db
         .collection("schedules")
         .findOne({ scheduleId });
 
       let reason = "Payment not available for processing";
       if (currentSchedule) {
-        if (currentSchedule.status === "processing") {
+        if (currentSchedule.status === "failed") {
+          reason = "Payment has failed and cannot be processed";
+        } else if (currentSchedule.status === "processing") {
           reason = `Payment already being processed by executor ${currentSchedule.processingBy}`;
         } else if (currentSchedule.status !== "active") {
           reason = `Payment status is ${currentSchedule.status}`;

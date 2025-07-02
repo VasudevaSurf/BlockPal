@@ -1,13 +1,9 @@
-// src/app/api/scheduled-payments/executor/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { enhancedScheduledPaymentsService } from "@/lib/enhanced-scheduled-payments-service";
 
-// This endpoint would be called by a cron job or background service
-// to execute scheduled payments that are due
 export async function POST(request: NextRequest) {
   try {
-    // Verify this is called from an authorized source (cron job, internal service)
     const authHeader = request.headers.get("Authorization");
     const expectedToken = process.env.CRON_SECRET || "your-cron-secret";
 
@@ -17,12 +13,12 @@ export async function POST(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Find all active scheduled payments that are due for execution
     const now = new Date();
+    // FIXED: Only get active payments (exclude failed)
     const duePayments = await db
       .collection("schedules")
       .find({
-        status: "active",
+        status: "active", // ONLY active payments
         nextExecutionAt: { $lte: now },
       })
       .toArray();
@@ -35,7 +31,6 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`⚡ Executing payment: ${payment.scheduleId}`);
 
-        // Get user's wallet to retrieve encrypted private key
         const wallet = await db.collection("wallets").findOne({
           walletAddress: payment.walletAddress,
           username: payment.username,
@@ -46,6 +41,7 @@ export async function POST(request: NextRequest) {
             `❌ No wallet or private key found for payment: ${payment.scheduleId}`
           );
 
+          // FIXED: Mark as failed (NO RETRY)
           await db.collection("schedules").updateOne(
             { _id: payment._id },
             {
@@ -66,14 +62,11 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Decrypt private key (implement proper decryption in production)
-        // For now, using base64 decode as per your current implementation
         const decryptedPrivateKey = Buffer.from(
           wallet.encryptedPrivateKey.encryptedData,
           "base64"
         ).toString();
 
-        // Execute the payment using enhanced API
         const executionResult =
           await enhancedScheduledPaymentsService.executeScheduledPayment(
             {
@@ -96,7 +89,6 @@ export async function POST(request: NextRequest) {
             `✅ Payment executed successfully: ${payment.scheduleId}`
           );
 
-          // Update the schedule in database
           const updateData: any = {
             executedCount: (payment.executedCount || 0) + 1,
             lastExecutionAt: new Date(),
@@ -111,7 +103,6 @@ export async function POST(request: NextRequest) {
                 payment.frequency
               );
 
-            // Check if we've reached max executions or if it's far in the future (indicating completion)
             const maxExecutions = payment.maxExecutions || 999999;
             if (
               updateData.executedCount >= maxExecutions ||
@@ -124,7 +115,6 @@ export async function POST(request: NextRequest) {
               updateData.nextExecutionAt = nextExecution;
             }
           } else {
-            // One-time payment completed
             updateData.status = "completed";
             updateData.completedAt = new Date();
           }
@@ -133,7 +123,6 @@ export async function POST(request: NextRequest) {
             .collection("schedules")
             .updateOne({ _id: payment._id }, { $set: updateData });
 
-          // Store execution record
           const executionRecord = {
             scheduleId: payment.scheduleId,
             username: payment.username,
@@ -169,43 +158,24 @@ export async function POST(request: NextRequest) {
             executionResult.error
           );
 
-          // Mark as failed after a certain number of retries
-          const retryCount = (payment.retryCount || 0) + 1;
-          const maxRetries = 3;
-
-          if (retryCount >= maxRetries) {
-            await db.collection("schedules").updateOne(
-              { _id: payment._id },
-              {
-                $set: {
-                  status: "failed",
-                  failedAt: new Date(),
-                  lastError: executionResult.error,
-                  retryCount,
-                },
-              }
-            );
-          } else {
-            // Retry later (add 5 minutes to next execution)
-            const nextRetry = new Date(now.getTime() + 5 * 60 * 1000);
-            await db.collection("schedules").updateOne(
-              { _id: payment._id },
-              {
-                $set: {
-                  nextExecutionAt: nextRetry,
-                  retryCount,
-                  lastError: executionResult.error,
-                  updatedAt: new Date(),
-                },
-              }
-            );
-          }
+          // FIXED: Mark as failed immediately (NO RETRY)
+          await db.collection("schedules").updateOne(
+            { _id: payment._id },
+            {
+              $set: {
+                status: "failed",
+                failedAt: new Date(),
+                lastError: executionResult.error,
+                updatedAt: new Date(),
+              },
+            }
+          );
 
           executionResults.push({
             scheduleId: payment.scheduleId,
             success: false,
             error: executionResult.error,
-            retryCount,
+            retryCount: 0,
           });
         }
       } catch (error: any) {
@@ -214,6 +184,7 @@ export async function POST(request: NextRequest) {
           error
         );
 
+        // FIXED: Mark as failed immediately (NO RETRY)
         await db.collection("schedules").updateOne(
           { _id: payment._id },
           {
@@ -258,12 +229,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Health check endpoint for the executor service
 export async function GET(request: NextRequest) {
   try {
     const { db } = await connectToDatabase();
 
-    // Get statistics about scheduled payments
     const stats = await Promise.all([
       db.collection("schedules").countDocuments({ status: "active" }),
       db.collection("schedules").countDocuments({ status: "completed" }),
@@ -281,7 +250,7 @@ export async function GET(request: NextRequest) {
       status: "active",
       nextExecutionAt: {
         $gt: now,
-        $lte: new Date(now.getTime() + 24 * 60 * 60 * 1000), // Next 24 hours
+        $lte: new Date(now.getTime() + 24 * 60 * 60 * 1000),
       },
     });
 
