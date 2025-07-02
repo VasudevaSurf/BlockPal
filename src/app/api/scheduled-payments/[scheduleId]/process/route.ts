@@ -32,22 +32,29 @@ export async function POST(
       `🔒 Attempting to mark payment ${scheduleId} as processing by executor ${executorId}`
     );
 
-    // FIXED: Only active payments can be processed (exclude failed)
+    // STRICT: Only active payments can be processed - NEVER failed payments
     const result = await db.collection("schedules").findOneAndUpdate(
       {
         scheduleId,
         status: "active", // ONLY active payments
-        $or: [
-          { processingBy: { $exists: false } },
-          { processingBy: null },
-          {
-            processingStarted: {
-              $lt: new Date(now.getTime() - 120000), // 2 minutes timeout
-            },
-          },
-        ],
-        nextExecutionAt: { $lte: now },
         $and: [
+          // Payment must not be failed
+          { status: { $ne: "failed" } },
+          // Processing conditions
+          {
+            $or: [
+              { processingBy: { $exists: false } },
+              { processingBy: null },
+              {
+                processingStarted: {
+                  $lt: new Date(now.getTime() - 120000), // 2 minutes timeout
+                },
+              },
+            ],
+          },
+          // Must be due for execution
+          { nextExecutionAt: { $lte: now } },
+          // Must not have been executed recently
           {
             $or: [
               { lastExecutionAt: { $exists: false } },
@@ -98,9 +105,13 @@ export async function POST(
       let reason = "Payment not available for processing";
       if (currentSchedule) {
         if (currentSchedule.status === "failed") {
-          reason = "Payment has failed and cannot be processed";
+          reason = "Payment has permanently failed and cannot be processed";
         } else if (currentSchedule.status === "processing") {
           reason = `Payment already being processed by executor ${currentSchedule.processingBy}`;
+        } else if (currentSchedule.status === "completed") {
+          reason = "Payment has already been completed";
+        } else if (currentSchedule.status === "cancelled") {
+          reason = "Payment has been cancelled";
         } else if (currentSchedule.status !== "active") {
           reason = `Payment status is ${currentSchedule.status}`;
         } else if (currentSchedule.nextExecutionAt > now) {

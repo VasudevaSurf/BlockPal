@@ -54,6 +54,15 @@ export async function POST(
       );
     }
 
+    // STRICT: Do not force update failed payments
+    if (currentSchedule.status === "failed") {
+      console.log(`❌ Cannot force update failed schedule ${scheduleId}`);
+      return NextResponse.json(
+        { error: "Cannot force update a permanently failed payment" },
+        { status: 400 }
+      );
+    }
+
     console.log(
       `📋 Current schedule status: ${currentSchedule.status}, processingBy: ${currentSchedule.processingBy}`
     );
@@ -118,14 +127,21 @@ export async function POST(
       updateData.completedAt = completedAt;
     }
 
-    const updateResult = await db
-      .collection("schedules")
-      .updateOne({ scheduleId }, { $set: updateData });
+    // STRICT: Only update if not failed
+    const updateResult = await db.collection("schedules").updateOne(
+      {
+        scheduleId,
+        status: { $ne: "failed" }, // Ensure we never update failed payments
+      },
+      { $set: updateData }
+    );
 
     if (updateResult.matchedCount === 0) {
-      console.log(`❌ Force update failed: Schedule ${scheduleId} not found`);
+      console.log(
+        `❌ Force update failed: Schedule ${scheduleId} not found or is failed`
+      );
       return NextResponse.json(
-        { error: "Schedule not found" },
+        { error: "Schedule not found or has permanently failed" },
         { status: 404 }
       );
     }

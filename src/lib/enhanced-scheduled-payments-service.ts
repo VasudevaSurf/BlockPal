@@ -1,4 +1,4 @@
-// src/lib/enhanced-scheduled-payments-service.ts (NO RETRY VERSION)
+// src/lib/enhanced-scheduled-payments-service.ts - FIXED GAS ESTIMATION (NO RETRY VERSION)
 import { enhancedSimpleTransferService } from "./enhanced-simple-transfer-service";
 
 export interface ScheduledPayment {
@@ -101,7 +101,7 @@ export class EnhancedScheduledPaymentsService {
       5
     );
 
-    // Get enhanced gas estimation using the transfer service
+    // FIXED: Get enhanced gas estimation using improved transfer service
     const enhancedEstimate = await this.getEnhancedGasEstimation(
       tokenInfo,
       fromAddress,
@@ -141,7 +141,7 @@ export class EnhancedScheduledPaymentsService {
     };
   }
 
-  // UPDATED: No retry logic - fail immediately on any error
+  // UPDATED: No retry logic - fail immediately on any error with better gas handling
   async executeScheduledPayment(
     tokenInfo: {
       name: string;
@@ -156,18 +156,25 @@ export class EnhancedScheduledPaymentsService {
     privateKey: string
   ): Promise<ExecutionResult> {
     console.log(
-      "🚀 Executing scheduled payment with Enhanced API (NO RETRY)..."
+      "🚀 Executing scheduled payment with Enhanced API (NO RETRY, FIXED GAS)..."
     );
 
     try {
+      // FIXED: Ensure proper token info structure for enhanced transfer service
+      const enhancedTokenInfo = {
+        ...tokenInfo,
+        isETH:
+          tokenInfo.contractAddress === "native" ||
+          tokenInfo.symbol === "ETH" ||
+          tokenInfo.isETH,
+      };
+
+      console.log(
+        "🔧 Using enhanced transfer service with improved gas estimation..."
+      );
+
       const result = await enhancedSimpleTransferService.executeTransfer(
-        {
-          ...tokenInfo,
-          isETH:
-            tokenInfo.contractAddress === "native" ||
-            tokenInfo.symbol === "ETH" ||
-            tokenInfo.isETH,
-        },
+        enhancedTokenInfo,
         recipient,
         amount,
         privateKey
@@ -175,7 +182,7 @@ export class EnhancedScheduledPaymentsService {
 
       if (result.success) {
         console.log(
-          "✅ Enhanced scheduled payment executed successfully (NO RETRY)"
+          "✅ Enhanced scheduled payment executed successfully (NO RETRY, FIXED GAS)"
         );
         return {
           success: true,
@@ -189,7 +196,7 @@ export class EnhancedScheduledPaymentsService {
         };
       } else {
         console.error(
-          "❌ Enhanced scheduled payment failed (NO RETRY):",
+          "❌ Enhanced scheduled payment failed (NO RETRY, FIXED GAS):",
           result.error
         );
         return {
@@ -200,7 +207,7 @@ export class EnhancedScheduledPaymentsService {
       }
     } catch (error: any) {
       console.error(
-        "💥 Enhanced scheduled payment execution error (NO RETRY):",
+        "💥 Enhanced scheduled payment execution error (NO RETRY, FIXED GAS):",
         error
       );
       return {
@@ -211,6 +218,7 @@ export class EnhancedScheduledPaymentsService {
     }
   }
 
+  // FIXED: Enhanced gas estimation using the improved transfer service
   private async getEnhancedGasEstimation(
     tokenInfo: {
       name: string;
@@ -230,12 +238,30 @@ export class EnhancedScheduledPaymentsService {
     congestionLevel: string;
   }> {
     try {
+      console.log(
+        "📊 Getting enhanced gas estimation for scheduled payment..."
+      );
+
+      // FIXED: Use the improved transfer service for better gas estimation
       const preview = await enhancedSimpleTransferService.createTransferPreview(
-        tokenInfo,
+        {
+          ...tokenInfo,
+          isETH:
+            tokenInfo.contractAddress === "native" ||
+            tokenInfo.symbol === "ETH" ||
+            tokenInfo.isETH,
+        },
         fromAddress,
         recipient,
         amount
       );
+
+      console.log("✅ Enhanced gas estimation completed:", {
+        estimatedGas: preview.gasEstimation.estimatedGas,
+        gasCostETH: preview.gasEstimation.gasCostETH,
+        gasCostUSD: preview.gasEstimation.gasCostUSD,
+        congestionLevel: preview.gasEstimation.congestionLevel,
+      });
 
       return {
         gasPrice: preview.gasEstimation.gasPrice,
@@ -245,12 +271,29 @@ export class EnhancedScheduledPaymentsService {
         congestionLevel: preview.gasEstimation.congestionLevel,
       };
     } catch (error) {
-      console.error("Error getting enhanced gas estimation:", error);
+      console.error("❌ Error getting enhanced gas estimation:", error);
+
+      // FIXED: Better fallback values that match the improved transfer service
+      const isETH =
+        tokenInfo.contractAddress === "native" ||
+        tokenInfo.symbol === "ETH" ||
+        tokenInfo.isETH;
+
+      const fallbackGas = isETH ? "21000" : "85000"; // Higher fallback for ERC20
+      const fallbackCostETH = isETH ? "0.00105" : "0.004225"; // Higher cost estimates
+      const fallbackCostUSD = isETH ? "3.68" : "14.79"; // Higher USD estimates
+
+      console.log("🔄 Using improved fallback gas values:", {
+        estimatedGas: fallbackGas,
+        gasCostETH: fallbackCostETH,
+        gasCostUSD: fallbackCostUSD,
+      });
+
       return {
-        gasPrice: "20",
-        estimatedGas: tokenInfo.isETH ? "21000" : "65000",
-        gasCostETH: tokenInfo.isETH ? "0.00042" : "0.0013",
-        gasCostUSD: tokenInfo.isETH ? "1.47" : "4.55",
+        gasPrice: "50", // Higher fallback gas price
+        estimatedGas: fallbackGas,
+        gasCostETH: fallbackCostETH,
+        gasCostUSD: fallbackCostUSD,
         congestionLevel: "Unknown",
       };
     }

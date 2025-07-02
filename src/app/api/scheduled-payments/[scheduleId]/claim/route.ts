@@ -32,21 +32,29 @@ export async function POST(
       `🔒 Attempting to claim payment ${scheduleId} for executor ${executorId}`
     );
 
-    // FIXED: Only active payments can be claimed (exclude failed)
+    // STRICT: Only active payments can be claimed - NEVER failed payments
     const result = await db.collection("schedules").findOneAndUpdate(
       {
         scheduleId,
-        status: "active", // ONLY active payments
-        $or: [
-          { claimedBy: { $exists: false } },
-          { claimedBy: null },
+        status: "active", // ONLY active payments - excludes failed, completed, cancelled
+        $and: [
+          // Payment must not be failed
+          { status: { $ne: "failed" } },
+          // Claiming conditions
           {
-            claimedAt: {
-              $lt: new Date(now.getTime() - 60000), // 1 minute timeout
-            },
+            $or: [
+              { claimedBy: { $exists: false } },
+              { claimedBy: null },
+              {
+                claimedAt: {
+                  $lt: new Date(now.getTime() - 60000), // 1 minute timeout
+                },
+              },
+            ],
           },
+          // Must be due for execution
+          { nextExecutionAt: { $lte: now } },
         ],
-        nextExecutionAt: { $lte: now },
       },
       {
         $set: {
@@ -83,7 +91,11 @@ export async function POST(
       let reason = "Payment not available for claiming";
       if (currentSchedule) {
         if (currentSchedule.status === "failed") {
-          reason = "Payment has failed and cannot be executed";
+          reason = "Payment has permanently failed and cannot be executed";
+        } else if (currentSchedule.status === "completed") {
+          reason = "Payment has already been completed";
+        } else if (currentSchedule.status === "cancelled") {
+          reason = "Payment has been cancelled";
         } else if (currentSchedule.status !== "active") {
           reason = `Payment status is ${currentSchedule.status}`;
         } else if (
@@ -104,6 +116,7 @@ export async function POST(
           error: reason,
           alreadyClaimed: !!currentSchedule?.claimedBy,
           claimedBy: currentSchedule?.claimedBy || null,
+          currentStatus: currentSchedule?.status || "not_found",
         },
         { status: 409 }
       );

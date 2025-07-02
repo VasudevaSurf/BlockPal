@@ -22,11 +22,11 @@ export async function GET(request: NextRequest) {
       now.toISOString()
     );
 
-    // FIXED: Exclude failed payments from execution
+    // STRICT: NEVER include failed payments in any query
     const duePayments = await db
       .collection("schedules")
       .find({
-        // Must be active (NOT failed)
+        // Must be active (NOT failed, NOT completed, NOT cancelled)
         status: "active",
 
         // Must be due for execution
@@ -37,6 +37,9 @@ export async function GET(request: NextRequest) {
 
         // Must NOT be currently processing
         $and: [
+          // STRICT: Exclude failed payments explicitly
+          { status: { $ne: "failed" } },
+
           {
             $or: [
               { processingBy: { $exists: false } },
@@ -101,9 +104,27 @@ export async function GET(request: NextRequest) {
       let skipPayment = false;
       const skipReasons = [];
 
-      // FIXED: Skip failed payments
+      // STRICT: Skip failed payments - this should never happen due to query but double-check
       if (payment.status === "failed") {
-        skipReasons.push("payment has failed");
+        skipReasons.push("payment has permanently failed");
+        skipPayment = true;
+      }
+
+      // Skip completed payments
+      if (payment.status === "completed") {
+        skipReasons.push("payment has been completed");
+        skipPayment = true;
+      }
+
+      // Skip cancelled payments
+      if (payment.status === "cancelled") {
+        skipReasons.push("payment has been cancelled");
+        skipPayment = true;
+      }
+
+      // Only process active payments
+      if (payment.status !== "active") {
+        skipReasons.push(`payment status is ${payment.status}`);
         skipPayment = true;
       }
 

@@ -17,12 +17,15 @@ export async function POST(request: NextRequest) {
 
     console.log("🔍 Looking for stuck processing payments...");
 
+    // STRICT: Only look for stuck payments that are not failed
     const stuckPayments = await db
       .collection("schedules")
       .find({
         status: "processing",
         processingStarted: { $lt: fiveMinutesAgo },
         username: decoded.username,
+        // STRICT: Exclude failed payments
+        $and: [{ status: { $ne: "failed" } }],
       })
       .toArray();
 
@@ -32,11 +35,20 @@ export async function POST(request: NextRequest) {
 
     for (const payment of stuckPayments) {
       try {
+        // STRICT: Do not fix failed payments
+        if (payment.status === "failed") {
+          console.log(`⏩ Skipping failed payment: ${payment.scheduleId}`);
+          continue;
+        }
+
         console.log(`🔧 Fixing stuck payment: ${payment.scheduleId}`);
 
         if (payment.frequency === "once") {
           const updateResult = await db.collection("schedules").updateOne(
-            { _id: payment._id },
+            {
+              _id: payment._id,
+              status: { $ne: "failed" }, // Only update if not failed
+            },
             {
               $set: {
                 status: "completed",
@@ -46,8 +58,11 @@ export async function POST(request: NextRequest) {
                 updatedAt: now,
                 processingBy: null,
                 processingStarted: null,
+                claimedBy: null,
+                claimedAt: null,
                 fixedStuckProcessing: true,
                 fixedAt: now,
+                nextExecutionAt: null,
               },
             }
           );
@@ -70,7 +85,10 @@ export async function POST(request: NextRequest) {
           );
 
           const updateResult = await db.collection("schedules").updateOne(
-            { _id: payment._id },
+            {
+              _id: payment._id,
+              status: { $ne: "failed" }, // Only update if not failed
+            },
             {
               $set: {
                 status: "active",
@@ -80,6 +98,8 @@ export async function POST(request: NextRequest) {
                 updatedAt: now,
                 processingBy: null,
                 processingStarted: null,
+                claimedBy: null,
+                claimedAt: null,
                 fixedStuckProcessing: true,
                 fixedAt: now,
               },
@@ -140,12 +160,15 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
+    // STRICT: Only look for stuck payments that are not failed
     const stuckPayments = await db
       .collection("schedules")
       .find({
         status: "processing",
         processingStarted: { $lt: fiveMinutesAgo },
         username: decoded.username,
+        // STRICT: Exclude failed payments
+        $and: [{ status: { $ne: "failed" } }],
       })
       .toArray();
 

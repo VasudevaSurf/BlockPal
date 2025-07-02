@@ -43,11 +43,6 @@ export async function PATCH(
 
       const currentSchedule = await db.collection("schedules").findOne({
         scheduleId,
-        $or: [
-          { processingBy: executorId },
-          { status: "processing" },
-          { status: "active" },
-        ],
       });
 
       if (!currentSchedule) {
@@ -55,6 +50,15 @@ export async function PATCH(
         return NextResponse.json(
           { error: "Schedule not found" },
           { status: 404 }
+        );
+      }
+
+      // STRICT: Do not update failed payments
+      if (currentSchedule.status === "failed") {
+        console.log(`❌ Cannot update failed schedule ${scheduleId}`);
+        return NextResponse.json(
+          { error: "Cannot update a permanently failed payment" },
+          { status: 400 }
         );
       }
 
@@ -128,48 +132,22 @@ export async function PATCH(
         `💾 Updating schedule ${scheduleId} to status: ${finalStatus} (Enhanced API)`
       );
 
+      // STRICT: Only update if not failed
       const updateResult = await db.collection("schedules").updateOne(
         {
           scheduleId,
-          $or: [
-            { processingBy: executorId },
-            { status: "processing" },
-            {
-              status: "active",
-              $or: [
-                { processingBy: { $exists: false } },
-                { processingBy: null },
-                { processingBy: executorId },
-              ],
-            },
-          ],
+          status: { $ne: "failed" }, // Ensure we never update failed payments
         },
         { $set: updateData }
       );
 
       if (updateResult.matchedCount === 0) {
         console.log(
-          `⚠️ No documents matched for update of ${scheduleId}. Attempting broader update...`
+          `❌ Schedule ${scheduleId} not found for update or has permanently failed`
         );
-
-        const broaderUpdate = await db
-          .collection("schedules")
-          .updateOne({ scheduleId }, { $set: updateData });
-
-        if (broaderUpdate.matchedCount === 0) {
-          console.log(`❌ Schedule ${scheduleId} not found for any update`);
-          return NextResponse.json(
-            { error: "Schedule not found for update" },
-            { status: 404 }
-          );
-        } else {
-          console.log(
-            `✅ Broader update successful for ${scheduleId} (Enhanced API)`
-          );
-        }
-      } else {
-        console.log(
-          `✅ Primary update successful for ${scheduleId} (Enhanced API)`
+        return NextResponse.json(
+          { error: "Schedule not found for update or has permanently failed" },
+          { status: 404 }
         );
       }
 
@@ -225,26 +203,18 @@ export async function PATCH(
         nextExecution: nextExecutionAt,
         executionCount: newExecutionCount,
         transactionHash: transactionHash,
-        updateMethod: updateResult.matchedCount > 0 ? "primary" : "broader",
         enhancedAPI: true,
       });
     } else if (action === "mark_failed") {
-      // FIXED: Mark schedule as failed permanently (NO RETRY)
+      // ENHANCED: Smart failure handling with transaction recovery
       const { error: errorMessage, enhancedAPI } = body;
 
       console.log(
-        `❌ Marking schedule ${scheduleId} as permanently failed: ${errorMessage} (Enhanced API: ${enhancedAPI})`
+        `❌ Attempting to mark schedule ${scheduleId} as failed: ${errorMessage} (Enhanced API: ${enhancedAPI})`
       );
 
       const currentSchedule = await db.collection("schedules").findOne({
         scheduleId,
-        $or: [
-          { processingBy: executorId },
-          { processingBy: { $exists: false } },
-          { processingBy: null },
-          { status: "processing" },
-          { status: "active" },
-        ],
       });
 
       if (!currentSchedule) {
@@ -255,7 +225,226 @@ export async function PATCH(
         );
       }
 
-      // PERMANENT FAILURE - NO RETRY
+      // ENHANCED: Check if error is "already known" and might actually succeed
+      if (errorMessage.toLowerCase().includes("already known")) {
+        console.log(
+          `🔍 "Already known" error detected - scheduling delayed check...`
+        );
+
+        // Instead of immediately marking as failed, wait and check via external API
+        await new Promise((resolve) => setTimeout(resolve, 8000)); // Wait 8 seconds for transaction to be mined
+
+        try {
+          // Use Alchemy/Infura API directly instead of web3 library
+          const rpcUrl =
+            process.env.RPC_URL ||
+            process.env.NEXT_PUBLIC_RPC_URL ||
+            "https://eth-mainnet.alchemyapi.io/v2/your-api-key";
+
+          // Check if transaction exists by making direct RPC calls
+          const checkTransactionExists = async (
+            walletAddress: string,
+            recipient: string
+          ) => {
+            try {
+              // Get latest block number
+              const latestBlockResponse = await fetch(rpcUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  jsonrpc: "2.0",
+                  method: "eth_blockNumber",
+                  params: [],
+                  id: 1,
+                }),
+              });
+
+              const latestBlockData = await latestBlockResponse.json();
+              const latestBlock = parseInt(latestBlockData.result, 16);
+
+              // Check last 10 blocks for transactions
+              for (let i = 0; i < 10; i++) {
+                const blockNumber = "0x" + (latestBlock - i).toString(16);
+
+                const blockResponse = await fetch(rpcUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    method: "eth_getBlockByNumber",
+                    params: [blockNumber, true],
+                    id: 1,
+                  }),
+                });
+
+                const blockData = await blockResponse.json();
+                if (blockData.result && blockData.result.transactions) {
+                  for (const tx of blockData.result.transactions) {
+                    if (
+                      tx.from?.toLowerCase() === walletAddress.toLowerCase() &&
+                      tx.to?.toLowerCase() === recipient.toLowerCase()
+                    ) {
+                      // Check if transaction was successful
+                      const receiptResponse = await fetch(rpcUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          jsonrpc: "2.0",
+                          method: "eth_getTransactionReceipt",
+                          params: [tx.hash],
+                          id: 1,
+                        }),
+                      });
+
+                      const receiptData = await receiptResponse.json();
+                      if (
+                        receiptData.result &&
+                        receiptData.result.status === "0x1"
+                      ) {
+                        return {
+                          found: true,
+                          hash: tx.hash,
+                          gasUsed: parseInt(receiptData.result.gasUsed, 16),
+                          blockNumber: parseInt(
+                            receiptData.result.blockNumber,
+                            16
+                          ),
+                        };
+                      }
+                    }
+                  }
+                }
+              }
+
+              return { found: false };
+            } catch (error) {
+              console.log(`⚠️ Error checking transactions:`, error);
+              return { found: false };
+            }
+          };
+
+          const transactionResult = await checkTransactionExists(
+            currentSchedule.walletAddress,
+            currentSchedule.recipient
+          );
+
+          if (transactionResult.found) {
+            console.log(
+              `✅ Found successful transaction: ${transactionResult.hash}`
+            );
+
+            // Transaction actually succeeded - mark as completed instead of failed
+            const newExecutionCount = (currentSchedule.executionCount || 0) + 1;
+            let finalStatus = "completed";
+            let nextExecutionAt = null;
+            let completedAt = new Date();
+
+            // For recurring payments, calculate next execution
+            if (
+              currentSchedule.frequency &&
+              currentSchedule.frequency !== "once"
+            ) {
+              const nextExecution = calculateNextExecution(
+                new Date(),
+                currentSchedule.frequency
+              );
+
+              const maxExecutions = currentSchedule.maxExecutions || 999999;
+              if (
+                newExecutionCount >= maxExecutions ||
+                nextExecution.getFullYear() > new Date().getFullYear() + 50
+              ) {
+                finalStatus = "completed";
+                completedAt = new Date();
+              } else {
+                finalStatus = "active";
+                nextExecutionAt = nextExecution;
+                completedAt = null;
+              }
+            }
+
+            const updateData: any = {
+              status: finalStatus,
+              executionCount: newExecutionCount,
+              lastExecutionAt: new Date(),
+              updatedAt: now,
+              processingBy: null,
+              processingStarted: null,
+              claimedBy: null,
+              claimedAt: null,
+              lastTransactionHash: transactionResult.hash,
+              lastGasUsed: transactionResult.gasUsed || 0,
+              lastBlockNumber: transactionResult.blockNumber || 0,
+              lastExecutedWithEnhancedAPI: enhancedAPI || false,
+              lastExecutorId: executorId,
+              recoveredFromAlreadyKnownError: true,
+              recoveredAt: new Date(),
+            };
+
+            if (nextExecutionAt) {
+              updateData.nextExecutionAt = nextExecutionAt;
+            }
+
+            if (completedAt) {
+              updateData.completedAt = completedAt;
+            }
+
+            await db
+              .collection("schedules")
+              .updateOne({ scheduleId }, { $set: updateData });
+
+            // Store execution record
+            const executionRecord = {
+              scheduleId,
+              username: currentSchedule.username,
+              walletAddress: currentSchedule.walletAddress,
+              transactionHash: transactionResult.hash,
+              gasUsed: transactionResult.gasUsed || 0,
+              blockNumber: transactionResult.blockNumber || 0,
+              executedAt: new Date(),
+              status: "completed",
+              tokenSymbol: currentSchedule.tokenSymbol,
+              contractAddress: currentSchedule.contractAddress,
+              recipient: currentSchedule.recipient,
+              amount: currentSchedule.amount,
+              executionCount: newExecutionCount,
+              executorId: executorId,
+              enhancedAPI: enhancedAPI || false,
+              recoveredFromError: true,
+              createdAt: now,
+            };
+
+            await db
+              .collection("executed_transactions")
+              .insertOne(executionRecord);
+
+            console.log(
+              `✅ Schedule ${scheduleId} successfully recovered and marked as completed`
+            );
+
+            return NextResponse.json({
+              success: true,
+              message:
+                "Transaction actually succeeded - schedule updated as completed",
+              recovered: true,
+              transactionHash: transactionResult.hash,
+              finalStatus: finalStatus,
+              nextExecution: nextExecutionAt,
+              executionCount: newExecutionCount,
+              enhancedAPI: true,
+            });
+          }
+        } catch (recoveryError) {
+          console.log(
+            `⚠️ Could not recover transaction for ${scheduleId}:`,
+            recoveryError
+          );
+          // Continue with marking as failed
+        }
+      }
+
+      // If we reach here, either it's not an "already known" error or recovery failed
+      // Mark as permanently failed
       await db.collection("schedules").updateOne(
         { scheduleId },
         {
@@ -266,15 +455,16 @@ export async function PATCH(
             updatedAt: now,
             processingBy: null,
             processingStarted: null,
+            claimedBy: null,
+            claimedAt: null,
             failedWithEnhancedAPI: enhancedAPI || false,
             lastExecutorId: executorId,
+            nextExecutionAt: null,
           },
         }
       );
 
-      console.log(
-        `❌ Schedule ${scheduleId} marked as permanently failed (Enhanced API)`
-      );
+      console.log(`❌ Schedule ${scheduleId} marked as permanently failed`);
 
       return NextResponse.json({
         success: true,
@@ -285,10 +475,31 @@ export async function PATCH(
         enhancedAPI: enhancedAPI || false,
       });
     } else if (action === "cancel") {
+      // STRICT: Only allow cancellation if not failed
+      const currentSchedule = await db.collection("schedules").findOne({
+        scheduleId,
+        username: decoded.username,
+      });
+
+      if (!currentSchedule) {
+        return NextResponse.json(
+          { error: "Scheduled payment not found" },
+          { status: 404 }
+        );
+      }
+
+      if (currentSchedule.status === "failed") {
+        return NextResponse.json(
+          { error: "Cannot cancel a permanently failed payment" },
+          { status: 400 }
+        );
+      }
+
       const result = await db.collection("schedules").updateOne(
         {
           scheduleId,
           username: decoded.username,
+          status: { $ne: "failed" }, // Ensure we don't cancel failed payments
         },
         {
           $set: {
@@ -297,6 +508,8 @@ export async function PATCH(
             updatedAt: now,
             processingBy: null,
             processingStarted: null,
+            claimedBy: null,
+            claimedAt: null,
             cancelledBy: executorId || "user",
           },
         }
@@ -304,7 +517,7 @@ export async function PATCH(
 
       if (result.matchedCount === 0) {
         return NextResponse.json(
-          { error: "Scheduled payment not found" },
+          { error: "Scheduled payment not found or cannot be cancelled" },
           { status: 404 }
         );
       }

@@ -1,4 +1,4 @@
-// src/lib/enhanced-simple-transfer-service.ts
+// src/lib/enhanced-simple-transfer-service.ts - FIXED GAS ESTIMATION
 import { ethers } from "ethers";
 
 const ALCHEMY_API_KEY =
@@ -69,6 +69,11 @@ class MainnetTransferManager {
         minPriorityFee: "1000000000", // 1 gwei
         maxPriorityFee: "50000000000", // 50 gwei
         transactionTimeout: 300000, // 5 minutes
+        // FIXED: Better gas limits
+        ethTransferGas: "21000",
+        erc20TransferGas: "65000", // Increased from default
+        erc20ApprovalGas: "46000",
+        gasLimitBuffer: 1.2, // 20% buffer
       },
     };
   }
@@ -228,6 +233,7 @@ class MainnetTransferManager {
     }
   }
 
+  // FIXED: Better gas estimation with proper limits
   async getOptimizedGasSettings(
     isETH = true,
     tokenAddress?: string,
@@ -244,34 +250,51 @@ class MainnetTransferManager {
       const maxFeePerGas =
         baseFee + priority + (baseFee * BigInt(20)) / BigInt(100);
 
-      let estimatedGas = isETH ? "21000" : "65000";
+      // FIXED: Better gas limit estimation
+      let estimatedGas: string;
 
-      if (
-        !isETH &&
-        tokenAddress &&
-        recipientAddress &&
-        amount &&
-        this.userWallet
-      ) {
-        try {
-          const amountInWei = ethers.parseUnits(amount, decimals);
+      if (isETH) {
+        estimatedGas = this.config.gasSettings.ethTransferGas;
+      } else {
+        // For ERC20 tokens, use actual estimation or safe default
+        estimatedGas = this.config.gasSettings.erc20TransferGas;
 
-          const data = this.encodeTransferData(
-            recipientAddress,
-            amountInWei.toString()
-          );
-          const gasEstimate = await this.makeAlchemyCall("eth_estimateGas", [
-            {
-              from: this.userWallet,
-              to: tokenAddress,
-              data: data,
-            },
-          ]);
+        if (tokenAddress && recipientAddress && amount && this.userWallet) {
+          try {
+            const amountInWei = ethers.parseUnits(amount, decimals);
+            const data = this.encodeTransferData(
+              recipientAddress,
+              amountInWei.toString()
+            );
 
-          estimatedGas = Math.floor(parseInt(gasEstimate, 16) * 1.1).toString();
-        } catch (error) {
-          console.warn("Gas estimation failed, using default:", error);
-          estimatedGas = "80000";
+            const gasEstimate = await this.makeAlchemyCall("eth_estimateGas", [
+              {
+                from: this.userWallet,
+                to: tokenAddress,
+                data: data,
+              },
+            ]);
+
+            // FIXED: Apply proper buffer and ensure minimum
+            const estimatedGasNumber = parseInt(gasEstimate, 16);
+            const bufferedGas = Math.floor(
+              estimatedGasNumber * this.config.gasSettings.gasLimitBuffer
+            );
+
+            // Ensure minimum gas for ERC20 transfers
+            const minERC20Gas = parseInt(
+              this.config.gasSettings.erc20TransferGas
+            );
+            estimatedGas = Math.max(bufferedGas, minERC20Gas).toString();
+
+            console.log(
+              `Gas estimation: ${estimatedGasNumber} -> buffered: ${bufferedGas} -> final: ${estimatedGas}`
+            );
+          } catch (error) {
+            console.warn("Gas estimation failed, using safe default:", error);
+            // FIXED: Use higher safe default for failed estimations
+            estimatedGas = "80000"; // Higher safe default
+          }
         }
       }
 
@@ -312,10 +335,12 @@ class MainnetTransferManager {
     return "Low";
   }
 
+  // FIXED: Higher safe defaults
   getSafeGasDefaults(isETH: boolean) {
     const maxFeePerGas = ethers.parseUnits("50", "gwei").toString();
     const priorityFee = ethers.parseUnits("5", "gwei").toString();
-    const estimatedGas = isETH ? "21000" : "80000";
+    // FIXED: Higher safe gas limits
+    const estimatedGas = isETH ? "21000" : "85000"; // Increased ERC20 default
 
     const gasCostInWei = BigInt(maxFeePerGas) * BigInt(estimatedGas);
     const gasCostInEther = ethers.formatEther(gasCostInWei.toString());
@@ -450,10 +475,11 @@ class MainnetTransferManager {
         throw new Error(`Failed to get nonce: ${nonceResult.error}`);
       }
 
+      // FIXED: Use gasLimit instead of gas for better compatibility
       const transaction = {
         to: recipientAddress,
         value: amountInWei.toString(),
-        gas: gasSettings.estimatedGas,
+        gasLimit: gasSettings.estimatedGas, // Changed from 'gas' to 'gasLimit'
         maxFeePerGas: gasSettings.maxFeePerGas,
         maxPriorityFeePerGas: gasSettings.maxPriorityFeePerGas,
         nonce: nonceResult.nonce,
@@ -462,7 +488,7 @@ class MainnetTransferManager {
       };
 
       console.log(
-        `Signing ETH transfer transaction (nonce: ${nonceResult.nonce})...`
+        `Signing ETH transfer transaction (nonce: ${nonceResult.nonce}, gasLimit: ${gasSettings.estimatedGas})...`
       );
       const wallet = new ethers.Wallet(this.userPrivateKey);
       const signedTx = await wallet.signTransaction(transaction);
@@ -560,10 +586,11 @@ class MainnetTransferManager {
         throw new Error(`Failed to get nonce: ${nonceResult.error}`);
       }
 
+      // FIXED: Use gasLimit instead of gas for better compatibility
       const transaction = {
         to: tokenAddress,
         data: transferData,
-        gas: gasSettings.estimatedGas,
+        gasLimit: gasSettings.estimatedGas, // Changed from 'gas' to 'gasLimit'
         maxFeePerGas: gasSettings.maxFeePerGas,
         maxPriorityFeePerGas: gasSettings.maxPriorityFeePerGas,
         nonce: nonceResult.nonce,
@@ -572,7 +599,7 @@ class MainnetTransferManager {
       };
 
       console.log(
-        `Signing ERC20 transfer transaction (nonce: ${nonceResult.nonce})...`
+        `Signing ERC20 transfer transaction (nonce: ${nonceResult.nonce}, gasLimit: ${gasSettings.estimatedGas})...`
       );
       const wallet = new ethers.Wallet(this.userPrivateKey);
       const signedTx = await wallet.signTransaction(transaction);

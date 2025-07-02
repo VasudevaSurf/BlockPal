@@ -14,21 +14,32 @@ export async function POST(request: NextRequest) {
     const { db } = await connectToDatabase();
 
     const now = new Date();
-    // FIXED: Only get active payments (exclude failed)
+
+    // STRICT: Only get active payments - NEVER failed, completed, or cancelled
     const duePayments = await db
       .collection("schedules")
       .find({
         status: "active", // ONLY active payments
         nextExecutionAt: { $lte: now },
+        // STRICT: Exclude failed payments explicitly
+        $and: [{ status: { $ne: "failed" } }],
       })
       .toArray();
 
-    console.log(`🔍 Found ${duePayments.length} payments due for execution`);
+    console.log(
+      `🔍 Found ${duePayments.length} active payments due for execution`
+    );
 
     const executionResults = [];
 
     for (const payment of duePayments) {
       try {
+        // STRICT: Double-check payment is not failed before processing
+        if (payment.status === "failed") {
+          console.log(`⏩ Skipping failed payment: ${payment.scheduleId}`);
+          continue;
+        }
+
         console.log(`⚡ Executing payment: ${payment.scheduleId}`);
 
         const wallet = await db.collection("wallets").findOne({
@@ -41,15 +52,23 @@ export async function POST(request: NextRequest) {
             `❌ No wallet or private key found for payment: ${payment.scheduleId}`
           );
 
-          // FIXED: Mark as failed (NO RETRY)
+          // STRICT: Mark as permanently failed - no retry
           await db.collection("schedules").updateOne(
-            { _id: payment._id },
+            {
+              _id: payment._id,
+              status: { $ne: "failed" }, // Only update if not already failed
+            },
             {
               $set: {
                 status: "failed",
                 failedAt: new Date(),
                 lastError: "Wallet or private key not found",
                 updatedAt: new Date(),
+                processingBy: null,
+                processingStarted: null,
+                claimedBy: null,
+                claimedAt: null,
+                nextExecutionAt: null,
               },
             }
           );
@@ -93,6 +112,10 @@ export async function POST(request: NextRequest) {
             executedCount: (payment.executedCount || 0) + 1,
             lastExecutionAt: new Date(),
             updatedAt: new Date(),
+            processingBy: null,
+            processingStarted: null,
+            claimedBy: null,
+            claimedAt: null,
           };
 
           // Calculate next execution for recurring payments
@@ -111,17 +134,24 @@ export async function POST(request: NextRequest) {
             ) {
               updateData.status = "completed";
               updateData.completedAt = new Date();
+              updateData.nextExecutionAt = null;
             } else {
               updateData.nextExecutionAt = nextExecution;
             }
           } else {
             updateData.status = "completed";
             updateData.completedAt = new Date();
+            updateData.nextExecutionAt = null;
           }
 
-          await db
-            .collection("schedules")
-            .updateOne({ _id: payment._id }, { $set: updateData });
+          // STRICT: Only update if payment is not failed
+          await db.collection("schedules").updateOne(
+            {
+              _id: payment._id,
+              status: { $ne: "failed" }, // Only update if not failed
+            },
+            { $set: updateData }
+          );
 
           const executionRecord = {
             scheduleId: payment.scheduleId,
@@ -158,15 +188,23 @@ export async function POST(request: NextRequest) {
             executionResult.error
           );
 
-          // FIXED: Mark as failed immediately (NO RETRY)
+          // STRICT: Mark as permanently failed - no retry
           await db.collection("schedules").updateOne(
-            { _id: payment._id },
+            {
+              _id: payment._id,
+              status: { $ne: "failed" }, // Only update if not already failed
+            },
             {
               $set: {
                 status: "failed",
                 failedAt: new Date(),
                 lastError: executionResult.error,
                 updatedAt: new Date(),
+                processingBy: null,
+                processingStarted: null,
+                claimedBy: null,
+                claimedAt: null,
+                nextExecutionAt: null,
               },
             }
           );
@@ -184,15 +222,23 @@ export async function POST(request: NextRequest) {
           error
         );
 
-        // FIXED: Mark as failed immediately (NO RETRY)
+        // STRICT: Mark as permanently failed - no retry
         await db.collection("schedules").updateOne(
-          { _id: payment._id },
+          {
+            _id: payment._id,
+            status: { $ne: "failed" }, // Only update if not already failed
+          },
           {
             $set: {
               status: "failed",
               failedAt: new Date(),
               lastError: error.message,
               updatedAt: new Date(),
+              processingBy: null,
+              processingStarted: null,
+              claimedBy: null,
+              claimedAt: null,
+              nextExecutionAt: null,
             },
           }
         );
@@ -241,6 +287,8 @@ export async function GET(request: NextRequest) {
     ]);
 
     const now = new Date();
+
+    // STRICT: Only count active payments for due/upcoming
     const dueCount = await db.collection("schedules").countDocuments({
       status: "active",
       nextExecutionAt: { $lte: now },

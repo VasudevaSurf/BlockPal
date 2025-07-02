@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
           recipient,
           amount,
           frequency,
-          status: "active",
+          status: "active", // Always create as active
           scheduledFor: firstExecution,
           nextExecutionAt: firstExecution,
           executionCount: 0,
@@ -138,9 +138,13 @@ export async function POST(request: NextRequest) {
           createdAt: new Date(),
           lastExecutionAt: null,
           updatedAt: new Date(),
-          // NO RETRY FIELDS
+          // Initialize failure fields as null (not failed)
           failedAt: null,
           lastError: null,
+          processingBy: null,
+          processingStarted: null,
+          claimedBy: null,
+          claimedAt: null,
         };
 
         const result = await db
@@ -184,13 +188,30 @@ export async function POST(request: NextRequest) {
         const scheduledPayment = await db.collection("schedules").findOne({
           scheduleId,
           username: decoded.username,
-          status: "active",
         });
 
         if (!scheduledPayment) {
           return NextResponse.json(
-            { error: "Scheduled payment not found or not active" },
+            { error: "Scheduled payment not found" },
             { status: 404 }
+          );
+        }
+
+        // STRICT: Do not execute failed payments
+        if (scheduledPayment.status === "failed") {
+          return NextResponse.json(
+            { error: "Cannot execute a permanently failed payment" },
+            { status: 400 }
+          );
+        }
+
+        // Only execute active payments
+        if (scheduledPayment.status !== "active") {
+          return NextResponse.json(
+            {
+              error: `Cannot execute payment with status: ${scheduledPayment.status}`,
+            },
+            { status: 400 }
           );
         }
 
@@ -232,8 +253,12 @@ export async function POST(request: NextRequest) {
             nextExecution
           );
 
+          // STRICT: Only update if payment is not failed
           await db.collection("schedules").updateOne(
-            { scheduleId },
+            {
+              scheduleId,
+              status: { $ne: "failed" }, // Only update if not failed
+            },
             {
               $set: {
                 executionCount,
@@ -241,6 +266,10 @@ export async function POST(request: NextRequest) {
                 status: newStatus,
                 lastExecutionAt: new Date(),
                 updatedAt: new Date(),
+                processingBy: null,
+                processingStarted: null,
+                claimedBy: null,
+                claimedAt: null,
               },
               $push: {
                 executionHistory: {
@@ -267,15 +296,23 @@ export async function POST(request: NextRequest) {
             newStatus,
           });
         } else {
-          // FIXED: Mark as failed permanently (NO RETRY)
+          // STRICT: Mark as permanently failed - no retry
           await db.collection("schedules").updateOne(
-            { scheduleId },
+            {
+              scheduleId,
+              status: { $ne: "failed" }, // Only update if not already failed
+            },
             {
               $set: {
                 status: "failed",
                 failedAt: new Date(),
                 lastError: executionResult.error,
                 updatedAt: new Date(),
+                processingBy: null,
+                processingStarted: null,
+                claimedBy: null,
+                claimedAt: null,
+                nextExecutionAt: null,
               },
             }
           );
@@ -290,6 +327,32 @@ export async function POST(request: NextRequest) {
         }
       } catch (error: any) {
         console.error("❌ Enhanced scheduled payment execution error:", error);
+
+        // STRICT: Mark as permanently failed on any execution error
+        const { scheduleId } = body;
+        if (scheduleId) {
+          const { db } = await connectToDatabase();
+          await db.collection("schedules").updateOne(
+            {
+              scheduleId,
+              status: { $ne: "failed" }, // Only update if not already failed
+            },
+            {
+              $set: {
+                status: "failed",
+                failedAt: new Date(),
+                lastError: error.message,
+                updatedAt: new Date(),
+                processingBy: null,
+                processingStarted: null,
+                claimedBy: null,
+                claimedAt: null,
+                nextExecutionAt: null,
+              },
+            }
+          );
+        }
+
         return NextResponse.json(
           {
             error: "Execution failed: " + error.message,
@@ -356,6 +419,10 @@ export async function GET(request: NextRequest) {
       id: payment._id.toString(),
       enhancedAPI: payment.useEnhancedAPI || false,
       nextExecution: payment.nextExecutionAt,
+      // Clearly indicate failed status
+      isFailed: payment.status === "failed",
+      failureReason: payment.lastError || null,
+      failedAt: payment.failedAt || null,
     }));
 
     console.log(`✅ Retrieved ${enrichedPayments.length} scheduled payments`);
