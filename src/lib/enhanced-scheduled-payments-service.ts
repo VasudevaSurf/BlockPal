@@ -1,4 +1,4 @@
-// src/lib/enhanced-scheduled-payments-service.ts (NEW - Enhanced API for Scheduled Payments)
+// src/lib/enhanced-scheduled-payments-service.ts (NO RETRY VERSION)
 import { enhancedSimpleTransferService } from "./enhanced-simple-transfer-service";
 
 export interface ScheduledPayment {
@@ -12,7 +12,7 @@ export interface ScheduledPayment {
   recipient: string;
   amount: string;
   frequency: "once" | "daily" | "weekly" | "monthly" | "yearly";
-  status: "active" | "completed" | "cancelled" | "failed";
+  status: "active" | "completed" | "cancelled" | "failed" | "processing";
   scheduledFor: Date;
   nextExecution?: Date;
   executionCount: number;
@@ -21,7 +21,12 @@ export interface ScheduledPayment {
   timezone?: string;
   createdAt: Date;
   lastExecutionAt?: Date;
-  useEnhancedAPI?: boolean; // NEW: Flag to use enhanced API
+  useEnhancedAPI?: boolean;
+  // NO RETRY FIELDS - Remove retry logic completely
+  failedAt?: Date;
+  lastError?: string;
+  processingBy?: string;
+  processingStarted?: Date;
 }
 
 export interface PaymentPreview {
@@ -48,6 +53,7 @@ export interface PaymentPreview {
     estimatedGas: string;
     gasCostETH: string;
     gasCostUSD: string;
+    congestionLevel: string;
   };
 }
 
@@ -66,7 +72,6 @@ export interface ExecutionResult {
 export class EnhancedScheduledPaymentsService {
   constructor() {}
 
-  // Create preview for scheduled payment using enhanced API
   async createScheduledPaymentPreview(
     tokenInfo: {
       name: string;
@@ -96,7 +101,7 @@ export class EnhancedScheduledPaymentsService {
       5
     );
 
-    // Get enhanced gas estimation
+    // Get enhanced gas estimation using the transfer service
     const enhancedEstimate = await this.getEnhancedGasEstimation(
       tokenInfo,
       fromAddress,
@@ -104,14 +109,12 @@ export class EnhancedScheduledPaymentsService {
       amount
     );
 
-    // For ERC20 tokens, check if approval is needed
+    // For ERC20 tokens, approval is handled automatically by enhanced API
     let approvalRequired = false;
     let currentAllowance = "0";
     let requiredAllowance = amount;
 
     if (!isETH) {
-      // For ERC20 tokens, we assume approval might be needed
-      // In a real implementation, you'd check the current allowance
       approvalRequired = false; // Enhanced API handles approvals automatically
     }
 
@@ -138,7 +141,7 @@ export class EnhancedScheduledPaymentsService {
     };
   }
 
-  // Execute a scheduled payment using enhanced API
+  // UPDATED: No retry logic - fail immediately on any error
   async executeScheduledPayment(
     tokenInfo: {
       name: string;
@@ -152,10 +155,11 @@ export class EnhancedScheduledPaymentsService {
     amount: string,
     privateKey: string
   ): Promise<ExecutionResult> {
-    console.log("🚀 Executing scheduled payment with Enhanced API...");
+    console.log(
+      "🚀 Executing scheduled payment with Enhanced API (NO RETRY)..."
+    );
 
     try {
-      // Use the enhanced simple transfer service
       const result = await enhancedSimpleTransferService.executeTransfer(
         {
           ...tokenInfo,
@@ -170,7 +174,9 @@ export class EnhancedScheduledPaymentsService {
       );
 
       if (result.success) {
-        console.log("✅ Enhanced scheduled payment executed successfully");
+        console.log(
+          "✅ Enhanced scheduled payment executed successfully (NO RETRY)"
+        );
         return {
           success: true,
           transactionHash: result.transactionHash,
@@ -182,7 +188,10 @@ export class EnhancedScheduledPaymentsService {
           enhancedAPI: true,
         };
       } else {
-        console.error("❌ Enhanced scheduled payment failed:", result.error);
+        console.error(
+          "❌ Enhanced scheduled payment failed (NO RETRY):",
+          result.error
+        );
         return {
           success: false,
           error: result.error || "Scheduled payment execution failed",
@@ -190,7 +199,10 @@ export class EnhancedScheduledPaymentsService {
         };
       }
     } catch (error: any) {
-      console.error("💥 Enhanced scheduled payment execution error:", error);
+      console.error(
+        "💥 Enhanced scheduled payment execution error (NO RETRY):",
+        error
+      );
       return {
         success: false,
         error: error.message || "Scheduled payment execution failed",
@@ -199,7 +211,6 @@ export class EnhancedScheduledPaymentsService {
     }
   }
 
-  // Get enhanced gas estimation
   private async getEnhancedGasEstimation(
     tokenInfo: {
       name: string;
@@ -216,9 +227,9 @@ export class EnhancedScheduledPaymentsService {
     estimatedGas: string;
     gasCostETH: string;
     gasCostUSD: string;
+    congestionLevel: string;
   }> {
     try {
-      // Use enhanced simple transfer service for preview
       const preview = await enhancedSimpleTransferService.createTransferPreview(
         tokenInfo,
         fromAddress,
@@ -231,20 +242,20 @@ export class EnhancedScheduledPaymentsService {
         estimatedGas: preview.gasEstimation.estimatedGas,
         gasCostETH: preview.gasEstimation.gasCostETH,
         gasCostUSD: preview.gasEstimation.gasCostUSD.replace("$", ""),
+        congestionLevel: preview.gasEstimation.congestionLevel,
       };
     } catch (error) {
       console.error("Error getting enhanced gas estimation:", error);
-      // Fallback estimates
       return {
         gasPrice: "20",
         estimatedGas: tokenInfo.isETH ? "21000" : "65000",
         gasCostETH: tokenInfo.isETH ? "0.00042" : "0.0013",
         gasCostUSD: tokenInfo.isETH ? "1.47" : "4.55",
+        congestionLevel: "Unknown",
       };
     }
   }
 
-  // Calculate next execution times based on frequency
   private calculateNextExecutions(
     startDate: Date,
     frequency: string,
@@ -283,25 +294,37 @@ export class EnhancedScheduledPaymentsService {
     return executions;
   }
 
-  // Check if a payment is due for execution
+  // UPDATED: Check if payment is due (exclude failed payments)
   isPaymentDue(scheduledPayment: ScheduledPayment): boolean {
+    // CRITICAL: Never execute failed payments
+    if (scheduledPayment.status === "failed") {
+      return false;
+    }
+
+    // Don't execute if currently processing
+    if (scheduledPayment.status === "processing") {
+      return false;
+    }
+
+    // Only execute active payments
+    if (scheduledPayment.status !== "active") {
+      return false;
+    }
+
     const now = new Date();
     const scheduledTime =
       scheduledPayment.nextExecution || scheduledPayment.scheduledFor;
-
-    // Allow execution if we're within 5 minutes of scheduled time
     const bufferMs = 5 * 60 * 1000; // 5 minutes
     return now.getTime() >= scheduledTime.getTime() - bufferMs;
   }
 
-  // Calculate the next execution time for a recurring payment
   calculateNextExecution(
     lastExecution: Date,
     frequency: string,
     timezone: string = "UTC"
   ): Date | null {
     if (frequency === "once") {
-      return null; // One-time payments don't have next executions
+      return null;
     }
 
     const nextExecution = new Date(lastExecution);
@@ -326,7 +349,6 @@ export class EnhancedScheduledPaymentsService {
     return nextExecution;
   }
 
-  // Validate scheduled payment parameters
   validateScheduledPayment(
     tokenInfo: any,
     recipient: string,
@@ -334,23 +356,19 @@ export class EnhancedScheduledPaymentsService {
     scheduledFor: Date,
     frequency: string
   ): { valid: boolean; error?: string } {
-    // Validate recipient address
     if (!enhancedSimpleTransferService.isValidAddress(recipient)) {
       return { valid: false, error: "Invalid recipient address" };
     }
 
-    // Validate amount
     const amountNumber = parseFloat(amount);
     if (isNaN(amountNumber) || amountNumber <= 0) {
       return { valid: false, error: "Invalid amount" };
     }
 
-    // Validate scheduled time is in the future
     if (scheduledFor <= new Date()) {
       return { valid: false, error: "Scheduled time must be in the future" };
     }
 
-    // Validate frequency
     const validFrequencies = ["once", "daily", "weekly", "monthly", "yearly"];
     if (!validFrequencies.includes(frequency)) {
       return { valid: false, error: "Invalid frequency" };
@@ -359,13 +377,19 @@ export class EnhancedScheduledPaymentsService {
     return { valid: true };
   }
 
-  // Get payment status based on execution count and frequency
+  // UPDATED: Get payment status (include failed status)
   getPaymentStatus(
     executionCount: number,
     maxExecutions: number,
     frequency: string,
-    nextExecution?: Date
+    nextExecution?: Date,
+    hasFailed?: boolean
   ): "active" | "completed" | "cancelled" | "failed" {
+    // If payment has failed, keep it failed
+    if (hasFailed) {
+      return "failed";
+    }
+
     if (frequency === "once" && executionCount > 0) {
       return "completed";
     }
@@ -382,6 +406,5 @@ export class EnhancedScheduledPaymentsService {
   }
 }
 
-// Export singleton instance
 export const enhancedScheduledPaymentsService =
   new EnhancedScheduledPaymentsService();

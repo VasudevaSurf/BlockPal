@@ -1,3 +1,4 @@
+// src/app/api/scheduled-payments/[scheduleId]/process/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -42,19 +43,23 @@ export async function POST(
           { processingBy: null },
           {
             processingStarted: {
-              $lt: new Date(now.getTime() - 120000),
+              $lt: new Date(now.getTime() - 120000), // 2 minutes timeout
             },
           },
         ],
         nextExecutionAt: { $lte: now },
         // Additional safety: avoid payments that were just executed
-        $or: [
-          { lastExecutionAt: { $exists: false } },
-          { lastExecutionAt: null },
+        $and: [
           {
-            lastExecutionAt: {
-              $lt: new Date(now.getTime() - 60000),
-            },
+            $or: [
+              { lastExecutionAt: { $exists: false } },
+              { lastExecutionAt: null },
+              {
+                lastExecutionAt: {
+                  $lt: new Date(now.getTime() - 60000), // 1 minute since last execution
+                },
+              },
+            ],
           },
         ],
       },

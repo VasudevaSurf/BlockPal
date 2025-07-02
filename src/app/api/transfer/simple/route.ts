@@ -1,4 +1,4 @@
-// src/app/api/transfer/simple/route.ts - FIXED VERSION
+// src/app/api/transfer/simple/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -32,7 +32,7 @@ function serializeBigInt(obj: any): any {
   return obj;
 }
 
-// FIXED: Updated decryption function that handles both old and new formats
+// Enhanced decryption function
 function decryptPrivateKey(encryptedData: any): string {
   try {
     console.log("🔓 Attempting to decrypt private key...", {
@@ -50,7 +50,7 @@ function decryptPrivateKey(encryptedData: any): string {
 
     // Handle object format
     if (encryptedData && typeof encryptedData === "object") {
-      // Method 1: Try simple base64 decode first (current wallet creation format)
+      // Method 1: Try simple base64 decode first
       if (encryptedData.encryptedData) {
         try {
           console.log("📋 Trying simple base64 decryption...");
@@ -85,39 +85,29 @@ function decryptPrivateKey(encryptedData: any): string {
 
           const password =
             process.env.ENCRYPTION_KEY || "your-encryption-key-32-chars-long";
-
-          // Create a proper 32-byte key from the password
           const key = crypto.scryptSync(password, "salt", 32);
 
-          // Handle IV
           let iv: Buffer;
           if (encryptedData.iv && encryptedData.iv !== "generated-iv") {
-            // Try to parse IV as hex
             try {
               iv = Buffer.from(encryptedData.iv, "hex");
               if (iv.length !== 16) {
                 throw new Error("Invalid IV length");
               }
             } catch {
-              // If hex parsing fails, try base64
               try {
                 iv = Buffer.from(encryptedData.iv, "base64");
                 if (iv.length !== 16) {
                   throw new Error("Invalid IV length");
                 }
               } catch {
-                // Fallback to zero IV
                 iv = Buffer.alloc(16, 0);
               }
             }
           } else {
-            // Default IV for backwards compatibility
             iv = Buffer.alloc(16, 0);
           }
 
-          console.log("🔑 Using IV:", iv.toString("hex"));
-
-          // Use createDecipheriv instead of deprecated createDecipher
           const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
           let decrypted = decipher.update(
             encryptedData.encryptedData,
@@ -130,49 +120,6 @@ function decryptPrivateKey(encryptedData: any): string {
           return decrypted;
         } catch (aesError) {
           console.log("⚠️ AES decryption failed:", aesError.message);
-        }
-      }
-
-      // Method 3: Try legacy crypto.createDecipher simulation
-      if (encryptedData.encryptedData) {
-        try {
-          console.log("🔄 Trying legacy decipher simulation...");
-
-          const password =
-            process.env.ENCRYPTION_KEY || "your-encryption-key-32-chars-long";
-
-          // Simulate the old createDecipher behavior
-          const hash = crypto.createHash("md5").update(password).digest();
-          const key = Buffer.concat([
-            hash,
-            crypto
-              .createHash("md5")
-              .update(Buffer.concat([hash, Buffer.from(password)]))
-              .digest(),
-          ]);
-          const iv = Buffer.alloc(16, 0); // Default IV
-
-          const decipher = crypto.createDecipheriv(
-            "aes-256-cbc",
-            key.slice(0, 32),
-            iv
-          );
-          decipher.setAutoPadding(true);
-
-          let decrypted = decipher.update(
-            encryptedData.encryptedData,
-            "base64",
-            "utf8"
-          );
-          decrypted += decipher.final("utf8");
-
-          console.log("✅ Legacy decipher simulation successful");
-          return decrypted;
-        } catch (legacyError) {
-          console.log(
-            "⚠️ Legacy decipher simulation failed:",
-            legacyError.message
-          );
         }
       }
     }
@@ -205,7 +152,7 @@ export async function POST(request: NextRequest) {
       useStoredKey,
     } = body;
 
-    console.log("🔄 Simple transfer API request:", {
+    console.log("🔄 Enhanced simple transfer API request:", {
       action,
       tokenSymbol: tokenInfo?.symbol,
       useStoredKey,
@@ -213,7 +160,7 @@ export async function POST(request: NextRequest) {
       fromAddressPrefix: fromAddress?.slice(0, 10),
     });
 
-    // FIXED: Validate required fields more thoroughly
+    // Validate required fields
     if (!action || !tokenInfo || !recipientAddress || !amount) {
       return NextResponse.json(
         {
@@ -224,7 +171,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // FIXED: Validate fromAddress for both preview and execute
+    // Validate fromAddress
     if (!fromAddress) {
       return NextResponse.json(
         { error: "Missing fromAddress parameter" },
@@ -319,7 +266,7 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // Decrypt the private key using the fixed function
+          // Decrypt the private key
           executionPrivateKey = decryptPrivateKey(wallet.encryptedPrivateKey);
 
           // Validate the decrypted private key
@@ -327,7 +274,6 @@ export async function POST(request: NextRequest) {
             throw new Error("Decrypted private key appears invalid");
           }
 
-          // Log the access for security audit
           console.log(
             `🔑 Private key retrieved for enhanced transfer from wallet ${fromAddress} by user ${decoded.username}`
           );
@@ -359,7 +305,6 @@ export async function POST(request: NextRequest) {
               { status: 500 }
             );
           }
-          // If manual private key is provided, continue with that
           executionPrivateKey = privateKey;
         }
       }
@@ -438,7 +383,6 @@ export async function POST(request: NextRequest) {
             }
           } catch (saveError) {
             console.error("❌ Error saving transaction:", saveError);
-            // Don't fail the whole transaction for this
           }
 
           return NextResponse.json({

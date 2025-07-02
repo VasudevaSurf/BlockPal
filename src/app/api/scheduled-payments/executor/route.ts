@@ -1,6 +1,7 @@
+// src/app/api/scheduled-payments/executor/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { scheduledPaymentService } from "@/lib/scheduled-payment-service";
+import { enhancedScheduledPaymentsService } from "@/lib/enhanced-scheduled-payments-service";
 
 // This endpoint would be called by a cron job or background service
 // to execute scheduled payments that are due
@@ -72,38 +73,21 @@ export async function POST(request: NextRequest) {
           "base64"
         ).toString();
 
-        // Transform payment data to match expected format
-        const scheduleData = {
-          id: payment._id.toString(),
-          scheduleId: payment.scheduleId,
-          walletAddress: payment.walletAddress,
-          tokenInfo: {
-            name: payment.tokenName || payment.tokenSymbol,
-            symbol: payment.tokenSymbol,
-            contractAddress: payment.contractAddress,
-            decimals: payment.decimals || 18,
-            isETH:
-              payment.contractAddress === "native" ||
-              payment.tokenSymbol === "ETH",
-          },
-          recipient: payment.recipients?.[0] || payment.recipient,
-          amount: payment.amounts?.[0] || payment.totalAmount,
-          scheduledFor: payment.scheduledFor,
-          frequency: payment.frequency || "once",
-          timezone: payment.timezone,
-          status: payment.status,
-          nextExecution: payment.nextExecutionAt,
-          executionCount: payment.executedCount || 0,
-          maxExecutions: payment.maxExecutions || 1,
-          description: payment.description,
-          createdAt: payment.createdAt,
-          lastExecutionAt: payment.lastExecutionAt,
-        };
-
-        // Execute the payment
+        // Execute the payment using enhanced API
         const executionResult =
-          await scheduledPaymentService.executeScheduledPayment(
-            scheduleData,
+          await enhancedScheduledPaymentsService.executeScheduledPayment(
+            {
+              name: payment.tokenName || payment.tokenSymbol,
+              symbol: payment.tokenSymbol,
+              contractAddress: payment.contractAddress,
+              decimals: payment.decimals || 18,
+              isETH:
+                payment.contractAddress === "native" ||
+                payment.tokenSymbol === "ETH",
+            },
+            payment.walletAddress,
+            payment.recipient,
+            payment.amount,
             decryptedPrivateKey
           );
 
@@ -115,15 +99,15 @@ export async function POST(request: NextRequest) {
           // Update the schedule in database
           const updateData: any = {
             executedCount: (payment.executedCount || 0) + 1,
-            lastExecutionAt: executionResult.executedAt,
+            lastExecutionAt: new Date(),
             updatedAt: new Date(),
           };
 
           // Calculate next execution for recurring payments
           if (payment.frequency && payment.frequency !== "once") {
             const nextExecution =
-              scheduledPaymentService.calculateNextExecution(
-                executionResult.executedAt,
+              enhancedScheduledPaymentsService.calculateNextExecution(
+                new Date(),
                 payment.frequency
               );
 
@@ -131,7 +115,8 @@ export async function POST(request: NextRequest) {
             const maxExecutions = payment.maxExecutions || 999999;
             if (
               updateData.executedCount >= maxExecutions ||
-              nextExecution.getFullYear() > new Date().getFullYear() + 50
+              (nextExecution &&
+                nextExecution.getFullYear() > new Date().getFullYear() + 50)
             ) {
               updateData.status = "completed";
               updateData.completedAt = new Date();
@@ -158,13 +143,14 @@ export async function POST(request: NextRequest) {
             blockNumber: executionResult.blockNumber,
             actualCostETH: executionResult.actualCostETH,
             actualCostUSD: executionResult.actualCostUSD,
-            executedAt: executionResult.executedAt,
+            executedAt: new Date(),
             status: "completed",
             tokenSymbol: payment.tokenSymbol,
             contractAddress: payment.contractAddress,
-            recipient: scheduleData.recipient,
-            amount: scheduleData.amount,
+            recipient: payment.recipient,
+            amount: payment.amount,
             executionCount: updateData.executedCount,
+            enhancedAPI: true,
           };
 
           await db
@@ -175,7 +161,7 @@ export async function POST(request: NextRequest) {
             scheduleId: payment.scheduleId,
             success: true,
             transactionHash: executionResult.transactionHash,
-            executedAt: executionResult.executedAt,
+            executedAt: new Date(),
           });
         } else {
           console.error(

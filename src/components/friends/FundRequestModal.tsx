@@ -1,4 +1,4 @@
-// src/components/friends/FundRequestModal.tsx - STRICT STATUS CHECKING
+// src/components/friends/FundRequestModal.tsx - ENHANCED with Fixed Token Dropdown
 "use client";
 
 import { useState, useEffect } from "react";
@@ -17,6 +17,7 @@ import {
   Zap,
   XCircle,
   Ban,
+  ChevronDown,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
@@ -37,9 +38,9 @@ interface FundRequestModalProps {
     requestedAt: string;
     expiresAt: string;
     requesterWalletAddress?: string;
-    transactionHash?: string; // ADDED: Transaction hash for fulfilled requests
-    respondedAt?: string; // ADDED: When it was responded to
-    fulfilledBy?: string; // ADDED: Who fulfilled it
+    transactionHash?: string;
+    respondedAt?: string;
+    fulfilledBy?: string;
   };
   onFulfilled?: () => void;
   onDeclined?: () => void;
@@ -89,6 +90,9 @@ export default function FundRequestModal({
   const [loadingRequester, setLoadingRequester] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(fundRequest.status);
 
+  // ADDED: Token dropdown state
+  const [showTokenDropdown, setShowTokenDropdown] = useState(false);
+
   // STRICT: Check if fund request is already processed
   const isProcessed = [
     "fulfilled",
@@ -101,6 +105,162 @@ export default function FundRequestModal({
   function isExpired(): boolean {
     return new Date() > new Date(fundRequest.expiresAt);
   }
+
+  // ENHANCED: Get token info with proper image handling
+  const getTokenInfo = () => {
+    const token = tokens.find((t) => t.symbol === fundRequest.tokenSymbol);
+    return token || null;
+  };
+
+  // ENHANCED: Get token icon with real image support (same as TokenList)
+  const getTokenIcon = (
+    symbol: string,
+    contractAddress?: string,
+    imageUrl?: string
+  ) => {
+    const colors: Record<string, string> = {
+      ETH: "bg-blue-500",
+      ETHEREUM: "bg-blue-500",
+      SOL: "bg-purple-500",
+      BTC: "bg-orange-500",
+      SUI: "bg-cyan-500",
+      XRP: "bg-gray-500",
+      ADA: "bg-blue-600",
+      AVAX: "bg-red-500",
+      TON: "bg-blue-400",
+      DOT: "bg-pink-500",
+      USDT: "bg-green-500",
+      USDC: "bg-blue-600",
+      YAI: "bg-yellow-500",
+      LINK: "bg-blue-700",
+    };
+
+    // Special handling for ETH/native token
+    if (
+      symbol === "ETH" ||
+      contractAddress === "native" ||
+      symbol === "ETHEREUM"
+    ) {
+      return colors.ETH || "bg-blue-500";
+    }
+
+    return colors[symbol] || "bg-gray-500";
+  };
+
+  // ENHANCED: Get token letter (same as TokenList)
+  const getTokenLetter = (symbol: string, contractAddress?: string) => {
+    const letters: Record<string, string> = {
+      ETH: "Ξ",
+      ETHEREUM: "Ξ",
+      SOL: "◎",
+      BTC: "₿",
+      SUI: "~",
+      XRP: "✕",
+      ADA: "₳",
+      AVAX: "A",
+      TON: "T",
+      DOT: "●",
+      USDT: "₮",
+      USDC: "$",
+      YAI: "Ÿ",
+      LINK: "⛓",
+    };
+
+    // Special handling for ETH/native token
+    if (
+      symbol === "ETH" ||
+      contractAddress === "native" ||
+      symbol === "ETHEREUM"
+    ) {
+      return letters.ETH || "Ξ";
+    }
+
+    return letters[symbol] || symbol.charAt(0);
+  };
+
+  // ENHANCED: Validate image URL (same as TokenList)
+  const isValidImageUrl = (url: string | null | undefined): boolean => {
+    if (!url || url === "null" || url === "undefined" || url === "") {
+      return false;
+    }
+    return (
+      url.startsWith("http") &&
+      (url.includes("coingecko") ||
+        url.includes("coinbase") ||
+        url.includes("cdn"))
+    );
+  };
+
+  // ENHANCED: Render token icon with image fallback (same as TokenList)
+  const renderTokenIcon = (
+    token: any,
+    size: "small" | "medium" | "large" = "medium"
+  ) => {
+    const sizeClasses = {
+      small: "w-6 h-6",
+      medium: "w-8 h-8",
+      large: "w-10 h-10",
+    };
+
+    const tokenSymbol = token?.symbol || fundRequest.tokenSymbol;
+    const contractAddress = token?.contractAddress;
+    const imageUrl = token?.icon;
+
+    return (
+      <>
+        {/* Real token image */}
+        {isValidImageUrl(imageUrl) ? (
+          <img
+            src={imageUrl}
+            alt={tokenSymbol}
+            className={`${sizeClasses[size]} rounded-full mr-3 flex-shrink-0`}
+            onError={(e) => {
+              console.log(
+                `❌ Image load failed for ${tokenSymbol}: ${imageUrl}`
+              );
+              // Fallback to colored circle if image fails
+              const target = e.target as HTMLImageElement;
+              target.style.display = "none";
+              const fallback = target.nextElementSibling as HTMLElement;
+              if (fallback) {
+                fallback.classList.remove("hidden");
+              }
+            }}
+          />
+        ) : null}
+
+        {/* Fallback colored circle */}
+        <div
+          className={`${sizeClasses[size]} ${getTokenIcon(
+            tokenSymbol,
+            contractAddress
+          )} rounded-full mr-3 flex items-center justify-center flex-shrink-0 ${
+            isValidImageUrl(imageUrl) ? "hidden" : ""
+          }`}
+        >
+          <span className="text-white text-sm font-medium">
+            {getTokenLetter(tokenSymbol, contractAddress)}
+          </span>
+        </div>
+      </>
+    );
+  };
+
+  // ADDED: Click outside handler for token dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const dropdown = document.querySelector("[data-token-dropdown]");
+      if (dropdown && !dropdown.contains(event.target as Node)) {
+        setShowTokenDropdown(false);
+      }
+    };
+
+    if (showTokenDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showTokenDropdown]);
 
   // STRICT: Fetch current status from server to ensure accuracy
   const fetchCurrentStatus = async () => {
@@ -147,6 +307,7 @@ export default function FundRequestModal({
       setError("");
       setRequesterInfo(null);
       setCurrentStatus(fundRequest.status);
+      setShowTokenDropdown(false); // ADDED: Reset dropdown state
 
       // STRICT: Always fetch current status first
       fetchCurrentStatus();
@@ -261,11 +422,6 @@ export default function FundRequestModal({
     } catch (err) {
       console.error("Failed to copy:", err);
     }
-  };
-
-  const getTokenInfo = () => {
-    const token = tokens.find((t) => t.symbol === fundRequest.tokenSymbol);
-    return token || null;
   };
 
   // STRICT: Block decline action if already processed
@@ -572,16 +728,19 @@ export default function FundRequestModal({
                 );
               })()}
 
-              {/* Request Details */}
+              {/* Request Details with Enhanced Token Display */}
               <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400 text-sm font-satoshi">
                       Amount:
                     </span>
-                    <span className="text-white font-semibold font-satoshi">
-                      {fundRequest.amount} {fundRequest.tokenSymbol}
-                    </span>
+                    <div className="flex items-center">
+                      {renderTokenIcon(tokenInfo, "small")}
+                      <span className="text-white font-semibold font-satoshi">
+                        {fundRequest.amount} {fundRequest.tokenSymbol}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400 text-sm font-satoshi">
@@ -660,7 +819,7 @@ export default function FundRequestModal({
                 </div>
               </div>
 
-              {/* Request Details */}
+              {/* Request Details with Enhanced Token Display */}
               <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
                 <div className="flex items-center mb-4">
                   <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
@@ -681,9 +840,12 @@ export default function FundRequestModal({
                     <span className="text-gray-400 text-sm font-satoshi">
                       Amount:
                     </span>
-                    <span className="text-white font-semibold font-satoshi">
-                      {fundRequest.amount} {fundRequest.tokenSymbol}
-                    </span>
+                    <div className="flex items-center">
+                      {renderTokenIcon(tokenInfo, "small")}
+                      <span className="text-white font-semibold font-satoshi">
+                        {fundRequest.amount} {fundRequest.tokenSymbol}
+                      </span>
+                    </div>
                   </div>
 
                   {fundRequest.message && (
@@ -814,13 +976,16 @@ export default function FundRequestModal({
                 </div>
               </div>
 
-              {/* Token Balance Check */}
+              {/* Enhanced Token Balance Check with Real Images */}
               {tokenInfo && (
                 <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-400 text-sm font-satoshi">
-                      Your {fundRequest.tokenSymbol} Balance:
-                    </span>
+                    <div className="flex items-center">
+                      {renderTokenIcon(tokenInfo, "small")}
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        Your {fundRequest.tokenSymbol} Balance:
+                      </span>
+                    </div>
                     <span className="text-white font-semibold font-satoshi">
                       {tokenInfo.balanceFormatted} {fundRequest.tokenSymbol}
                     </span>
@@ -955,17 +1120,20 @@ export default function FundRequestModal({
             </div>
           )}
 
-          {/* Rest of the existing steps (sending, success, error) remain the same */}
+          {/* Existing steps (sending, success, error) with enhanced token displays */}
           {step === "sending" && (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19] mx-auto mb-4"></div>
               <h4 className="text-white font-semibold font-satoshi mb-2">
                 Processing Enhanced Transfer
               </h4>
-              <p className="text-gray-400 text-sm font-satoshi">
-                Sending {fundRequest.amount} {fundRequest.tokenSymbol} to @
-                {fundRequest.requesterUsername} using Enhanced API...
-              </p>
+              <div className="flex items-center justify-center mb-2">
+                {renderTokenIcon(tokenInfo, "small")}
+                <p className="text-gray-400 text-sm font-satoshi">
+                  Sending {fundRequest.amount} {fundRequest.tokenSymbol} to @
+                  {fundRequest.requesterUsername} using Enhanced API...
+                </p>
+              </div>
               <div className="mt-3 p-2 bg-green-900/20 border border-green-500/50 rounded">
                 <p className="text-green-400 text-xs font-satoshi">
                   ⚡ Enhanced API: Lower gas fees and faster processing
@@ -983,10 +1151,14 @@ export default function FundRequestModal({
                 <h4 className="text-white font-semibold font-satoshi mb-2">
                   Enhanced Transfer Successful!
                 </h4>
-                <p className="text-gray-400 text-sm font-satoshi">
-                  You've successfully sent {fundRequest.amount}{" "}
-                  {fundRequest.tokenSymbol} to @{fundRequest.requesterUsername}
-                </p>
+                <div className="flex items-center justify-center mb-2">
+                  {renderTokenIcon(tokenInfo, "small")}
+                  <p className="text-gray-400 text-sm font-satoshi">
+                    You've successfully sent {fundRequest.amount}{" "}
+                    {fundRequest.tokenSymbol} to @
+                    {fundRequest.requesterUsername}
+                  </p>
+                </div>
               </div>
 
               {/* Enhanced API Success Info */}

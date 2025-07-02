@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - COMPLETE VERSION WITH STRICT STATUS CHECKING
+// src/components/FriendsPage.tsx - ENHANCED with Fixed Token Dropdown
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -102,6 +102,9 @@ export default function FriendsPage() {
     message: "",
   });
 
+  // ADDED: Token dropdown state
+  const [showTokenDropdown, setShowTokenDropdown] = useState(false);
+
   // Track copied state for clipboard actions
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -116,6 +119,134 @@ export default function FriendsPage() {
 
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
+
+  // ENHANCED: Token image utilities (same as TokenList)
+  const getTokenIcon = (symbol: string, contractAddress?: string) => {
+    const colors: Record<string, string> = {
+      ETH: "bg-blue-500",
+      ETHEREUM: "bg-blue-500",
+      SOL: "bg-purple-500",
+      BTC: "bg-orange-500",
+      SUI: "bg-cyan-500",
+      XRP: "bg-gray-500",
+      ADA: "bg-blue-600",
+      AVAX: "bg-red-500",
+      TON: "bg-blue-400",
+      DOT: "bg-pink-500",
+      USDT: "bg-green-500",
+      USDC: "bg-blue-600",
+      YAI: "bg-yellow-500",
+      LINK: "bg-blue-700",
+    };
+
+    // Special handling for ETH/native token
+    if (
+      symbol === "ETH" ||
+      contractAddress === "native" ||
+      symbol === "ETHEREUM"
+    ) {
+      return colors.ETH || "bg-blue-500";
+    }
+
+    return colors[symbol] || "bg-gray-500";
+  };
+
+  const getTokenLetter = (symbol: string, contractAddress?: string) => {
+    const letters: Record<string, string> = {
+      ETH: "Ξ",
+      ETHEREUM: "Ξ",
+      SOL: "◎",
+      BTC: "₿",
+      SUI: "~",
+      XRP: "✕",
+      ADA: "₳",
+      AVAX: "A",
+      TON: "T",
+      DOT: "●",
+      USDT: "₮",
+      USDC: "$",
+      YAI: "Ÿ",
+      LINK: "⛓",
+    };
+
+    // Special handling for ETH/native token
+    if (
+      symbol === "ETH" ||
+      contractAddress === "native" ||
+      symbol === "ETHEREUM"
+    ) {
+      return letters.ETH || "Ξ";
+    }
+
+    return letters[symbol] || symbol.charAt(0);
+  };
+
+  const isValidImageUrl = (url: string | null | undefined): boolean => {
+    if (!url || url === "null" || url === "undefined" || url === "") {
+      return false;
+    }
+    return (
+      url.startsWith("http") &&
+      (url.includes("coingecko") ||
+        url.includes("coinbase") ||
+        url.includes("cdn"))
+    );
+  };
+
+  // ENHANCED: Render token with real images
+  const renderTokenOption = (token: any, isSelected: boolean = false) => {
+    const symbol = token?.symbol || "ETH";
+    const contractAddress = token?.contractAddress;
+    const imageUrl = token?.icon;
+
+    return (
+      <div
+        className={`flex items-center ${isSelected ? "justify-between" : ""}`}
+      >
+        {/* Real token image */}
+        {isValidImageUrl(imageUrl) ? (
+          <img
+            src={imageUrl}
+            alt={symbol}
+            className="w-5 h-5 rounded-full mr-2 flex-shrink-0"
+            onError={(e) => {
+              console.log(`❌ Image load failed for ${symbol}: ${imageUrl}`);
+              // Fallback to colored circle if image fails
+              const target = e.target as HTMLImageElement;
+              target.style.display = "none";
+              const fallback = target.nextElementSibling as HTMLElement;
+              if (fallback) {
+                fallback.classList.remove("hidden");
+              }
+            }}
+          />
+        ) : null}
+
+        {/* Fallback colored circle */}
+        <div
+          className={`w-5 h-5 ${getTokenIcon(
+            symbol,
+            contractAddress
+          )} rounded-full mr-2 flex items-center justify-center flex-shrink-0 ${
+            isValidImageUrl(imageUrl) ? "hidden" : ""
+          }`}
+        >
+          <span className="text-white text-xs font-medium">
+            {getTokenLetter(symbol, contractAddress)}
+          </span>
+        </div>
+
+        <span className="text-white font-satoshi">{symbol}</span>
+
+        {isSelected && (
+          <ChevronDown
+            size={16}
+            className="text-gray-400 pointer-events-none ml-auto"
+          />
+        )}
+      </div>
+    );
+  };
 
   // Auto-search for user suggestions
   useEffect(() => {
@@ -153,6 +284,22 @@ export default function FriendsPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // ADDED: Click outside handler for token dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const dropdown = document.querySelector("[data-token-dropdown]");
+      if (dropdown && !dropdown.contains(event.target as Node)) {
+        setShowTokenDropdown(false);
+      }
+    };
+
+    if (showTokenDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showTokenDropdown]);
 
   // FIXED: Load current user and initial data
   useEffect(() => {
@@ -446,8 +593,13 @@ export default function FriendsPage() {
   const openFundRequestModal = (friend: Friend) => {
     setSelectedFriend(friend);
     setShowFundRequestModal(true);
+    // ENHANCED: Set default to ETH or first available token with image
+    const defaultToken =
+      tokens.find((token) => token.symbol === "ETH") ||
+      tokens.find((token) => isValidImageUrl(token.icon)) ||
+      tokens[0];
     setFundRequestData({
-      tokenSymbol: tokens.length > 0 ? tokens[0].symbol : "ETH",
+      tokenSymbol: defaultToken?.symbol || "ETH",
       amount: "",
       message: "",
     });
@@ -1306,7 +1458,7 @@ export default function FriendsPage() {
         </div>
       </div>
 
-      {/* Fund Request Modal */}
+      {/* ENHANCED: Fund Request Modal with Fixed Token Dropdown */}
       {showFundRequestModal && selectedFriend && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
@@ -1318,6 +1470,7 @@ export default function FriendsPage() {
                 onClick={() => {
                   setShowFundRequestModal(false);
                   setSelectedFriend(null);
+                  setShowTokenDropdown(false); // ADDED: Reset dropdown state
                 }}
                 className="text-gray-400 hover:text-white transition-colors"
               >
@@ -1436,32 +1589,160 @@ export default function FriendsPage() {
             </div>
 
             <div className="space-y-4">
+              {/* FIXED: Token Dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Token
                 </label>
-                <div className="relative">
-                  <select
-                    value={fundRequestData.tokenSymbol}
-                    onChange={(e) =>
-                      setFundRequestData({
-                        ...fundRequestData,
-                        tokenSymbol: e.target.value,
-                      })
-                    }
-                    className="w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white font-satoshi appearance-none pr-10"
+                <div className="relative" data-token-dropdown>
+                  {/* Custom Select Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowTokenDropdown(!showTokenDropdown)}
+                    className="w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white font-satoshi text-left flex items-center justify-between hover:border-[#E2AF19] transition-colors focus:outline-none focus:border-[#E2AF19]"
                   >
-                    <option value="ETH">ETH</option>
-                    {tokens.map((token) => (
-                      <option key={token.id} value={token.symbol}>
-                        {token.symbol}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
-                  />
+                    <div className="flex items-center">
+                      {(() => {
+                        const selectedToken = tokens.find(
+                          (t) => t.symbol === fundRequestData.tokenSymbol
+                        ) || {
+                          symbol: "ETH",
+                          icon: null,
+                          contractAddress: "native",
+                        };
+                        return (
+                          <>
+                            {/* Real token image */}
+                            {isValidImageUrl(selectedToken.icon) ? (
+                              <img
+                                src={selectedToken.icon}
+                                alt={selectedToken.symbol}
+                                className="w-6 h-6 rounded-full mr-3 flex-shrink-0"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = "none";
+                                  const fallback =
+                                    target.nextElementSibling as HTMLElement;
+                                  if (fallback) {
+                                    fallback.classList.remove("hidden");
+                                  }
+                                }}
+                              />
+                            ) : null}
+
+                            {/* Fallback colored circle */}
+                            <div
+                              className={`w-6 h-6 ${getTokenIcon(
+                                selectedToken.symbol,
+                                selectedToken.contractAddress
+                              )} rounded-full mr-3 flex items-center justify-center flex-shrink-0 ${
+                                isValidImageUrl(selectedToken.icon)
+                                  ? "hidden"
+                                  : ""
+                              }`}
+                            >
+                              <span className="text-white text-xs font-medium">
+                                {getTokenLetter(
+                                  selectedToken.symbol,
+                                  selectedToken.contractAddress
+                                )}
+                              </span>
+                            </div>
+
+                            <span className="text-white font-satoshi">
+                              {selectedToken.symbol}
+                            </span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <ChevronDown
+                      size={16}
+                      className={`text-gray-400 transition-transform ${
+                        showTokenDropdown ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* Custom Dropdown Menu */}
+                  {showTokenDropdown && (
+                    <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                      {/* ETH Option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFundRequestData({
+                            ...fundRequestData,
+                            tokenSymbol: "ETH",
+                          });
+                          setShowTokenDropdown(false);
+                        }}
+                        className="w-full flex items-center px-3 py-3 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
+                      >
+                        <div className="w-6 h-6 bg-blue-500 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs font-medium">
+                            Ξ
+                          </span>
+                        </div>
+                        <span className="text-white font-satoshi">ETH</span>
+                      </button>
+
+                      {/* Other Token Options */}
+                      {tokens.map((token) => (
+                        <button
+                          key={token.id}
+                          type="button"
+                          onClick={() => {
+                            setFundRequestData({
+                              ...fundRequestData,
+                              tokenSymbol: token.symbol,
+                            });
+                            setShowTokenDropdown(false);
+                          }}
+                          className="w-full flex items-center px-3 py-3 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
+                        >
+                          {/* Real token image */}
+                          {isValidImageUrl(token.icon) ? (
+                            <img
+                              src={token.icon}
+                              alt={token.symbol}
+                              className="w-6 h-6 rounded-full mr-3 flex-shrink-0"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = "none";
+                                const fallback =
+                                  target.nextElementSibling as HTMLElement;
+                                if (fallback) {
+                                  fallback.classList.remove("hidden");
+                                }
+                              }}
+                            />
+                          ) : null}
+
+                          {/* Fallback colored circle */}
+                          <div
+                            className={`w-6 h-6 ${getTokenIcon(
+                              token.symbol,
+                              token.contractAddress
+                            )} rounded-full mr-3 flex items-center justify-center flex-shrink-0 ${
+                              isValidImageUrl(token.icon) ? "hidden" : ""
+                            }`}
+                          >
+                            <span className="text-white text-xs font-medium">
+                              {getTokenLetter(
+                                token.symbol,
+                                token.contractAddress
+                              )}
+                            </span>
+                          </div>
+
+                          <span className="text-white font-satoshi">
+                            {token.symbol}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1502,6 +1783,7 @@ export default function FriendsPage() {
                   onClick={() => {
                     setShowFundRequestModal(false);
                     setSelectedFriend(null);
+                    setShowTokenDropdown(false); // ADDED: Reset dropdown state
                   }}
                   className="flex-1 px-4 py-2 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
                 >

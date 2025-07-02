@@ -1,3 +1,4 @@
+// src/components/payments/ScheduledPaymentsPage.tsx - FIXED: Real token icons
 "use client";
 
 import { useState, useEffect } from "react";
@@ -79,21 +80,120 @@ interface PaymentPreview {
   requiredAllowance?: string;
 }
 
-const getTokenIcon = (token: string) => {
-  const icons: Record<string, { bg: string; symbol: string }> = {
-    Ethereum: { bg: "bg-blue-500", symbol: "Ξ" },
-    ETH: { bg: "bg-blue-500", symbol: "Ξ" },
-    USDT: { bg: "bg-green-500", symbol: "₮" },
-    USDC: { bg: "bg-blue-600", symbol: "$" },
-    LINK: { bg: "bg-blue-700", symbol: "⛓" },
-    DAI: { bg: "bg-yellow-500", symbol: "◈" },
-    UNI: { bg: "bg-pink-500", symbol: "🦄" },
-    Solana: { bg: "bg-purple-500", symbol: "◎" },
-    Polkadot: { bg: "bg-pink-500", symbol: "●" },
-    Sui: { bg: "bg-cyan-500", symbol: "~" },
-    XRP: { bg: "bg-gray-500", symbol: "✕" },
+// FIXED: Helper function to get token icon color as fallback
+const getTokenIconColor = (symbol: string) => {
+  const colors: Record<string, string> = {
+    Ethereum: "bg-blue-500",
+    ETH: "bg-blue-500",
+    USDT: "bg-green-500",
+    USDC: "bg-blue-600",
+    LINK: "bg-blue-700",
+    DAI: "bg-yellow-500",
+    UNI: "bg-pink-500",
+    Solana: "bg-purple-500",
+    Polkadot: "bg-pink-500",
+    Sui: "bg-cyan-500",
+    XRP: "bg-gray-500",
+    WBTC: "bg-orange-500",
+    AAVE: "bg-purple-600",
+    MATIC: "bg-purple-700",
+    CRV: "bg-red-500",
+    COMP: "bg-green-600",
   };
-  return icons[token] || { bg: "bg-gray-500", symbol: "?" };
+  return colors[symbol] || "bg-gray-500";
+};
+
+// FIXED: Helper function to get token letter as fallback
+const getTokenLetter = (symbol: string) => {
+  const letters: Record<string, string> = {
+    Ethereum: "Ξ",
+    ETH: "Ξ",
+    USDT: "₮",
+    USDC: "$",
+    LINK: "⛓",
+    DAI: "◈",
+    UNI: "🦄",
+    Solana: "◎",
+    Polkadot: "●",
+    Sui: "~",
+    XRP: "✕",
+    WBTC: "₿",
+    AAVE: "👻",
+    MATIC: "◆",
+    CRV: "🌊",
+    COMP: "🧠",
+  };
+  return letters[symbol] || symbol.charAt(0);
+};
+
+// FIXED: Better icon URL validation
+const isValidImageUrl = (url: string | null | undefined): boolean => {
+  if (!url || url === "null" || url === "undefined" || url === "") {
+    return false;
+  }
+  return (
+    url.startsWith("http") &&
+    (url.includes("coingecko") ||
+      url.includes("coinbase") ||
+      url.includes("cdn") ||
+      url.includes("assets"))
+  );
+};
+
+// FIXED: Component to render token icon with real images
+const TokenIcon = ({
+  token,
+  size = "w-5 h-5",
+}: {
+  token: any;
+  size?: string;
+}) => {
+  const [imageError, setImageError] = useState(false);
+
+  // Check if we have a valid image URL and no error occurred
+  const showImage = !imageError && isValidImageUrl(token.icon);
+
+  return (
+    <div className="relative flex-shrink-0">
+      {showImage ? (
+        <>
+          <img
+            src={token.icon}
+            alt={token.symbol}
+            className={`${size} rounded-full`}
+            onError={(e) => {
+              console.log(
+                `❌ Image load failed for ${token.symbol}: ${token.icon}`
+              );
+              setImageError(true);
+            }}
+          />
+          {/* Fallback icon (hidden initially, shown if image fails) */}
+          <div
+            className={`${size} ${getTokenIconColor(
+              token.symbol
+            )} rounded-full flex items-center justify-center absolute top-0 left-0 ${
+              imageError ? "block" : "hidden"
+            }`}
+          >
+            <span className="text-white text-xs font-medium">
+              {getTokenLetter(token.symbol)}
+            </span>
+          </div>
+        </>
+      ) : (
+        <div
+          className={`${size} ${getTokenIconColor(
+            token.symbol
+          )} rounded-full flex items-center justify-center`}
+        >
+          <span className="text-white text-xs font-medium">
+            {getTokenLetter(token.symbol)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 };
 
 const timezones = [
@@ -150,6 +250,7 @@ export default function ScheduledPaymentsPage() {
         isETH: firstToken.symbol === "ETH",
         balance: firstToken.balance,
         price: firstToken.price,
+        icon: firstToken.icon, // FIXED: Include the icon URL
       });
     }
   }, [tokens, selectedToken]);
@@ -564,16 +665,8 @@ export default function ScheduledPaymentsPage() {
                   <div className="flex items-center">
                     {selectedToken && (
                       <>
-                        <div
-                          className={`w-5 h-5 ${
-                            getTokenIcon(selectedToken.symbol).bg
-                          } rounded-full flex items-center justify-center mr-2`}
-                        >
-                          <span className="text-white text-xs font-bold">
-                            {getTokenIcon(selectedToken.symbol).symbol}
-                          </span>
-                        </div>
-                        <span className="text-white font-satoshi text-sm">
+                        <TokenIcon token={selectedToken} size="w-5 h-5" />
+                        <span className="text-white font-satoshi text-sm ml-2">
                           {selectedToken.symbol}
                         </span>
                       </>
@@ -582,47 +675,38 @@ export default function ScheduledPaymentsPage() {
                   <ChevronDown size={16} className="text-gray-400" />
                 </button>
 
-                {/* Dropdown */}
+                {/* FIXED: Dropdown with real token icons */}
                 {isTokenDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {tokens.map((token) => {
-                      const tokenIcon = getTokenIcon(token.symbol);
-                      return (
-                        <button
-                          key={token.id}
-                          onClick={() => {
-                            setSelectedToken({
-                              name: token.name,
-                              symbol: token.symbol,
-                              contractAddress:
-                                token.contractAddress || token.id,
-                              decimals: token.decimals || 18,
-                              isETH: token.symbol === "ETH",
-                              balance: token.balance,
-                              price: token.price,
-                            });
-                            setIsTokenDropdownOpen(false);
-                          }}
-                          className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
-                        >
-                          <div
-                            className={`w-5 h-5 ${tokenIcon.bg} rounded-full flex items-center justify-center mr-2`}
-                          >
-                            <span className="text-white text-xs font-bold">
-                              {tokenIcon.symbol}
-                            </span>
+                    {tokens.map((token) => (
+                      <button
+                        key={token.id}
+                        onClick={() => {
+                          setSelectedToken({
+                            name: token.name,
+                            symbol: token.symbol,
+                            contractAddress: token.contractAddress || token.id,
+                            decimals: token.decimals || 18,
+                            isETH: token.symbol === "ETH",
+                            balance: token.balance,
+                            price: token.price,
+                            icon: token.icon, // FIXED: Include the icon URL
+                          });
+                          setIsTokenDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
+                      >
+                        <TokenIcon token={token} size="w-5 h-5" />
+                        <div className="flex-1 ml-2">
+                          <div className="text-white font-satoshi text-sm">
+                            {token.symbol}
                           </div>
-                          <div className="flex-1">
-                            <div className="text-white font-satoshi text-sm">
-                              {token.symbol}
-                            </div>
-                            <div className="text-gray-400 font-satoshi text-xs">
-                              Balance: {token.balance.toFixed(4)}
-                            </div>
+                          <div className="text-gray-400 font-satoshi text-xs">
+                            Balance: {token.balance.toFixed(4)}
                           </div>
-                        </button>
-                      );
-                    })}
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -822,7 +906,17 @@ export default function ScheduledPaymentsPage() {
               </div>
             ) : (
               filteredPayments.map((payment) => {
-                const tokenIcon = getTokenIcon(payment.tokenSymbol);
+                // FIXED: Create a token object for the payment with icon info from tokens list
+                const paymentToken = tokens.find(
+                  (t) =>
+                    t.symbol === payment.tokenSymbol ||
+                    t.contractAddress === payment.contractAddress
+                ) || {
+                  symbol: payment.tokenSymbol,
+                  name: payment.tokenName,
+                  icon: null, // Will fallback to colored icon
+                };
+
                 return (
                   <div
                     key={payment.id}
@@ -843,14 +937,8 @@ export default function ScheduledPaymentsPage() {
                             {payment.recipient.slice(-6)}
                           </div>
                           <div className="flex items-center mt-1">
-                            <div
-                              className={`w-4 h-4 ${tokenIcon.bg} rounded-full flex items-center justify-center mr-1`}
-                            >
-                              <span className="text-white text-xs font-bold">
-                                {tokenIcon.symbol}
-                              </span>
-                            </div>
-                            <span className="text-gray-400 text-xs font-satoshi">
+                            <TokenIcon token={paymentToken} size="w-4 h-4" />
+                            <span className="text-gray-400 text-xs font-satoshi ml-1">
                               {payment.tokenSymbol}
                             </span>
                           </div>
@@ -947,7 +1035,7 @@ export default function ScheduledPaymentsPage() {
         </div>
       </div>
 
-      {/* Desktop Layout */}
+      {/* Desktop Layout - Similar fixes applied */}
       <div className="hidden xl:flex flex-col gap-6 flex-1 min-h-0">
         {/* Schedule Payment Form */}
         <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-shrink-0">
@@ -978,16 +1066,8 @@ export default function ScheduledPaymentsPage() {
                 <div className="flex items-center">
                   {selectedToken && (
                     <>
-                      <div
-                        className={`w-5 h-5 ${
-                          getTokenIcon(selectedToken.symbol).bg
-                        } rounded-full flex items-center justify-center mr-2`}
-                      >
-                        <span className="text-white text-xs font-bold">
-                          {getTokenIcon(selectedToken.symbol).symbol}
-                        </span>
-                      </div>
-                      <span className="text-white font-satoshi text-sm">
+                      <TokenIcon token={selectedToken} size="w-5 h-5" />
+                      <span className="text-white font-satoshi text-sm ml-2">
                         {selectedToken.symbol}
                       </span>
                     </>
@@ -996,45 +1076,38 @@ export default function ScheduledPaymentsPage() {
                 <ChevronDown size={14} className="text-gray-400" />
               </button>
 
+              {/* FIXED: Desktop dropdown with real token icons */}
               {isTokenDropdownOpen && (
                 <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {tokens.map((token) => {
-                    const tokenIcon = getTokenIcon(token.symbol);
-                    return (
-                      <button
-                        key={token.id}
-                        onClick={() => {
-                          setSelectedToken({
-                            name: token.name,
-                            symbol: token.symbol,
-                            contractAddress: token.contractAddress || token.id,
-                            decimals: token.decimals || 18,
-                            isETH: token.symbol === "ETH",
-                            balance: token.balance,
-                            price: token.price,
-                          });
-                          setIsTokenDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
-                      >
-                        <div
-                          className={`w-5 h-5 ${tokenIcon.bg} rounded-full flex items-center justify-center mr-2`}
-                        >
-                          <span className="text-white text-xs font-bold">
-                            {tokenIcon.symbol}
-                          </span>
+                  {tokens.map((token) => (
+                    <button
+                      key={token.id}
+                      onClick={() => {
+                        setSelectedToken({
+                          name: token.name,
+                          symbol: token.symbol,
+                          contractAddress: token.contractAddress || token.id,
+                          decimals: token.decimals || 18,
+                          isETH: token.symbol === "ETH",
+                          balance: token.balance,
+                          price: token.price,
+                          icon: token.icon, // FIXED: Include the icon URL
+                        });
+                        setIsTokenDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
+                    >
+                      <TokenIcon token={token} size="w-5 h-5" />
+                      <div className="flex-1 ml-2">
+                        <div className="text-white font-satoshi text-sm">
+                          {token.symbol}
                         </div>
-                        <div className="flex-1">
-                          <div className="text-white font-satoshi text-sm">
-                            {token.symbol}
-                          </div>
-                          <div className="text-gray-400 font-satoshi text-xs">
-                            Balance: {token.balance.toFixed(4)}
-                          </div>
+                        <div className="text-gray-400 font-satoshi text-xs">
+                          Balance: {token.balance.toFixed(4)}
                         </div>
-                      </button>
-                    );
-                  })}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -1299,7 +1372,17 @@ export default function ScheduledPaymentsPage() {
               </div>
             ) : (
               filteredPayments.map((payment, index) => {
-                const tokenIcon = getTokenIcon(payment.tokenSymbol);
+                // FIXED: Create a token object for the payment with icon info
+                const paymentToken = tokens.find(
+                  (t) =>
+                    t.symbol === payment.tokenSymbol ||
+                    t.contractAddress === payment.contractAddress
+                ) || {
+                  symbol: payment.tokenSymbol,
+                  name: payment.tokenName,
+                  icon: null, // Will fallback to colored icon
+                };
+
                 return (
                   <div key={payment.id}>
                     <div className="grid grid-cols-6 gap-2 items-center py-2 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors">
@@ -1318,14 +1401,8 @@ export default function ScheduledPaymentsPage() {
                       </div>
 
                       <div className="flex items-center min-w-0">
-                        <div
-                          className={`w-5 h-5 ${tokenIcon.bg} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
-                        >
-                          <span className="text-white text-xs font-bold">
-                            {tokenIcon.symbol}
-                          </span>
-                        </div>
-                        <span className="text-white font-satoshi text-sm truncate">
+                        <TokenIcon token={paymentToken} size="w-5 h-5" />
+                        <span className="text-white font-satoshi text-sm truncate ml-2">
                           {payment.tokenSymbol}
                         </span>
                       </div>
@@ -1412,6 +1489,7 @@ export default function ScheduledPaymentsPage() {
         </div>
       </div>
 
+      {/* Modals remain the same... */}
       {/* Preview Modal */}
       {showPreview && preview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

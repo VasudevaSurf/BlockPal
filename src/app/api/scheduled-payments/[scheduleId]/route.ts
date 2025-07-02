@@ -1,4 +1,4 @@
-// src/app/api/scheduled-payments/[scheduleId]/route.ts - FIXED FOR ENHANCED API
+// src/app/api/scheduled-payments/[scheduleId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -28,7 +28,7 @@ export async function PATCH(
     );
 
     if (action === "update_after_execution") {
-      // FIXED: Update schedule after successful execution using enhanced API
+      // Update schedule after successful execution using enhanced API
       const {
         transactionHash,
         gasUsed,
@@ -43,7 +43,7 @@ export async function PATCH(
         `📝 Updating schedule ${scheduleId} after successful enhanced execution`
       );
 
-      // STEP 1: Get the current schedule with flexible matching
+      // Get the current schedule with flexible matching
       const currentSchedule = await db.collection("schedules").findOne({
         scheduleId,
         $or: [
@@ -65,7 +65,7 @@ export async function PATCH(
         `📋 Found schedule ${scheduleId} with status: ${currentSchedule.status}, processingBy: ${currentSchedule.processingBy}`
       );
 
-      // STEP 2: Calculate new execution count and next execution
+      // Calculate new execution count and next execution
       const newExecutionCount = (currentSchedule.executionCount || 0) + 1;
       let finalStatus = "completed";
       let nextExecutionAt = null;
@@ -106,7 +106,7 @@ export async function PATCH(
         );
       }
 
-      // STEP 3: Prepare update data with enhanced API markers
+      // Prepare update data with enhanced API markers
       const updateData: any = {
         status: finalStatus,
         executionCount: newExecutionCount,
@@ -121,7 +121,7 @@ export async function PATCH(
         lastBlockNumber: parseInt(blockNumber) || 0,
         lastActualCostETH: parseFloat(actualCostETH) || 0,
         lastActualCostUSD: parseFloat(actualCostUSD) || 0,
-        // FIXED: Add enhanced API markers
+        // Add enhanced API markers
         lastExecutedWithEnhancedAPI: enhancedAPI || false,
         lastExecutorId: executorId,
       };
@@ -134,7 +134,7 @@ export async function PATCH(
         updateData.completedAt = completedAt;
       }
 
-      // STEP 4: Perform the update with flexible matching
+      // Perform the update with flexible matching
       console.log(
         `💾 Updating schedule ${scheduleId} to status: ${finalStatus} (Enhanced API)`
       );
@@ -190,7 +190,7 @@ export async function PATCH(
         `✅ Schedule ${scheduleId} updated successfully - Status: ${finalStatus} (Enhanced API)`
       );
 
-      // STEP 5: Store execution record with unique ID and enhanced API flag
+      // Store execution record with unique ID and enhanced API flag
       const executionRecordId = `${scheduleId}_exec_${newExecutionCount}_${Date.now()}`;
       const executionRecord = {
         _id: executionRecordId,
@@ -245,7 +245,7 @@ export async function PATCH(
         enhancedAPI: true,
       });
     } else if (action === "mark_failed") {
-      // FIXED: Mark schedule as failed with enhanced API context
+      // Mark schedule as failed with enhanced API context
       const { error: errorMessage, enhancedAPI } = body;
 
       console.log(

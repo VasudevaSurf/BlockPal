@@ -1,4 +1,4 @@
-// src/app/api/scheduled-payments/due/route.ts - FIXED FOR ENHANCED EXECUTOR
+// src/app/api/scheduled-payments/due/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
       `📊 After safety checks: ${safeDuePayments.length} payments ready for execution`
     );
 
-    // FIXED: Transform the data to match expected format for enhanced executor
+    // Transform the data to match expected format for enhanced executor
     const transformedPayments = safeDuePayments.map((payment) => {
       const transformed = {
         id: payment._id.toString(),
@@ -235,7 +235,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      scheduledPayments: uniquePayments, // FIXED: Use correct field name
+      scheduledPayments: uniquePayments,
       count: uniquePayments.length,
       timestamp: now.toISOString(),
       debug: {

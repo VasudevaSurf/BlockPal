@@ -1,3 +1,4 @@
+// src/app/api/scheduled-payments/[scheduleId]/claim/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -43,7 +44,7 @@ export async function POST(
           { claimedBy: null },
           {
             claimedAt: {
-              $lt: new Date(now.getTime() - 60000),
+              $lt: new Date(now.getTime() - 60000), // 1 minute timeout
             },
           },
         ],

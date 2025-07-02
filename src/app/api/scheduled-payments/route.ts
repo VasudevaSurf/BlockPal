@@ -1,4 +1,4 @@
-// src/app/api/scheduled-payments/route.ts - FIXED COLLECTION NAME AND ENHANCED API
+// src/app/api/scheduled-payments/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
                 timezone
               );
 
-        // FIXED: Create scheduled payment document with correct field names
+        // Create scheduled payment document
         const scheduledPayment = {
           scheduleId,
           username: decoded.username,
@@ -137,18 +137,17 @@ export async function POST(request: NextRequest) {
           frequency,
           status: "active",
           scheduledFor: firstExecution,
-          nextExecutionAt: firstExecution, // FIXED: Use correct field name
+          nextExecutionAt: firstExecution,
           executionCount: 0,
-          maxExecutions: frequency === "once" ? 1 : 100, // Default max for recurring
+          maxExecutions: frequency === "once" ? 1 : 100,
           description: description || "",
           timezone: timezone || "UTC",
-          useEnhancedAPI: true, // Flag to use enhanced API
+          useEnhancedAPI: true,
           createdAt: new Date(),
           lastExecutionAt: null,
           updatedAt: new Date(),
         };
 
-        // FIXED: Save to correct collection name "schedules"
         const result = await db
           .collection("schedules")
           .insertOne(scheduledPayment);
@@ -162,7 +161,7 @@ export async function POST(request: NextRequest) {
           success: true,
           scheduleId,
           scheduledFor: firstExecution.toISOString(),
-          nextExecution: firstExecution.toISOString(), // For one-time or first execution
+          nextExecution: firstExecution.toISOString(),
           enhancedAPI: true,
           message:
             "Scheduled payment created with Enhanced API for better gas efficiency",
@@ -188,7 +187,6 @@ export async function POST(request: NextRequest) {
 
         const { db } = await connectToDatabase();
 
-        // FIXED: Get the scheduled payment from correct collection
         const scheduledPayment = await db.collection("schedules").findOne({
           scheduleId,
           username: decoded.username,
@@ -348,7 +346,6 @@ export async function GET(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // FIXED: Get scheduled payments from correct collection
     const query: any = {
       username: decoded.username,
       walletAddress,
@@ -370,7 +367,6 @@ export async function GET(request: NextRequest) {
       ...payment,
       id: payment._id.toString(),
       enhancedAPI: payment.useEnhancedAPI || false,
-      // FIXED: Map field names for frontend compatibility
       nextExecution: payment.nextExecutionAt,
     }));
 
