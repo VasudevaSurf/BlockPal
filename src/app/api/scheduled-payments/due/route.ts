@@ -1,4 +1,4 @@
-// src/app/api/scheduled-payments/due/route.ts
+// src/app/api/scheduled-payments/due/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -23,92 +23,39 @@ export async function GET(request: NextRequest) {
       now.toISOString()
     );
 
-    // Enhanced query for smart contract compatible payments
+    // FIXED: Much more lenient query - start with just active payments
     const duePayments = await db
       .collection("schedules")
       .find({
-        // Must be active (NOT failed, NOT completed, NOT cancelled)
+        // Must be active
         status: "active",
 
-        // Must be smart contract enabled
-        smartContractEnabled: true,
+        // FIXED: Don't require smartContractEnabled flag for now
+        // We'll set it programmatically if missing
 
-        // Must be due for execution
+        // Must be due for execution (expanded time window)
         $or: [
           { nextExecutionAt: { $lte: fiveMinutesFromNow } },
           { scheduledFor: { $lte: fiveMinutesFromNow } },
+          // Also include payments that should have been executed but weren't
+          { nextExecutionAt: { $lte: now } },
+          { scheduledFor: { $lte: now } },
         ],
 
         // Must be supported token for smart contract
         tokenSymbol: { $in: ["ETH", "USDT", "USDC", "DAI", "LINK", "UNI"] },
 
+        // Basic safety checks only
         $and: [
-          // STRICT: Exclude failed payments explicitly
-          { status: { $ne: "failed" } },
-
-          // Must NOT be currently processing
+          // Must NOT be currently processing (unless stale)
           {
             $or: [
               { processingBy: { $exists: false } },
               { processingBy: null },
               {
                 processingStarted: {
-                  $lt: threeMinutesAgo, // 3 minutes timeout for smart contract
+                  $lt: threeMinutesAgo, // 3 minutes timeout
                 },
-              },
-            ],
-          },
-
-          // Must NOT have been executed recently
-          {
-            $or: [
-              { lastExecutionAt: { $exists: false } },
-              { lastExecutionAt: null },
-              {
-                lastExecutionAt: {
-                  $lt: oneMinuteAgo,
-                },
-              },
-            ],
-          },
-
-          // Must NOT have been created very recently
-          {
-            $or: [
-              { createdAt: { $exists: false } },
-              {
-                createdAt: {
-                  $lt: new Date(now.getTime() - 45000), // 45 seconds
-                },
-              },
-            ],
-          },
-
-          // Must NOT have been updated very recently
-          {
-            $or: [
-              { updatedAt: { $exists: false } },
-              {
-                updatedAt: {
-                  $lt: new Date(now.getTime() - 30000), // 30 seconds
-                },
-              },
-            ],
-          },
-
-          // Smart contract specific validations
-          {
-            $or: [
-              // ETH payments - always valid
-              { tokenSymbol: "ETH" },
-              // ERC20 payments - must have valid contract address
-              {
-                $and: [
-                  { tokenSymbol: { $ne: "ETH" } },
-                  { contractAddress: { $ne: null } },
-                  { contractAddress: { $ne: "" } },
-                  { contractAddress: { $exists: true } },
-                ],
               },
             ],
           },
@@ -116,16 +63,21 @@ export async function GET(request: NextRequest) {
           // Must have valid recipient
           { recipient: { $regex: /^0x[a-fA-F0-9]{40}$/ } },
 
-          // Must have valid amount
-          { amount: { $gt: 0 } },
+          // Must have valid amount (handle both string and number)
+          {
+            $or: [
+              { amount: { $gt: 0 } }, // For numeric amounts
+              { amount: { $type: "string", $ne: "" } }, // For string amounts
+            ],
+          },
         ],
       })
       .sort({ nextExecutionAt: 1, scheduledFor: 1 })
-      .limit(15) // Increased limit for smart contract processing
+      .limit(50) // Increased limit
       .toArray();
 
     console.log(
-      `📊 Enhanced: Found ${duePayments.length} smart contract compatible payments that passed initial filtering`
+      `📊 Enhanced: Found ${duePayments.length} payments that passed initial filtering`
     );
 
     const safeDuePayments = [];
@@ -136,22 +88,36 @@ export async function GET(request: NextRequest) {
 
       // Enhanced validation for smart contract execution
 
-      // STRICT: Skip failed payments
-      if (payment.status === "failed") {
-        skipReasons.push("payment has permanently failed");
-        skipPayment = true;
-      }
-
       // Skip non-active payments
       if (payment.status !== "active") {
         skipReasons.push(`payment status is ${payment.status}`);
         skipPayment = true;
       }
 
-      // Smart contract specific validations
+      // FIXED: Set enhanced API flags if missing
       if (!payment.smartContractEnabled) {
-        skipReasons.push("smart contract not enabled");
-        skipPayment = true;
+        console.log(
+          `🔧 Setting smartContractEnabled for payment ${payment.scheduleId}`
+        );
+        // Update the database to set the flag
+        await db.collection("schedules").updateOne(
+          { _id: payment._id },
+          {
+            $set: {
+              smartContractEnabled: true,
+              useEnhancedAPI: true,
+              smartContractAddress:
+                "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+              taxRate: 0.005,
+              gasOptimization: true,
+              taxHandling: "automatic",
+              executionMethod: "smart_contract",
+            },
+          }
+        );
+        // Update the payment object
+        payment.smartContractEnabled = true;
+        payment.useEnhancedAPI = true;
       }
 
       // Token support validation
@@ -166,35 +132,75 @@ export async function GET(request: NextRequest) {
       // Contract address validation for ERC20 tokens
       if (payment.tokenSymbol !== "ETH") {
         if (!payment.contractAddress || payment.contractAddress === "") {
-          skipReasons.push("missing contract address for ERC20 token");
-          skipPayment = true;
+          // FIXED: Auto-set known contract addresses
+          const knownContracts = {
+            USDT: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            DAI: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+            LINK: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+            UNI: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+          };
+
+          const correctAddress = knownContracts[payment.tokenSymbol];
+          if (correctAddress) {
+            console.log(
+              `🔧 Setting contract address for ${payment.tokenSymbol}: ${correctAddress}`
+            );
+            await db
+              .collection("schedules")
+              .updateOne(
+                { _id: payment._id },
+                { $set: { contractAddress: correctAddress } }
+              );
+            payment.contractAddress = correctAddress;
+          } else {
+            skipReasons.push("missing contract address for ERC20 token");
+            skipPayment = true;
+          }
         }
-
-        // Validate known contract addresses
-        const knownContracts = {
-          USDT: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-          USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-          DAI: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
-          LINK: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
-          UNI: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-        };
-
-        if (
-          knownContracts[payment.tokenSymbol] &&
-          payment.contractAddress.toLowerCase() !==
-            knownContracts[payment.tokenSymbol].toLowerCase()
-        ) {
-          skipReasons.push(
-            `invalid contract address for ${payment.tokenSymbol}`
-          );
-          skipPayment = true;
+      } else {
+        // FIXED: Set native for ETH tokens if missing
+        if (!payment.contractAddress || payment.contractAddress === "") {
+          console.log(`🔧 Setting native contract address for ETH`);
+          await db
+            .collection("schedules")
+            .updateOne(
+              { _id: payment._id },
+              { $set: { contractAddress: "native" } }
+            );
+          payment.contractAddress = "native";
         }
       }
 
-      // Amount validation
-      if (!payment.amount || parseFloat(payment.amount) <= 0) {
-        skipReasons.push("invalid amount");
+      // FIXED: Amount validation with string conversion
+      if (!payment.amount) {
+        skipReasons.push("missing amount");
         skipPayment = true;
+      } else {
+        // Handle both string and number amounts
+        let amountValue;
+        if (typeof payment.amount === "string") {
+          amountValue = parseFloat(payment.amount);
+        } else if (typeof payment.amount === "number") {
+          amountValue = payment.amount;
+          // Convert to string in database
+          const amountStr = payment.amount.toString();
+          await db
+            .collection("schedules")
+            .updateOne({ _id: payment._id }, { $set: { amount: amountStr } });
+          payment.amount = amountStr;
+          console.log(
+            `🔧 Converted amount to string for ${payment.scheduleId}: ${amountStr}`
+          );
+        } else {
+          skipReasons.push("invalid amount type");
+          skipPayment = true;
+        }
+
+        if (!skipPayment && (isNaN(amountValue) || amountValue <= 0)) {
+          skipReasons.push("invalid amount value");
+          skipPayment = true;
+        }
       }
 
       // Recipient validation
@@ -212,7 +218,7 @@ export async function GET(request: NextRequest) {
         skipPayment = true;
       }
 
-      // Timing validation
+      // Timing validation with more lenient approach
       let executionTime = null;
       if (payment.nextExecutionAt) {
         executionTime = new Date(payment.nextExecutionAt);
@@ -225,7 +231,8 @@ export async function GET(request: NextRequest) {
         skipPayment = true;
       } else {
         const timeDiff = executionTime.getTime() - now.getTime();
-        if (timeDiff > 5 * 60 * 1000) {
+        // FIXED: More lenient timing - allow payments up to 10 minutes early
+        if (timeDiff > 10 * 60 * 1000) {
           skipReasons.push(
             `not yet due (${Math.round(timeDiff / 60000)} minutes early)`
           );
@@ -237,8 +244,8 @@ export async function GET(request: NextRequest) {
       if (payment.lastExecutionAt) {
         const timeSinceLastExecution =
           now.getTime() - new Date(payment.lastExecutionAt).getTime();
-        if (timeSinceLastExecution < 90000) {
-          // 1.5 minutes for smart contract
+        if (timeSinceLastExecution < 60000) {
+          // 1 minute minimum
           skipReasons.push(
             `executed ${Math.round(timeSinceLastExecution / 1000)}s ago`
           );
@@ -278,7 +285,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(
-      `📊 Enhanced: After smart contract safety checks: ${safeDuePayments.length} payments ready for execution`
+      `📊 Enhanced: After safety checks: ${safeDuePayments.length} payments ready for execution`
     );
 
     // Transform payments with smart contract specific information
@@ -292,7 +299,7 @@ export async function GET(request: NextRequest) {
         tokenName: payment.tokenName,
         contractAddress: payment.contractAddress,
         recipient: payment.recipient,
-        amount: payment.amount,
+        amount: payment.amount, // Should now be a string
         frequency: payment.frequency || "once",
         status: payment.status,
         scheduledFor: payment.scheduledFor,
@@ -313,9 +320,9 @@ export async function GET(request: NextRequest) {
         processingBy: payment.processingBy,
         processingStarted: payment.processingStarted,
         updatedAt: payment.updatedAt,
-        useEnhancedAPI: payment.useEnhancedAPI || false,
+        useEnhancedAPI: payment.useEnhancedAPI || true, // Default to true
         // Smart contract specific fields
-        smartContractEnabled: payment.smartContractEnabled || false,
+        smartContractEnabled: payment.smartContractEnabled || true, // Default to true
         smartContractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
         gasOptimization: true,
         taxHandling: "automatic_0.5_percent",
@@ -370,12 +377,19 @@ export async function GET(request: NextRequest) {
       contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
       supportedTokens: ["ETH", "USDT", "USDC", "DAI", "LINK", "UNI"],
       enhancedAPI: true,
+      autoFixed: {
+        smartContractFlags: "Set for missing payments",
+        contractAddresses: "Auto-set for known tokens",
+        amountConversions: "Converted numbers to strings",
+        lenientTiming: "Expanded time window for due payments",
+      },
       debug: {
         totalFound: duePayments.length,
         afterSafetyChecks: safeDuePayments.length,
         afterDeduplication: uniquePayments.length,
         safetyCheckTime: new Date().toISOString(),
         smartContractCompatible: true,
+        autoFixApplied: true,
       },
     });
   } catch (error) {

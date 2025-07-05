@@ -1,4 +1,4 @@
-// src/app/api/scheduled-payments/route.ts - UPDATED WITH SMART CONTRACT INTEGRATION
+// src/app/api/scheduled-payments/route.ts - FIXED STRING AMOUNT STORAGE
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -16,6 +16,26 @@ const CONTRACT_CONFIG = {
     UNI: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
   },
 };
+
+// FIXED: Helper function to ensure amount is stored as string
+function ensureAmountIsString(amount: string | number): string {
+  if (typeof amount === "number") {
+    // Handle scientific notation and precision issues
+    if (amount < 1e-6) {
+      // For very small numbers, use toFixed to avoid scientific notation
+      return amount.toFixed(18).replace(/\.?0+$/, "");
+    } else {
+      // For normal numbers, convert to string
+      return amount.toString();
+    }
+  } else if (typeof amount === "string") {
+    return amount;
+  } else {
+    throw new Error(
+      `Invalid amount type: ${typeof amount}. Expected string or number.`
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,6 +67,8 @@ export async function POST(request: NextRequest) {
         frequency,
         useEnhancedAPI: true,
         smartContract: true,
+        amount: amount,
+        amountType: typeof amount,
       }
     );
 
@@ -162,6 +184,16 @@ export async function POST(request: NextRequest) {
             ] || tokenInfo.contractAddress;
         }
 
+        // FIXED: Ensure amount is stored as string
+        const amountStr = ensureAmountIsString(amount);
+
+        console.log("💾 Enhanced: Storing amount as string:", {
+          originalAmount: amount,
+          originalType: typeof amount,
+          storedAmount: amountStr,
+          storedType: typeof amountStr,
+        });
+
         const scheduledPayment = {
           scheduleId,
           username: decoded.username,
@@ -171,7 +203,7 @@ export async function POST(request: NextRequest) {
           contractAddress: contractAddress,
           decimals: decimals,
           recipient,
-          amount: parseFloat(amount), // Store as number for easier calculations
+          amount: amountStr, // FIXED: Store as string to prevent ethers.js errors
           frequency,
           status: "active",
           scheduledFor: firstExecution,
@@ -284,6 +316,16 @@ export async function POST(request: NextRequest) {
           scheduleId
         );
 
+        // FIXED: Ensure amount from database is handled properly
+        const paymentAmountStr = ensureAmountIsString(scheduledPayment.amount);
+
+        console.log("🔍 Enhanced: Payment amount handling:", {
+          fromDatabase: scheduledPayment.amount,
+          databaseType: typeof scheduledPayment.amount,
+          converted: paymentAmountStr,
+          convertedType: typeof paymentAmountStr,
+        });
+
         const executionResult = await executeScheduledPaymentWithSmartContract(
           {
             name: scheduledPayment.tokenName,
@@ -296,7 +338,7 @@ export async function POST(request: NextRequest) {
           },
           scheduledPayment.walletAddress,
           scheduledPayment.recipient,
-          scheduledPayment.amount.toString(),
+          paymentAmountStr, // Use string amount
           privateKey
         );
 
@@ -488,9 +530,11 @@ export async function GET(request: NextRequest) {
       .limit(100)
       .toArray();
 
+    // FIXED: Ensure all amounts are strings when returning data
     const enrichedPayments = scheduledPayments.map((payment) => ({
       ...payment,
       id: payment._id.toString(),
+      amount: ensureAmountIsString(payment.amount), // Ensure amount is string
       enhancedAPI: payment.useEnhancedAPI || false,
       smartContract: payment.smartContractEnabled || false,
       nextExecution: payment.nextExecutionAt,
@@ -537,7 +581,7 @@ export async function GET(request: NextRequest) {
 function validateScheduledPayment(
   tokenInfo: any,
   recipient: string,
-  amount: string,
+  amount: string | number, // FIXED: Accept both string and number
   scheduledFor: Date,
   frequency: string
 ): { valid: boolean; error?: string } {
@@ -545,7 +589,9 @@ function validateScheduledPayment(
     return { valid: false, error: "Invalid recipient address" };
   }
 
-  const amountNumber = parseFloat(amount);
+  // FIXED: Handle both string and number amounts
+  const amountStr = ensureAmountIsString(amount);
+  const amountNumber = parseFloat(amountStr);
   if (isNaN(amountNumber) || amountNumber <= 0) {
     return { valid: false, error: "Invalid amount" };
   }
@@ -599,13 +645,16 @@ async function createScheduledPaymentPreview(
   tokenInfo: any,
   fromAddress: string,
   recipient: string,
-  amount: string,
+  amount: string | number, // FIXED: Accept both string and number
   scheduledFor: Date,
   frequency: string,
   timezone: string = "UTC"
 ): Promise<any> {
   const isETH =
     tokenInfo.symbol === "ETH" || tokenInfo.contractAddress === "native";
+
+  // FIXED: Ensure amount is string for calculations
+  const amountStr = ensureAmountIsString(amount);
 
   // Calculate next executions
   const nextExecutions = calculateMultipleNextExecutions(
@@ -615,7 +664,7 @@ async function createScheduledPaymentPreview(
   );
 
   // Calculate tax using smart contract rate
-  const { taxETH, taxUSD } = await calculateTax(amount, tokenInfo);
+  const { taxETH, taxUSD } = await calculateTax(amountStr, tokenInfo);
 
   // Estimate gas
   const gasEstimation = await getGasEstimation(tokenInfo, isETH);
@@ -637,7 +686,7 @@ async function createScheduledPaymentPreview(
       isETH: isETH,
     },
     recipient,
-    amount,
+    amount: amountStr, // Return as string
     scheduledFor,
     frequency,
     nextExecutions,
@@ -658,7 +707,7 @@ async function executeScheduledPaymentWithSmartContract(
   tokenInfo: any,
   fromAddress: string,
   recipient: string,
-  amount: string,
+  amount: string, // FIXED: Always expect string here
   privateKey: string
 ): Promise<any> {
   // This would integrate with the smart contract execution logic
@@ -693,7 +742,7 @@ async function executeScheduledPaymentWithSmartContract(
 
 // Helper functions
 function calculateTax(
-  amount: string,
+  amount: string, // FIXED: Always expect string
   tokenInfo: any
 ): Promise<{ taxETH: string; taxUSD: string }> {
   const amountNum = parseFloat(amount);

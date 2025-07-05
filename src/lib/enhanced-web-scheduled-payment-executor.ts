@@ -1,4 +1,4 @@
-// src/lib/enhanced-web-scheduled-payment-executor.ts - FIXED TOKEN APPROVAL ISSUES
+// src/lib/enhanced-web-scheduled-payment-executor.ts - FIXED STRING AMOUNT HANDLING
 import { enhancedScheduledPaymentsService } from "./enhanced-scheduled-payments-service";
 
 interface ScheduledPaymentData {
@@ -9,7 +9,7 @@ interface ScheduledPaymentData {
   tokenName: string;
   contractAddress: string;
   recipient: string;
-  amount: string;
+  amount: string | number; // FIXED: Handle both string and number from database
   scheduledFor: string;
   frequency: string;
   status: string;
@@ -39,7 +39,7 @@ export class EnhancedWebScheduledPaymentExecutor {
 
   constructor() {
     console.log(
-      `🌟 Enhanced Web Payment Executor initialized (ID: ${this.executorId}) with fixed token approvals`
+      `🌟 Enhanced Web Payment Executor initialized (ID: ${this.executorId}) with fixed string amount handling`
     );
   }
 
@@ -50,7 +50,7 @@ export class EnhancedWebScheduledPaymentExecutor {
     }
 
     console.log(
-      `🚀 Starting enhanced payment executor with fixed approvals (ID: ${this.executorId})`
+      `🚀 Starting enhanced payment executor with fixed string amounts (ID: ${this.executorId})`
     );
     this.isRunning = true;
 
@@ -63,7 +63,7 @@ export class EnhancedWebScheduledPaymentExecutor {
     }, this.checkInterval);
 
     console.log(
-      "✅ Enhanced executor started with improved token approval handling"
+      "✅ Enhanced executor started with improved string amount handling"
     );
   }
 
@@ -95,7 +95,7 @@ export class EnhancedWebScheduledPaymentExecutor {
     }
     this.privateKey = privateKey;
     console.log(
-      "🔑 Private key set for enhanced executor with improved approvals"
+      "🔑 Private key set for enhanced executor with string amount handling"
     );
   }
 
@@ -112,11 +112,31 @@ export class EnhancedWebScheduledPaymentExecutor {
     }
   }
 
+  // FIXED: Helper function to ensure amount is always a string
+  private ensureAmountIsString(amount: string | number): string {
+    if (typeof amount === "number") {
+      // Handle scientific notation and precision issues
+      if (amount < 1e-6) {
+        // For very small numbers, use toFixed to avoid scientific notation
+        return amount.toFixed(18).replace(/\.?0+$/, "");
+      } else {
+        // For normal numbers, convert to string
+        return amount.toString();
+      }
+    } else if (typeof amount === "string") {
+      return amount;
+    } else {
+      throw new Error(
+        `Invalid amount type: ${typeof amount}. Expected string or number.`
+      );
+    }
+  }
+
   private async checkAndExecutePayments() {
     try {
       this.lastCheckTime = new Date();
       console.log(
-        `🔍 [Enhanced-${this.executorId}] Checking for due payments with fixed token approvals...`
+        `🔍 [Enhanced-${this.executorId}] Checking for due payments with fixed string amounts...`
       );
 
       const response = await fetch("/api/scheduled-payments/due", {
@@ -132,7 +152,7 @@ export class EnhancedWebScheduledPaymentExecutor {
       const duePayments = data.scheduledPayments || [];
 
       console.log(
-        `📊 [Enhanced-${this.executorId}] Found ${duePayments.length} payments due for enhanced execution with fixed approvals`
+        `📊 [Enhanced-${this.executorId}] Found ${duePayments.length} payments due for enhanced execution with string amounts`
       );
 
       if (duePayments.length === 0) {
@@ -166,13 +186,13 @@ export class EnhancedWebScheduledPaymentExecutor {
       );
 
       console.log(
-        `📊 [Enhanced-${this.executorId}] ${availablePayments.length} enhanced payments available for execution with fixed approvals`
+        `📊 [Enhanced-${this.executorId}] ${availablePayments.length} enhanced payments available for execution with string amounts`
       );
 
-      // Execute each payment with enhanced token approval handling
+      // Execute each payment with enhanced string amount handling
       for (const payment of availablePayments) {
         try {
-          await this.executeEnhancedPaymentWithFixedApprovals(payment);
+          await this.executeEnhancedPaymentWithStringAmounts(payment);
         } catch (error) {
           console.error(
             `💥 Error executing enhanced payment ${payment.scheduleId}:`,
@@ -187,7 +207,7 @@ export class EnhancedWebScheduledPaymentExecutor {
     }
   }
 
-  private async executeEnhancedPaymentWithFixedApprovals(
+  private async executeEnhancedPaymentWithStringAmounts(
     paymentData: ScheduledPaymentData
   ) {
     const scheduleId = paymentData.scheduleId;
@@ -198,7 +218,7 @@ export class EnhancedWebScheduledPaymentExecutor {
 
     this.processingPayments.add(scheduleId);
     console.log(
-      `⚡ [Enhanced-${this.executorId}] Executing enhanced payment with fixed approvals: ${scheduleId}`
+      `⚡ [Enhanced-${this.executorId}] Executing enhanced payment with string amounts: ${scheduleId}`
     );
 
     try {
@@ -233,9 +253,9 @@ export class EnhancedWebScheduledPaymentExecutor {
         `✅ [Enhanced-${this.executorId}] Successfully marked as processing ${scheduleId}`
       );
 
-      // STEP 2: Execute blockchain transaction with fixed token approvals
+      // STEP 2: Execute blockchain transaction with fixed string amounts
       console.log(
-        `💰 [Enhanced-${this.executorId}] Executing blockchain transaction with fixed token approvals...`
+        `💰 [Enhanced-${this.executorId}] Executing blockchain transaction with string amounts...`
       );
 
       // FIXED: Prepare token info with proper structure and validation
@@ -253,18 +273,30 @@ export class EnhancedWebScheduledPaymentExecutor {
         ),
       };
 
+      // FIXED: Ensure amount is string before passing to service
+      const amountStr = this.ensureAmountIsString(paymentData.amount);
+
+      console.log("🔍 Enhanced: Amount conversion details:", {
+        originalAmount: paymentData.amount,
+        originalType: typeof paymentData.amount,
+        convertedAmount: amountStr,
+        convertedType: typeof amountStr,
+        tokenSymbol: tokenInfo.symbol,
+      });
+
       // FIXED: Additional validation before execution
       if (!this.validatePaymentData(paymentData, tokenInfo)) {
         throw new Error("Payment data validation failed");
       }
 
-      console.log("🔧 Enhanced: Using fixed token approval logic for:", {
+      console.log("🔧 Enhanced: Using string amount for execution:", {
         tokenSymbol: tokenInfo.symbol,
         isETH: tokenInfo.isETH,
         contractAddress: tokenInfo.contractAddress,
         decimals: tokenInfo.decimals,
         recipient: paymentData.recipient.slice(0, 10) + "...",
-        amount: paymentData.amount,
+        amount: amountStr,
+        amountType: typeof amountStr,
       });
 
       const executionResult =
@@ -272,13 +304,13 @@ export class EnhancedWebScheduledPaymentExecutor {
           tokenInfo,
           paymentData.walletAddress,
           paymentData.recipient,
-          paymentData.amount,
+          amountStr, // Use string amount
           this.privateKey
         );
 
       if (executionResult.success) {
         console.log(
-          `✅ [Enhanced-${this.executorId}] Blockchain transaction successful with fixed approvals!`
+          `✅ [Enhanced-${this.executorId}] Blockchain transaction successful with string amounts!`
         );
         console.log(
           `📤 [Enhanced-${this.executorId}] TX: ${executionResult.transactionHash}`
@@ -291,7 +323,7 @@ export class EnhancedWebScheduledPaymentExecutor {
             ...executionResult,
             executedAt: new Date(),
             enhancedAPI: true,
-            fixedApprovals: true,
+            stringAmountHandling: true,
           },
           5 // 5 retries
         );
@@ -300,7 +332,7 @@ export class EnhancedWebScheduledPaymentExecutor {
           this.executedPayments.add(scheduleId);
           this.showNotification(
             "✅ Enhanced Payment Executed!",
-            `${paymentData.amount} ${paymentData.tokenSymbol} sent with fixed token approvals`,
+            `${amountStr} ${paymentData.tokenSymbol} sent with string amount handling`,
             "success"
           );
         } else {
@@ -313,9 +345,14 @@ export class EnhancedWebScheduledPaymentExecutor {
           `❌ [Enhanced-${this.executorId}] Blockchain transaction failed: ${executionResult.error}`
         );
 
-        // FIXED: Better error handling for approval failures
+        // FIXED: Better error handling for string amount failures
         let errorCategory = "execution_failed";
         if (
+          executionResult.error?.includes("invalid") &&
+          executionResult.error?.includes("string")
+        ) {
+          errorCategory = "amount_format_error";
+        } else if (
           executionResult.error?.includes("approval") ||
           executionResult.error?.includes("allowance")
         ) {
@@ -348,6 +385,11 @@ export class EnhancedWebScheduledPaymentExecutor {
 
       let errorCategory = "critical_error";
       if (
+        error.message?.includes("invalid") &&
+        error.message?.includes("string")
+      ) {
+        errorCategory = "amount_format_critical_error";
+      } else if (
         error.message?.includes("approval") ||
         error.message?.includes("allowance")
       ) {
@@ -407,10 +449,11 @@ export class EnhancedWebScheduledPaymentExecutor {
       return false;
     }
 
-    // Validate amount
-    const amount = parseFloat(paymentData.amount);
+    // Validate amount - FIXED: Handle both string and number
+    const amountStr = this.ensureAmountIsString(paymentData.amount);
+    const amount = parseFloat(amountStr);
     if (isNaN(amount) || amount <= 0) {
-      console.error("❌ Enhanced: Invalid amount");
+      console.error("❌ Enhanced: Invalid amount after string conversion");
       return false;
     }
 
@@ -464,6 +507,7 @@ export class EnhancedWebScheduledPaymentExecutor {
                 enhancedAPI: true,
                 taxPaidETH: executionResult.taxPaidETH || "0",
                 contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+                stringAmountHandling: true,
               }),
               credentials: "include",
             }
@@ -506,6 +550,7 @@ export class EnhancedWebScheduledPaymentExecutor {
                 enhancedAPI: true,
                 taxPaid: executionResult.taxPaidETH || "0",
                 contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+                stringAmountHandling: true,
               }),
               credentials: "include",
             }
@@ -568,7 +613,7 @@ export class EnhancedWebScheduledPaymentExecutor {
           error: error,
           enhancedAPI: enhancedAPI,
           errorCategory: errorCategory,
-          fixedApprovals: true,
+          stringAmountHandling: true,
         }),
         credentials: "include",
       });
@@ -630,12 +675,12 @@ export class EnhancedWebScheduledPaymentExecutor {
       failedPayments: Array.from(this.failedPayments),
       hasPrivateKey: !!this.privateKey,
       enhancedAPI: true,
-      fixedApprovals: true,
-      gasOptimization: "Enhanced with Fixed Token Approvals",
+      stringAmountHandling: true,
+      gasOptimization: "Enhanced with Fixed String Amount Handling",
     };
   }
 }
 
-// Export singleton instance for enhanced execution with fixed approvals
+// Export singleton instance for enhanced execution with string amount handling
 export const enhancedWebScheduledPaymentExecutor =
   new EnhancedWebScheduledPaymentExecutor();

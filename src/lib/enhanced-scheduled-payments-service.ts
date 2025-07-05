@@ -1,4 +1,3 @@
-// src/lib/enhanced-scheduled-payments-service.ts - FIXED TOKEN APPROVAL ISSUES
 import { ethers } from "ethers";
 
 const ALCHEMY_API_KEY =
@@ -75,7 +74,7 @@ export class EnhancedScheduledPaymentsService {
     },
     fromAddress: string,
     recipient: string,
-    amount: string,
+    amount: string | number, // FIXED: Accept both string and number
     privateKey: string
   ): Promise<ExecutionResult> {
     console.log(
@@ -86,6 +85,15 @@ export class EnhancedScheduledPaymentsService {
       const wallet = new ethers.Wallet(privateKey, this.provider);
       const contractWithSigner = this.contract.connect(wallet);
 
+      // FIXED: Convert amount to string if it's a number
+      const amountStr = this.ensureAmountIsString(amount);
+      console.log("🔧 Enhanced: Amount conversion:", {
+        original: amount,
+        type: typeof amount,
+        converted: amountStr,
+        typeAfter: typeof amountStr,
+      });
+
       // FIXED: Proper ETH detection
       const isETH = this.isETHToken(tokenInfo);
       const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
@@ -95,7 +103,7 @@ export class EnhancedScheduledPaymentsService {
         contractAddress: tokenInfo.contractAddress,
         isETH: isETH,
         decimals: tokenInfo.decimals,
-        amount: amount,
+        amount: amountStr, // Use string amount
       });
 
       let tx: ethers.ContractTransactionResponse;
@@ -105,7 +113,9 @@ export class EnhancedScheduledPaymentsService {
         console.log(
           "💰 Enhanced: Executing ETH transfer with smart contract..."
         );
-        const amountWei = ethers.parseEther(amount);
+
+        // FIXED: Ensure amount is string before parseEther
+        const amountWei = ethers.parseEther(amountStr);
 
         // Get tax from smart contract
         const taxWei = await this.contract.calculateETHTax(amountWei);
@@ -113,7 +123,7 @@ export class EnhancedScheduledPaymentsService {
         taxPaidETH = ethers.formatEther(taxWei);
 
         console.log("💰 Enhanced: ETH Transfer Details:", {
-          amount: amount,
+          amount: amountStr,
           amountWei: amountWei.toString(),
           taxWei: taxWei.toString(),
           totalWei: totalWei.toString(),
@@ -150,7 +160,7 @@ export class EnhancedScheduledPaymentsService {
         const approvalSuccess = await this.handleTokenApprovalWithRetries(
           tokenAddress,
           fromAddress,
-          amount,
+          amountStr, // Use string amount
           tokenInfo.decimals,
           privateKey
         );
@@ -164,7 +174,7 @@ export class EnhancedScheduledPaymentsService {
           tokenInfo.symbol,
           tokenInfo.decimals
         );
-        const amountWei = ethers.parseUnits(amount.toString(), decimals);
+        const amountWei = ethers.parseUnits(amountStr, decimals); // Use string amount
 
         // FIXED: Validate amount fits in uint96 (smart contract requirement)
         const maxUint96 = BigInt("79228162514264337593543950335"); // 2^96 - 1
@@ -179,7 +189,7 @@ export class EnhancedScheduledPaymentsService {
 
         // Calculate tax in ETH for ERC20
         const { taxETH } = await this.calculateERC20Tax(
-          amount,
+          amountStr, // Use string amount
           tokenInfo.symbol
         );
         const taxWei = ethers.parseEther(taxETH);
@@ -187,7 +197,7 @@ export class EnhancedScheduledPaymentsService {
 
         console.log("🪙 Enhanced: ERC20 Transfer Details:", {
           tokenAddress: tokenAddress,
-          amount: amount,
+          amount: amountStr,
           decimals: decimals,
           amountWei: amountWei.toString(),
           taxETH: taxETH,
@@ -288,11 +298,31 @@ export class EnhancedScheduledPaymentsService {
     }
   }
 
+  // FIXED: New helper function to ensure amount is always a string
+  private ensureAmountIsString(amount: string | number): string {
+    if (typeof amount === "number") {
+      // Handle scientific notation and precision issues
+      if (amount < 1e-6) {
+        // For very small numbers, use toFixed to avoid scientific notation
+        return amount.toFixed(18).replace(/\.?0+$/, "");
+      } else {
+        // For normal numbers, convert to string
+        return amount.toString();
+      }
+    } else if (typeof amount === "string") {
+      return amount;
+    } else {
+      throw new Error(
+        `Invalid amount type: ${typeof amount}. Expected string or number.`
+      );
+    }
+  }
+
   // FIXED: Enhanced token approval with retries and better error handling
   private async handleTokenApprovalWithRetries(
     tokenAddress: string,
     fromAddress: string,
-    amount: string,
+    amount: string, // Now always a string
     decimals: number,
     privateKey: string,
     maxRetries: number = 3
@@ -342,7 +372,7 @@ export class EnhancedScheduledPaymentsService {
   private async handleTokenApproval(
     tokenAddress: string,
     fromAddress: string,
-    amount: string,
+    amount: string, // Now always a string
     decimals: number,
     privateKey: string
   ): Promise<boolean> {
@@ -365,7 +395,7 @@ export class EnhancedScheduledPaymentsService {
       );
 
       // FIXED: Get current allowance and required amount
-      const amountWei = ethers.parseUnits(amount.toString(), decimals);
+      const amountWei = ethers.parseUnits(amount, decimals); // amount is now guaranteed to be string
       const currentAllowance = await tokenContract.allowance(
         fromAddress,
         CONTRACT_CONFIG.address
@@ -548,7 +578,7 @@ export class EnhancedScheduledPaymentsService {
 
   // FIXED: Calculate ERC20 tax in ETH
   private async calculateERC20Tax(
-    amount: string,
+    amount: string, // Now always a string
     tokenSymbol: string
   ): Promise<{ taxETH: string; taxUSD: string }> {
     try {
@@ -604,7 +634,7 @@ export class EnhancedScheduledPaymentsService {
   validateScheduledPayment(
     tokenInfo: any,
     recipient: string,
-    amount: string,
+    amount: string | number, // FIXED: Accept both string and number
     scheduledFor: Date,
     frequency: string
   ): { valid: boolean; error?: string } {
@@ -612,7 +642,9 @@ export class EnhancedScheduledPaymentsService {
       return { valid: false, error: "Invalid recipient address" };
     }
 
-    const amountNumber = parseFloat(amount);
+    // FIXED: Handle both string and number amounts
+    const amountStr = this.ensureAmountIsString(amount);
+    const amountNumber = parseFloat(amountStr);
     if (isNaN(amountNumber) || amountNumber <= 0) {
       return { valid: false, error: "Invalid amount" };
     }
