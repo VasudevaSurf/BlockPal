@@ -25,6 +25,7 @@ import {
 import { RootState } from "@/store";
 import SimpleTransferModal from "@/components/transfer/SimpleTransferModal";
 import TransactionHistory from "@/components/transactions/TransactionHistory";
+import { SkeletonTokenOverview } from "@/components/ui/Skeleton";
 
 interface TokenInfo {
   name: string;
@@ -92,6 +93,8 @@ export default function TokenOverviewPage() {
   const fetchTokenInfo = async () => {
     try {
       setLoading(true);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       const response = await fetch(
         `/api/tokens/${contractAddress}?walletAddress=${walletAddress}`,
         { credentials: "include" }
@@ -250,11 +253,7 @@ export default function TokenOverviewPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F]">
-        <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-[#E2AF19]"></div>
-      </div>
-    );
+    return <SkeletonTokenOverview />;
   }
 
   if (!tokenInfo) {

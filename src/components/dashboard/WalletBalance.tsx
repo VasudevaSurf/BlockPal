@@ -6,6 +6,7 @@ import { Copy, ChevronDown } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { openWalletSelector } from "@/store/slices/uiSlice";
 import { updateWalletBalance } from "@/store/slices/walletSlice";
+import { SkeletonWalletBalance } from "@/components/ui/Skeleton";
 
 export default function WalletBalance() {
   const dispatch = useDispatch<AppDispatch>();
@@ -15,6 +16,16 @@ export default function WalletBalance() {
 
   // Use ref to prevent duplicate balance updates
   const balanceLoaded = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (
+      activeWallet?.address &&
+      balanceLoaded.current !== activeWallet.address
+    ) {
+      balanceLoaded.current = activeWallet.address;
+      dispatch(updateWalletBalance(activeWallet.address));
+    }
+  }, [activeWallet?.address, dispatch]);
 
   useEffect(() => {
     console.log("💰 WalletBalance - Effect triggered", {
@@ -61,6 +72,10 @@ export default function WalletBalance() {
 
   // Only use real balance from database
   const displayBalance = totalBalance;
+
+  if (loading && !activeWallet) {
+    return <SkeletonWalletBalance />;
+  }
 
   return (
     <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">

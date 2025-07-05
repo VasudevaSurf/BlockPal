@@ -9,6 +9,7 @@ import { setActiveWallet, fetchWallets } from "@/store/slices/walletSlice";
 import { useWalletBalances } from "@/hooks/useWalletBalances";
 import Button from "@/components/ui/Button";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface WalletSwitcherProps {
   isOpen: boolean;
@@ -112,36 +113,38 @@ export default function WalletSwitcher({
                 Switch between wallets or manage your accounts
               </p>
             </div>
-            <div className="flex items-center space-x-2">
-              {/* FIXED: Refresh button for balances */}
-              <button
-                onClick={refreshAllBalances}
-                disabled={loadingBalances}
-                className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
-                title="Refresh wallet balances"
-              >
-                <RefreshCw
-                  size={16}
-                  className={loadingBalances ? "animate-spin" : ""}
-                />
-              </button>
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
-              >
-                <X size={20} />
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+            >
+              <X size={20} />
+            </button>
           </div>
 
           {/* Wallets List */}
           <div className="p-6 max-h-[60vh] overflow-y-auto">
+            {/* UPDATED: Show skeleton when loading balances */}
             {loadingBalances && walletsWithBalances.length === 0 && (
-              <div className="text-center mb-4">
-                <div className="flex items-center justify-center text-gray-400 text-sm">
-                  <RefreshCw size={14} className="mr-2 animate-spin" />
-                  Loading wallet balances...
-                </div>
+              <div className="space-y-3 mb-6">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-4"
+                  >
+                    <div className="flex items-center">
+                      <Skeleton variant="circular" className="w-10 h-10 mr-3" />
+                      <div className="flex-1">
+                        <Skeleton className="h-4 w-24 mb-1" />
+                        <Skeleton className="h-3 w-32" />
+                      </div>
+                      <div className="text-right">
+                        <Skeleton className="h-4 w-20 mb-1" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                      <Skeleton variant="circular" className="w-2 h-2 ml-3" />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 

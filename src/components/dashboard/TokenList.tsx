@@ -9,6 +9,7 @@ import { fetchWalletTokens } from "@/store/slices/walletSlice";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import WalletRefreshButton from "@/components/wallet/WalletRefreshButton";
 import { RefreshCw } from "lucide-react";
+import { SkeletonTokenList } from "@/components/ui/Skeleton";
 
 export default function TokenList() {
   const router = useRouter();
@@ -20,6 +21,16 @@ export default function TokenList() {
 
   // Use ref to prevent duplicate API calls
   const tokensLoaded = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (
+      activeWallet?.address &&
+      tokensLoaded.current !== activeWallet.address
+    ) {
+      tokensLoaded.current = activeWallet.address;
+      dispatch(fetchWalletTokens(activeWallet.address));
+    }
+  }, [activeWallet?.address, dispatch]);
 
   useEffect(() => {
     console.log("🪙 TokenList - Effect triggered", {
@@ -215,31 +226,7 @@ export default function TokenList() {
   const displayTokens = tokens;
 
   if (loading && tokens.length === 0) {
-    return (
-      <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-        <div className="flex items-center justify-between mb-4 lg:mb-6">
-          <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
-            Token Holdings ({tokens.length})
-          </h2>
-          <WalletRefreshButton />
-        </div>
-        <div className="animate-pulse space-y-4">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gray-700 rounded-full"></div>
-              <div className="flex-1">
-                <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-gray-700 rounded w-1/2"></div>
-              </div>
-              <div className="text-right">
-                <div className="h-4 bg-gray-700 rounded w-16 mb-2"></div>
-                <div className="h-3 bg-gray-700 rounded w-12"></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <SkeletonTokenList />;
   }
 
   if (!activeWallet) {

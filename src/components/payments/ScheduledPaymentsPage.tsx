@@ -26,6 +26,7 @@ import {
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { SkeletonScheduledPayments } from "@/components/ui/Skeleton";
 
 interface ScheduledPayment {
   id: string;
@@ -237,6 +238,7 @@ export default function ScheduledPaymentsPage() {
   const [result, setResult] = useState<any>(null);
   const [showResult, setShowResult] = useState(false);
   const [copied, setCopied] = useState<string>("");
+  const [initialLoading, setInitialLoading] = useState(true);
 
   // Initialize with first available token
   useEffect(() => {
@@ -568,6 +570,30 @@ export default function ScheduledPaymentsPage() {
   const completedCount = scheduledPayments.filter(
     (payment) => payment.status === "completed"
   ).length;
+
+  useEffect(() => {
+    if (activeWallet?.address) {
+      loadInitialData();
+    }
+  }, [activeWallet?.address]);
+
+  const loadInitialData = async () => {
+    try {
+      setInitialLoading(true);
+      // Simulate API calls
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      // Load actual data here...
+    } catch (error) {
+      console.error("Error loading initial data:", error);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  // UPDATED: Show skeleton when initially loading
+  if (initialLoading) {
+    return <SkeletonScheduledPayments />;
+  }
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">

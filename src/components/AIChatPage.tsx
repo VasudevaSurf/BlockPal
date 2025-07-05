@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { Bell, HelpCircle, Send, Copy, RefreshCw, Trash2 } from "lucide-react";
 import { RootState } from "@/store";
+import { SkeletonAIChat } from "@/components/ui/Skeleton";
 
 interface Message {
   id: string;
@@ -27,6 +28,7 @@ export default function AIChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -185,6 +187,27 @@ How can I assist you today with your crypto needs? Try asking about:
     "Is Bitcoin a good investment?",
     "Explain DeFi protocols",
   ];
+
+  useEffect(() => {
+    // Simulate initial load
+    const timer = setTimeout(() => {
+      setInitialLoading(false);
+      setMessages([
+        {
+          id: "welcome",
+          type: "assistant",
+          content: "Hello",
+          timestamp: new Date(),
+        },
+      ]);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (initialLoading) {
+    return <SkeletonAIChat />;
+  }
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">

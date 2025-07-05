@@ -11,6 +11,7 @@ import {
   Clock,
   Users,
 } from "lucide-react";
+import { SkeletonTransactionHistory } from "@/components/ui/Skeleton";
 
 interface Transaction {
   _id?: string;
@@ -135,6 +136,13 @@ export default function TransactionHistory({
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState<string>("");
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  useEffect(() => {
+    if (walletAddress) {
+      fetchTransactions();
+    }
+  }, [walletAddress]);
 
   useEffect(() => {
     fetchTransactions();
@@ -145,6 +153,12 @@ export default function TransactionHistory({
 
     try {
       setLoading(true);
+      if (transactions.length === 0) {
+        setInitialLoading(true);
+      }
+
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       let url = "/api/transactions";
       const params = new URLSearchParams();
@@ -243,6 +257,14 @@ export default function TransactionHistory({
       setLoading(false);
     }
   };
+
+  if (initialLoading && transactions.length === 0) {
+    return (
+      <div className={`flex flex-col min-h-0 ${className}`}>
+        <SkeletonTransactionHistory />
+      </div>
+    );
+  }
 
   const copyToClipboard = async (text: string, type: string) => {
     try {

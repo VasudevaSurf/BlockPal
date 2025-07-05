@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { SkeletonSwapSection } from "@/components/ui/Skeleton";
 
 export default function SwapSection() {
   const [sellAmount, setSellAmount] = useState("0");
   const [buyAmount, setBuyAmount] = useState("0");
+  const [loading, setLoading] = useState(false);
+
+  if (loading) {
+    return <SkeletonSwapSection />;
+  }
 
   return (
     <div className="bg-black rounded-[16px] lg:rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-4 lg:p-6 overflow-hidden">

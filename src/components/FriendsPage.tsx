@@ -27,6 +27,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FundRequestModal from "@/components/friends/FundRequestModal";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
+import { SkeletonFriendsPage } from "@/components/ui/Skeleton";
 
 interface User {
   _id: string;
@@ -119,6 +120,10 @@ export default function FriendsPage() {
 
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
   // ENHANCED: Token image utilities (same as TokenList)
   const getTokenIcon = (symbol: string, contractAddress?: string) => {
@@ -301,17 +306,6 @@ export default function FriendsPage() {
     }
   }, [showTokenDropdown]);
 
-  // FIXED: Load current user and initial data
-  useEffect(() => {
-    loadCurrentUser();
-    loadInitialData();
-    fetchUnreadCount();
-
-    // Set up polling for unread count
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Load data based on active tab
   useEffect(() => {
     if (!initialLoading) {
@@ -347,9 +341,9 @@ export default function FriendsPage() {
   const loadInitialData = async () => {
     try {
       setInitialLoading(true);
-      setError("");
-
-      // Load the default tab data first
+      // Simulate API calls
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Load actual data here...
       if (activeTab === "Friends") {
         await loadFriends();
       } else if (activeTab === "Requests") {
@@ -359,7 +353,6 @@ export default function FriendsPage() {
       }
     } catch (error) {
       console.error("Error loading initial data:", error);
-      setError("Failed to load data. Please refresh the page.");
     } finally {
       setInitialLoading(false);
     }
@@ -379,6 +372,17 @@ export default function FriendsPage() {
       console.error("Error fetching unread count:", error);
     }
   };
+
+  // FIXED: Load current user and initial data
+  useEffect(() => {
+    loadCurrentUser();
+    loadInitialData();
+    fetchUnreadCount();
+
+    // Set up polling for unread count
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const isWalletAddress = (input: string): boolean => {
     return /^0x[a-fA-F0-9]{40}$/.test(input);
@@ -766,33 +770,20 @@ export default function FriendsPage() {
     setSelectedFundRequest(request);
   };
 
-  // Show initial loading state
-  if (initialLoading) {
-    return (
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 flex-shrink-0 gap-4 sm:gap-0">
-          <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
-              Friends
-            </h1>
-            <p className="text-gray-400 text-sm font-satoshi mt-1">
-              Connect with friends and request funds
-            </p>
-          </div>
-        </div>
+  // FIXED: Load current user and initial data
+  useEffect(() => {
+    loadCurrentUser();
+    loadInitialData();
+    fetchUnreadCount();
 
-        {/* Loading state */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19] mx-auto mb-4"></div>
-            <p className="text-gray-400 font-satoshi">
-              Loading your friends...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    // Set up polling for unread count
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // UPDATED: Show skeleton when initially loading
+  if (initialLoading) {
+    return <SkeletonFriendsPage />;
   }
 
   return (
