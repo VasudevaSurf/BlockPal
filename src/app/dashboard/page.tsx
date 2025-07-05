@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - UPDATED TO USE ENHANCED EXECUTOR
+// src/app/dashboard/page.tsx - UPDATED WITH REAL-TIME FEATURES
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -10,21 +10,20 @@ import {
   LogOut,
   Wallet,
   ChevronDown,
-  Play,
-  Pause,
-  Zap,
+  Radio,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
 import { fetchWallets, setActiveWallet } from "@/store/slices/walletSlice";
+import { useRealtimeWalletBalances } from "@/hooks/useRealtimeWalletBalances";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
-import WalletSwitcher from "@/components/wallet/WalletSwitcher";
+import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
+import RealtimeBalanceNotifications from "@/components/notifications/RealtimeBalanceNotifications";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
-
-// UPDATED: Import the enhanced payment executor
-import { enhancedWebScheduledPaymentExecutor } from "@/lib/enhanced-web-scheduled-payment-executor";
 
 export default function DashboardPage() {
   const {
@@ -40,133 +39,19 @@ export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
-  // UPDATED: Enhanced payment executor state
-  const [executorRunning, setExecutorRunning] = useState(false);
-  const [executorStatus, setExecutorStatus] = useState<any>(null);
-  const executorInitialized = useRef(false);
+  // Real-time wallet balances
+  const { realtimeBalances, activeWalletBalance, isMonitoring, notifications } =
+    useRealtimeWalletBalances();
 
   // Wallet switcher state
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
   const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
+  const [showRealtimeStatus, setShowRealtimeStatus] = useState(false);
 
   // Use refs to track if we've already made initial calls
   const authChecked = useRef(false);
   const walletsLoaded = useRef(false);
   const activeWalletSet = useRef(false);
-
-  // UPDATED: Initialize enhanced payment executor when user is authenticated and has wallets
-  useEffect(() => {
-    console.log("🔧 Enhanced Payment executor initialization effect", {
-      isAuthenticated,
-      hasActiveWallet: !!activeWallet,
-      executorInitialized: executorInitialized.current,
-    });
-
-    if (isAuthenticated && activeWallet && !executorInitialized.current) {
-      console.log("🚀 Initializing enhanced payment executor...");
-
-      // Get private key from the wallet and start enhanced executor
-      initializeEnhancedPaymentExecutor();
-      executorInitialized.current = true;
-    }
-  }, [isAuthenticated, activeWallet]);
-
-  // UPDATED: Update enhanced executor status periodically
-  useEffect(() => {
-    if (executorRunning) {
-      const statusInterval = setInterval(() => {
-        const status = enhancedWebScheduledPaymentExecutor.getStatus();
-        setExecutorStatus(status);
-      }, 5000); // Update every 5 seconds
-
-      return () => clearInterval(statusInterval);
-    }
-  }, [executorRunning]);
-
-  // UPDATED: Initialize enhanced payment executor
-  const initializeEnhancedPaymentExecutor = async () => {
-    try {
-      if (!activeWallet?.address) {
-        console.log("❌ No active wallet found for enhanced executor");
-        return;
-      }
-
-      console.log("🔑 Getting private key for enhanced payment executor...");
-
-      // Get the private key from your wallet API
-      const response = await fetch("/api/wallets/private-key", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          walletAddress: activeWallet.address,
-        }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        console.log("✅ Private key retrieved, starting enhanced executor...");
-
-        // Set the private key and start the enhanced executor
-        enhancedWebScheduledPaymentExecutor.setPrivateKey(data.privateKey);
-        enhancedWebScheduledPaymentExecutor.start();
-
-        setExecutorRunning(true);
-        setExecutorStatus(enhancedWebScheduledPaymentExecutor.getStatus());
-
-        console.log("✅ Enhanced payment executor started successfully!");
-
-        // Show notification
-        if ("Notification" in window && Notification.permission !== "denied") {
-          if (Notification.permission === "granted") {
-            new Notification("Enhanced Auto-Payment System Started", {
-              body: "Scheduled payments will now be executed automatically with 30% lower gas fees",
-              icon: "/favicon.ico",
-            });
-          } else {
-            Notification.requestPermission().then((permission) => {
-              if (permission === "granted") {
-                new Notification("Enhanced Auto-Payment System Started", {
-                  body: "Scheduled payments will now be executed automatically with 30% lower gas fees",
-                  icon: "/favicon.ico",
-                });
-              }
-            });
-          }
-        }
-      } else {
-        console.error("❌ Failed to get private key:", data.error);
-      }
-    } catch (error) {
-      console.error("💥 Error initializing enhanced payment executor:", error);
-    }
-  };
-
-  // UPDATED: Toggle enhanced executor
-  const toggleEnhancedExecutor = () => {
-    if (executorRunning) {
-      console.log("🛑 Stopping enhanced payment executor...");
-      enhancedWebScheduledPaymentExecutor.stop();
-      setExecutorRunning(false);
-      setExecutorStatus(null);
-    } else {
-      console.log("🚀 Starting enhanced payment executor...");
-      initializeEnhancedPaymentExecutor();
-    }
-  };
-
-  // UPDATED: Cleanup enhanced executor on unmount
-  useEffect(() => {
-    return () => {
-      if (executorRunning) {
-        console.log("🧹 Cleaning up enhanced payment executor...");
-        enhancedWebScheduledPaymentExecutor.stop();
-      }
-    };
-  }, []);
 
   // Auth check effect - only run once
   useEffect(() => {
@@ -242,12 +127,6 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     try {
-      // UPDATED: Stop enhanced executor before logout
-      if (executorRunning) {
-        enhancedWebScheduledPaymentExecutor.stop();
-        setExecutorRunning(false);
-      }
-
       await dispatch(logoutUser());
       router.push("/auth");
     } catch (error) {
@@ -305,58 +184,65 @@ export default function DashboardPage() {
     return colors[activeIndex % colors.length] || colors[0];
   };
 
+  // Get active wallet from real-time data
+  const activeRealtimeWallet = realtimeBalances.find((w) => w.isActive);
+
   console.log("🎨 Dashboard - Rendering main content");
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+      {/* Real-time Balance Notifications */}
+      <RealtimeBalanceNotifications />
+
       {/* Header - Fixed and Responsive */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 flex-shrink-0 gap-4 sm:gap-0">
         <div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
             Dashboard
           </h1>
-          <p className="text-gray-400 text-sm font-satoshi mt-1">
+          <p className="text-gray-400 text-sm font-satoshi mt-1 flex items-center">
             Welcome back, {user?.displayName || user?.name || "User"}
+            {/* Real-time indicator */}
+            {isMonitoring && (
+              <span className="ml-2 flex items-center text-green-400">
+                <Radio size={12} className="mr-1 animate-pulse" />
+                <span className="text-xs">Real-time</span>
+              </span>
+            )}
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
-          {/* UPDATED: Enhanced Payment Executor Status */}
-          {/* {wallets.length > 0 && (
-            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3">
-              <button
-                onClick={toggleEnhancedExecutor}
-                className="flex items-center space-x-2"
-                title={`Enhanced Auto-Payment System: ${
-                  executorRunning ? "Running" : "Stopped"
+          {/* Real-time Status
+          {wallets.length > 0 && (
+            <button
+              onClick={() => setShowRealtimeStatus(!showRealtimeStatus)}
+              className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 hover:border-[#E2AF19] transition-colors"
+            >
+              <Radio
+                size={16}
+                className={`mr-2 lg:w-5 lg:h-5 ${
+                  isMonitoring
+                    ? "text-green-400 animate-pulse"
+                    : "text-gray-400"
+                }`}
+              />
+              <span
+                className={`text-xs sm:text-sm font-satoshi ${
+                  isMonitoring ? "text-green-400" : "text-gray-400"
                 }`}
               >
-                {executorRunning ? (
-                  <Zap
-                    size={16}
-                    className="text-green-400 lg:w-5 lg:h-5 animate-pulse"
-                  />
-                ) : (
-                  <Play size={16} className="text-gray-400 lg:w-5 lg:h-5" />
-                )}
-                <span
-                  className={`text-xs sm:text-sm font-satoshi ${
-                    executorRunning ? "text-green-400" : "text-gray-400"
-                  }`}
-                >
-                  Enhanced Auto-Pay {executorRunning ? "ON" : "OFF"}
+                {isMonitoring ? "Live Monitoring" : "Offline"}
+              </span>
+              {notifications.length > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {notifications.length}
                 </span>
-              </button>
-
-              {executorStatus && executorRunning && (
-                <div className="ml-2 text-xs text-gray-400">
-                  ({executorStatus.processingPayments?.length || 0} processing)
-                </div>
               )}
-            </div>
+            </button>
           )} */}
 
-          {/* Wallet Selector */}
+          {/* Wallet Selector with Real-time Data */}
           {wallets.length > 0 && (
             <button
               onClick={() => setWalletSwitcherOpen(true)}
@@ -375,10 +261,46 @@ export default function DashboardPage() {
                     backgroundSize: "6px 6px lg:8px 8px",
                   }}
                 ></div>
+                {/* Real-time pulse indicator */}
+                {isMonitoring && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+                )}
               </div>
-              <span className="text-white text-xs sm:text-sm font-satoshi mr-2 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors">
-                {activeWallet?.name || "Loading..."}
-              </span>
+
+              <div className="flex-1 min-w-0">
+                <span className="text-white text-xs sm:text-sm font-satoshi mr-2 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors block">
+                  {activeWallet?.name || "Loading..."}
+                </span>
+
+                {/* Real-time balance display */}
+                {activeRealtimeWallet && (
+                  <div className="flex items-center text-xs text-gray-400">
+                    <span>${activeRealtimeWallet.balance.toFixed(2)}</span>
+                    {activeRealtimeWallet.changeAmount &&
+                      Math.abs(activeRealtimeWallet.changeAmount) > 0.01 && (
+                        <span
+                          className={`ml-1 flex items-center ${
+                            activeRealtimeWallet.changeAmount > 0
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {activeRealtimeWallet.changeAmount > 0 ? (
+                            <TrendingUp size={10} />
+                          ) : (
+                            <TrendingDown size={10} />
+                          )}
+                          <span className="ml-1">
+                            $
+                            {Math.abs(
+                              activeRealtimeWallet.changeAmount
+                            ).toFixed(2)}
+                          </span>
+                        </span>
+                      )}
+                  </div>
+                )}
+              </div>
 
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
 
@@ -428,6 +350,49 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Real-time Status Panel */}
+      {showRealtimeStatus && wallets.length > 0 && (
+        <div className="mb-4 p-4 bg-black border border-[#2C2C2C] rounded-xl">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-semibold font-satoshi">
+              Real-time Monitor
+            </h3>
+            <button
+              onClick={() => setShowRealtimeStatus(false)}
+              className="text-gray-400 hover:text-white text-sm"
+            >
+              Hide
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-gray-400">Status:</span>
+              <div
+                className={`font-medium ${
+                  isMonitoring ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                {isMonitoring ? "Active" : "Inactive"}
+              </div>
+            </div>
+            <div>
+              <span className="text-gray-400">Wallets:</span>
+              <div className="text-white font-medium">{wallets.length}</div>
+            </div>
+            <div>
+              <span className="text-gray-400">Updates:</span>
+              <div className="text-white font-medium">Every 15s</div>
+            </div>
+            <div>
+              <span className="text-gray-400">Notifications:</span>
+              <div className="text-white font-medium">
+                {notifications.length}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Rest of your existing dashboard content */}
       {wallets.length === 0 ? (
         // Your existing empty dashboard states
@@ -473,8 +438,9 @@ export default function DashboardPage() {
         onWalletCreated={handleWalletCreated}
       />
 
+      {/* Updated to use Real-time Wallet Switcher */}
       {wallets.length > 0 && (
-        <WalletSwitcher
+        <RealtimeWalletSwitcher
           isOpen={walletSwitcherOpen}
           onClose={() => setWalletSwitcherOpen(false)}
         />

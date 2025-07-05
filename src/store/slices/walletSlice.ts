@@ -228,6 +228,38 @@ const walletSlice = createSlice({
         state.tokens = [];
       }
     },
+    updateWalletBalances: (
+      state,
+      action: PayloadAction<
+        { walletId: string; balance: number; tokenCount: number }[]
+      >
+    ) => {
+      action.payload.forEach(({ walletId, balance, tokenCount }) => {
+        const wallet = state.wallets.find((w) => w.id === walletId);
+        if (wallet) {
+          wallet.balance = balance;
+          // You can also store tokenCount if you add it to the Wallet interface
+          if (wallet.isActive) {
+            state.totalBalance = balance;
+          }
+        }
+      });
+    },
+
+    // Add this new action in the reducers section
+    updateSingleWalletBalance: (
+      state,
+      action: PayloadAction<{ walletId: string; balance: number }>
+    ) => {
+      const { walletId, balance } = action.payload;
+      const wallet = state.wallets.find((w) => w.id === walletId);
+      if (wallet) {
+        wallet.balance = balance;
+        if (wallet.isActive) {
+          state.totalBalance = balance;
+        }
+      }
+    },
     clearError: (state) => {
       state.error = null;
     },
