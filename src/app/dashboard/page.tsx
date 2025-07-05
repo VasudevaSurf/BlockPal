@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - UPDATED WITH REAL-TIME FEATURES
+// src/app/dashboard/page.tsx - FIXED: Real-time wallet updates in header
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -172,7 +172,8 @@ export default function DashboardPage() {
     return null;
   }
 
-  const getWalletColor = (index: number) => {
+  // FIXED: Get wallet color based on activeWallet index in wallets array
+  const getWalletColor = () => {
     const colors = [
       "bg-gradient-to-br from-blue-400 to-cyan-400",
       "bg-gradient-to-br from-purple-400 to-pink-400",
@@ -180,14 +181,55 @@ export default function DashboardPage() {
       "bg-gradient-to-br from-orange-400 to-red-400",
       "bg-gradient-to-br from-indigo-400 to-purple-400",
     ];
-    const activeIndex = wallets.findIndex((w) => w.id === activeWallet?.id);
-    return colors[activeIndex % colors.length] || colors[0];
+
+    if (!activeWallet) return colors[0];
+
+    // Find the index of the active wallet in the wallets array
+    const activeIndex = wallets.findIndex((w) => w.id === activeWallet.id);
+    return colors[activeIndex >= 0 ? activeIndex % colors.length : 0];
   };
 
-  // Get active wallet from real-time data
-  const activeRealtimeWallet = realtimeBalances.find((w) => w.isActive);
+  // FIXED: Get active wallet from real-time data or fallback to Redux state
+  const getActiveWalletBalance = () => {
+    const activeRealtimeWallet = realtimeBalances.find((w) => w.isActive);
+    if (activeRealtimeWallet) {
+      return activeRealtimeWallet.balance;
+    }
+    return activeWallet?.balance || 0;
+  };
 
-  console.log("🎨 Dashboard - Rendering main content");
+  // FIXED: Get active wallet display data
+  const getActiveWalletDisplayData = () => {
+    const activeRealtimeWallet = realtimeBalances.find((w) => w.isActive);
+
+    if (activeRealtimeWallet) {
+      return {
+        name: activeRealtimeWallet.name,
+        address: activeRealtimeWallet.address,
+        balance: activeRealtimeWallet.balance,
+        changeAmount: activeRealtimeWallet.changeAmount,
+        hasRealtimeData: true,
+      };
+    }
+
+    // Fallback to Redux state
+    return {
+      name: activeWallet?.name || "Loading...",
+      address: activeWallet?.address || "",
+      balance: activeWallet?.balance || 0,
+      changeAmount: undefined,
+      hasRealtimeData: false,
+    };
+  };
+
+  const activeWalletData = getActiveWalletDisplayData();
+
+  console.log("🎨 Dashboard - Rendering main content", {
+    activeWalletId: activeWallet?.id,
+    activeWalletName: activeWalletData.name,
+    hasRealtimeData: activeWalletData.hasRealtimeData,
+    walletColor: getWalletColor(),
+  });
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
@@ -213,35 +255,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
-          {/* Real-time Status
-          {wallets.length > 0 && (
-            <button
-              onClick={() => setShowRealtimeStatus(!showRealtimeStatus)}
-              className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 hover:border-[#E2AF19] transition-colors"
-            >
-              <Radio
-                size={16}
-                className={`mr-2 lg:w-5 lg:h-5 ${
-                  isMonitoring
-                    ? "text-green-400 animate-pulse"
-                    : "text-gray-400"
-                }`}
-              />
-              <span
-                className={`text-xs sm:text-sm font-satoshi ${
-                  isMonitoring ? "text-green-400" : "text-gray-400"
-                }`}
-              >
-                {isMonitoring ? "Live Monitoring" : "Offline"}
-              </span>
-              {notifications.length > 0 && (
-                <span className="ml-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {notifications.length}
-                </span>
-              )}
-            </button>
-          )} */}
-
           {/* Wallet Selector with Real-time Data */}
           {wallets.length > 0 && (
             <button
@@ -249,9 +262,7 @@ export default function DashboardPage() {
               className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto hover:border-[#E2AF19] transition-colors group"
             >
               <div
-                className={`w-6 h-6 lg:w-8 lg:h-8 ${getWalletColor(
-                  0
-                )} rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0`}
+                className={`w-6 h-6 lg:w-8 lg:h-8 ${getWalletColor()} rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0`}
               >
                 <div
                   className="absolute inset-0 rounded-full opacity-30"
@@ -269,47 +280,42 @@ export default function DashboardPage() {
 
               <div className="flex-1 min-w-0">
                 <span className="text-white text-xs sm:text-sm font-satoshi mr-2 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors block">
-                  {activeWallet?.name || "Loading..."}
+                  {activeWalletData.name}
                 </span>
 
                 {/* Real-time balance display */}
-                {activeRealtimeWallet && (
-                  <div className="flex items-center text-xs text-gray-400">
-                    <span>${activeRealtimeWallet.balance.toFixed(2)}</span>
-                    {activeRealtimeWallet.changeAmount &&
-                      Math.abs(activeRealtimeWallet.changeAmount) > 0.01 && (
-                        <span
-                          className={`ml-1 flex items-center ${
-                            activeRealtimeWallet.changeAmount > 0
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }`}
-                        >
-                          {activeRealtimeWallet.changeAmount > 0 ? (
-                            <TrendingUp size={10} />
-                          ) : (
-                            <TrendingDown size={10} />
-                          )}
-                          <span className="ml-1">
-                            $
-                            {Math.abs(
-                              activeRealtimeWallet.changeAmount
-                            ).toFixed(2)}
-                          </span>
+                <div className="flex items-center text-xs text-gray-400">
+                  <span>${activeWalletData.balance.toFixed(2)}</span>
+                  {activeWalletData.changeAmount &&
+                    Math.abs(activeWalletData.changeAmount) > 0.01 && (
+                      <span
+                        className={`ml-1 flex items-center ${
+                          activeWalletData.changeAmount > 0
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {activeWalletData.changeAmount > 0 ? (
+                          <TrendingUp size={10} />
+                        ) : (
+                          <TrendingDown size={10} />
+                        )}
+                        <span className="ml-1">
+                          ${Math.abs(activeWalletData.changeAmount).toFixed(2)}
                         </span>
-                      )}
-                  </div>
-                )}
+                      </span>
+                    )}
+                </div>
               </div>
 
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
 
               <span className="text-gray-400 text-xs sm:text-sm font-satoshi mr-2 lg:mr-3 hidden sm:block truncate">
-                {activeWallet?.address
-                  ? `${activeWallet.address.slice(
+                {activeWalletData.address
+                  ? `${activeWalletData.address.slice(
                       0,
                       6
-                    )}...${activeWallet.address.slice(-4)}`
+                    )}...${activeWalletData.address.slice(-4)}`
                   : "Loading..."}
               </span>
 

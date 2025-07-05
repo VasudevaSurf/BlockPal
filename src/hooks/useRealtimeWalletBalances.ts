@@ -1,4 +1,4 @@
-// src/hooks/useRealtimeWalletBalances.ts - Real-time wallet balance hook
+// src/hooks/useRealtimeWalletBalances.ts - FIXED: Proper active wallet tracking
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
@@ -48,6 +48,27 @@ export function useRealtimeWalletBalances() {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
   const prevBalancesRef = useRef<Map<string, number>>(new Map());
+
+  // FIXED: Update active status when activeWallet changes
+  useEffect(() => {
+    if (activeWallet && realtimeBalances.length > 0) {
+      console.log("🎯 Real-time hook: Updating active wallet status", {
+        activeWalletId: activeWallet.id,
+        currentBalances: realtimeBalances.map((w) => ({
+          id: w.id,
+          name: w.name,
+          isActive: w.isActive,
+        })),
+      });
+
+      setRealtimeBalances((prev) =>
+        prev.map((wallet) => ({
+          ...wallet,
+          isActive: wallet.id === activeWallet.id,
+        }))
+      );
+    }
+  }, [activeWallet?.id, realtimeBalances.length]);
 
   // Initialize real-time monitoring when wallets are available
   useEffect(() => {
@@ -99,6 +120,8 @@ export function useRealtimeWalletBalances() {
                 changeAmount,
                 isIncreasing: changeAmount > 0,
                 tokens: update.tokens,
+                // FIXED: Preserve isActive status based on current activeWallet
+                isActive: activeWallet?.id === walletId,
               };
             }
             return wallet;
@@ -169,9 +192,14 @@ export function useRealtimeWalletBalances() {
     }
   }, [wallets, activeWallet]);
 
-  // Initialize balances from current wallet data
+  // FIXED: Initialize balances from current wallet data with proper active status
   useEffect(() => {
     if (wallets.length > 0 && realtimeBalances.length === 0) {
+      console.log("🎯 Real-time hook: Initializing balances", {
+        walletsCount: wallets.length,
+        activeWalletId: activeWallet?.id,
+      });
+
       const initialBalances: RealtimeWalletBalance[] = wallets.map(
         (wallet) => ({
           id: wallet.id,
@@ -188,6 +216,14 @@ export function useRealtimeWalletBalances() {
       // Initialize previous balances reference
       wallets.forEach((wallet) => {
         prevBalancesRef.current.set(wallet.id, wallet.balance || 0);
+      });
+
+      console.log("✅ Real-time balances initialized", {
+        balances: initialBalances.map((b) => ({
+          id: b.id,
+          name: b.name,
+          isActive: b.isActive,
+        })),
       });
     }
   }, [wallets, activeWallet]);
@@ -231,9 +267,11 @@ export function useRealtimeWalletBalances() {
     }
   }, [wallets]);
 
-  // Get active wallet balance
+  // FIXED: Get active wallet balance with proper active tracking
   const activeWalletBalance =
-    realtimeBalances.find((w) => w.isActive)?.balance || 0;
+    realtimeBalances.find((w) => w.isActive)?.balance ||
+    activeWallet?.balance ||
+    0;
 
   // Get total balance across all wallets
   const totalBalance = realtimeBalances.reduce(
@@ -260,6 +298,14 @@ export function useRealtimeWalletBalances() {
   const dismissNotification = useCallback((timestamp: Date) => {
     setNotifications((prev) => prev.filter((n) => n.timestamp !== timestamp));
   }, []);
+
+  console.log("🔍 Real-time hook state", {
+    walletsCount: wallets.length,
+    realtimeBalancesCount: realtimeBalances.length,
+    activeWalletId: activeWallet?.id,
+    activeRealtimeWallet: realtimeBalances.find((w) => w.isActive)?.name,
+    isMonitoring,
+  });
 
   return {
     // Balance data
