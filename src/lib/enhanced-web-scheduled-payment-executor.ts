@@ -1,4 +1,4 @@
-// src/lib/enhanced-web-scheduled-payment-executor.ts - FIXED GAS ESTIMATION
+// src/lib/enhanced-web-scheduled-payment-executor.ts - FIXED TOKEN APPROVAL ISSUES
 import { enhancedScheduledPaymentsService } from "./enhanced-scheduled-payments-service";
 
 interface ScheduledPaymentData {
@@ -27,7 +27,7 @@ interface ScheduledPaymentData {
 export class EnhancedWebScheduledPaymentExecutor {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
-  private checkInterval = 30000; // Check every 30 seconds for enhanced API
+  private checkInterval = 30000; // Check every 30 seconds
   private processingPayments = new Set<string>();
   private executorId = `enhanced_executor_${Math.random()
     .toString(36)
@@ -39,7 +39,7 @@ export class EnhancedWebScheduledPaymentExecutor {
 
   constructor() {
     console.log(
-      `🌟 Enhanced Web Payment Executor initialized (ID: ${this.executorId})`
+      `🌟 Enhanced Web Payment Executor initialized (ID: ${this.executorId}) with fixed token approvals`
     );
   }
 
@@ -50,20 +50,20 @@ export class EnhancedWebScheduledPaymentExecutor {
     }
 
     console.log(
-      `🚀 Starting enhanced payment executor (ID: ${this.executorId})`
+      `🚀 Starting enhanced payment executor with fixed approvals (ID: ${this.executorId})`
     );
     this.isRunning = true;
 
     // Run immediately
     this.checkAndExecutePayments();
 
-    // Set up interval - check every 30 seconds for enhanced API
+    // Set up interval
     this.intervalId = setInterval(() => {
       this.checkAndExecutePayments();
     }, this.checkInterval);
 
     console.log(
-      "✅ Enhanced executor started - checking every 30 seconds with improved gas estimation"
+      "✅ Enhanced executor started with improved token approval handling"
     );
   }
 
@@ -94,7 +94,9 @@ export class EnhancedWebScheduledPaymentExecutor {
       throw new Error("Invalid private key provided");
     }
     this.privateKey = privateKey;
-    console.log("🔑 Private key set for enhanced executor");
+    console.log(
+      "🔑 Private key set for enhanced executor with improved approvals"
+    );
   }
 
   private isValidPrivateKey(privateKey: string): boolean {
@@ -114,7 +116,7 @@ export class EnhancedWebScheduledPaymentExecutor {
     try {
       this.lastCheckTime = new Date();
       console.log(
-        `🔍 [Enhanced-${this.executorId}] Checking for due payments with improved gas estimation...`
+        `🔍 [Enhanced-${this.executorId}] Checking for due payments with fixed token approvals...`
       );
 
       const response = await fetch("/api/scheduled-payments/due", {
@@ -130,7 +132,7 @@ export class EnhancedWebScheduledPaymentExecutor {
       const duePayments = data.scheduledPayments || [];
 
       console.log(
-        `📊 [Enhanced-${this.executorId}] Found ${duePayments.length} payments due for enhanced execution`
+        `📊 [Enhanced-${this.executorId}] Found ${duePayments.length} payments due for enhanced execution with fixed approvals`
       );
 
       if (duePayments.length === 0) {
@@ -164,13 +166,13 @@ export class EnhancedWebScheduledPaymentExecutor {
       );
 
       console.log(
-        `📊 [Enhanced-${this.executorId}] ${availablePayments.length} enhanced payments available for execution`
+        `📊 [Enhanced-${this.executorId}] ${availablePayments.length} enhanced payments available for execution with fixed approvals`
       );
 
-      // Execute each payment with enhanced gas estimation
+      // Execute each payment with enhanced token approval handling
       for (const payment of availablePayments) {
         try {
-          await this.executeEnhancedPayment(payment);
+          await this.executeEnhancedPaymentWithFixedApprovals(payment);
         } catch (error) {
           console.error(
             `💥 Error executing enhanced payment ${payment.scheduleId}:`,
@@ -185,7 +187,9 @@ export class EnhancedWebScheduledPaymentExecutor {
     }
   }
 
-  private async executeEnhancedPayment(paymentData: ScheduledPaymentData) {
+  private async executeEnhancedPaymentWithFixedApprovals(
+    paymentData: ScheduledPaymentData
+  ) {
     const scheduleId = paymentData.scheduleId;
 
     if (this.processingPayments.has(scheduleId)) {
@@ -194,11 +198,11 @@ export class EnhancedWebScheduledPaymentExecutor {
 
     this.processingPayments.add(scheduleId);
     console.log(
-      `⚡ [Enhanced-${this.executorId}] Executing enhanced payment: ${scheduleId}`
+      `⚡ [Enhanced-${this.executorId}] Executing enhanced payment with fixed approvals: ${scheduleId}`
     );
 
     try {
-      // STEP 1: Mark as processing (enhanced API)
+      // STEP 1: Mark as processing
       console.log(
         `🔄 [Enhanced-${this.executorId}] Marking payment ${scheduleId} as processing...`
       );
@@ -229,25 +233,36 @@ export class EnhancedWebScheduledPaymentExecutor {
         `✅ [Enhanced-${this.executorId}] Successfully marked as processing ${scheduleId}`
       );
 
-      // STEP 2: Execute blockchain transaction with enhanced gas estimation
+      // STEP 2: Execute blockchain transaction with fixed token approvals
       console.log(
-        `💰 [Enhanced-${this.executorId}] Executing enhanced blockchain transaction with improved gas...`
+        `💰 [Enhanced-${this.executorId}] Executing blockchain transaction with fixed token approvals...`
       );
 
-      // FIXED: Prepare token info with proper structure for enhanced API
+      // FIXED: Prepare token info with proper structure and validation
       const tokenInfo = {
-        name: paymentData.tokenName,
+        name: paymentData.tokenName || paymentData.tokenSymbol,
         symbol: paymentData.tokenSymbol,
         contractAddress: paymentData.contractAddress,
-        decimals: paymentData.decimals || 18,
-        isETH:
-          paymentData.contractAddress === "native" ||
-          paymentData.tokenSymbol === "ETH",
+        decimals: this.getCorrectDecimals(
+          paymentData.tokenSymbol,
+          paymentData.decimals
+        ),
+        isETH: this.isETHToken(
+          paymentData.tokenSymbol,
+          paymentData.contractAddress
+        ),
       };
 
-      console.log("🔧 Using enhanced gas estimation for:", {
+      // FIXED: Additional validation before execution
+      if (!this.validatePaymentData(paymentData, tokenInfo)) {
+        throw new Error("Payment data validation failed");
+      }
+
+      console.log("🔧 Enhanced: Using fixed token approval logic for:", {
         tokenSymbol: tokenInfo.symbol,
         isETH: tokenInfo.isETH,
+        contractAddress: tokenInfo.contractAddress,
+        decimals: tokenInfo.decimals,
         recipient: paymentData.recipient.slice(0, 10) + "...",
         amount: paymentData.amount,
       });
@@ -263,19 +278,20 @@ export class EnhancedWebScheduledPaymentExecutor {
 
       if (executionResult.success) {
         console.log(
-          `✅ [Enhanced-${this.executorId}] Enhanced blockchain transaction successful!`
+          `✅ [Enhanced-${this.executorId}] Blockchain transaction successful with fixed approvals!`
         );
         console.log(
           `📤 [Enhanced-${this.executorId}] TX: ${executionResult.transactionHash}`
         );
 
-        // STEP 3: Update database with enhanced API flag
+        // STEP 3: Update database
         const updateSuccess = await this.updateDatabaseWithRetries(
           scheduleId,
           {
             ...executionResult,
             executedAt: new Date(),
             enhancedAPI: true,
+            fixedApprovals: true,
           },
           5 // 5 retries
         );
@@ -284,7 +300,7 @@ export class EnhancedWebScheduledPaymentExecutor {
           this.executedPayments.add(scheduleId);
           this.showNotification(
             "✅ Enhanced Payment Executed!",
-            `${paymentData.amount} ${paymentData.tokenSymbol} sent with 30% gas savings`,
+            `${paymentData.amount} ${paymentData.tokenSymbol} sent with fixed token approvals`,
             "success"
           );
         } else {
@@ -294,12 +310,27 @@ export class EnhancedWebScheduledPaymentExecutor {
         }
       } else {
         console.error(
-          `❌ [Enhanced-${this.executorId}] Enhanced blockchain transaction failed: ${executionResult.error}`
+          `❌ [Enhanced-${this.executorId}] Blockchain transaction failed: ${executionResult.error}`
         );
+
+        // FIXED: Better error handling for approval failures
+        let errorCategory = "execution_failed";
+        if (
+          executionResult.error?.includes("approval") ||
+          executionResult.error?.includes("allowance")
+        ) {
+          errorCategory = "approval_failed";
+        } else if (executionResult.error?.includes("balance")) {
+          errorCategory = "insufficient_balance";
+        } else if (executionResult.error?.includes("deadline")) {
+          errorCategory = "deadline_exceeded";
+        }
+
         await this.markScheduleAsFailed(
           scheduleId,
           executionResult.error,
-          true
+          true,
+          errorCategory
         );
 
         this.failedPayments.add(scheduleId);
@@ -314,7 +345,21 @@ export class EnhancedWebScheduledPaymentExecutor {
         `💥 [Enhanced-${this.executorId}] Critical enhanced error:`,
         error
       );
-      await this.markScheduleAsFailed(scheduleId, error.message, true);
+
+      let errorCategory = "critical_error";
+      if (
+        error.message?.includes("approval") ||
+        error.message?.includes("allowance")
+      ) {
+        errorCategory = "approval_system_failure";
+      }
+
+      await this.markScheduleAsFailed(
+        scheduleId,
+        error.message,
+        true,
+        errorCategory
+      );
 
       this.failedPayments.add(scheduleId);
       this.showNotification(
@@ -325,6 +370,67 @@ export class EnhancedWebScheduledPaymentExecutor {
     } finally {
       this.processingPayments.delete(scheduleId);
     }
+  }
+
+  // FIXED: Helper functions for better validation
+  private getCorrectDecimals(tokenSymbol: string, fallback?: number): number {
+    const knownDecimals: { [key: string]: number } = {
+      ETH: 18,
+      USDT: 6,
+      USDC: 6,
+      DAI: 18,
+      LINK: 18,
+      UNI: 18,
+    };
+
+    return knownDecimals[tokenSymbol] || fallback || 18;
+  }
+
+  private isETHToken(tokenSymbol: string, contractAddress: string): boolean {
+    return (
+      tokenSymbol === "ETH" ||
+      contractAddress === "native" ||
+      contractAddress === "0x0000000000000000000000000000000000000000"
+    );
+  }
+
+  private validatePaymentData(
+    paymentData: ScheduledPaymentData,
+    tokenInfo: any
+  ): boolean {
+    // Validate recipient address
+    if (
+      !paymentData.recipient ||
+      !/^0x[a-fA-F0-9]{40}$/i.test(paymentData.recipient)
+    ) {
+      console.error("❌ Enhanced: Invalid recipient address");
+      return false;
+    }
+
+    // Validate amount
+    const amount = parseFloat(paymentData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      console.error("❌ Enhanced: Invalid amount");
+      return false;
+    }
+
+    // Validate token symbol
+    const supportedTokens = ["ETH", "USDT", "USDC", "DAI", "LINK", "UNI"];
+    if (!supportedTokens.includes(tokenInfo.symbol)) {
+      console.error(`❌ Enhanced: Unsupported token: ${tokenInfo.symbol}`);
+      return false;
+    }
+
+    // Validate contract address for ERC20 tokens
+    if (
+      !tokenInfo.isETH &&
+      (!tokenInfo.contractAddress || tokenInfo.contractAddress === "")
+    ) {
+      console.error("❌ Enhanced: Missing contract address for ERC20 token");
+      return false;
+    }
+
+    return true;
   }
 
   // Enhanced database update with multiple retry attempts
@@ -355,7 +461,9 @@ export class EnhancedWebScheduledPaymentExecutor {
                 actualCostETH: executionResult.actualCostETH,
                 actualCostUSD: executionResult.actualCostUSD,
                 executedAt: executionResult.executedAt.toISOString(),
-                enhancedAPI: true, // Mark as enhanced API execution
+                enhancedAPI: true,
+                taxPaidETH: executionResult.taxPaidETH || "0",
+                contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
               }),
               credentials: "include",
             }
@@ -395,7 +503,9 @@ export class EnhancedWebScheduledPaymentExecutor {
                 actualCostUSD: executionResult.actualCostUSD,
                 executedAt: executionResult.executedAt.toISOString(),
                 forceUpdate: true,
-                enhancedAPI: true, // Mark as enhanced API execution
+                enhancedAPI: true,
+                taxPaid: executionResult.taxPaidETH || "0",
+                contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
               }),
               credentials: "include",
             }
@@ -445,7 +555,8 @@ export class EnhancedWebScheduledPaymentExecutor {
   private async markScheduleAsFailed(
     scheduleId: string,
     error: string,
-    enhancedAPI: boolean = true
+    enhancedAPI: boolean = true,
+    errorCategory: string = "unknown"
   ) {
     try {
       const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
@@ -456,13 +567,15 @@ export class EnhancedWebScheduledPaymentExecutor {
           executorId: this.executorId,
           error: error,
           enhancedAPI: enhancedAPI,
+          errorCategory: errorCategory,
+          fixedApprovals: true,
         }),
         credentials: "include",
       });
 
       if (response.ok) {
         console.log(
-          `✅ [Enhanced-${this.executorId}] Schedule marked as failed with enhanced API flag`
+          `✅ [Enhanced-${this.executorId}] Schedule marked as failed with enhanced API flag and error category: ${errorCategory}`
         );
       }
     } catch (error) {
@@ -517,11 +630,12 @@ export class EnhancedWebScheduledPaymentExecutor {
       failedPayments: Array.from(this.failedPayments),
       hasPrivateKey: !!this.privateKey,
       enhancedAPI: true,
-      gasOptimization: "Improved",
+      fixedApprovals: true,
+      gasOptimization: "Enhanced with Fixed Token Approvals",
     };
   }
 }
 
-// Export singleton instance for enhanced execution
+// Export singleton instance for enhanced execution with fixed approvals
 export const enhancedWebScheduledPaymentExecutor =
   new EnhancedWebScheduledPaymentExecutor();

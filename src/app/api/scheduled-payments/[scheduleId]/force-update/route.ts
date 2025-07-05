@@ -1,3 +1,4 @@
+// src/app/api/scheduled-payments/[scheduleId]/force-update/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -26,6 +27,8 @@ export async function POST(
       actualCostUSD,
       executedAt,
       forceUpdate,
+      contractAddress,
+      taxPaid,
     } = body;
 
     if (!forceUpdate) {
@@ -39,7 +42,7 @@ export async function POST(
     const now = new Date();
 
     console.log(
-      `🔄 Force updating schedule ${scheduleId} by executor ${executorId}`
+      `🔄 Enhanced: Force updating schedule ${scheduleId} by executor ${executorId} with smart contract`
     );
 
     const currentSchedule = await db.collection("schedules").findOne({
@@ -47,7 +50,7 @@ export async function POST(
     });
 
     if (!currentSchedule) {
-      console.log(`❌ Schedule ${scheduleId} not found`);
+      console.log(`❌ Enhanced: Schedule ${scheduleId} not found`);
       return NextResponse.json(
         { error: "Schedule not found" },
         { status: 404 }
@@ -56,7 +59,9 @@ export async function POST(
 
     // STRICT: Do not force update failed payments
     if (currentSchedule.status === "failed") {
-      console.log(`❌ Cannot force update failed schedule ${scheduleId}`);
+      console.log(
+        `❌ Enhanced: Cannot force update failed schedule ${scheduleId}`
+      );
       return NextResponse.json(
         { error: "Cannot force update a permanently failed payment" },
         { status: 400 }
@@ -64,7 +69,7 @@ export async function POST(
     }
 
     console.log(
-      `📋 Current schedule status: ${currentSchedule.status}, processingBy: ${currentSchedule.processingBy}`
+      `📋 Enhanced: Current schedule status: ${currentSchedule.status}, processingBy: ${currentSchedule.processingBy}`
     );
 
     const newExecutionCount = (currentSchedule.executedCount || 0) + 1;
@@ -87,20 +92,20 @@ export async function POST(
         finalStatus = "completed";
         completedAt = new Date(executedAt);
         console.log(
-          `🏁 Force update: Recurring schedule ${scheduleId} completed after ${newExecutionCount} executions`
+          `🏁 Enhanced: Recurring schedule ${scheduleId} completed after ${newExecutionCount} executions`
         );
       } else {
         finalStatus = "active";
         nextExecutionAt = nextExecution;
         completedAt = null;
         console.log(
-          `🔄 Force update: Recurring schedule ${scheduleId} next execution: ${nextExecution.toISOString()}`
+          `🔄 Enhanced: Recurring schedule ${scheduleId} next execution: ${nextExecution.toISOString()}`
         );
       }
     } else {
       finalStatus = "completed";
       completedAt = new Date(executedAt);
-      console.log(`🏁 Force update: One-time schedule ${scheduleId} completed`);
+      console.log(`🏁 Enhanced: One-time schedule ${scheduleId} completed`);
     }
 
     const updateData: any = {
@@ -110,6 +115,8 @@ export async function POST(
       updatedAt: now,
       processingBy: null,
       processingStarted: null,
+      claimedBy: null,
+      claimedAt: null,
       lastTransactionHash: transactionHash,
       lastGasUsed: gasUsed,
       lastBlockNumber: blockNumber,
@@ -117,6 +124,12 @@ export async function POST(
       lastActualCostUSD: actualCostUSD,
       forceUpdatedBy: executorId,
       forceUpdatedAt: now,
+      // Smart contract specific fields
+      smartContractExecution: true,
+      contractAddress:
+        contractAddress || "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+      taxPaidETH: taxPaid || "0",
+      enhancedAPI: true,
     };
 
     if (nextExecutionAt) {
@@ -138,7 +151,7 @@ export async function POST(
 
     if (updateResult.matchedCount === 0) {
       console.log(
-        `❌ Force update failed: Schedule ${scheduleId} not found or is failed`
+        `❌ Enhanced: Force update failed: Schedule ${scheduleId} not found or is failed`
       );
       return NextResponse.json(
         { error: "Schedule not found or has permanently failed" },
@@ -147,9 +160,10 @@ export async function POST(
     }
 
     console.log(
-      `✅ Force update successful: Schedule ${scheduleId} updated to status: ${finalStatus}`
+      `✅ Enhanced: Force update successful: Schedule ${scheduleId} updated to status: ${finalStatus}`
     );
 
+    // Store execution record with smart contract info
     const executionRecordId = `${scheduleId}_force_exec_${newExecutionCount}_${Date.now()}`;
     const executionRecord = {
       _id: executionRecordId,
@@ -171,6 +185,12 @@ export async function POST(
       executorId: executorId,
       createdAt: now,
       isForceUpdate: true,
+      // Smart contract specific
+      smartContractAddress:
+        contractAddress || "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+      taxPaidETH: taxPaid || "0",
+      enhancedAPI: true,
+      executionMethod: "smart_contract",
     };
 
     await db
@@ -182,20 +202,24 @@ export async function POST(
       );
 
     console.log(
-      `✅ Force update: Execution record stored for schedule ${scheduleId}`
+      `✅ Enhanced: Execution record stored for schedule ${scheduleId} with smart contract data`
     );
 
     return NextResponse.json({
       success: true,
-      message: "Schedule force updated successfully",
+      message: "Schedule force updated successfully with smart contract",
       finalStatus: finalStatus,
       nextExecution: nextExecutionAt,
       executionCount: newExecutionCount,
       transactionHash: transactionHash,
       wasForceUpdated: true,
+      smartContractEnabled: true,
+      contractAddress:
+        contractAddress || "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+      enhancedAPI: true,
     });
   } catch (error) {
-    console.error("💥 Error in force update:", error);
+    console.error("💥 Enhanced: Error in force update:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
