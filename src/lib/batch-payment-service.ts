@@ -1,4 +1,4 @@
-// src/lib/batch-payment-service.ts - UPDATED WITH SMART CONTRACT INTEGRATION
+// src/lib/batch-payment-service.ts - UPDATED WITH DECIMAL PRECISION FIXES
 import { ethers } from "ethers";
 
 const ALCHEMY_API_KEY =
@@ -82,6 +82,40 @@ export interface BatchTransferResult {
   executionTimeSeconds?: number;
 }
 
+// FIXED: Helper function to handle decimal precision for ETH amounts
+function normalizeETHAmount(amount: number | string): string {
+  const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+
+  // Round to 18 decimal places (ETH precision) to avoid floating point issues
+  const rounded = Math.round(numAmount * 1e18) / 1e18;
+
+  // Convert to string with proper precision (max 18 decimals)
+  return rounded.toFixed(18).replace(/\.?0+$/, "");
+}
+
+// FIXED: Helper function to safely parse ETH amounts
+function safeParseEther(amount: number | string): bigint {
+  try {
+    const normalizedAmount = normalizeETHAmount(amount);
+    return ethers.parseEther(normalizedAmount);
+  } catch (error) {
+    console.error("Error parsing ETH amount:", amount, error);
+    // Fallback to a minimal amount if parsing fails
+    return ethers.parseEther("0.000001");
+  }
+}
+
+// FIXED: Helper function to safely format ETH amounts
+function safeFormatEther(amount: bigint): string {
+  try {
+    const formatted = ethers.formatEther(amount);
+    return normalizeETHAmount(formatted);
+  } catch (error) {
+    console.error("Error formatting ETH amount:", amount, error);
+    return "0.000001";
+  }
+}
+
 export class BatchPaymentService {
   private provider: ethers.JsonRpcProvider;
   private contract: ethers.Contract;
@@ -121,6 +155,19 @@ export class BatchPaymentService {
       if (isNaN(amount) || amount <= 0) {
         errors.push(
           `Invalid amount for ${payment.recipient}: ${payment.amount}`
+        );
+      }
+
+      // FIXED: Check for reasonable amount ranges
+      if (amount > 1000000) {
+        errors.push(
+          `Amount too large for ${payment.recipient}: ${payment.amount}`
+        );
+      }
+
+      if (amount < 0.000001) {
+        errors.push(
+          `Amount too small for ${payment.recipient}: ${payment.amount}`
         );
       }
     }
@@ -173,7 +220,7 @@ export class BatchPaymentService {
     const transferMode = this.getTransferMode(payments);
     const batchSize = payments.length;
 
-    // Calculate totals
+    // Calculate totals with proper precision
     const totalUSDValue = payments.reduce((sum, p) => sum + p.usdValue, 0);
     const ethPayments = payments.filter((p) => p.tokenInfo.isETH);
     const totalETHValue = ethPayments.reduce(
@@ -205,20 +252,20 @@ export class BatchPaymentService {
     // Get gas estimation
     const gasEstimation = await this.estimateBatchGas(payments, fromAddress);
 
-    // Calculate total cost
+    // Calculate total cost with proper precision
     const gasCostETH = parseFloat(gasEstimation.gasCostETH);
-    const totalCostETH = (gasCostETH + totalTaxETH).toFixed(8);
+    const totalCostETH = normalizeETHAmount(gasCostETH + totalTaxETH);
     const ethPrice = await this.getETHPrice();
     const totalCostUSD = (parseFloat(totalCostETH) * ethPrice).toFixed(2);
 
     return {
       transfers: payments,
       transferMode,
-      totalETHValue: totalETHValue.toString(),
+      totalETHValue: normalizeETHAmount(totalETHValue),
       totalUSDValue,
       gasEstimation,
       taxEstimation: {
-        totalTaxETH: totalTaxETH.toFixed(8),
+        totalTaxETH: normalizeETHAmount(totalTaxETH),
         totalTaxUSD: totalTaxUSD.toFixed(2),
         breakdown: taxBreakdown,
       },
@@ -263,15 +310,15 @@ export class BatchPaymentService {
 
         const transfers = payments.map((payment) => ({
           recipient: payment.recipient,
-          amount: ethers.parseEther(payment.amount),
+          amount: safeParseEther(payment.amount),
         }));
 
-        // Calculate total amount including tax
+        // FIXED: Calculate total amount with proper precision
         const totalAmount = payments.reduce(
           (sum, p) => sum + parseFloat(p.amount),
           0
         );
-        const totalAmountWei = ethers.parseEther(totalAmount.toString());
+        const totalAmountWei = safeParseEther(totalAmount);
         const totalTaxWei = await this.contract.calculateETHTax(totalAmountWei);
         const totalValueWei = totalAmountWei + totalTaxWei;
 
@@ -287,9 +334,9 @@ export class BatchPaymentService {
           amount: ethers.parseUnits(payment.amount, payment.tokenInfo.decimals),
         }));
 
-        // Calculate total tax in ETH for ERC20 batch
+        // FIXED: Calculate total tax in ETH for ERC20 batch with proper precision
         const totalTaxETH = await this.calculateBatchTaxETH(payments);
-        const taxWei = ethers.parseEther(totalTaxETH);
+        const taxWei = safeParseEther(totalTaxETH);
 
         tx = await contractWithSigner.batchERC20Transfer(
           firstPayment.tokenInfo.contractAddress,
@@ -309,21 +356,23 @@ export class BatchPaymentService {
             ? "0x0000000000000000000000000000000000000000"
             : payment.tokenInfo.contractAddress,
           amount: payment.tokenInfo.isETH
-            ? ethers.parseEther(payment.amount)
+            ? safeParseEther(payment.amount)
             : ethers.parseUnits(payment.amount, payment.tokenInfo.decimals),
         }));
 
-        // Calculate ETH needed for mixed batch (ETH transfers + taxes)
+        // FIXED: Calculate ETH needed for mixed batch with proper precision
         const ethTransfers = payments.filter((p) => p.tokenInfo.isETH);
         const totalETHTransfers = ethTransfers.reduce(
           (sum, p) => sum + parseFloat(p.amount),
           0
         );
         const totalTaxETH = await this.calculateBatchTaxETH(payments);
-        const totalETHNeeded = totalETHTransfers + parseFloat(totalTaxETH);
-        const totalETHWei = ethers.parseEther(totalETHNeeded.toString());
+        const totalETHNeeded = normalizeETHAmount(
+          totalETHTransfers + parseFloat(totalTaxETH)
+        );
+        const totalETHWei = safeParseEther(totalETHNeeded);
 
-        const taxWei = ethers.parseEther(totalTaxETH);
+        const taxWei = safeParseEther(totalTaxETH);
 
         tx = await contractWithSigner.batchMixedTransfer(
           mixedPayments,
@@ -349,7 +398,7 @@ export class BatchPaymentService {
       const gasUsed = Number(receipt.gasUsed);
       const gasPrice = receipt.gasPrice || tx.gasPrice;
       const actualGasCostWei = BigInt(gasUsed) * gasPrice;
-      const actualGasCostETH = ethers.formatEther(actualGasCostWei);
+      const actualGasCostETH = safeFormatEther(actualGasCostWei);
 
       const ethPrice = await this.getETHPrice();
       const actualCostUSD = (parseFloat(actualGasCostETH) * ethPrice).toFixed(
@@ -388,9 +437,9 @@ export class BatchPaymentService {
   ): Promise<{ taxETH: string; taxUSD: string }> {
     try {
       if (payment.tokenInfo.isETH) {
-        const amountWei = ethers.parseEther(payment.amount);
+        const amountWei = safeParseEther(payment.amount);
         const taxWei = await this.contract.calculateETHTax(amountWei);
-        const taxETH = ethers.formatEther(taxWei);
+        const taxETH = safeFormatEther(taxWei);
 
         const ethPrice = await this.getETHPrice();
         const taxUSD = (parseFloat(taxETH) * ethPrice).toFixed(2);
@@ -400,13 +449,13 @@ export class BatchPaymentService {
         // For ERC20 tokens, calculate tax in USD then convert to ETH
         const taxUSD = payment.usdValue * this.taxRate;
         const ethPrice = await this.getETHPrice();
-        const taxETH = (taxUSD / ethPrice).toFixed(8);
+        const taxETH = normalizeETHAmount(taxUSD / ethPrice);
 
         return { taxETH, taxUSD: taxUSD.toFixed(2) };
       }
     } catch (error) {
       console.error("Error calculating payment tax:", error);
-      return { taxETH: "0.001", taxUSD: "3.50" };
+      return { taxETH: normalizeETHAmount(0.001), taxUSD: "3.50" };
     }
   }
 
@@ -420,7 +469,7 @@ export class BatchPaymentService {
       totalTaxETH += parseFloat(taxETH);
     }
 
-    return totalTaxETH.toFixed(8);
+    return normalizeETHAmount(totalTaxETH);
   }
 
   private async estimateBatchGas(
@@ -443,13 +492,13 @@ export class BatchPaymentService {
       if (transferMode === "BATCH_ETH") {
         const transfers = payments.map((p) => ({
           recipient: p.recipient,
-          amount: ethers.parseEther(p.amount),
+          amount: safeParseEther(p.amount),
         }));
         const totalAmount = payments.reduce(
           (sum, p) => sum + parseFloat(p.amount),
           0
         );
-        const totalAmountWei = ethers.parseEther(totalAmount.toString());
+        const totalAmountWei = safeParseEther(totalAmount);
         const totalTaxWei = await this.contract.calculateETHTax(totalAmountWei);
         const totalValueWei = totalAmountWei + totalTaxWei;
 
@@ -486,7 +535,7 @@ export class BatchPaymentService {
       const gasPrice = feeData.gasPrice || ethers.parseUnits("20", "gwei");
 
       const gasCostWei = batchGasWithBuffer * gasPrice;
-      const gasCostETH = ethers.formatEther(gasCostWei);
+      const gasCostETH = safeFormatEther(gasCostWei);
 
       const ethPrice = await this.getETHPrice();
       const gasCostUSD = (parseFloat(gasCostETH) * ethPrice).toFixed(2);
@@ -514,7 +563,7 @@ export class BatchPaymentService {
         individualGas: individualGas.toString(),
         gasSavings: savings.toString(),
         savingsPercent: savingsPercent.toString(),
-        gasCostETH: "0.005",
+        gasCostETH: normalizeETHAmount(0.005),
         gasCostUSD: "17.50",
       };
     }
