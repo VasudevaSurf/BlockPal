@@ -1,3 +1,4 @@
+// src/app/api/scheduled-payments/route.ts - UPDATED WITH SMART CONTRACT INTEGRATION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -25,16 +26,22 @@ export async function POST(request: NextRequest) {
       description,
     } = body;
 
-    console.log("🔄 Enhanced Scheduled payments API request:", {
-      action,
-      tokenSymbol: tokenInfo?.symbol,
-      frequency,
-      useEnhancedAPI: true,
-    });
+    console.log(
+      "🔄 Enhanced Scheduled payments API request with smart contract:",
+      {
+        action,
+        tokenSymbol: tokenInfo?.symbol,
+        frequency,
+        useEnhancedAPI: true,
+        smartContract: true,
+      }
+    );
 
     if (action === "preview") {
       try {
-        console.log("📊 Creating enhanced scheduled payment preview...");
+        console.log(
+          "📊 Creating enhanced scheduled payment preview with smart contract..."
+        );
 
         const validation =
           enhancedScheduledPaymentsService.validateScheduledPayment(
@@ -63,14 +70,22 @@ export async function POST(request: NextRequest) {
             timezone
           );
 
-        console.log("✅ Enhanced scheduled payment preview created");
+        console.log(
+          "✅ Enhanced scheduled payment preview created with smart contract"
+        );
 
         return NextResponse.json({
           success: true,
           preview: {
             ...preview,
             enhancedAPI: true,
-            gasSavings: "~30% lower gas fees with Enhanced API",
+            smartContract: true,
+            gasSavings: "~30% lower gas fees with Smart Contract",
+            taxInfo: {
+              taxETH: preview.taxETH,
+              taxUSD: preview.taxUSD,
+              taxRate: "0.5%",
+            },
           },
         });
       } catch (error: any) {
@@ -82,7 +97,9 @@ export async function POST(request: NextRequest) {
       }
     } else if (action === "create") {
       try {
-        console.log("🚀 Creating enhanced scheduled payment...");
+        console.log(
+          "🚀 Creating enhanced scheduled payment with smart contract..."
+        );
 
         const validation =
           enhancedScheduledPaymentsService.validateScheduledPayment(
@@ -127,7 +144,7 @@ export async function POST(request: NextRequest) {
           recipient,
           amount,
           frequency,
-          status: "active", // Always create as active
+          status: "active",
           scheduledFor: firstExecution,
           nextExecutionAt: firstExecution,
           executionCount: 0,
@@ -135,10 +152,11 @@ export async function POST(request: NextRequest) {
           description: description || "",
           timezone: timezone || "UTC",
           useEnhancedAPI: true,
+          smartContractEnabled: true,
+          contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
           createdAt: new Date(),
           lastExecutionAt: null,
           updatedAt: new Date(),
-          // Initialize failure fields as null (not failed)
           failedAt: null,
           lastError: null,
           processingBy: null,
@@ -152,7 +170,7 @@ export async function POST(request: NextRequest) {
           .insertOne(scheduledPayment);
 
         console.log(
-          "✅ Enhanced scheduled payment created with ID:",
+          "✅ Enhanced scheduled payment created with smart contract, ID:",
           scheduleId
         );
 
@@ -162,8 +180,10 @@ export async function POST(request: NextRequest) {
           scheduledFor: firstExecution.toISOString(),
           nextExecution: firstExecution.toISOString(),
           enhancedAPI: true,
+          smartContract: true,
+          contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
           message:
-            "Scheduled payment created with Enhanced API for better gas efficiency",
+            "Scheduled payment created with Smart Contract for optimal gas efficiency and automatic tax handling",
         });
       } catch (error: any) {
         console.error("❌ Enhanced scheduled payment creation error:", error);
@@ -197,7 +217,6 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // STRICT: Do not execute failed payments
         if (scheduledPayment.status === "failed") {
           return NextResponse.json(
             { error: "Cannot execute a permanently failed payment" },
@@ -205,7 +224,6 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Only execute active payments
         if (scheduledPayment.status !== "active") {
           return NextResponse.json(
             {
@@ -216,7 +234,7 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(
-          "🚀 Executing scheduled payment with Enhanced API:",
+          "🚀 Executing scheduled payment with smart contract:",
           scheduleId
         );
 
@@ -253,11 +271,10 @@ export async function POST(request: NextRequest) {
             nextExecution
           );
 
-          // STRICT: Only update if payment is not failed
           await db.collection("schedules").updateOne(
             {
               scheduleId,
-              status: { $ne: "failed" }, // Only update if not failed
+              status: { $ne: "failed" },
             },
             {
               $set: {
@@ -270,6 +287,8 @@ export async function POST(request: NextRequest) {
                 processingStarted: null,
                 claimedBy: null,
                 claimedAt: null,
+                lastTransactionHash: executionResult.transactionHash,
+                lastExecutedWithSmartContract: true,
               },
               $push: {
                 executionHistory: {
@@ -279,28 +298,31 @@ export async function POST(request: NextRequest) {
                   actualCostETH: executionResult.actualCostETH,
                   actualCostUSD: executionResult.actualCostUSD,
                   enhancedAPI: true,
+                  smartContract: true,
                 },
               },
             }
           );
 
-          console.log("✅ Enhanced scheduled payment executed successfully");
+          console.log(
+            "✅ Enhanced scheduled payment executed successfully with smart contract"
+          );
 
           return NextResponse.json({
             success: true,
             executionResult: {
               ...executionResult,
               enhancedAPI: true,
+              smartContract: true,
             },
             nextExecution: nextExecution?.toISOString() || null,
             newStatus,
           });
         } else {
-          // STRICT: Mark as permanently failed - no retry
           await db.collection("schedules").updateOne(
             {
               scheduleId,
-              status: { $ne: "failed" }, // Only update if not already failed
+              status: { $ne: "failed" },
             },
             {
               $set: {
@@ -313,6 +335,7 @@ export async function POST(request: NextRequest) {
                 claimedBy: null,
                 claimedAt: null,
                 nextExecutionAt: null,
+                failedWithSmartContract: true,
               },
             }
           );
@@ -321,6 +344,7 @@ export async function POST(request: NextRequest) {
             {
               error: "Execution failed: " + executionResult.error,
               enhancedAPI: true,
+              smartContract: true,
             },
             { status: 500 }
           );
@@ -328,14 +352,13 @@ export async function POST(request: NextRequest) {
       } catch (error: any) {
         console.error("❌ Enhanced scheduled payment execution error:", error);
 
-        // STRICT: Mark as permanently failed on any execution error
         const { scheduleId } = body;
         if (scheduleId) {
           const { db } = await connectToDatabase();
           await db.collection("schedules").updateOne(
             {
               scheduleId,
-              status: { $ne: "failed" }, // Only update if not already failed
+              status: { $ne: "failed" },
             },
             {
               $set: {
@@ -348,6 +371,7 @@ export async function POST(request: NextRequest) {
                 claimedBy: null,
                 claimedAt: null,
                 nextExecutionAt: null,
+                failedWithSmartContract: true,
               },
             }
           );
@@ -357,6 +381,7 @@ export async function POST(request: NextRequest) {
           {
             error: "Execution failed: " + error.message,
             enhancedAPI: true,
+            smartContract: true,
           },
           { status: 500 }
         );
@@ -418,18 +443,24 @@ export async function GET(request: NextRequest) {
       ...payment,
       id: payment._id.toString(),
       enhancedAPI: payment.useEnhancedAPI || false,
+      smartContract: payment.smartContractEnabled || false,
       nextExecution: payment.nextExecutionAt,
-      // Clearly indicate failed status
       isFailed: payment.status === "failed",
       failureReason: payment.lastError || null,
       failedAt: payment.failedAt || null,
+      contractAddress:
+        payment.contractAddress || "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
     }));
 
-    console.log(`✅ Retrieved ${enrichedPayments.length} scheduled payments`);
+    console.log(
+      `✅ Retrieved ${enrichedPayments.length} scheduled payments with smart contract info`
+    );
 
     return NextResponse.json({
       scheduledPayments: enrichedPayments,
       enhancedAPISupported: true,
+      smartContractEnabled: true,
+      contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
     });
   } catch (error: any) {
     console.error("💥 Get scheduled payments error:", error);

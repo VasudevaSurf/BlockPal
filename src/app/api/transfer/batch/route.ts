@@ -1,11 +1,11 @@
-// src/app/api/transfer/batch/route.ts - FIXED: activeWallet reference error
+// src/app/api/transfer/batch/route.ts - UPDATED WITH SMART CONTRACT INTEGRATION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
 import { batchPaymentService, BatchPayment } from "@/lib/batch-payment-service";
 import crypto from "crypto";
 
-// FIXED: Updated decryption function that handles both old and new formats
+// Enhanced decryption function for stored private keys
 function decryptPrivateKey(encryptedData: any): string {
   try {
     console.log("🔓 Attempting to decrypt private key...", {
@@ -169,11 +169,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, payments, privateKey, fromAddress, useStoredKey } = body;
 
-    console.log("🔄 Batch transfer API request:", {
+    console.log("🔄 Enhanced batch transfer API request with smart contract:", {
       action,
       paymentsCount: payments?.length,
-      fromAddress: fromAddress?.slice(0, 10) + "...", // FIXED: Log fromAddress for debugging
+      fromAddress: fromAddress?.slice(0, 10) + "...",
       useStoredKey,
+      smartContract: true,
     });
 
     // Validate required fields
@@ -182,7 +183,7 @@ export async function POST(request: NextRequest) {
       !payments ||
       !Array.isArray(payments) ||
       payments.length === 0 ||
-      !fromAddress // FIXED: Ensure fromAddress is provided
+      !fromAddress
     ) {
       return NextResponse.json(
         {
@@ -231,9 +232,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "preview") {
-      // Create batch transfer preview
+      // Create batch transfer preview with smart contract
       try {
-        console.log("📊 Creating batch transfer preview...");
+        console.log(
+          "📊 Creating enhanced batch transfer preview with smart contract..."
+        );
 
         // Format payments with proper structure
         const formattedPayments: BatchPayment[] = payments.map(
@@ -259,21 +262,33 @@ export async function POST(request: NextRequest) {
           fromAddress
         );
 
-        console.log("✅ Batch preview created successfully");
+        console.log(
+          "✅ Enhanced batch preview created successfully with smart contract"
+        );
 
         return NextResponse.json({
           success: true,
-          preview,
+          preview: {
+            ...preview,
+            smartContract: true,
+            contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+            enhancedFeatures: [
+              "Automatic tax calculation and handling",
+              "Optimized gas usage with batching",
+              "Smart contract security",
+              "Lower transaction fees",
+            ],
+          },
         });
       } catch (error: any) {
-        console.error("❌ Preview creation error:", error);
+        console.error("❌ Enhanced preview creation error:", error);
         return NextResponse.json(
           { error: "Failed to create preview: " + error.message },
           { status: 500 }
         );
       }
     } else if (action === "execute") {
-      // Execute batch transfer
+      // Execute batch transfer with smart contract
       let executionPrivateKey = privateKey;
 
       // If no private key provided or useStoredKey is true, try to get from database
@@ -304,7 +319,7 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // Decrypt the private key using the fixed function
+          // Decrypt the private key using the enhanced function
           executionPrivateKey = decryptPrivateKey(wallet.encryptedPrivateKey);
 
           // Validate the decrypted private key
@@ -314,7 +329,7 @@ export async function POST(request: NextRequest) {
 
           // Log the access for security audit
           console.log(
-            `🔑 Private key retrieved for batch transfer from wallet ${fromAddress} by user ${decoded.username}`
+            `🔑 Private key retrieved for enhanced batch transfer from wallet ${fromAddress} by user ${decoded.username}`
           );
 
           // Update last used timestamp
@@ -324,6 +339,7 @@ export async function POST(request: NextRequest) {
               $set: {
                 lastUsedAt: new Date(),
                 lastPrivateKeyAccess: new Date(),
+                lastUsedForSmartContract: true,
               },
             }
           );
@@ -343,7 +359,6 @@ export async function POST(request: NextRequest) {
               { status: 500 }
             );
           }
-          // If manual private key is provided, continue with that
           executionPrivateKey = privateKey;
         }
       }
@@ -356,7 +371,9 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        console.log("🚀 Executing batch transfer...");
+        console.log(
+          "🚀 Executing enhanced batch transfer with smart contract..."
+        );
 
         // Format payments with proper structure
         const formattedPayments: BatchPayment[] = payments.map(
@@ -383,20 +400,23 @@ export async function POST(request: NextRequest) {
         );
 
         if (result.success) {
-          console.log("✅ Batch transfer successful:", result.transactionHash);
+          console.log(
+            "✅ Enhanced batch transfer successful with smart contract:",
+            result.transactionHash
+          );
 
           // Calculate actual costs if available
           if (result.gasUsed) {
             const gasPrice = await batchPaymentService.getCurrentGasPrice();
             const gasPriceWei = parseFloat(gasPrice) * 1e9; // Convert Gwei to Wei
             const actualCostETH = (result.gasUsed * gasPriceWei) / 1e18;
-            const ethPriceUSD = 2000; // Get from price API
+            const ethPriceUSD = 3500; // Get from price API
             const actualCostUSD = actualCostETH * ethPriceUSD;
 
             result.actualGasSavings = actualCostUSD.toFixed(2);
           }
 
-          // FIXED: Save batch transaction to database directly using transactionService
+          // Save enhanced batch transaction to database
           try {
             const { transactionService } = await import(
               "@/lib/transaction-service"
@@ -417,6 +437,9 @@ export async function POST(request: NextRequest) {
               actualCostETH: result.actualCostETH,
               actualCostUSD: result.actualCostUSD,
               explorerUrl: result.explorerUrl,
+              smartContract: true,
+              contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+              taxPaid: result.actualTaxPaid,
               transfers: formattedPayments.map((payment) => ({
                 recipient: payment.recipient,
                 tokenSymbol: payment.tokenInfo.symbol,
@@ -432,33 +455,50 @@ export async function POST(request: NextRequest) {
             );
 
             if (saveResult.success) {
-              console.log("✅ Batch transaction saved to database");
+              console.log("✅ Enhanced batch transaction saved to database");
             } else {
               console.warn(
-                "⚠️ Failed to save batch transaction to database:",
+                "⚠️ Failed to save enhanced batch transaction to database:",
                 saveResult.error
               );
             }
           } catch (saveError) {
-            console.error("❌ Error saving batch transaction:", saveError);
+            console.error(
+              "❌ Error saving enhanced batch transaction:",
+              saveError
+            );
             // Don't fail the whole transaction for this
           }
 
           return NextResponse.json({
             success: true,
-            result,
+            result: {
+              ...result,
+              smartContract: true,
+              contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+              enhancedFeatures: [
+                "Smart contract execution",
+                "Automatic tax handling",
+                "Optimized gas usage",
+                "Enhanced security",
+              ],
+            },
           });
         } else {
-          console.error("❌ Batch transfer failed:", result.error);
+          console.error("❌ Enhanced batch transfer failed:", result.error);
           return NextResponse.json(
-            { error: result.error || "Batch transfer execution failed" },
+            {
+              error: result.error || "Enhanced batch transfer execution failed",
+            },
             { status: 500 }
           );
         }
       } catch (error: any) {
-        console.error("❌ Batch transfer execution error:", error);
+        console.error("❌ Enhanced batch transfer execution error:", error);
         return NextResponse.json(
-          { error: "Batch transfer execution failed: " + error.message },
+          {
+            error: "Enhanced batch transfer execution failed: " + error.message,
+          },
           { status: 500 }
         );
       }
@@ -469,7 +509,7 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error: any) {
-    console.error("💥 Batch transfer API error:", error);
+    console.error("💥 Enhanced batch transfer API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -1,143 +1,29 @@
-// src/lib/batch-payment-service.ts (PRODUCTION VERSION)
+// src/lib/batch-payment-service.ts - UPDATED WITH SMART CONTRACT INTEGRATION
 import { ethers } from "ethers";
 
-const SEPOLIA_BATCH_CONTRACT_CONFIG = {
-  address: "0xf36aA894c9dA5CbD342Ec4C3574d876A0832b69b",
+const ALCHEMY_API_KEY =
+  process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "EH1H6OhzYUtjjHCYJ49zv43ILefPyF0X";
+const COINGECKO_API_KEY =
+  process.env.NEXT_PUBLIC_COINGECKO_API_KEY || "CG-JxUrd1Y1MHtzK2LSkonPTam9";
+
+// Smart Contract Configuration
+const CONTRACT_CONFIG = {
+  address: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
   abi: [
-    {
-      inputs: [
-        { internalType: "address[]", name: "recipients", type: "address[]" },
-        { internalType: "uint256[]", name: "amounts", type: "uint256[]" },
-        { internalType: "uint256", name: "_deadline", type: "uint256" },
-      ],
-      name: "batchETHTransfer",
-      outputs: [],
-      stateMutability: "payable",
-      type: "function",
-    },
-    {
-      inputs: [
-        { internalType: "address", name: "token", type: "address" },
-        { internalType: "address[]", name: "recipients", type: "address[]" },
-        { internalType: "uint256[]", name: "amounts", type: "uint256[]" },
-        { internalType: "uint256", name: "_deadline", type: "uint256" },
-      ],
-      name: "batchERC20Transfer",
-      outputs: [],
-      stateMutability: "nonpayable",
-      type: "function",
-    },
-    {
-      inputs: [
-        {
-          components: [
-            { internalType: "address", name: "recipient", type: "address" },
-            { internalType: "address", name: "token", type: "address" },
-            { internalType: "uint256", name: "amount", type: "uint256" },
-          ],
-          internalType: "struct DecentralizedPaymentSystem.MixedPayment[]",
-          name: "payments",
-          type: "tuple[]",
-        },
-        { internalType: "uint256", name: "_deadline", type: "uint256" },
-      ],
-      name: "batchMixedTransfer",
-      outputs: [],
-      stateMutability: "payable",
-      type: "function",
-    },
-    {
-      inputs: [{ internalType: "uint256", name: "batchSize", type: "uint256" }],
-      name: "estimateBatchETHGas",
-      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-      stateMutability: "pure",
-      type: "function",
-    },
-    {
-      inputs: [{ internalType: "uint256", name: "batchSize", type: "uint256" }],
-      name: "estimateBatchERC20Gas",
-      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-      stateMutability: "pure",
-      type: "function",
-    },
-    {
-      inputs: [{ internalType: "uint256", name: "batchSize", type: "uint256" }],
-      name: "estimateBatchMixedGas",
-      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-      stateMutability: "pure",
-      type: "function",
-    },
-    {
-      inputs: [
-        { internalType: "uint256", name: "batchSize", type: "uint256" },
-        { internalType: "string", name: "transferType", type: "string" },
-      ],
-      name: "estimateGasSavings",
-      outputs: [
-        { internalType: "uint256", name: "individual", type: "uint256" },
-        { internalType: "uint256", name: "batch", type: "uint256" },
-        { internalType: "uint256", name: "savings", type: "uint256" },
-        { internalType: "uint256", name: "savingsPercent", type: "uint256" },
-      ],
-      stateMutability: "pure",
-      type: "function",
-    },
+    "function batchETHTransfer((address recipient, uint96 amount)[] transfers, uint256 _deadline) external payable",
+    "function batchERC20Transfer(address token, (address recipient, uint96 amount)[] transfers, uint256 taxInETH, uint256 _deadline) external payable",
+    "function batchMixedTransfer((address recipient, address token, uint96 amount)[] payments, uint256 taxInETH, uint256 _deadline) external payable",
+    "function calculateETHTax(uint256 amount) external pure returns (uint256)",
   ],
 };
 
 const ERC20_ABI = [
-  {
-    inputs: [{ internalType: "address", name: "account", type: "address" }],
-    name: "balanceOf",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "decimals",
-    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "name",
-    outputs: [{ internalType: "string", name: "", type: "string" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "symbol",
-    outputs: [{ internalType: "string", name: "", type: "string" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      { internalType: "address", name: "owner", type: "address" },
-      { internalType: "address", name: "spender", type: "address" },
-    ],
-    name: "allowance",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      { internalType: "address", name: "spender", type: "address" },
-      { internalType: "uint256", name: "amount", type: "uint256" },
-    ],
-    name: "approve",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
+  "function balanceOf(address owner) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
 ];
-
-const ALCHEMY_API_KEY =
-  process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "EH1H6OhzYUtjjHCYJ49zv43ILefPyF0X";
 
 export interface BatchPayment {
   id: string;
@@ -155,7 +41,7 @@ export interface BatchPayment {
 
 export interface BatchTransferPreview {
   transfers: BatchPayment[];
-  transferMode: "BATCH" | "MIXED";
+  transferMode: "BATCH_ETH" | "BATCH_ERC20" | "MIXED";
   totalETHValue: string;
   totalUSDValue: number;
   gasEstimation: {
@@ -166,7 +52,19 @@ export interface BatchTransferPreview {
     gasCostETH: string;
     gasCostUSD: string;
   };
+  taxEstimation: {
+    totalTaxETH: string;
+    totalTaxUSD: string;
+    breakdown: Array<{
+      tokenSymbol: string;
+      taxETH: string;
+      taxUSD: string;
+    }>;
+  };
+  totalCostETH: string;
+  totalCostUSD: string;
   network: string;
+  contractAddress: string;
 }
 
 export interface BatchTransferResult {
@@ -179,60 +77,27 @@ export interface BatchTransferResult {
   approvalTxHashes?: string[];
   totalTransfers?: number;
   actualGasSavings?: string;
+  actualTaxPaid?: string;
   error?: string;
   executionTimeSeconds?: number;
 }
 
 export class BatchPaymentService {
   private provider: ethers.JsonRpcProvider;
-  private sepoliaProvider: ethers.JsonRpcProvider;
   private contract: ethers.Contract;
-  private sepoliaContract: ethers.Contract;
+  private taxRate = 0.005; // 0.5%
 
   constructor() {
-    // Mainnet provider and contract
     this.provider = new ethers.JsonRpcProvider(
       `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
     );
-
-    // Sepolia provider and contract for testing
-    this.sepoliaProvider = new ethers.JsonRpcProvider(
-      `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-    );
-
     this.contract = new ethers.Contract(
-      SEPOLIA_BATCH_CONTRACT_CONFIG.address,
-      SEPOLIA_BATCH_CONTRACT_CONFIG.abi,
+      CONTRACT_CONFIG.address,
+      CONTRACT_CONFIG.abi,
       this.provider
     );
-
-    this.sepoliaContract = new ethers.Contract(
-      SEPOLIA_BATCH_CONTRACT_CONFIG.address,
-      SEPOLIA_BATCH_CONTRACT_CONFIG.abi,
-      this.sepoliaProvider
-    );
   }
 
-  // Get appropriate provider and contract based on network
-  private getProviderAndContract(useTestnet: boolean = false) {
-    if (useTestnet) {
-      return {
-        provider: this.sepoliaProvider,
-        contract: this.sepoliaContract,
-        explorerUrl: "https://sepolia.etherscan.io",
-        networkName: "Sepolia Testnet",
-      };
-    } else {
-      return {
-        provider: this.provider,
-        contract: this.contract,
-        explorerUrl: "https://etherscan.io",
-        networkName: "Ethereum Mainnet",
-      };
-    }
-  }
-
-  // Validate batch payments
   validateBatchPayments(payments: BatchPayment[]): {
     isValid: boolean;
     errors: string[];
@@ -278,40 +143,27 @@ export class BatchPaymentService {
     };
   }
 
-  // Determine transfer mode
-  getTransferMode(payments: BatchPayment[]): "BATCH" | "MIXED" {
-    const uniqueTokens = new Set(
-      payments.map((p) => p.tokenInfo.contractAddress)
-    );
-    return uniqueTokens.size === 1 ? "BATCH" : "MIXED";
-  }
+  getTransferMode(
+    payments: BatchPayment[]
+  ): "BATCH_ETH" | "BATCH_ERC20" | "MIXED" {
+    const ethPayments = payments.filter((p) => p.tokenInfo.isETH);
+    const erc20Payments = payments.filter((p) => !p.tokenInfo.isETH);
 
-  // Convert amount to token units
-  convertToTokenUnits(
-    amount: string,
-    tokenInfo: BatchPayment["tokenInfo"]
-  ): string {
-    if (tokenInfo.isETH) {
-      return ethers.parseEther(amount).toString();
+    if (ethPayments.length === payments.length) {
+      return "BATCH_ETH";
+    } else if (erc20Payments.length === payments.length) {
+      const uniqueTokens = new Set(
+        erc20Payments.map((p) => p.tokenInfo.contractAddress)
+      );
+      return uniqueTokens.size === 1 ? "BATCH_ERC20" : "MIXED";
     } else {
-      return ethers.parseUnits(amount, tokenInfo.decimals).toString();
+      return "MIXED";
     }
   }
 
-  // Calculate total ETH needed for mixed transfers
-  calculateETHNeeded(payments: BatchPayment[]): string {
-    const totalETH = payments
-      .filter((p) => p.tokenInfo.isETH)
-      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-
-    return ethers.parseEther(totalETH.toString()).toString();
-  }
-
-  // Create batch transfer preview
   async createBatchPreview(
     payments: BatchPayment[],
-    fromAddress: string,
-    useTestnet: boolean = false
+    fromAddress: string
   ): Promise<BatchTransferPreview> {
     const validation = this.validateBatchPayments(payments);
     if (!validation.isValid) {
@@ -323,106 +175,370 @@ export class BatchPaymentService {
 
     // Calculate totals
     const totalUSDValue = payments.reduce((sum, p) => sum + p.usdValue, 0);
-    const totalETHValue = this.calculateETHNeeded(payments);
+    const ethPayments = payments.filter((p) => p.tokenInfo.isETH);
+    const totalETHValue = ethPayments.reduce(
+      (sum, p) => sum + parseFloat(p.amount),
+      0
+    );
 
-    const { provider, networkName } = this.getProviderAndContract(useTestnet);
+    // Calculate tax for each payment
+    const taxBreakdown = await Promise.all(
+      payments.map(async (payment) => {
+        const { taxETH, taxUSD } = await this.calculatePaymentTax(payment);
+        return {
+          tokenSymbol: payment.tokenInfo.symbol,
+          taxETH,
+          taxUSD,
+        };
+      })
+    );
+
+    const totalTaxETH = taxBreakdown.reduce(
+      (sum, tax) => sum + parseFloat(tax.taxETH),
+      0
+    );
+    const totalTaxUSD = taxBreakdown.reduce(
+      (sum, tax) => sum + parseFloat(tax.taxUSD),
+      0
+    );
 
     // Get gas estimation
-    let transferType: string;
-    if (transferMode === "BATCH") {
-      transferType = payments[0].tokenInfo.isETH ? "ETH" : "ERC20";
-    } else {
-      transferType = "MIXED";
-    }
+    const gasEstimation = await this.estimateBatchGas(payments, fromAddress);
+
+    // Calculate total cost
+    const gasCostETH = parseFloat(gasEstimation.gasCostETH);
+    const totalCostETH = (gasCostETH + totalTaxETH).toFixed(8);
+    const ethPrice = await this.getETHPrice();
+    const totalCostUSD = (parseFloat(totalCostETH) * ethPrice).toFixed(2);
+
+    return {
+      transfers: payments,
+      transferMode,
+      totalETHValue: totalETHValue.toString(),
+      totalUSDValue,
+      gasEstimation,
+      taxEstimation: {
+        totalTaxETH: totalTaxETH.toFixed(8),
+        totalTaxUSD: totalTaxUSD.toFixed(2),
+        breakdown: taxBreakdown,
+      },
+      totalCostETH,
+      totalCostUSD,
+      network: "Ethereum Mainnet",
+      contractAddress: CONTRACT_CONFIG.address,
+    };
+  }
+
+  async executeBatchTransfer(
+    payments: BatchPayment[],
+    privateKey: string
+  ): Promise<BatchTransferResult> {
+    const startTime = Date.now();
 
     try {
-      const contract = useTestnet ? this.sepoliaContract : this.contract;
-      const gasEstimate = await contract.estimateGasSavings(
-        batchSize,
-        transferType
-      );
-      const gasPrice = await provider.getFeeData();
-      const gasPriceWei = gasPrice.gasPrice || ethers.parseUnits("20", "gwei");
+      console.log("🚀 Starting enhanced batch transfer with smart contract...");
 
-      const batchGasCost = BigInt(gasEstimate.batch) * gasPriceWei;
-      const gasCostETH = ethers.formatEther(batchGasCost);
-      const ethPriceUSD = useTestnet ? 2000 : 2500; // Mock price for testnet
-      const gasCostUSD = parseFloat(gasCostETH) * ethPriceUSD;
+      const transferMode = this.getTransferMode(payments);
+      const wallet = new ethers.Wallet(privateKey, this.provider);
+      const contractWithSigner = this.contract.connect(wallet);
+
+      // Handle approvals for ERC20 tokens
+      const approvalResult = await this.handleTokenApprovals(
+        payments,
+        privateKey
+      );
+      if (!approvalResult.success) {
+        return {
+          success: false,
+          error: approvalResult.error,
+          approvalTxHashes: approvalResult.approvalTxHashes,
+        };
+      }
+
+      const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+      let tx: ethers.ContractTransactionResponse;
+
+      if (transferMode === "BATCH_ETH") {
+        console.log("💰 Executing ETH batch transfer with tax...");
+
+        const transfers = payments.map((payment) => ({
+          recipient: payment.recipient,
+          amount: ethers.parseEther(payment.amount),
+        }));
+
+        // Calculate total amount including tax
+        const totalAmount = payments.reduce(
+          (sum, p) => sum + parseFloat(p.amount),
+          0
+        );
+        const totalAmountWei = ethers.parseEther(totalAmount.toString());
+        const totalTaxWei = await this.contract.calculateETHTax(totalAmountWei);
+        const totalValueWei = totalAmountWei + totalTaxWei;
+
+        tx = await contractWithSigner.batchETHTransfer(transfers, deadline, {
+          value: totalValueWei,
+        });
+      } else if (transferMode === "BATCH_ERC20") {
+        console.log("🪙 Executing ERC20 batch transfer with tax...");
+
+        const firstPayment = payments[0];
+        const transfers = payments.map((payment) => ({
+          recipient: payment.recipient,
+          amount: ethers.parseUnits(payment.amount, payment.tokenInfo.decimals),
+        }));
+
+        // Calculate total tax in ETH for ERC20 batch
+        const totalTaxETH = await this.calculateBatchTaxETH(payments);
+        const taxWei = ethers.parseEther(totalTaxETH);
+
+        tx = await contractWithSigner.batchERC20Transfer(
+          firstPayment.tokenInfo.contractAddress,
+          transfers,
+          taxWei,
+          deadline,
+          {
+            value: taxWei,
+          }
+        );
+      } else {
+        console.log("🔄 Executing mixed batch transfer with tax...");
+
+        const mixedPayments = payments.map((payment) => ({
+          recipient: payment.recipient,
+          token: payment.tokenInfo.isETH
+            ? "0x0000000000000000000000000000000000000000"
+            : payment.tokenInfo.contractAddress,
+          amount: payment.tokenInfo.isETH
+            ? ethers.parseEther(payment.amount)
+            : ethers.parseUnits(payment.amount, payment.tokenInfo.decimals),
+        }));
+
+        // Calculate ETH needed for mixed batch (ETH transfers + taxes)
+        const ethTransfers = payments.filter((p) => p.tokenInfo.isETH);
+        const totalETHTransfers = ethTransfers.reduce(
+          (sum, p) => sum + parseFloat(p.amount),
+          0
+        );
+        const totalTaxETH = await this.calculateBatchTaxETH(payments);
+        const totalETHNeeded = totalETHTransfers + parseFloat(totalTaxETH);
+        const totalETHWei = ethers.parseEther(totalETHNeeded.toString());
+
+        const taxWei = ethers.parseEther(totalTaxETH);
+
+        tx = await contractWithSigner.batchMixedTransfer(
+          mixedPayments,
+          taxWei,
+          deadline,
+          {
+            value: totalETHWei,
+          }
+        );
+      }
+
+      console.log("⏳ Waiting for batch transaction confirmation...");
+      const receipt = await tx.wait();
+
+      if (!receipt || receipt.status !== 1) {
+        throw new Error("Batch transaction failed or was reverted");
+      }
+
+      const endTime = Date.now();
+      const executionTimeSeconds = Math.round((endTime - startTime) / 1000);
+
+      // Calculate actual costs
+      const gasUsed = Number(receipt.gasUsed);
+      const gasPrice = receipt.gasPrice || tx.gasPrice;
+      const actualGasCostWei = BigInt(gasUsed) * gasPrice;
+      const actualGasCostETH = ethers.formatEther(actualGasCostWei);
+
+      const ethPrice = await this.getETHPrice();
+      const actualCostUSD = (parseFloat(actualGasCostETH) * ethPrice).toFixed(
+        2
+      );
+
+      console.log("✅ Enhanced batch transfer completed successfully!");
 
       return {
-        transfers: payments,
+        success: true,
+        transactionHash: receipt.hash,
+        gasUsed,
+        blockNumber: receipt.blockNumber,
+        explorerUrl: `https://etherscan.io/tx/${receipt.hash}`,
         transferMode,
-        totalETHValue: ethers.formatEther(totalETHValue),
-        totalUSDValue,
-        gasEstimation: {
-          batchGas: gasEstimate.batch.toString(),
-          individualGas: gasEstimate.individual.toString(),
-          gasSavings: gasEstimate.savings.toString(),
-          savingsPercent: gasEstimate.savingsPercent.toString(),
-          gasCostETH: gasCostETH,
-          gasCostUSD: gasCostUSD.toFixed(2),
-        },
-        network: networkName,
+        approvalTxHashes: approvalResult.approvalTxHashes,
+        totalTransfers: payments.length,
+        executionTimeSeconds,
       };
-    } catch (error) {
-      console.error("Error getting gas estimation:", error);
+    } catch (error: any) {
+      const endTime = Date.now();
+      const executionTimeSeconds = Math.round((endTime - startTime) / 1000);
 
-      // Fallback gas estimation
-      const estimatedBatchGas =
-        batchSize <= 5 ? "150000" : (batchSize * 25000).toString();
-      const estimatedIndividualGas = (batchSize * 21000).toString();
-      const savings =
-        parseInt(estimatedIndividualGas) - parseInt(estimatedBatchGas);
-      const savingsPercent = Math.round(
-        (savings / parseInt(estimatedIndividualGas)) * 100
-      );
-
-      const gasPrice = await provider.getFeeData();
-      const gasPriceWei = gasPrice.gasPrice || ethers.parseUnits("20", "gwei");
-      const batchGasCost = BigInt(estimatedBatchGas) * gasPriceWei;
-      const gasCostETH = ethers.formatEther(batchGasCost);
-      const ethPriceUSD = useTestnet ? 2000 : 2500;
-      const gasCostUSD = parseFloat(gasCostETH) * ethPriceUSD;
+      console.error("❌ Enhanced batch transfer failed:", error);
 
       return {
-        transfers: payments,
-        transferMode,
-        totalETHValue: ethers.formatEther(totalETHValue),
-        totalUSDValue,
-        gasEstimation: {
-          batchGas: estimatedBatchGas,
-          individualGas: estimatedIndividualGas,
-          gasSavings: savings.toString(),
-          savingsPercent: savingsPercent.toString(),
-          gasCostETH: gasCostETH,
-          gasCostUSD: gasCostUSD.toFixed(2),
-        },
-        network: networkName,
+        success: false,
+        error: error.message || "Batch transfer execution failed",
+        executionTimeSeconds,
       };
     }
   }
 
-  // Check and approve ERC20 tokens for batch transfer
-  async checkAndApproveTokens(
+  private async calculatePaymentTax(
+    payment: BatchPayment
+  ): Promise<{ taxETH: string; taxUSD: string }> {
+    try {
+      if (payment.tokenInfo.isETH) {
+        const amountWei = ethers.parseEther(payment.amount);
+        const taxWei = await this.contract.calculateETHTax(amountWei);
+        const taxETH = ethers.formatEther(taxWei);
+
+        const ethPrice = await this.getETHPrice();
+        const taxUSD = (parseFloat(taxETH) * ethPrice).toFixed(2);
+
+        return { taxETH, taxUSD };
+      } else {
+        // For ERC20 tokens, calculate tax in USD then convert to ETH
+        const taxUSD = payment.usdValue * this.taxRate;
+        const ethPrice = await this.getETHPrice();
+        const taxETH = (taxUSD / ethPrice).toFixed(8);
+
+        return { taxETH, taxUSD: taxUSD.toFixed(2) };
+      }
+    } catch (error) {
+      console.error("Error calculating payment tax:", error);
+      return { taxETH: "0.001", taxUSD: "3.50" };
+    }
+  }
+
+  private async calculateBatchTaxETH(
+    payments: BatchPayment[]
+  ): Promise<string> {
+    let totalTaxETH = 0;
+
+    for (const payment of payments) {
+      const { taxETH } = await this.calculatePaymentTax(payment);
+      totalTaxETH += parseFloat(taxETH);
+    }
+
+    return totalTaxETH.toFixed(8);
+  }
+
+  private async estimateBatchGas(
     payments: BatchPayment[],
-    privateKey: string,
-    useTestnet: boolean = false
+    fromAddress: string
+  ): Promise<{
+    batchGas: string;
+    individualGas: string;
+    gasSavings: string;
+    savingsPercent: string;
+    gasCostETH: string;
+    gasCostUSD: string;
+  }> {
+    try {
+      const transferMode = this.getTransferMode(payments);
+
+      // Estimate gas for batch transaction
+      let batchGasEstimate: bigint;
+
+      if (transferMode === "BATCH_ETH") {
+        const transfers = payments.map((p) => ({
+          recipient: p.recipient,
+          amount: ethers.parseEther(p.amount),
+        }));
+        const totalAmount = payments.reduce(
+          (sum, p) => sum + parseFloat(p.amount),
+          0
+        );
+        const totalAmountWei = ethers.parseEther(totalAmount.toString());
+        const totalTaxWei = await this.contract.calculateETHTax(totalAmountWei);
+        const totalValueWei = totalAmountWei + totalTaxWei;
+
+        batchGasEstimate = await this.contract.batchETHTransfer.estimateGas(
+          transfers,
+          Math.floor(Date.now() / 1000) + 3600,
+          { value: totalValueWei }
+        );
+      } else {
+        // For ERC20 and mixed, use higher estimate
+        batchGasEstimate = BigInt(payments.length * 85000 + 50000);
+      }
+
+      // Calculate individual transaction gas
+      const individualGasPerTx = BigInt(21000); // Basic ETH transfer
+      const totalIndividualGas = individualGasPerTx * BigInt(payments.length);
+
+      // Add 20% buffer to batch estimate
+      const batchGasWithBuffer = (batchGasEstimate * BigInt(120)) / BigInt(100);
+
+      // Calculate savings
+      const gasSavings =
+        totalIndividualGas > batchGasWithBuffer
+          ? totalIndividualGas - batchGasWithBuffer
+          : BigInt(0);
+
+      const savingsPercent =
+        totalIndividualGas > BigInt(0)
+          ? Number((gasSavings * BigInt(100)) / totalIndividualGas)
+          : 0;
+
+      // Get current gas price and calculate costs
+      const feeData = await this.provider.getFeeData();
+      const gasPrice = feeData.gasPrice || ethers.parseUnits("20", "gwei");
+
+      const gasCostWei = batchGasWithBuffer * gasPrice;
+      const gasCostETH = ethers.formatEther(gasCostWei);
+
+      const ethPrice = await this.getETHPrice();
+      const gasCostUSD = (parseFloat(gasCostETH) * ethPrice).toFixed(2);
+
+      return {
+        batchGas: batchGasWithBuffer.toString(),
+        individualGas: totalIndividualGas.toString(),
+        gasSavings: gasSavings.toString(),
+        savingsPercent: savingsPercent.toString(),
+        gasCostETH,
+        gasCostUSD,
+      };
+    } catch (error) {
+      console.error("Error estimating batch gas:", error);
+
+      // Fallback calculation
+      const batchGas = payments.length * 25000 + 100000;
+      const individualGas = payments.length * 21000;
+      const savings = Math.max(0, individualGas - batchGas);
+      const savingsPercent =
+        individualGas > 0 ? Math.round((savings / individualGas) * 100) : 0;
+
+      return {
+        batchGas: batchGas.toString(),
+        individualGas: individualGas.toString(),
+        gasSavings: savings.toString(),
+        savingsPercent: savingsPercent.toString(),
+        gasCostETH: "0.005",
+        gasCostUSD: "17.50",
+      };
+    }
+  }
+
+  private async handleTokenApprovals(
+    payments: BatchPayment[],
+    privateKey: string
   ): Promise<{ success: boolean; approvalTxHashes: string[]; error?: string }> {
-    const { provider } = this.getProviderAndContract(useTestnet);
-    const wallet = new ethers.Wallet(privateKey, provider);
+    const wallet = new ethers.Wallet(privateKey, this.provider);
     const approvalTxHashes: string[] = [];
 
-    // Group payments by token contract
+    // Group ERC20 payments by token contract
     const tokenAmounts = new Map<
       string,
-      { tokenInfo: BatchPayment["tokenInfo"]; totalAmount: bigint }
+      { tokenInfo: any; totalAmount: bigint }
     >();
 
     for (const payment of payments) {
       if (!payment.tokenInfo.isETH) {
         const address = payment.tokenInfo.contractAddress;
-        const amount = BigInt(
-          this.convertToTokenUnits(payment.amount, payment.tokenInfo)
+        const amount = ethers.parseUnits(
+          payment.amount,
+          payment.tokenInfo.decimals
         );
 
         if (tokenAmounts.has(address)) {
@@ -446,26 +562,19 @@ export class BatchPaymentService {
           wallet
         );
 
-        // Check current allowance
         const currentAllowance = await tokenContract.allowance(
           wallet.address,
-          SEPOLIA_BATCH_CONTRACT_CONFIG.address
+          CONTRACT_CONFIG.address
         );
 
         if (currentAllowance < totalAmount) {
-          console.log(
-            `Approving ${tokenInfo.symbol} for ${ethers.formatUnits(
-              totalAmount,
-              tokenInfo.decimals
-            )}`
-          );
+          console.log(`🔐 Approving ${tokenInfo.symbol} for batch transfer...`);
 
           const approveTx = await tokenContract.approve(
-            SEPOLIA_BATCH_CONTRACT_CONFIG.address,
+            CONTRACT_CONFIG.address,
             totalAmount
           );
 
-          console.log(`Approval transaction sent: ${approveTx.hash}`);
           const receipt = await approveTx.wait();
 
           if (receipt?.status === 1) {
@@ -501,302 +610,35 @@ export class BatchPaymentService {
     };
   }
 
-  // Execute batch transfer
-  async executeBatchTransfer(
-    payments: BatchPayment[],
-    privateKey: string,
-    useTestnet: boolean = false
-  ): Promise<BatchTransferResult> {
-    const startTime = Date.now();
-
+  private async getETHPrice(): Promise<number> {
     try {
-      console.log("🚀 Starting batch transfer execution...");
-
-      const transferMode = this.getTransferMode(payments);
-      const { provider, contract, explorerUrl } =
-        this.getProviderAndContract(useTestnet);
-      const wallet = new ethers.Wallet(privateKey, provider);
-      const contractWithSigner = contract.connect(wallet);
-
-      // Handle approvals for ERC20 tokens
-      const approvalResult = await this.checkAndApproveTokens(
-        payments,
-        privateKey,
-        useTestnet
-      );
-      if (!approvalResult.success) {
-        return {
-          success: false,
-          error: approvalResult.error,
-          approvalTxHashes: approvalResult.approvalTxHashes,
-        };
-      }
-
-      const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
-      let tx: ethers.ContractTransactionResponse;
-
-      if (transferMode === "BATCH") {
-        // Same token batch transfer
-        const firstPayment = payments[0];
-        const recipients = payments.map((p) => p.recipient);
-        const amounts = payments.map((p) =>
-          this.convertToTokenUnits(p.amount, p.tokenInfo)
-        );
-
-        if (firstPayment.tokenInfo.isETH) {
-          console.log("📤 Executing ETH batch transfer...");
-          const totalValue = amounts.reduce(
-            (sum, amount) => (BigInt(sum) + BigInt(amount)).toString(),
-            "0"
-          );
-
-          tx = await contractWithSigner.batchETHTransfer(
-            recipients,
-            amounts,
-            deadline,
-            {
-              value: totalValue,
-            }
-          );
-        } else {
-          console.log(
-            `📤 Executing ${firstPayment.tokenInfo.symbol} batch transfer...`
-          );
-
-          tx = await contractWithSigner.batchERC20Transfer(
-            firstPayment.tokenInfo.contractAddress,
-            recipients,
-            amounts,
-            deadline
-          );
+      const response = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
+        {
+          headers: {
+            "X-CG-Demo-API-Key": COINGECKO_API_KEY,
+          },
         }
-      } else {
-        // Mixed token batch transfer
-        console.log("📤 Executing mixed token batch transfer...");
-
-        const mixedPayments = payments.map((payment) => ({
-          recipient: payment.recipient,
-          token: payment.tokenInfo.isETH
-            ? "0x0000000000000000000000000000000000000000"
-            : payment.tokenInfo.contractAddress,
-          amount: this.convertToTokenUnits(payment.amount, payment.tokenInfo),
-        }));
-
-        const totalETHNeeded = this.calculateETHNeeded(payments);
-
-        tx = await contractWithSigner.batchMixedTransfer(
-          mixedPayments,
-          deadline,
-          {
-            value: totalETHNeeded,
-          }
-        );
-      }
-
-      console.log("⏳ Waiting for transaction confirmation...");
-      const receipt = await tx.wait();
-
-      if (!receipt || receipt.status !== 1) {
-        throw new Error("Transaction failed or was reverted");
-      }
-
-      const endTime = Date.now();
-      const executionTimeSeconds = Math.round((endTime - startTime) / 1000);
-
-      console.log("✅ Batch transfer completed successfully!");
-
-      return {
-        success: true,
-        transactionHash: receipt.hash,
-        gasUsed: Number(receipt.gasUsed),
-        blockNumber: receipt.blockNumber,
-        explorerUrl: `${explorerUrl}/tx/${receipt.hash}`,
-        transferMode,
-        approvalTxHashes: approvalResult.approvalTxHashes,
-        totalTransfers: payments.length,
-        executionTimeSeconds,
-      };
-    } catch (error: any) {
-      const endTime = Date.now();
-      const executionTimeSeconds = Math.round((endTime - startTime) / 1000);
-
-      console.error("❌ Batch transfer failed:", error);
-
-      return {
-        success: false,
-        error: error.message || "Batch transfer execution failed",
-        executionTimeSeconds,
-      };
+      );
+      const data = await response.json();
+      return data.ethereum?.usd || 3500;
+    } catch (error) {
+      return 3500;
     }
   }
 
-  // Validate Ethereum address
   isValidAddress(address: string): boolean {
     return ethers.isAddress(address);
   }
 
-  // Get current gas price
-  async getCurrentGasPrice(useTestnet: boolean = false): Promise<string> {
+  async getCurrentGasPrice(): Promise<string> {
     try {
-      const { provider } = this.getProviderAndContract(useTestnet);
-      const feeData = await provider.getFeeData();
+      const feeData = await this.provider.getFeeData();
       return ethers.formatUnits(feeData.gasPrice || "20000000000", "gwei");
     } catch (error) {
-      return "20"; // Default fallback
-    }
-  }
-
-  // Check if wallet has sufficient balance for batch transfer
-  async checkSufficientBalance(
-    payments: BatchPayment[],
-    walletAddress: string,
-    useTestnet: boolean = false
-  ): Promise<{ sufficient: boolean; missingTokens: string[]; error?: string }> {
-    try {
-      const { provider } = this.getProviderAndContract(useTestnet);
-      const missingTokens: string[] = [];
-
-      // Group payments by token
-      const tokenTotals = new Map<
-        string,
-        { symbol: string; total: number; decimals: number; isETH: boolean }
-      >();
-
-      for (const payment of payments) {
-        const key = payment.tokenInfo.contractAddress;
-        const amount = parseFloat(payment.amount);
-
-        if (tokenTotals.has(key)) {
-          tokenTotals.get(key)!.total += amount;
-        } else {
-          tokenTotals.set(key, {
-            symbol: payment.tokenInfo.symbol,
-            total: amount,
-            decimals: payment.tokenInfo.decimals,
-            isETH: payment.tokenInfo.isETH,
-          });
-        }
-      }
-
-      // Check balance for each token
-      for (const [
-        contractAddress,
-        { symbol, total, decimals, isETH },
-      ] of tokenTotals) {
-        if (isETH) {
-          const balance = await provider.getBalance(walletAddress);
-          const balanceFormatted = parseFloat(ethers.formatEther(balance));
-
-          if (balanceFormatted < total) {
-            missingTokens.push(
-              `${symbol}: need ${total} but have ${balanceFormatted.toFixed(6)}`
-            );
-          }
-        } else {
-          const tokenContract = new ethers.Contract(
-            contractAddress,
-            ERC20_ABI,
-            provider
-          );
-
-          const balance = await tokenContract.balanceOf(walletAddress);
-          const balanceFormatted = parseFloat(
-            ethers.formatUnits(balance, decimals)
-          );
-
-          if (balanceFormatted < total) {
-            missingTokens.push(
-              `${symbol}: need ${total} but have ${balanceFormatted.toFixed(6)}`
-            );
-          }
-        }
-      }
-
-      return {
-        sufficient: missingTokens.length === 0,
-        missingTokens,
-      };
-    } catch (error: any) {
-      return {
-        sufficient: false,
-        missingTokens: [],
-        error: error.message,
-      };
-    }
-  }
-
-  // Calculate potential gas savings
-  async calculateGasSavings(
-    payments: BatchPayment[],
-    useTestnet: boolean = false
-  ): Promise<{
-    individualTotalGas: string;
-    batchTotalGas: string;
-    gasSavings: string;
-    savingsPercent: string;
-    costSavingsETH: string;
-    costSavingsUSD: string;
-  }> {
-    try {
-      const { provider } = this.getProviderAndContract(useTestnet);
-      const transferMode = this.getTransferMode(payments);
-      const batchSize = payments.length;
-
-      let transferType: string;
-      if (transferMode === "BATCH") {
-        transferType = payments[0].tokenInfo.isETH ? "ETH" : "ERC20";
-      } else {
-        transferType = "MIXED";
-      }
-
-      const contract = useTestnet ? this.sepoliaContract : this.contract;
-      const gasEstimate = await contract.estimateGasSavings(
-        batchSize,
-        transferType
-      );
-
-      const gasPrice = await provider.getFeeData();
-      const gasPriceWei = gasPrice.gasPrice || ethers.parseUnits("20", "gwei");
-
-      const individualCost = BigInt(gasEstimate.individual) * gasPriceWei;
-      const batchCost = BigInt(gasEstimate.batch) * gasPriceWei;
-      const costSavings = individualCost - batchCost;
-
-      const costSavingsETH = ethers.formatEther(costSavings);
-      const ethPriceUSD = useTestnet ? 2000 : 2500;
-      const costSavingsUSD = parseFloat(costSavingsETH) * ethPriceUSD;
-
-      return {
-        individualTotalGas: gasEstimate.individual.toString(),
-        batchTotalGas: gasEstimate.batch.toString(),
-        gasSavings: gasEstimate.savings.toString(),
-        savingsPercent: gasEstimate.savingsPercent.toString(),
-        costSavingsETH: costSavingsETH,
-        costSavingsUSD: costSavingsUSD.toFixed(2),
-      };
-    } catch (error) {
-      console.error("Error calculating gas savings:", error);
-
-      // Fallback calculation
-      const individualGasPerTransfer = 21000;
-      const individualTotalGas = payments.length * individualGasPerTransfer;
-      const batchTotalGas = Math.max(150000, payments.length * 25000);
-      const gasSavings = individualTotalGas - batchTotalGas;
-      const savingsPercent = Math.round(
-        (gasSavings / individualTotalGas) * 100
-      );
-
-      return {
-        individualTotalGas: individualTotalGas.toString(),
-        batchTotalGas: batchTotalGas.toString(),
-        gasSavings: gasSavings.toString(),
-        savingsPercent: savingsPercent.toString(),
-        costSavingsETH: "0.001",
-        costSavingsUSD: "2.50",
-      };
+      return "20";
     }
   }
 }
 
-// Export singleton instance
 export const batchPaymentService = new BatchPaymentService();
