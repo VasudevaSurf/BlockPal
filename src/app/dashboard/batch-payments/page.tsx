@@ -1,4 +1,4 @@
-// src/app/dashboard/batch-payments/page.tsx - UPDATED WITH USERNAME SEARCH
+// src/app/dashboard/batch-payments/page.tsx - FIXED SKELETON LOADING OVERFLOW
 "use client";
 
 import { useState, useEffect } from "react";
@@ -757,20 +757,24 @@ export default function BatchPaymentsPage() {
           </div>
         )}
 
-        {/* Transaction History - Mobile - ONLY BATCH TRANSACTIONS */}
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          <TransactionHistory
-            walletAddress={activeWallet?.address}
-            transactionTypeFilter="batch"
-            limit={20}
-            title="Batch Transaction History"
-            showRefresh={true}
-            className="min-h-0"
-          />
+        {/* Transaction History - Mobile - FIXED CONTAINER */}
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] flex-shrink-0 overflow-hidden">
+          <div className="p-4 h-full max-h-[400px] flex flex-col">
+            <div className="h-full overflow-hidden">
+              <TransactionHistory
+                walletAddress={activeWallet?.address}
+                transactionTypeFilter="batch"
+                limit={20}
+                title="Batch Transaction History"
+                showRefresh={true}
+                className="h-full overflow-hidden"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Desktop Layout with same fixes... */}
+      {/* Desktop Layout */}
       <div className="hidden xl:flex flex-col gap-6 flex-1 min-h-0">
         {/* Combined Batch Payments Form and List */}
         <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-1 flex flex-col min-h-0">
@@ -984,16 +988,20 @@ export default function BatchPaymentsPage() {
           )}
         </div>
 
-        {/* Transaction History - Desktop - ONLY BATCH TRANSACTIONS */}
-        <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-1 flex flex-col min-h-0">
-          <TransactionHistory
-            walletAddress={activeWallet?.address}
-            transactionTypeFilter="batch"
-            limit={50}
-            title="Batch Transaction History"
-            showRefresh={true}
-            className="flex-1 min-h-0"
-          />
+        {/* Transaction History - Desktop - FIXED CONTAINER */}
+        <div className="bg-black rounded-[20px] border border-[#2C2C2C] flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="p-6 h-full flex flex-col overflow-hidden">
+            <div className="h-full overflow-hidden">
+              <TransactionHistory
+                walletAddress={activeWallet?.address}
+                transactionTypeFilter="batch"
+                limit={50}
+                title="Batch Transaction History"
+                showRefresh={true}
+                className="h-full overflow-hidden"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
