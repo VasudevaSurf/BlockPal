@@ -2,7 +2,15 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { Bell, HelpCircle, Send, Copy, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Bell,
+  HelpCircle,
+  Send,
+  Copy,
+  RefreshCw,
+  Trash2,
+  Check,
+} from "lucide-react";
 import { RootState } from "@/store";
 import { SkeletonAIChat } from "@/components/ui/Skeleton";
 
@@ -12,6 +20,7 @@ interface Message {
   content: string;
   timestamp: Date;
   processing?: boolean;
+  typing?: boolean;
 }
 
 export default function AIChatPage() {
@@ -20,7 +29,7 @@ export default function AIChatPage() {
     {
       id: "welcome",
       type: "assistant",
-      content: `Hello`,
+      content: `Hello! I'm your AI crypto assistant. I can help you with token analysis, security checks, smart contracts, and more. What would you like to know?`,
       timestamp: new Date(),
     },
   ]);
@@ -29,6 +38,7 @@ export default function AIChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,6 +47,52 @@ export default function AIChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Typing animation function - Much faster speed
+  const typeMessage = (fullText: string, messageId: string) => {
+    return new Promise<void>((resolve) => {
+      let currentText = "";
+      let currentIndex = 0;
+
+      const typeInterval = setInterval(() => {
+        if (currentIndex < fullText.length) {
+          // Add more characters for much faster typing
+          const charsToAdd =
+            Math.random() > 0.3 ? (Math.random() > 0.6 ? 8 : 5) : 3; // 3-8 characters at once
+          currentText += fullText.slice(
+            currentIndex,
+            currentIndex + charsToAdd
+          );
+          currentIndex += charsToAdd;
+
+          // Update the message content
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === messageId
+                ? { ...msg, content: currentText, typing: true }
+                : msg
+            )
+          );
+        } else {
+          // Typing complete
+          clearInterval(typeInterval);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === messageId
+                ? {
+                    ...msg,
+                    content: fullText,
+                    typing: false,
+                    processing: false,
+                  }
+                : msg
+            )
+          );
+          resolve();
+        }
+      }, 8 + Math.random() * 12); // Much faster interval: 8-20ms
+    });
+  };
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isTyping) return;
@@ -53,14 +109,15 @@ export default function AIChatPage() {
     setInputMessage("");
     setIsTyping(true);
 
-    // Add processing message
+    // Add processing message with typing indicator
+    const processingMessageId = (Date.now() + 1).toString();
     const processingMessage: Message = {
-      id: (Date.now() + 1).toString(),
+      id: processingMessageId,
       type: "assistant",
-      content:
-        "🤖 Assistant: Processing your request...\n🧠 AI analyzing your request...",
+      content: "",
       timestamp: new Date(),
       processing: true,
+      typing: true,
     };
 
     setMessages((prev) => [...prev, processingMessage]);
@@ -97,31 +154,41 @@ export default function AIChatPage() {
 
       const data = await response.json();
 
-      // Remove processing message and add AI response
-      setMessages((prev) => {
-        const withoutProcessing = prev.filter((msg) => !msg.processing);
-        const aiResponse: Message = {
-          id: (Date.now() + 2).toString(),
-          type: "assistant",
-          content: data.response,
-          timestamp: new Date(),
-        };
-        return [...withoutProcessing, aiResponse];
-      });
+      // Remove processing message and add AI response with typing effect
+      setMessages((prev) => prev.filter((msg) => !msg.processing));
+
+      const aiResponseId = (Date.now() + 2).toString();
+      const aiMessage: Message = {
+        id: aiResponseId,
+        type: "assistant",
+        content: "",
+        timestamp: new Date(),
+        typing: true,
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+
+      // Start typing animation
+      await typeMessage(data.response, aiResponseId);
     } catch (error) {
       console.error("AI Chat error:", error);
 
-      // Remove processing message and add error message
-      setMessages((prev) => {
-        const withoutProcessing = prev.filter((msg) => !msg.processing);
-        const errorMessage: Message = {
-          id: (Date.now() + 2).toString(),
-          type: "assistant",
-          content: `❌ I encountered an error: ${error.message}\n\nPlease try again or rephrase your question.`,
-          timestamp: new Date(),
-        };
-        return [...withoutProcessing, errorMessage];
-      });
+      // Remove processing message and add error message with typing
+      setMessages((prev) => prev.filter((msg) => !msg.processing));
+
+      const errorMessageId = (Date.now() + 2).toString();
+      const errorMessage: Message = {
+        id: errorMessageId,
+        type: "assistant",
+        content: "",
+        timestamp: new Date(),
+        typing: true,
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
+
+      const errorText = `❌ I encountered an error: ${error.message}\n\nPlease try again or rephrase your question.`;
+      await typeMessage(errorText, errorMessageId);
     } finally {
       setIsTyping(false);
     }
@@ -137,8 +204,34 @@ export default function AIChatPage() {
   const copyMessage = async (content: string) => {
     try {
       await navigator.clipboard.writeText(content);
+      // Visual feedback for successful copy
+      const messageId = `message-${Date.now()}`;
+      setCopiedItems((prev) => new Set(prev).add(messageId));
+      setTimeout(() => {
+        setCopiedItems((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(messageId);
+          return newSet;
+        });
+      }, 2000);
     } catch (err) {
       console.error("Failed to copy message");
+    }
+  };
+
+  const copyCodeBlock = async (code: string, blockId: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedItems((prev) => new Set(prev).add(blockId));
+      setTimeout(() => {
+        setCopiedItems((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(blockId);
+          return newSet;
+        });
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy code");
     }
   };
 
@@ -160,23 +253,100 @@ How can I assist you today with your crypto needs? Try asking about:
     ]);
   };
 
-  const formatMessage = (content: string) => {
-    // Convert markdown-style formatting to HTML
-    let formatted = content
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(
-        /```solidity\n([\s\S]*?)\n```/g,
-        '<pre class="code-block solidity"><code>$1</code></pre>'
-      )
-      .replace(
-        /```(.*?)\n([\s\S]*?)\n```/g,
-        '<pre class="code-block"><code>$2</code></pre>'
-      )
-      .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
-      .replace(/\n/g, "<br>");
+  const formatMessage = (content: string, messageId: string) => {
+    // Extract code blocks for special handling
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+    let blockCounter = 0;
 
-    return formatted;
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      // Add text before code block
+      if (match.index > lastIndex) {
+        const textPart = content.slice(lastIndex, match.index);
+        parts.push({
+          type: "text",
+          content: textPart,
+        });
+      }
+
+      // Add code block
+      const language = match[1] || "text";
+      const code = match[2];
+      const blockId = `${messageId}-code-${blockCounter++}`;
+
+      parts.push({
+        type: "code",
+        language,
+        content: code,
+        blockId,
+      });
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < content.length) {
+      parts.push({
+        type: "text",
+        content: content.slice(lastIndex),
+      });
+    }
+
+    // If no code blocks found, treat as text
+    if (parts.length === 0) {
+      parts.push({
+        type: "text",
+        content: content,
+      });
+    }
+
+    return parts.map((part, index) => {
+      if (part.type === "code") {
+        return (
+          <div key={index} className="relative my-4">
+            <div className="flex items-center justify-between bg-[#1a1a1a] border border-[#2c2c2c] rounded-t-lg px-4 py-2">
+              <span className="text-xs text-gray-400 font-mono">
+                {part.language}
+              </span>
+              <button
+                onClick={() => copyCodeBlock(part.content, part.blockId)}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+              >
+                {copiedItems.has(part.blockId) ? (
+                  <>
+                    <Check size={12} />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={12} />
+                    Copy
+                  </>
+                )}
+              </button>
+            </div>
+            <pre className="bg-[#1a1a1a] border border-[#2c2c2c] border-t-0 rounded-b-lg p-4 overflow-x-auto">
+              <code className="text-sm font-mono text-gray-200">
+                {part.content}
+              </code>
+            </pre>
+          </div>
+        );
+      } else {
+        // Format regular text with markdown-style formatting
+        let formatted = part.content
+          .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+          .replace(/\*(.*?)\*/g, "<em>$1</em>")
+          .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
+          .replace(/\n/g, "<br>");
+
+        return (
+          <div key={index} dangerouslySetInnerHTML={{ __html: formatted }} />
+        );
+      }
+    });
   };
 
   // Quick suggestion buttons
@@ -192,14 +362,6 @@ How can I assist you today with your crypto needs? Try asking about:
     // Simulate initial load
     const timer = setTimeout(() => {
       setInitialLoading(false);
-      setMessages([
-        {
-          id: "welcome",
-          type: "assistant",
-          content: "Hello",
-          timestamp: new Date(),
-        },
-      ]);
     }, 1000);
 
     return () => clearTimeout(timer);
@@ -300,39 +462,47 @@ How can I assist you today with your crypto needs? Try asking about:
                 <div className="flex flex-col items-start space-y-2">
                   {/* Message Content */}
                   <div className="max-w-full sm:max-w-4xl bg-black p-3 lg:p-4 rounded-2xl border border-[#2C2C2C]">
-                    {message.processing ? (
+                    {message.processing && !message.content ? (
                       <div className="flex items-center space-x-2">
                         <RefreshCw
                           size={16}
                           className="text-[#E2AF19] animate-spin"
                         />
-                        <div
-                          className="text-[#F9EFD1] text-xs sm:text-sm leading-relaxed font-satoshi"
-                          dangerouslySetInnerHTML={{
-                            __html: formatMessage(message.content),
-                          }}
-                        />
+                        <span className="text-[#F9EFD1] text-xs sm:text-sm font-satoshi">
+                          🧠 AI analyzing your request...
+                        </span>
                       </div>
                     ) : (
-                      <div
-                        className="text-[#F9EFD1] text-xs sm:text-sm leading-relaxed font-satoshi message-content"
-                        dangerouslySetInnerHTML={{
-                          __html: formatMessage(message.content),
-                        }}
-                      />
+                      <div className="text-[#F9EFD1] text-xs sm:text-sm leading-relaxed font-satoshi message-content">
+                        {formatMessage(message.content, message.id)}
+                        {message.typing && (
+                          <span className="inline-block w-2 h-4 bg-[#E2AF19] ml-1 animate-pulse"></span>
+                        )}
+                      </div>
                     )}
                   </div>
 
                   {/* Copy Button - Only for non-processing messages */}
-                  {!message.processing && (
-                    <button
-                      onClick={() => copyMessage(message.content)}
-                      className="bg-[#E2AF19] text-black px-2 lg:px-3 py-1 rounded-md text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1"
-                    >
-                      Copy
-                      <Copy size={10} className="lg:w-3 lg:h-3" />
-                    </button>
-                  )}
+                  {!message.processing &&
+                    !message.typing &&
+                    message.content && (
+                      <button
+                        onClick={() => copyMessage(message.content)}
+                        className="bg-[#E2AF19] text-black px-2 lg:px-3 py-1 rounded-md text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1"
+                      >
+                        {copiedItems.has(`message-${message.id}`) ? (
+                          <>
+                            <Check size={10} className="lg:w-3 lg:h-3" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={10} className="lg:w-3 lg:h-3" />
+                            Copy
+                          </>
+                        )}
+                      </button>
+                    )}
                 </div>
               ) : (
                 <div className="flex justify-end">
@@ -435,22 +605,6 @@ How can I assist you today with your crypto needs? Try asking about:
           color: #e2af19;
         }
 
-        .message-content .code-block {
-          background: #1a1a1a;
-          border: 1px solid #2c2c2c;
-          border-radius: 8px;
-          padding: 12px;
-          margin: 8px 0;
-          overflow-x: auto;
-          font-family: "Courier New", monospace;
-          font-size: 12px;
-          line-height: 1.4;
-        }
-
-        .message-content .code-block.solidity {
-          border-left: 4px solid #e2af19;
-        }
-
         .message-content .inline-code {
           background: #2c2c2c;
           color: #e2af19;
@@ -475,10 +629,22 @@ How can I assist you today with your crypto needs? Try asking about:
           }
         }
 
+        /* Typing cursor animation */
+        @keyframes pulse {
+          0%,
+          50% {
+            opacity: 1;
+          }
+          51%,
+          100% {
+            opacity: 0;
+          }
+        }
+
         /* Mobile specific styles */
         @media (max-width: 640px) {
           textarea {
-            font-size: 16px !important; /* Prevents zoom on iOS */
+            font-size: 16px !important;
           }
         }
       `}</style>
