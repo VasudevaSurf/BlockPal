@@ -533,6 +533,230 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ scheduleId: string }> }
+) {
+  try {
+    const token = request.cookies.get("auth-token")?.value;
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const resolvedParams = await params;
+    const { scheduleId } = resolvedParams;
+
+    if (!scheduleId) {
+      return NextResponse.json(
+        { error: "Schedule ID required" },
+        { status: 400 }
+      );
+    }
+
+    const { db } = await connectToDatabase();
+
+    console.log(
+      `🗑️ Enhanced: Attempting to delete scheduled payment: ${scheduleId}`
+    );
+
+    // Find the payment first to verify ownership and status
+    const payment = await db.collection("schedules").findOne({
+      scheduleId,
+      username: decoded.username,
+    });
+
+    if (!payment) {
+      console.log(`❌ Enhanced: Payment not found: ${scheduleId}`);
+      return NextResponse.json(
+        { error: "Scheduled payment not found" },
+        { status: 404 }
+      );
+    }
+
+    // STRICT: Don't allow deletion of currently processing payments
+    if (payment.status === "processing") {
+      console.log(
+        `❌ Enhanced: Cannot delete processing payment: ${scheduleId}`
+      );
+      return NextResponse.json(
+        { error: "Cannot delete a payment that is currently being processed" },
+        { status: 400 }
+      );
+    }
+
+    // Perform the deletion
+    const deleteResult = await db.collection("schedules").deleteOne({
+      scheduleId,
+      username: decoded.username,
+    });
+
+    if (deleteResult.deletedCount === 0) {
+      console.log(`❌ Enhanced: Failed to delete payment: ${scheduleId}`);
+      return NextResponse.json(
+        { error: "Failed to delete scheduled payment" },
+        { status: 500 }
+      );
+    }
+
+    console.log(`✅ Enhanced: Successfully deleted payment: ${scheduleId}`);
+
+    // Also clean up any related execution records (optional)
+    try {
+      await db.collection("executed_transactions").deleteMany({
+        scheduleId: scheduleId,
+      });
+      console.log(
+        `🧹 Enhanced: Cleaned up execution records for: ${scheduleId}`
+      );
+    } catch (cleanupError) {
+      console.warn(
+        `⚠️ Enhanced: Failed to cleanup execution records:`,
+        cleanupError
+      );
+      // Don't fail the main delete operation for cleanup issues
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Scheduled payment deleted successfully",
+      scheduleId: scheduleId,
+      enhancedAPI: true,
+    });
+  } catch (error) {
+    console.error("💥 Enhanced: Error deleting scheduled payment:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ scheduleId: string }> }
+) {
+  try {
+    const token = request.cookies.get("auth-token")?.value;
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const resolvedParams = await params;
+    const { scheduleId } = resolvedParams;
+    const body = await request.json();
+    const { action, status } = body;
+
+    if (!scheduleId) {
+      return NextResponse.json(
+        { error: "Schedule ID required" },
+        { status: 400 }
+      );
+    }
+
+    const { db } = await connectToDatabase();
+    const now = new Date();
+
+    console.log(
+      `🔄 Enhanced: Attempting to update scheduled payment: ${scheduleId}, action: ${action}`
+    );
+
+    // Find the payment first
+    const payment = await db.collection("schedules").findOne({
+      scheduleId,
+      username: decoded.username,
+    });
+
+    if (!payment) {
+      console.log(`❌ Enhanced: Payment not found: ${scheduleId}`);
+      return NextResponse.json(
+        { error: "Scheduled payment not found" },
+        { status: 404 }
+      );
+    }
+
+    if (action === "cancel") {
+      // STRICT: Don't allow cancellation of failed payments
+      if (payment.status === "failed") {
+        return NextResponse.json(
+          { error: "Cannot cancel a permanently failed payment" },
+          { status: 400 }
+        );
+      }
+
+      // STRICT: Don't cancel completed payments
+      if (payment.status === "completed") {
+        return NextResponse.json(
+          { error: "Cannot cancel a completed payment" },
+          { status: 400 }
+        );
+      }
+
+      // STRICT: Don't cancel already cancelled payments
+      if (payment.status === "cancelled") {
+        return NextResponse.json(
+          { error: "Payment is already cancelled" },
+          { status: 400 }
+        );
+      }
+
+      // Perform the cancellation
+      const updateResult = await db.collection("schedules").updateOne(
+        {
+          scheduleId,
+          username: decoded.username,
+          status: { $ne: "failed" }, // STRICT: Never update failed payments
+        },
+        {
+          $set: {
+            status: "cancelled",
+            cancelledAt: now,
+            updatedAt: now,
+            nextExecutionAt: null,
+            processingBy: null,
+            processingStarted: null,
+            claimedBy: null,
+            claimedAt: null,
+            cancelledWithSmartContract: true,
+            enhancedAPI: true,
+          },
+        }
+      );
+
+      if (updateResult.matchedCount === 0) {
+        return NextResponse.json(
+          { error: "Failed to cancel payment or payment not found" },
+          { status: 404 }
+        );
+      }
+
+      console.log(`✅ Enhanced: Successfully cancelled payment: ${scheduleId}`);
+
+      return NextResponse.json({
+        success: true,
+        message: "Scheduled payment cancelled successfully",
+        scheduleId: scheduleId,
+        newStatus: "cancelled",
+        enhancedAPI: true,
+      });
+    }
+
+    return NextResponse.json(
+      { error: "Invalid action. Only 'cancel' is supported." },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("💥 Enhanced: Error updating scheduled payment:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 // Enhanced validation function
 function validateScheduledPayment(
   tokenInfo: any,

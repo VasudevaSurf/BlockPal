@@ -1,3 +1,4 @@
+// src/components/payments/ScheduledPaymentsPage.tsx - COMPLETE UPDATED VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -47,6 +48,7 @@ interface ScheduledPayment {
   description?: string;
   createdAt: string;
   lastExecutionAt?: string;
+  lastTransactionHash?: string;
   timezone?: string;
   estimatedGas?: string;
   gasCostETH?: string;
@@ -84,18 +86,10 @@ interface PaymentPreview {
   totalCostETH: string;
   totalCostUSD: string;
   approvalRequired: boolean;
-  currentAllowance?: string;
-  requiredAllowance?: string;
-  enhancedAPIEstimate?: {
-    gasPrice: string;
-    estimatedGas: string;
-    gasCostETH: string;
-    gasCostUSD: string;
-    congestionLevel: string;
-  };
+  smartContractOptimized: boolean;
 }
 
-// Token icon helper functions (keeping existing ones)
+// Token icon helper functions
 const getTokenIconColor = (symbol: string) => {
   const colors: Record<string, string> = {
     Ethereum: "bg-blue-500",
@@ -272,6 +266,23 @@ export default function ScheduledPaymentsPage() {
     }
   }, [activeWallet?.address, activeTab]);
 
+  useEffect(() => {
+    if (activeWallet?.address) {
+      loadInitialData();
+    }
+  }, [activeWallet?.address]);
+
+  const loadInitialData = async () => {
+    try {
+      setInitialLoading(true);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    } catch (error) {
+      console.error("Error loading initial data:", error);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
   const fetchScheduledPayments = async () => {
     if (!activeWallet?.address) return;
 
@@ -296,6 +307,117 @@ export default function ScheduledPaymentsPage() {
       console.error("Error fetching scheduled payments:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // FIXED: Add the missing handleDeletePayment function
+  const handleDeletePayment = async (scheduleId: string) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this scheduled payment? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("✅ Payment deleted successfully");
+        // Refresh the list
+        fetchScheduledPayments();
+      } else {
+        setError(data.error || "Failed to delete payment");
+      }
+    } catch (error: any) {
+      console.error("❌ Error deleting payment:", error);
+      setError("Failed to delete payment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // FIXED: Improve the cancel payment function
+  const handleCancelPayment = async (scheduleId: string) => {
+    if (!confirm("Are you sure you want to cancel this scheduled payment?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "cancel",
+          status: "cancelled",
+        }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("✅ Payment cancelled successfully");
+        // Refresh the list
+        fetchScheduledPayments();
+      } else {
+        setError(data.error || "Failed to cancel payment");
+      }
+    } catch (error: any) {
+      console.error("❌ Error cancelling payment:", error);
+      setError("Failed to cancel payment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // FIXED: Add working explorer and hash functions
+  const openExplorer = (payment: ScheduledPayment) => {
+    if (payment.lastTransactionHash) {
+      const explorerUrl = `https://etherscan.io/tx/${payment.lastTransactionHash}`;
+      window.open(explorerUrl, "_blank");
+    } else {
+      // If no transaction hash, search by wallet address
+      const explorerUrl = `https://etherscan.io/address/${payment.walletAddress}`;
+      window.open(explorerUrl, "_blank");
+    }
+  };
+
+  const copyTransactionHash = async (payment: ScheduledPayment) => {
+    if (payment.lastTransactionHash) {
+      try {
+        await navigator.clipboard.writeText(payment.lastTransactionHash);
+        setCopied(`hash-${payment.id}`);
+        setTimeout(() => setCopied(""), 2000);
+      } catch (err) {
+        console.error("Failed to copy transaction hash:", err);
+        setError("Failed to copy transaction hash");
+      }
+    } else {
+      // If no transaction hash, copy the schedule ID
+      try {
+        await navigator.clipboard.writeText(payment.scheduleId);
+        setCopied(`schedule-${payment.id}`);
+        setTimeout(() => setCopied(""), 2000);
+      } catch (err) {
+        console.error("Failed to copy schedule ID:", err);
+        setError("Failed to copy schedule ID");
+      }
     }
   };
 
@@ -458,30 +580,6 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  const handleCancelPayment = async (scheduleId: string) => {
-    try {
-      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "cancel",
-        }),
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        fetchScheduledPayments();
-      } else {
-        const data = await response.json();
-        setError(data.error || "Failed to cancel payment");
-      }
-    } catch (error) {
-      setError("Failed to cancel payment");
-    }
-  };
-
   const copyToClipboard = async (text: string, type: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -518,6 +616,113 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
+  // FIXED: Update action button renderers
+  const renderMobileActionButtons = (payment: ScheduledPayment) => {
+    if (activeTab === "active") {
+      return (
+        <>
+          <button
+            onClick={() => handleCancelPayment(payment.scheduleId)}
+            disabled={loading}
+            className="bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
+          >
+            <Pause size={12} className="mr-1" />
+            {loading ? "..." : "Cancel"}
+          </button>
+          <button
+            onClick={() => handleDeletePayment(payment.scheduleId)}
+            disabled={loading}
+            className="bg-gray-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
+          >
+            <Trash2 size={12} className="mr-1" />
+            {loading ? "..." : "Delete"}
+          </button>
+        </>
+      );
+    } else {
+      return (
+        <>
+          <button
+            onClick={() => openExplorer(payment)}
+            className="text-[#E2AF19] text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+          >
+            <ExternalLink size={12} className="mr-1" />
+            Explorer
+          </button>
+          <button
+            onClick={() => copyTransactionHash(payment)}
+            className="text-[#E2AF19] text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+          >
+            <Hash size={12} className="mr-1" />
+            {copied === `hash-${payment.id}` ||
+            copied === `schedule-${payment.id}`
+              ? "Copied!"
+              : payment.lastTransactionHash
+              ? "Hash"
+              : "ID"}
+          </button>
+        </>
+      );
+    }
+  };
+
+  const renderDesktopActionButtons = (payment: ScheduledPayment) => {
+    if (activeTab === "active") {
+      return (
+        <div className="flex items-center justify-center space-x-1">
+          <button
+            onClick={() => handleCancelPayment(payment.scheduleId)}
+            disabled={loading}
+            className="bg-red-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
+            title="Cancel"
+          >
+            <Pause size={10} />
+          </button>
+          <button
+            onClick={() => handleDeletePayment(payment.scheduleId)}
+            disabled={loading}
+            className="bg-gray-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
+            title="Delete"
+          >
+            <Trash2 size={10} />
+          </button>
+        </div>
+      );
+    } else {
+      return (
+        <div className="flex items-center justify-center space-x-2">
+          <button
+            onClick={() => openExplorer(payment)}
+            className="text-[#E2AF19] px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+            title={
+              payment.lastTransactionHash ? "View Transaction" : "View Address"
+            }
+          >
+            <ExternalLink size={10} className="mr-1" />
+            Explorer
+          </button>
+          <button
+            onClick={() => copyTransactionHash(payment)}
+            className="text-[#E2AF19] px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+            title={
+              payment.lastTransactionHash
+                ? "Copy Transaction Hash"
+                : "Copy Schedule ID"
+            }
+          >
+            <Hash size={10} className="mr-1" />
+            {copied === `hash-${payment.id}` ||
+            copied === `schedule-${payment.id}`
+              ? "Copied!"
+              : payment.lastTransactionHash
+              ? "Hash"
+              : "ID"}
+          </button>
+        </div>
+      );
+    }
+  };
+
   const filteredPayments = scheduledPayments.filter(
     (payment) => payment.status === activeTab
   );
@@ -528,23 +733,6 @@ export default function ScheduledPaymentsPage() {
   const completedCount = scheduledPayments.filter(
     (payment) => payment.status === "completed"
   ).length;
-
-  useEffect(() => {
-    if (activeWallet?.address) {
-      loadInitialData();
-    }
-  }, [activeWallet?.address]);
-
-  const loadInitialData = async () => {
-    try {
-      setInitialLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-    } catch (error) {
-      console.error("Error loading initial data:", error);
-    } finally {
-      setInitialLoading(false);
-    }
-  };
 
   if (initialLoading) {
     return <SkeletonScheduledPayments />;
@@ -668,7 +856,7 @@ export default function ScheduledPaymentsPage() {
                   <ChevronDown size={16} className="text-gray-400" />
                 </button>
 
-                {/* FIXED: Dropdown with real token icons */}
+                {/* Dropdown with real token icons */}
                 {isTokenDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {tokens.map((token) => (
@@ -683,7 +871,7 @@ export default function ScheduledPaymentsPage() {
                             isETH: token.symbol === "ETH",
                             balance: token.balance,
                             price: token.price,
-                            icon: token.icon, // FIXED: Include the icon URL
+                            icon: token.icon,
                           });
                           setIsTokenDropdownOpen(false);
                         }}
@@ -899,7 +1087,6 @@ export default function ScheduledPaymentsPage() {
               </div>
             ) : (
               filteredPayments.map((payment) => {
-                // FIXED: Create a token object for the payment with icon info from tokens list
                 const paymentToken = tokens.find(
                   (t) =>
                     t.symbol === payment.tokenSymbol ||
@@ -907,7 +1094,7 @@ export default function ScheduledPaymentsPage() {
                 ) || {
                   symbol: payment.tokenSymbol,
                   name: payment.tokenName,
-                  icon: null, // Will fallback to colored icon
+                  icon: null,
                 };
 
                 return (
@@ -986,39 +1173,7 @@ export default function ScheduledPaymentsPage() {
 
                     {/* Action Buttons */}
                     <div className="flex justify-center space-x-3 pt-3 border-t border-[#2C2C2C]">
-                      {activeTab === "active" ? (
-                        <>
-                          <button
-                            onClick={() =>
-                              handleCancelPayment(payment.scheduleId)
-                            }
-                            className="bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
-                          >
-                            <Pause size={12} className="mr-1" />
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDeletePayment(payment.scheduleId)
-                            }
-                            className="bg-gray-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
-                          >
-                            <Trash2 size={12} className="mr-1" />
-                            Delete
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button className="text-[#E2AF19] text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center">
-                            <ExternalLink size={12} className="mr-1" />
-                            Explorer
-                          </button>
-                          <button className="text-[#E2AF19] text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center">
-                            <Hash size={12} className="mr-1" />
-                            Hash
-                          </button>
-                        </>
-                      )}
+                      {renderMobileActionButtons(payment)}
                     </div>
                   </div>
                 );
@@ -1028,7 +1183,7 @@ export default function ScheduledPaymentsPage() {
         </div>
       </div>
 
-      {/* Desktop Layout - Similar fixes applied */}
+      {/* Desktop Layout */}
       <div className="hidden xl:flex flex-col gap-6 flex-1 min-h-0">
         {/* Schedule Payment Form */}
         <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-shrink-0">
@@ -1069,7 +1224,7 @@ export default function ScheduledPaymentsPage() {
                 <ChevronDown size={14} className="text-gray-400" />
               </button>
 
-              {/* FIXED: Desktop dropdown with real token icons */}
+              {/* Desktop dropdown with real token icons */}
               {isTokenDropdownOpen && (
                 <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {tokens.map((token) => (
@@ -1084,7 +1239,7 @@ export default function ScheduledPaymentsPage() {
                           isETH: token.symbol === "ETH",
                           balance: token.balance,
                           price: token.price,
-                          icon: token.icon, // FIXED: Include the icon URL
+                          icon: token.icon,
                         });
                         setIsTokenDropdownOpen(false);
                       }}
@@ -1365,7 +1520,6 @@ export default function ScheduledPaymentsPage() {
               </div>
             ) : (
               filteredPayments.map((payment, index) => {
-                // FIXED: Create a token object for the payment with icon info
                 const paymentToken = tokens.find(
                   (t) =>
                     t.symbol === payment.tokenSymbol ||
@@ -1373,7 +1527,7 @@ export default function ScheduledPaymentsPage() {
                 ) || {
                   symbol: payment.tokenSymbol,
                   name: payment.tokenName,
-                  icon: null, // Will fallback to colored icon
+                  icon: null,
                 };
 
                 return (
@@ -1435,39 +1589,7 @@ export default function ScheduledPaymentsPage() {
                       </div>
 
                       <div className="text-center">
-                        {activeTab === "active" ? (
-                          <div className="flex items-center justify-center space-x-1">
-                            <button
-                              onClick={() =>
-                                handleCancelPayment(payment.scheduleId)
-                              }
-                              className="bg-red-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
-                              title="Cancel"
-                            >
-                              <Pause size={10} />
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDeletePayment(payment.scheduleId)
-                              }
-                              className="bg-gray-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
-                              title="Delete"
-                            >
-                              <Trash2 size={10} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center space-x-2">
-                            <button className="text-[#E2AF19] px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center">
-                              <ExternalLink size={10} className="mr-1" />
-                              Explorer
-                            </button>
-                            <button className="text-[#E2AF19] px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center">
-                              <Hash size={10} className="mr-1" />
-                              Hash
-                            </button>
-                          </div>
-                        )}
+                        {renderDesktopActionButtons(payment)}
                       </div>
                     </div>
 
@@ -1482,7 +1604,6 @@ export default function ScheduledPaymentsPage() {
         </div>
       </div>
 
-      {/* Modals remain the same... */}
       {/* Preview Modal */}
       {showPreview && preview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1669,10 +1790,122 @@ export default function ScheduledPaymentsPage() {
         </div>
       )}
 
-      {/* The rest of the component structure remains the same... */}
-      {/* Mobile and Desktop layouts, transaction lists, etc. */}
+      {/* Success Result Modal */}
+      {showResult && result && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-lg">
+            <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-white font-mayeka">
+                  Payment Scheduled!
+                </h2>
+                <div className="flex items-center bg-gradient-to-r from-green-500 to-emerald-600 px-2 py-1 rounded-full">
+                  <CheckCircle size={12} className="text-white mr-1" />
+                  <span className="text-white text-xs">Success</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowResult(false)}
+                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-      <style>{`
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4">
+                  <div className="flex items-center mb-2">
+                    <CheckCircle size={16} className="text-green-400 mr-2" />
+                    <span className="text-green-400 font-semibold font-satoshi">
+                      Smart Contract Scheduled Payment Created
+                    </span>
+                  </div>
+                  <p className="text-green-400 text-sm font-satoshi">
+                    Your payment has been successfully scheduled with our smart
+                    contract system.
+                  </p>
+                </div>
+
+                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
+                  <h3 className="text-white font-semibold font-satoshi mb-3">
+                    Schedule Details
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        Schedule ID:
+                      </span>
+                      <div className="flex items-center">
+                        <span className="text-white font-mono text-sm">
+                          {result.scheduleId?.slice(0, 12)}...
+                        </span>
+                        <button
+                          onClick={() =>
+                            copyToClipboard(result.scheduleId, "scheduleId")
+                          }
+                          className="ml-2 text-gray-400 hover:text-white transition-colors"
+                        >
+                          <Copy size={12} />
+                        </button>
+                        {copied === "scheduleId" && (
+                          <span className="ml-2 text-green-400 text-xs">
+                            Copied!
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        Next Execution:
+                      </span>
+                      <span className="text-white text-sm">
+                        {formatDateTime(result.nextExecution)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        Smart Contract:
+                      </span>
+                      <span className="text-blue-400 text-sm">
+                        {result.contractAddress?.slice(0, 12)}...
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
+                  <div className="flex items-center mb-2">
+                    <Zap size={16} className="text-blue-400 mr-2" />
+                    <span className="text-blue-400 font-semibold font-satoshi">
+                      Enhanced Features Enabled
+                    </span>
+                  </div>
+                  <ul className="text-blue-400 text-sm font-satoshi space-y-1">
+                    <li>• Gas optimization for lower fees</li>
+                    <li>• Automatic tax calculation</li>
+                    <li>• Smart contract security</li>
+                    <li>• Real-time execution monitoring</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+              <Button
+                onClick={() => setShowResult(false)}
+                className="w-full font-satoshi"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx global>{`
         .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
@@ -1684,7 +1917,7 @@ export default function ScheduledPaymentsPage() {
         input[type="date"] {
           color-scheme: dark;
         }
-        
+
         input[type="date"]::-webkit-calendar-picker-indicator {
           filter: invert(1);
           cursor: pointer;
@@ -1693,7 +1926,7 @@ export default function ScheduledPaymentsPage() {
         input[type="time"] {
           color-scheme: dark;
         }
-        
+
         input[type="time"]::-webkit-calendar-picker-indicator {
           filter: invert(1);
           cursor: pointer;
