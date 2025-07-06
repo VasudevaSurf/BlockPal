@@ -1,8 +1,7 @@
-// src/app/api/profile/route.ts - Updated with active wallet management
+// src/app/api/profile/route.ts - FIXED with scheduled payments count
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,69 +14,90 @@ export async function GET(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Get user profile data
-    const user = await db.collection("users").findOne(
-      { _id: new ObjectId(decoded.userId) },
-      { projection: { passwordHash: 0 } } // Exclude password hash
-    );
+    console.log("🔍 Fetching profile for user:", decoded.username);
+
+    // Get user profile
+    const user = await db
+      .collection("users")
+      .findOne(
+        { username: decoded.username },
+        { projection: { passwordHash: 0 } }
+      );
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Get user statistics
-    const [wallets, transactions, schedules, friends] = await Promise.all([
-      db.collection("wallets").find({ username: user.username }).toArray(),
-      db.collection("transactions").countDocuments({
-        $or: [
-          { senderUsername: user.username },
-          { receiverUsername: user.username },
-        ],
-      }),
-      db.collection("schedules").countDocuments({
-        username: user.username,
-        status: "active",
-      }),
-      db.collection("friends").countDocuments({
-        $or: [
-          { requesterUsername: user.username },
-          { receiverUsername: user.username },
-        ],
-        status: "accepted",
-      }),
-    ]);
+    // FIXED: Get actual transaction count
+    const totalTransactions = await db
+      .collection("executed_transactions")
+      .countDocuments({
+        username: decoded.username,
+      });
 
-    // Find the active wallet
-    const activeWallet =
-      wallets.find((w) => w._id.toString() === user.activeWalletId) ||
-      wallets[0];
+    // FIXED: Get completed scheduled payments count only
+    const scheduledPayments = await db.collection("schedules").countDocuments({
+      username: decoded.username,
+      status: "completed", // Only count completed scheduled payments
+    });
+
+    // FIXED: Get friends count
+    const friendsCount = await db.collection("friends").countDocuments({
+      $and: [
+        {
+          $or: [
+            { requesterUsername: decoded.username },
+            { receiverUsername: decoded.username },
+          ],
+        },
+        { status: "accepted" },
+      ],
+    });
+
+    console.log("📊 Profile stats:", {
+      username: decoded.username,
+      totalTransactions,
+      completedScheduledPayments: scheduledPayments,
+      friendsCount,
+    });
 
     const profile = {
       username: user.username,
       displayName: user.displayName || user.username,
-      gmail: user.gmail,
-      avatar: user.avatar,
-      walletAddress: activeWallet?.walletAddress || null,
-      activeWalletId: user.activeWalletId || null,
+      gmail: user.gmail || user.email,
+      avatar: user.avatar || null,
       accountCreated: user.createdAt
         ? new Date(user.createdAt).toLocaleDateString()
-        : "Unknown",
-      totalTransactions: transactions || 0,
-      scheduledPayments: schedules || 0,
-      friendsCount: friends || 0,
+        : new Date().toLocaleDateString(),
+      // FIXED: Use actual counts from database
+      totalTransactions,
+      scheduledPayments,
+      friendsCount,
       preferences: {
-        notifications: user.preferences?.notifications ?? true,
-        pushNotifications: user.preferences?.pushNotifications ?? true,
-        emailNotifications: user.preferences?.emailNotifications ?? true,
+        notifications: user.preferences?.notifications !== false,
+        pushNotifications: user.preferences?.pushNotifications !== false,
+        emailNotifications: user.preferences?.emailNotifications !== false,
         friendRequests: user.preferences?.friendRequests || "everyone",
-        currency: user.currency || "USD",
+        currency: user.preferences?.currency || "USD",
       },
+      // FIXED: Get actual 2FA status
       twoFactorEnabled: user.twoFactorEnabled || false,
     };
 
-    return NextResponse.json({ profile });
+    console.log("✅ Profile data prepared:", {
+      username: profile.username,
+      totalTransactions: profile.totalTransactions,
+      completedScheduledPayments: profile.scheduledPayments,
+      friendsCount: profile.friendsCount,
+      twoFactorEnabled: profile.twoFactorEnabled,
+    });
+
+    return NextResponse.json({
+      success: true,
+      profile,
+    });
   } catch (error) {
-    console.error("Get profile error:", error);
+    console.error("💥 Error fetching profile:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -94,50 +114,25 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const updateData = await request.json();
+    const body = await request.json();
+    const { displayName } = body;
+
     const { db } = await connectToDatabase();
 
-    // Prepare update object
-    const updateFields: any = {};
+    console.log("🔄 Updating profile for user:", decoded.username, {
+      displayName,
+    });
 
-    if (updateData.displayName)
-      updateFields.displayName = updateData.displayName;
-    if (updateData.currency) updateFields.currency = updateData.currency;
-    if (updateData.preferences) {
-      updateFields.preferences = updateData.preferences;
+    const updateData: any = {};
+    if (displayName !== undefined) {
+      updateData.displayName = displayName;
     }
 
-    // IMPORTANT: Handle active wallet update
-    if (updateData.activeWalletId) {
-      // Verify the wallet belongs to this user
-      const wallet = await db.collection("wallets").findOne({
-        _id: new ObjectId(updateData.activeWalletId),
-        username: decoded.username,
-      });
+    updateData.updatedAt = new Date();
 
-      if (!wallet) {
-        return NextResponse.json(
-          { error: "Wallet not found or access denied" },
-          { status: 404 }
-        );
-      }
-
-      updateFields.activeWalletId = updateData.activeWalletId;
-      console.log(
-        `✅ Setting active wallet for ${decoded.username}: ${updateData.activeWalletId}`
-      );
-    }
-
-    // Update user profile
-    const result = await db.collection("users").updateOne(
-      { _id: new ObjectId(decoded.userId) },
-      {
-        $set: {
-          ...updateFields,
-          updatedAt: new Date(),
-        },
-      }
-    );
+    const result = await db
+      .collection("users")
+      .updateOne({ username: decoded.username }, { $set: updateData });
 
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -147,16 +142,64 @@ export async function PUT(request: NextRequest) {
     const updatedUser = await db
       .collection("users")
       .findOne(
-        { _id: new ObjectId(decoded.userId) },
+        { username: decoded.username },
         { projection: { passwordHash: 0 } }
       );
 
+    // Get updated stats
+    const totalTransactions = await db
+      .collection("executed_transactions")
+      .countDocuments({
+        username: decoded.username,
+      });
+
+    const scheduledPayments = await db.collection("schedules").countDocuments({
+      username: decoded.username,
+      status: "completed", // Only count completed scheduled payments
+    });
+
+    const friendsCount = await db.collection("friends").countDocuments({
+      $and: [
+        {
+          $or: [
+            { requesterUsername: decoded.username },
+            { receiverUsername: decoded.username },
+          ],
+        },
+        { status: "accepted" },
+      ],
+    });
+
+    const profile = {
+      username: updatedUser.username,
+      displayName: updatedUser.displayName || updatedUser.username,
+      gmail: updatedUser.gmail || updatedUser.email,
+      avatar: updatedUser.avatar || null,
+      accountCreated: updatedUser.createdAt
+        ? new Date(updatedUser.createdAt).toLocaleDateString()
+        : new Date().toLocaleDateString(),
+      totalTransactions,
+      scheduledPayments,
+      friendsCount,
+      preferences: {
+        notifications: updatedUser.preferences?.notifications !== false,
+        pushNotifications: updatedUser.preferences?.pushNotifications !== false,
+        emailNotifications:
+          updatedUser.preferences?.emailNotifications !== false,
+        friendRequests: updatedUser.preferences?.friendRequests || "everyone",
+        currency: updatedUser.preferences?.currency || "USD",
+      },
+      twoFactorEnabled: updatedUser.twoFactorEnabled || false,
+    };
+
+    console.log("✅ Profile updated successfully");
+
     return NextResponse.json({
-      message: "Profile updated successfully",
-      profile: updatedUser,
+      success: true,
+      profile,
     });
   } catch (error) {
-    console.error("Update profile error:", error);
+    console.error("💥 Error updating profile:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

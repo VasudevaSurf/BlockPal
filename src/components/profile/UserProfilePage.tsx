@@ -1,3 +1,4 @@
+// src/components/profile/UserProfilePage.tsx - FIXED with skeleton loading
 "use client";
 
 import { useState, useEffect } from "react";
@@ -32,6 +33,7 @@ import { logoutUser } from "@/store/slices/authSlice";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import TwoFactorSetupModal from "./TwoFactorSetupModal";
+import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 
 interface UserProfile {
   username: string;
@@ -51,6 +53,129 @@ interface UserProfile {
     currency: "USD" | "INR" | "EUR";
   };
   twoFactorEnabled: boolean;
+}
+
+// Profile Statistics Skeleton Component
+function ProfileStatsSkeleton() {
+  return (
+    <>
+      {/* Mobile Stats */}
+      <div className="block xl:hidden">
+        <div className="grid grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]"
+            >
+              <div className="flex items-center mb-2">
+                <Skeleton variant="circular" className="w-4 h-4 mr-2" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+              <Skeleton className="h-6 w-8" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop Stats */}
+      <div className="hidden xl:block">
+        <div className="grid grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] text-center"
+            >
+              <Skeleton variant="circular" className="w-6 h-6 mx-auto mb-2" />
+              <Skeleton className="h-5 w-8 mx-auto mb-1" />
+              <Skeleton className="h-3 w-20 mx-auto" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Profile Header Skeleton Component
+function ProfileHeaderSkeleton() {
+  return (
+    <SkeletonCard>
+      <div className="flex items-center justify-between mb-4 lg:mb-6">
+        <Skeleton className="h-5 lg:h-6 w-32" />
+        <Skeleton variant="rounded" className="h-8 lg:h-10 w-20 lg:w-32" />
+      </div>
+
+      {/* Mobile Layout */}
+      <div className="block xl:hidden">
+        <div className="flex items-center mb-6">
+          <Skeleton variant="circular" className="w-16 h-16 mr-4" />
+          <div>
+            <Skeleton className="h-6 w-32 mb-1" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-12" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Layout */}
+      <div className="hidden xl:block">
+        <div className="flex items-start space-x-6">
+          <Skeleton variant="circular" className="w-24 h-24" />
+          <div className="flex-1">
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-24 mb-4" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Skeleton className="h-3 w-12 mb-1" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <div>
+                <Skeleton className="h-3 w-20 mb-1" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </SkeletonCard>
+  );
+}
+
+// Settings Section Skeleton
+function SettingsSectionSkeleton() {
+  return (
+    <SkeletonCard>
+      <Skeleton className="h-5 lg:h-6 w-32 mb-4 lg:mb-6" />
+
+      <div className="space-y-4 lg:space-y-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Skeleton
+                variant="circular"
+                className="w-4 h-4 lg:w-5 lg:h-5 mr-3"
+              />
+              <div>
+                <Skeleton className="h-4 w-32 mb-1" />
+                {i === 2 && <Skeleton className="h-3 w-16" />}
+              </div>
+            </div>
+            <Skeleton variant="rounded" className="h-6 lg:h-8 w-12 lg:w-16" />
+          </div>
+        ))}
+      </div>
+    </SkeletonCard>
+  );
 }
 
 export default function UserProfilePage() {
@@ -85,6 +210,8 @@ export default function UserProfilePage() {
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
+      console.log("📡 Fetching user profile...");
+
       const response = await fetch("/api/profile", {
         credentials: "include",
       });
@@ -93,9 +220,11 @@ export default function UserProfilePage() {
         const data = await response.json();
         setProfile(data.profile);
         console.log("✅ Profile loaded:", data.profile);
+      } else {
+        console.error("❌ Failed to fetch profile:", response.status);
       }
     } catch (error) {
-      console.error("Error fetching profile:", error);
+      console.error("💥 Error fetching profile:", error);
     } finally {
       setLoading(false);
     }
@@ -219,10 +348,81 @@ export default function UserProfilePage() {
     await dispatch(logoutUser());
   };
 
+  // FIXED: Show skeleton loading when loading
   if (loading) {
     return (
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-6 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19]"></div>
+      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 flex-shrink-0 gap-4 sm:gap-0">
+          <div>
+            <Skeleton className="h-6 sm:h-8 lg:h-10 w-48 sm:w-64 lg:w-80 mb-2" />
+            <Skeleton className="h-4 w-32 sm:w-48" />
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
+            {/* Wallet Selector Skeleton */}
+            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto">
+              <Skeleton
+                variant="circular"
+                className="w-6 h-6 lg:w-8 lg:h-8 mr-2 lg:mr-3"
+              />
+              <Skeleton className="h-4 w-16 mr-2" />
+              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
+              <Skeleton className="h-4 w-20 lg:w-24 hidden sm:block" />
+            </div>
+
+            {/* Icons Container Skeleton */}
+            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
+              <Skeleton variant="circular" className="w-6 h-6 lg:w-8 lg:h-8" />
+              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+              <Skeleton variant="circular" className="w-6 h-6 lg:w-8 lg:h-8" />
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Layout Skeleton */}
+        <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+          <ProfileHeaderSkeleton />
+
+          <SkeletonCard>
+            <Skeleton className="h-5 w-32 mb-4" />
+            <ProfileStatsSkeleton />
+          </SkeletonCard>
+
+          <SettingsSectionSkeleton />
+          <SettingsSectionSkeleton />
+          <SettingsSectionSkeleton />
+        </div>
+
+        {/* Desktop Layout Skeleton */}
+        <div className="hidden xl:flex gap-6 flex-1 min-h-0">
+          {/* Left Column */}
+          <div className="flex-1 space-y-6 overflow-y-auto scrollbar-hide">
+            <ProfileHeaderSkeleton />
+
+            <SkeletonCard>
+              <Skeleton className="h-6 w-32 mb-6" />
+              <ProfileStatsSkeleton />
+            </SkeletonCard>
+          </div>
+
+          {/* Right Column */}
+          <div className="w-[400px] space-y-6 overflow-y-auto scrollbar-hide">
+            <SettingsSectionSkeleton />
+            <SettingsSectionSkeleton />
+            <SettingsSectionSkeleton />
+          </div>
+        </div>
+
+        <style jsx global>{`
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
       </div>
     );
   }
@@ -240,6 +440,23 @@ export default function UserProfilePage() {
     );
   }
 
+  // FIXED: Get wallet color based on activeWallet index in wallets array
+  const getWalletColor = () => {
+    const colors = [
+      "bg-gradient-to-br from-blue-400 to-cyan-400",
+      "bg-gradient-to-br from-purple-400 to-pink-400",
+      "bg-gradient-to-br from-green-400 to-emerald-400",
+      "bg-gradient-to-br from-orange-400 to-red-400",
+      "bg-gradient-to-br from-indigo-400 to-purple-400",
+    ];
+
+    if (!activeWallet) return colors[0];
+
+    // Find the index of the active wallet in the wallets array
+    const activeIndex = wallets.findIndex((w) => w.id === activeWallet.id);
+    return colors[activeIndex >= 0 ? activeIndex % colors.length : 0];
+  };
+
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
       {/* Header */}
@@ -256,7 +473,9 @@ export default function UserProfilePage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
           {/* Wallet Selector */}
           <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto">
-            <div className="w-6 h-6 lg:w-8 lg:h-8 bg-gradient-to-b from-blue-400 to-cyan-400 rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0">
+            <div
+              className={`w-6 h-6 lg:w-8 lg:h-8 ${getWalletColor()} rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0`}
+            >
               <div
                 className="absolute inset-0 rounded-full opacity-30"
                 style={{
@@ -394,7 +613,7 @@ export default function UserProfilePage() {
               <div className="flex items-center mb-2">
                 <Calendar size={16} className="text-[#E2AF19] mr-2" />
                 <span className="text-gray-400 text-xs font-satoshi">
-                  Scheduled Payments
+                  Completed Schedules
                 </span>
               </div>
               <div className="text-white text-lg font-bold font-satoshi">
@@ -747,7 +966,7 @@ export default function UserProfilePage() {
                   {profile.scheduledPayments}
                 </div>
                 <div className="text-gray-400 text-sm font-satoshi">
-                  Scheduled Payments
+                  Completed Schedules
                 </div>
               </div>
 
