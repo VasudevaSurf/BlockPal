@@ -1,4 +1,4 @@
-// src/components/transfer/SimpleTransferModal.tsx - FIXED VERSION
+// src/components/transfer/SimpleTransferModal.tsx - UPDATED WITH USERNAME SEARCH
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,6 +16,8 @@ import {
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import UsernameInput from "@/components/ui/UsernameInput";
+import { UserSuggestion } from "@/hooks/useUsernameSearch";
 
 interface SimpleTransferModalProps {
   isOpen: boolean;
@@ -87,11 +89,15 @@ export default function SimpleTransferModal({
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState("");
 
+  // NEW: Selected user state for username input
+  const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
+
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       setStep("form");
       setFormData({ recipientAddress: "", amount: "" });
+      setSelectedUser(null); // NEW: Reset selected user
       setPreview(null);
       setTransactionResult(null);
       setErrors({});
@@ -100,18 +106,62 @@ export default function SimpleTransferModal({
     }
   }, [isOpen]);
 
+  // NEW: Handle username/address input change
+  const handleRecipientChange = (
+    value: string,
+    suggestion?: UserSuggestion
+  ) => {
+    setFormData({ ...formData, recipientAddress: value });
+
+    if (suggestion) {
+      setSelectedUser(suggestion);
+      console.log("✅ User selected for simple transfer:", suggestion);
+    } else {
+      setSelectedUser(null);
+    }
+
+    // Clear error when user types
+    if (errors.recipientAddress) {
+      setErrors({ ...errors, recipientAddress: "" });
+    }
+  };
+
+  // NEW: Handle user selection from dropdown
+  const handleUserSelect = (user: UserSuggestion) => {
+    setSelectedUser(user);
+    setFormData({ ...formData, recipientAddress: user.walletAddress });
+    console.log("✅ User selected from dropdown:", user);
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // Validate recipient address
+    // NEW: Enhanced validation for username/address
     if (!formData.recipientAddress.trim()) {
       newErrors.recipientAddress = "Recipient address is required";
-    } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.recipientAddress)) {
-      newErrors.recipientAddress = "Invalid Ethereum address format";
-    } else if (
-      formData.recipientAddress.toLowerCase() === walletAddress.toLowerCase()
-    ) {
-      newErrors.recipientAddress = "Cannot send to yourself";
+    } else if (selectedUser) {
+      // User selected from dropdown - use their wallet address
+      if (
+        !selectedUser.walletAddress ||
+        !/^0x[a-fA-F0-9]{40}$/.test(selectedUser.walletAddress)
+      ) {
+        newErrors.recipientAddress =
+          "Selected user has an invalid wallet address";
+      } else if (
+        selectedUser.walletAddress.toLowerCase() === walletAddress.toLowerCase()
+      ) {
+        newErrors.recipientAddress = "Cannot send to yourself";
+      }
+    } else {
+      // Direct address input - validate format
+      if (!/^0x[a-fA-F0-9]{40}$/.test(formData.recipientAddress)) {
+        newErrors.recipientAddress =
+          "Invalid recipient address format. Please enter a valid address or select a user";
+      } else if (
+        formData.recipientAddress.toLowerCase() === walletAddress.toLowerCase()
+      ) {
+        newErrors.recipientAddress = "Cannot send to yourself";
+      }
     }
 
     // Validate amount
@@ -138,7 +188,7 @@ export default function SimpleTransferModal({
       return;
     }
 
-    // FIXED: Validate required parameters
+    // Validate required parameters
     if (!walletAddress) {
       setErrors({ general: "Wallet address not available" });
       return;
@@ -153,9 +203,17 @@ export default function SimpleTransferModal({
     setErrors({}); // Clear previous errors
 
     try {
+      // NEW: Use selected user's wallet address if available, otherwise use direct input
+      const recipientAddress = selectedUser
+        ? selectedUser.walletAddress
+        : formData.recipientAddress;
+
       console.log("📡 Sending preview request with:", {
         tokenInfo,
-        recipientAddress: formData.recipientAddress,
+        recipientAddress: recipientAddress,
+        selectedUser: selectedUser
+          ? `@${selectedUser.username}`
+          : "Direct address",
         amount: formData.amount,
         fromAddress: walletAddress,
         tokenPrice: tokenInfo.priceData?.current_price,
@@ -174,9 +232,9 @@ export default function SimpleTransferModal({
               tokenInfo.contractAddress === "native" ||
               tokenInfo.symbol === "ETH",
           },
-          recipientAddress: formData.recipientAddress,
+          recipientAddress: recipientAddress,
           amount: formData.amount,
-          fromAddress: walletAddress, // FIXED: Ensure this is passed
+          fromAddress: walletAddress,
           tokenPrice: tokenInfo.priceData?.current_price,
         }),
         credentials: "include",
@@ -218,7 +276,7 @@ export default function SimpleTransferModal({
       return;
     }
 
-    // FIXED: Validate required parameters
+    // Validate required parameters
     if (!walletAddress) {
       setErrors({ general: "Wallet address not available" });
       return;
@@ -229,9 +287,17 @@ export default function SimpleTransferModal({
     setErrors({}); // Clear previous errors
 
     try {
+      // NEW: Use selected user's wallet address if available
+      const recipientAddress = selectedUser
+        ? selectedUser.walletAddress
+        : formData.recipientAddress;
+
       console.log("📡 Sending execution request with:", {
         tokenInfo,
-        recipientAddress: formData.recipientAddress,
+        recipientAddress: recipientAddress,
+        selectedUser: selectedUser
+          ? `@${selectedUser.username}`
+          : "Direct address",
         amount: formData.amount,
         fromAddress: walletAddress,
         tokenPrice: tokenInfo.priceData?.current_price,
@@ -250,9 +316,9 @@ export default function SimpleTransferModal({
               tokenInfo.contractAddress === "native" ||
               tokenInfo.symbol === "ETH",
           },
-          recipientAddress: formData.recipientAddress,
+          recipientAddress: recipientAddress,
           amount: formData.amount,
-          fromAddress: walletAddress, // FIXED: Ensure this is passed
+          fromAddress: walletAddress,
           tokenPrice: tokenInfo.priceData?.current_price,
           useStoredKey: true, // Use stored private key
         }),
@@ -331,6 +397,30 @@ export default function SimpleTransferModal({
     return letters[symbol] || symbol.charAt(0);
   };
 
+  // NEW: Helper function to get recipient display info
+  const getRecipientDisplayInfo = () => {
+    if (selectedUser) {
+      return {
+        name: `@${selectedUser.username}`,
+        displayName: selectedUser.displayName || selectedUser.username,
+        address: selectedUser.walletAddress,
+        isUser: true,
+      };
+    } else {
+      return {
+        name: formData.recipientAddress
+          ? `${formData.recipientAddress.slice(
+              0,
+              10
+            )}...${formData.recipientAddress.slice(-6)}`
+          : "",
+        displayName: null,
+        address: formData.recipientAddress,
+        isUser: false,
+      };
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -402,20 +492,13 @@ export default function SimpleTransferModal({
 
               {/* Form Fields */}
               <div className="space-y-4">
+                {/* NEW: Username/Address Input */}
                 <div>
-                  <Input
-                    type="text"
-                    placeholder="0x... recipient address"
+                  <UsernameInput
                     value={formData.recipientAddress}
-                    onChange={(e) => {
-                      setFormData({
-                        ...formData,
-                        recipientAddress: e.target.value,
-                      });
-                      if (errors.recipientAddress) {
-                        setErrors({ ...errors, recipientAddress: "" });
-                      }
-                    }}
+                    onChange={handleRecipientChange}
+                    onUserSelect={handleUserSelect}
+                    placeholder="@username or 0x... address"
                     error={errors.recipientAddress}
                     className="font-satoshi"
                   />
@@ -517,12 +600,32 @@ export default function SimpleTransferModal({
                       {preview.fromAddress.slice(-6)}
                     </span>
                   </div>
+                  {/* NEW: Enhanced recipient display */}
                   <div className="flex justify-between">
                     <span className="text-gray-400">To:</span>
-                    <span className="text-white">
-                      {preview.toAddress.slice(0, 8)}...
-                      {preview.toAddress.slice(-6)}
-                    </span>
+                    <div className="text-right">
+                      {selectedUser ? (
+                        <div>
+                          <span className="text-green-400 font-medium">
+                            @{selectedUser.username}
+                          </span>
+                          {selectedUser.displayName && (
+                            <div className="text-gray-400 text-xs">
+                              {selectedUser.displayName}
+                            </div>
+                          )}
+                          <div className="text-white text-xs">
+                            {selectedUser.walletAddress.slice(0, 8)}...
+                            {selectedUser.walletAddress.slice(-6)}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-white">
+                          {preview.toAddress.slice(0, 8)}...
+                          {preview.toAddress.slice(-6)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Amount:</span>

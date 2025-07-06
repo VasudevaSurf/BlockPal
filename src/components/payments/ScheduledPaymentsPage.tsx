@@ -1,4 +1,3 @@
-// src/components/payments/ScheduledPaymentsPage.tsx - COMPLETE UPDATED VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -28,6 +27,8 @@ import {
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import UsernameInput from "@/components/ui/UsernameInput";
+import { UserSuggestion } from "@/hooks/useUsernameSearch";
 import { SkeletonScheduledPayments } from "@/components/ui/Skeleton";
 
 interface ScheduledPayment {
@@ -242,6 +243,9 @@ export default function ScheduledPaymentsPage() {
   const [copied, setCopied] = useState<string>("");
   const [initialLoading, setInitialLoading] = useState(true);
 
+  // NEW: Selected user state for username input
+  const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
+
   // Initialize with first available token
   useEffect(() => {
     if (tokens.length > 0 && !selectedToken) {
@@ -310,7 +314,33 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  // FIXED: Add the missing handleDeletePayment function
+  // NEW: Handle username/address input change
+  const handleRecipientChange = (
+    value: string,
+    suggestion?: UserSuggestion
+  ) => {
+    setFormData({ ...formData, recipient: value });
+
+    if (suggestion) {
+      setSelectedUser(suggestion);
+      console.log("✅ User selected for scheduled payment:", suggestion);
+    } else {
+      setSelectedUser(null);
+    }
+
+    // Clear error when user types
+    if (error) {
+      setError("");
+    }
+  };
+
+  // NEW: Handle user selection from dropdown
+  const handleUserSelect = (user: UserSuggestion) => {
+    setSelectedUser(user);
+    setFormData({ ...formData, recipient: user.walletAddress });
+    console.log("✅ User selected from dropdown:", user);
+  };
+
   const handleDeletePayment = async (scheduleId: string) => {
     if (
       !confirm(
@@ -335,7 +365,6 @@ export default function ScheduledPaymentsPage() {
 
       if (response.ok) {
         console.log("✅ Payment deleted successfully");
-        // Refresh the list
         fetchScheduledPayments();
       } else {
         setError(data.error || "Failed to delete payment");
@@ -348,7 +377,6 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  // FIXED: Improve the cancel payment function
   const handleCancelPayment = async (scheduleId: string) => {
     if (!confirm("Are you sure you want to cancel this scheduled payment?")) {
       return;
@@ -373,7 +401,6 @@ export default function ScheduledPaymentsPage() {
 
       if (response.ok) {
         console.log("✅ Payment cancelled successfully");
-        // Refresh the list
         fetchScheduledPayments();
       } else {
         setError(data.error || "Failed to cancel payment");
@@ -386,13 +413,11 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  // FIXED: Add working explorer and hash functions
   const openExplorer = (payment: ScheduledPayment) => {
     if (payment.lastTransactionHash) {
       const explorerUrl = `https://etherscan.io/tx/${payment.lastTransactionHash}`;
       window.open(explorerUrl, "_blank");
     } else {
-      // If no transaction hash, search by wallet address
       const explorerUrl = `https://etherscan.io/address/${payment.walletAddress}`;
       window.open(explorerUrl, "_blank");
     }
@@ -409,7 +434,6 @@ export default function ScheduledPaymentsPage() {
         setError("Failed to copy transaction hash");
       }
     } else {
-      // If no transaction hash, copy the schedule ID
       try {
         await navigator.clipboard.writeText(payment.scheduleId);
         setCopied(`schedule-${payment.id}`);
@@ -432,9 +456,24 @@ export default function ScheduledPaymentsPage() {
       return false;
     }
 
-    if (!/^0x[a-fA-F0-9]{40}$/.test(formData.recipient)) {
-      setError("Invalid recipient address format");
-      return false;
+    // NEW: Enhanced validation for username/address
+    if (selectedUser) {
+      // User selected from dropdown - use their wallet address
+      if (
+        !selectedUser.walletAddress ||
+        !/^0x[a-fA-F0-9]{40}$/.test(selectedUser.walletAddress)
+      ) {
+        setError("Selected user has an invalid wallet address");
+        return false;
+      }
+    } else {
+      // Direct address input - validate format
+      if (!/^0x[a-fA-F0-9]{40}$/.test(formData.recipient)) {
+        setError(
+          "Invalid recipient address format. Please enter a valid address or select a user"
+        );
+        return false;
+      }
     }
 
     const amount = parseFloat(formData.amount);
@@ -474,18 +513,28 @@ export default function ScheduledPaymentsPage() {
       const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
+      // NEW: Use selected user's wallet address if available, otherwise use direct input
+      const recipientAddress = selectedUser
+        ? selectedUser.walletAddress
+        : formData.recipient;
+
       const requestBody = {
         action: "preview",
         tokenInfo: selectedToken,
         fromAddress: activeWallet.address,
-        recipient: formData.recipient,
+        recipient: recipientAddress,
         amount: formData.amount,
         scheduledFor: scheduledDateTime.toISOString(),
         frequency,
         timezone: selectedTimezone.tz,
       };
 
-      console.log("📡 Sending smart contract preview request:", requestBody);
+      console.log("📡 Sending smart contract preview request:", {
+        ...requestBody,
+        selectedUser: selectedUser
+          ? `@${selectedUser.username}`
+          : "Direct address",
+      });
 
       const response = await fetch("/api/scheduled-payments", {
         method: "POST",
@@ -525,11 +574,16 @@ export default function ScheduledPaymentsPage() {
       const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
+      // NEW: Use selected user's wallet address if available
+      const recipientAddress = selectedUser
+        ? selectedUser.walletAddress
+        : formData.recipient;
+
       const createBody = {
         action: "create",
         tokenInfo: selectedToken,
         fromAddress: activeWallet.address,
-        recipient: formData.recipient,
+        recipient: recipientAddress,
         amount: formData.amount,
         scheduledFor: scheduledDateTime.toISOString(),
         frequency,
@@ -537,7 +591,12 @@ export default function ScheduledPaymentsPage() {
         description: formData.description,
       };
 
-      console.log("📡 Sending smart contract create request:", createBody);
+      console.log("📡 Sending smart contract create request:", {
+        ...createBody,
+        selectedUser: selectedUser
+          ? `@${selectedUser.username}`
+          : "Direct address",
+      });
 
       const response = await fetch("/api/scheduled-payments", {
         method: "POST",
@@ -566,11 +625,11 @@ export default function ScheduledPaymentsPage() {
         time: "",
         description: "",
       });
+      setSelectedUser(null); // NEW: Reset selected user
       setRecurringEnabled(false);
 
       console.log("✅ Smart contract scheduled payment created successfully");
 
-      // Refresh the list
       fetchScheduledPayments();
     } catch (err: any) {
       console.error("❌ Create error:", err);
@@ -616,7 +675,6 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  // FIXED: Update action button renderers
   const renderMobileActionButtons = (payment: ScheduledPayment) => {
     if (activeTab === "active") {
       return (
@@ -822,15 +880,13 @@ export default function ScheduledPaymentsPage() {
           </h2>
 
           <div className="space-y-4">
-            {/* Recipient */}
+            {/* NEW: Username/Address Input */}
             <div>
-              <Input
-                type="text"
-                placeholder="@username or address"
+              <UsernameInput
                 value={formData.recipient}
-                onChange={(e) =>
-                  setFormData({ ...formData, recipient: e.target.value })
-                }
+                onChange={handleRecipientChange}
+                onUserSelect={handleUserSelect}
+                placeholder="@username or 0x... address"
                 className="font-satoshi text-gray-400"
               />
             </div>
@@ -1018,6 +1074,7 @@ export default function ScheduledPaymentsPage() {
                     time: "",
                     description: "",
                   });
+                  setSelectedUser(null); // NEW: Reset selected user
                   setRecurringEnabled(false);
                   setError("");
                 }}
@@ -1193,14 +1250,13 @@ export default function ScheduledPaymentsPage() {
 
           {/* Form Row */}
           <div className="grid grid-cols-12 gap-4 mb-6">
+            {/* NEW: Username/Address Input */}
             <div className="col-span-3">
-              <Input
-                type="text"
-                placeholder="@username or address"
+              <UsernameInput
                 value={formData.recipient}
-                onChange={(e) =>
-                  setFormData({ ...formData, recipient: e.target.value })
-                }
+                onChange={handleRecipientChange}
+                onUserSelect={handleUserSelect}
+                placeholder="@username or 0x... address"
                 className="font-satoshi text-gray-400"
               />
             </div>
@@ -1407,6 +1463,7 @@ export default function ScheduledPaymentsPage() {
                   time: "",
                   description: "",
                 });
+                setSelectedUser(null); // NEW: Reset selected user
                 setRecurringEnabled(false);
                 setError("");
               }}

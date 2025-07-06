@@ -1,4 +1,4 @@
-// src/app/dashboard/batch-payments/page.tsx - FIXED: Real token icons like TokenList
+// src/app/dashboard/batch-payments/page.tsx - UPDATED WITH USERNAME SEARCH
 "use client";
 
 import { useState, useEffect } from "react";
@@ -20,6 +20,8 @@ import {
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import UsernameInput from "@/components/ui/UsernameInput";
+import { UserSuggestion } from "@/hooks/useUsernameSearch";
 import TransactionHistory from "@/components/transactions/TransactionHistory";
 
 interface BatchPayment {
@@ -30,14 +32,15 @@ interface BatchPayment {
     contractAddress: string;
     decimals: number;
     isETH: boolean;
-    logoUrl?: string; // FIXED: Add logoUrl for real images
+    logoUrl?: string;
   };
   recipient: string;
   amount: string;
   usdValue: number;
+  selectedUser?: UserSuggestion | null; // NEW: Track selected user for each payment
 }
 
-// FIXED: Helper function to check if icon URL is valid (same as TokenList)
+// Helper function to check if icon URL is valid (same as TokenList)
 const isValidImageUrl = (url: string | null | undefined): boolean => {
   if (!url || url === "null" || url === "undefined" || url === "") {
     return false;
@@ -50,7 +53,7 @@ const isValidImageUrl = (url: string | null | undefined): boolean => {
   );
 };
 
-// FIXED: Get fallback token icon colors (same as TokenList)
+// Get fallback token icon colors (same as TokenList)
 const getTokenIcon = (symbol: string, contractAddress?: string) => {
   const colors: Record<string, string> = {
     ETH: "bg-blue-500",
@@ -81,7 +84,7 @@ const getTokenIcon = (symbol: string, contractAddress?: string) => {
   return colors[symbol] || "bg-gray-500";
 };
 
-// FIXED: Get fallback token letters (same as TokenList)
+// Get fallback token letters (same as TokenList)
 const getTokenLetter = (symbol: string, contractAddress?: string) => {
   const letters: Record<string, string> = {
     ETH: "Ξ",
@@ -112,7 +115,7 @@ const getTokenLetter = (symbol: string, contractAddress?: string) => {
   return letters[symbol] || symbol.charAt(0);
 };
 
-// FIXED: Token icon component (same logic as TokenList)
+// Token icon component (same logic as TokenList)
 const TokenIcon = ({
   token,
   size = "w-5 h-5",
@@ -179,6 +182,9 @@ export default function BatchPaymentsPage() {
   const [copied, setCopied] = useState<string>("");
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
 
+  // NEW: Selected user state for username input
+  const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
+
   // Initialize with first available token
   useEffect(() => {
     if (tokens.length > 0 && !selectedToken) {
@@ -191,10 +197,37 @@ export default function BatchPaymentsPage() {
         isETH: firstToken.symbol === "ETH",
         balance: firstToken.balance,
         price: firstToken.price,
-        logoUrl: firstToken.icon || firstToken.logoUrl, // FIXED: Include logoUrl
+        logoUrl: firstToken.icon || firstToken.logoUrl,
       });
     }
   }, [tokens, selectedToken]);
+
+  // NEW: Handle username/address input change
+  const handleRecipientChange = (
+    value: string,
+    suggestion?: UserSuggestion
+  ) => {
+    setFormData({ ...formData, recipient: value });
+
+    if (suggestion) {
+      setSelectedUser(suggestion);
+      console.log("✅ User selected for batch payment:", suggestion);
+    } else {
+      setSelectedUser(null);
+    }
+
+    // Clear error when user types
+    if (error) {
+      setError("");
+    }
+  };
+
+  // NEW: Handle user selection from dropdown
+  const handleUserSelect = (user: UserSuggestion) => {
+    setSelectedUser(user);
+    setFormData({ ...formData, recipient: user.walletAddress });
+    console.log("✅ User selected from dropdown:", user);
+  };
 
   const addToBatch = () => {
     if (!formData.recipient || !formData.amount || !selectedToken) {
@@ -202,10 +235,29 @@ export default function BatchPaymentsPage() {
       return;
     }
 
-    // Validate recipient address
-    if (!/^0x[a-fA-F0-9]{40}$/.test(formData.recipient)) {
-      setError("Invalid recipient address format");
-      return;
+    // NEW: Enhanced validation for username/address
+    let finalRecipientAddress = formData.recipient;
+    let finalSelectedUser = selectedUser;
+
+    if (selectedUser) {
+      // User selected from dropdown - use their wallet address
+      if (
+        !selectedUser.walletAddress ||
+        !/^0x[a-fA-F0-9]{40}$/.test(selectedUser.walletAddress)
+      ) {
+        setError("Selected user has an invalid wallet address");
+        return;
+      }
+      finalRecipientAddress = selectedUser.walletAddress;
+    } else {
+      // Direct address input - validate format
+      if (!/^0x[a-fA-F0-9]{40}$/.test(formData.recipient)) {
+        setError(
+          "Invalid recipient address format. Please enter a valid address or select a user"
+        );
+        return;
+      }
+      finalSelectedUser = null;
     }
 
     // Validate amount
@@ -225,7 +277,8 @@ export default function BatchPaymentsPage() {
     // Check for duplicate recipient with same token
     const duplicate = batchPayments.find(
       (payment) =>
-        payment.recipient.toLowerCase() === formData.recipient.toLowerCase() &&
+        payment.recipient.toLowerCase() ===
+          finalRecipientAddress.toLowerCase() &&
         payment.tokenInfo.contractAddress === selectedToken.contractAddress
     );
 
@@ -246,15 +299,17 @@ export default function BatchPaymentsPage() {
         contractAddress: selectedToken.contractAddress,
         decimals: selectedToken.decimals,
         isETH: selectedToken.isETH,
-        logoUrl: selectedToken.logoUrl, // FIXED: Include logoUrl
+        logoUrl: selectedToken.logoUrl,
       },
-      recipient: formData.recipient.toLowerCase(),
+      recipient: finalRecipientAddress.toLowerCase(),
       amount: formData.amount,
       usdValue,
+      selectedUser: finalSelectedUser, // NEW: Store selected user info
     };
 
     setBatchPayments([...batchPayments, newPayment]);
     setFormData({ recipient: "", amount: "" });
+    setSelectedUser(null); // NEW: Reset selected user
     setError("");
   };
 
@@ -402,12 +457,35 @@ export default function BatchPaymentsPage() {
     setResult(null);
     setShowResult(false);
     setError("");
+    setSelectedUser(null); // NEW: Reset selected user
   };
 
   const totalAmount = batchPayments.reduce(
     (sum, payment) => sum + parseFloat(payment.amount),
     0
   );
+
+  // NEW: Helper function to display recipient info
+  const getRecipientDisplay = (payment: BatchPayment) => {
+    if (payment.selectedUser) {
+      return {
+        name: `@${payment.selectedUser.username}`,
+        displayName:
+          payment.selectedUser.displayName || payment.selectedUser.username,
+        address: payment.recipient,
+        isUser: true,
+      };
+    } else {
+      return {
+        name: `${payment.recipient.slice(0, 10)}...${payment.recipient.slice(
+          -6
+        )}`,
+        displayName: null,
+        address: payment.recipient,
+        isUser: false,
+      };
+    }
+  };
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
@@ -482,20 +560,19 @@ export default function BatchPaymentsPage() {
 
           {/* Mobile Form Layout */}
           <div className="space-y-3">
+            {/* NEW: Username/Address Input */}
             <div>
-              <Input
-                type="text"
-                placeholder="0x... recipient address"
+              <UsernameInput
                 value={formData.recipient}
-                onChange={(e) =>
-                  setFormData({ ...formData, recipient: e.target.value })
-                }
+                onChange={handleRecipientChange}
+                onUserSelect={handleUserSelect}
+                placeholder="@username or 0x... address"
                 className="font-satoshi text-gray-400"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              {/* FIXED: Token Selector with real images */}
+              {/* Token Selector with real images */}
               <div className="relative">
                 <button
                   onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
@@ -514,7 +591,7 @@ export default function BatchPaymentsPage() {
                   <ChevronDown size={16} className="text-gray-400" />
                 </button>
 
-                {/* FIXED: Dropdown with real images */}
+                {/* Dropdown with real images */}
                 {isTokenDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {tokens.map((token) => (
@@ -529,7 +606,7 @@ export default function BatchPaymentsPage() {
                             isETH: token.symbol === "ETH",
                             balance: token.balance,
                             price: token.price,
-                            logoUrl: token.icon || token.logoUrl, // FIXED: Include logoUrl
+                            logoUrl: token.icon || token.logoUrl,
                           });
                           setIsTokenDropdownOpen(false);
                         }}
@@ -618,7 +695,7 @@ export default function BatchPaymentsPage() {
           </div>
         )}
 
-        {/* Batch Payments List - Mobile Cards with real images */}
+        {/* Batch Payments List - Mobile Cards with enhanced recipient display */}
         {batchPayments.length > 0 && (
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
             <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
@@ -626,49 +703,56 @@ export default function BatchPaymentsPage() {
             </h3>
 
             <div className="space-y-3">
-              {batchPayments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] relative"
-                >
-                  <button
-                    onClick={() => removeFromBatch(payment.id)}
-                    className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-400 transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
+              {batchPayments.map((payment) => {
+                const recipientInfo = getRecipientDisplay(payment);
 
-                  <div className="flex items-center mb-3 pr-6">
-                    <div className="w-8 h-8 bg-gray-600 rounded-full mr-3 flex items-center justify-center">
-                      <span className="text-white text-sm">
-                        {payment.recipient.startsWith("0x")
-                          ? "0"
-                          : payment.recipient[1]?.toUpperCase() || "?"}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-white font-medium font-satoshi truncate">
-                        {payment.recipient.slice(0, 10)}...
-                        {payment.recipient.slice(-6)}
-                      </div>
-                      <div className="flex items-center mt-1">
-                        <TokenIcon token={payment.tokenInfo} size="w-4 h-4" />
-                        <span className="text-gray-400 text-sm font-satoshi">
-                          {payment.tokenInfo.symbol}
+                return (
+                  <div
+                    key={payment.id}
+                    className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] relative"
+                  >
+                    <button
+                      onClick={() => removeFromBatch(payment.id)}
+                      className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-400 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+
+                    <div className="flex items-center mb-3 pr-6">
+                      {/* NEW: Enhanced recipient display */}
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">
+                          {recipientInfo.isUser ? "@" : "0"}
                         </span>
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white font-medium font-satoshi truncate">
+                          {recipientInfo.name}
+                        </div>
+                        {recipientInfo.isUser && recipientInfo.displayName && (
+                          <div className="text-gray-400 text-xs font-satoshi truncate">
+                            {recipientInfo.displayName}
+                          </div>
+                        )}
+                        <div className="flex items-center mt-1">
+                          <TokenIcon token={payment.tokenInfo} size="w-4 h-4" />
+                          <span className="text-gray-400 text-sm font-satoshi">
+                            {payment.tokenInfo.symbol}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="text-white font-bold font-satoshi">
-                        {payment.amount} {payment.tokenInfo.symbol}
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="text-white font-bold font-satoshi">
+                          {payment.amount} {payment.tokenInfo.symbol}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -696,19 +780,18 @@ export default function BatchPaymentsPage() {
 
           {/* Input Row - Desktop Grid */}
           <div className="grid grid-cols-8 gap-3 mb-4">
+            {/* NEW: Username/Address Input */}
             <div className="col-span-3">
-              <Input
-                type="text"
-                placeholder="0x... recipient address"
+              <UsernameInput
                 value={formData.recipient}
-                onChange={(e) =>
-                  setFormData({ ...formData, recipient: e.target.value })
-                }
+                onChange={handleRecipientChange}
+                onUserSelect={handleUserSelect}
+                placeholder="@username or 0x... address"
                 className="font-satoshi text-gray-400 py-3 text-sm h-full"
               />
             </div>
 
-            {/* FIXED: Token Selector - Desktop */}
+            {/* Token Selector - Desktop */}
             <div className="col-span-2 relative">
               <button
                 onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
@@ -742,7 +825,7 @@ export default function BatchPaymentsPage() {
                           isETH: token.symbol === "ETH",
                           balance: token.balance,
                           price: token.price,
-                          logoUrl: token.icon || token.logoUrl, // FIXED: Include logoUrl
+                          logoUrl: token.icon || token.logoUrl,
                         });
                         setIsTokenDropdownOpen(false);
                       }}
@@ -810,7 +893,7 @@ export default function BatchPaymentsPage() {
             </div>
           </div>
 
-          {/* Batch Payments List with real images */}
+          {/* Batch Payments List with enhanced recipient display */}
           <div
             className="overflow-y-auto scrollbar-hide mb-6 flex-1"
             style={{ maxHeight: "300px" }}
@@ -829,40 +912,54 @@ export default function BatchPaymentsPage() {
               </div>
             ) : (
               <div>
-                {batchPayments.map((payment, index) => (
-                  <div key={payment.id}>
-                    <div className="grid grid-cols-4 gap-2 items-center py-3 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors">
-                      <div className="flex items-center min-w-0">
-                        <div className="w-6 h-6 bg-gray-600 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
-                          <span className="text-white text-xs">
-                            {payment.recipient.startsWith("0x")
-                              ? "0"
-                              : payment.recipient[1]?.toUpperCase() || "?"}
+                {batchPayments.map((payment, index) => {
+                  const recipientInfo = getRecipientDisplay(payment);
+
+                  return (
+                    <div key={payment.id}>
+                      <div className="grid grid-cols-4 gap-2 items-center py-3 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors">
+                        {/* NEW: Enhanced recipient display */}
+                        <div className="flex items-center min-w-0">
+                          <div className="w-6 h-6 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
+                            <span className="text-white text-xs font-medium">
+                              {recipientInfo.isUser ? "@" : "0"}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-white font-satoshi text-sm truncate block">
+                              {recipientInfo.name}
+                            </span>
+                            {recipientInfo.isUser &&
+                              recipientInfo.displayName && (
+                                <span className="text-gray-400 font-satoshi text-xs truncate block">
+                                  {recipientInfo.displayName}
+                                </span>
+                              )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center min-w-0">
+                          <TokenIcon token={payment.tokenInfo} size="w-5 h-5" />
+                          <span className="text-white font-satoshi text-sm truncate">
+                            {payment.tokenInfo.symbol}
                           </span>
                         </div>
-                        <span className="text-white font-satoshi text-sm truncate">
-                          {payment.recipient.slice(0, 10)}...
-                          {payment.recipient.slice(-6)}
-                        </span>
+
+                        <div className="text-white font-satoshi text-sm">
+                          {payment.amount} {payment.tokenInfo.symbol}
+                        </div>
+
+                        <div className="text-white font-satoshi text-sm">
+                          ~ 65,000 gas
+                        </div>
                       </div>
 
-                      <div className="flex items-center min-w-0">
-                        <TokenIcon token={payment.tokenInfo} size="w-5 h-5" />
-                        <span className="text-white font-satoshi text-sm truncate">
-                          {payment.tokenInfo.symbol}
-                        </span>
-                      </div>
-
-                      <div className="text-white font-satoshi text-sm">
-                        {payment.amount} {payment.tokenInfo.symbol}
-                      </div>
+                      {index < batchPayments.length - 1 && (
+                        <div className="border-b border-[#2C2C2C] mx-3 my-1"></div>
+                      )}
                     </div>
-
-                    {index < batchPayments.length - 1 && (
-                      <div className="border-b border-[#2C2C2C] mx-3 my-1"></div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
