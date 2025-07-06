@@ -287,7 +287,7 @@ export default function GlobalDashboardHeader({
               {displayTitle}
             </h1>
             {/* Real-time status indicator in title */}
-            {isMonitoring && (
+            {/* {isMonitoring && (
               <div className="ml-3 flex items-center">
                 <Wifi
                   size={16}
@@ -303,7 +303,7 @@ export default function GlobalDashboardHeader({
                   LIVE
                 </span>
               </div>
-            )}
+            )} */}
           </div>
 
           {displaySubtitle && (
@@ -312,7 +312,7 @@ export default function GlobalDashboardHeader({
                 {displaySubtitle}
               </p>
               {/* Real-time indicator with status */}
-              {isMonitoring && (
+              {/* {isMonitoring && (
                 <div className="ml-4 flex items-center text-green-400">
                   <Radio size={12} className="mr-1 animate-pulse" />
                   <span className="text-xs">Auto-refresh</span>
@@ -327,7 +327,7 @@ export default function GlobalDashboardHeader({
                     </span>
                   )}
                 </div>
-              )}
+              )} */}
             </div>
           )}
         </div>
@@ -388,7 +388,7 @@ export default function GlobalDashboardHeader({
                       </span>
                     )}
                   {/* Real-time status indicator */}
-                  {isMonitoring && (
+                  {/* {isMonitoring && (
                     <span
                       className={`ml-2 text-xs ${
                         isDataStale ? "text-yellow-400" : "text-green-400"
@@ -396,7 +396,7 @@ export default function GlobalDashboardHeader({
                     >
                       • LIVE
                     </span>
-                  )}
+                  )} */}
                 </div>
               </div>
 
@@ -442,10 +442,10 @@ export default function GlobalDashboardHeader({
                 />
               )}
 
-              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+              {/* <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div> */}
 
               {/* Real-time status button */}
-              <button
+              {/* <button
                 onClick={() => setShowRealtimeStatus(!showRealtimeStatus)}
                 className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
                 title="Real-time status"
@@ -463,12 +463,12 @@ export default function GlobalDashboardHeader({
                 {isMonitoring && (
                   <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 )}
-              </button>
+              </button> */}
 
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
 
               {/* Manual refresh button */}
-              <button
+              {/* <button
                 onClick={refreshDashboard}
                 className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full"
                 title="Force refresh"
@@ -479,7 +479,7 @@ export default function GlobalDashboardHeader({
                 />
               </button>
 
-              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div> */}
 
               <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
                 <HelpCircle size={16} className="text-gray-400 lg:w-5 lg:h-5" />

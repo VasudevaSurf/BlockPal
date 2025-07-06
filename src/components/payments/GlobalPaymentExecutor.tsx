@@ -149,8 +149,7 @@ export default function GlobalPaymentExecutor() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
-      {/* Enhanced Main Executor Button */}
-      <div className="relative">
+      {/* <div className="relative">
         <button
           onClick={() => setShowStatus(!showStatus)}
           className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
@@ -169,30 +168,26 @@ export default function GlobalPaymentExecutor() {
           )}
         </button>
 
-        {/* Enhanced Status indicator dot */}
         <div
           className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
             executorRunning ? "bg-emerald-400 animate-pulse" : "bg-red-400"
           }`}
         />
 
-        {/* Processing indicator with enhanced styling */}
         {executorStatus?.processingPayments?.length > 0 && (
           <div className="absolute -top-2 -left-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold animate-bounce">
             {executorStatus.processingPayments.length}
           </div>
         )}
 
-        {/* Enhanced API Badge */}
         {executorRunning && (
           <div className="absolute -bottom-1 -left-1 bg-gradient-to-r from-yellow-400 to-orange-400 text-black text-xs rounded-full px-1 py-0.5 font-bold">
             API
           </div>
         )}
-      </div>
+      </div> */}
 
-      {/* Enhanced Status Panel */}
-      {showStatus && (
+      {/* {showStatus && (
         <div className="absolute bottom-16 right-0 w-80 bg-black border border-[#2C2C2C] rounded-lg p-4 shadow-xl">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center">
@@ -213,7 +208,6 @@ export default function GlobalPaymentExecutor() {
             </button>
           </div>
 
-          {/* Enhanced API Benefits */}
           <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/50 rounded-lg p-2 mb-3">
             <div className="flex items-center mb-1">
               <TrendingUp size={14} className="text-green-400 mr-2" />
@@ -289,7 +283,6 @@ export default function GlobalPaymentExecutor() {
             )}
           </div>
 
-          {/* Recent Activity with Enhanced API indication */}
           {executorStatus?.processingPayments?.length > 0 && (
             <div className="mt-3 pt-3 border-t border-[#2C2C2C]">
               <div className="text-xs text-gray-400 mb-2">
@@ -309,7 +302,6 @@ export default function GlobalPaymentExecutor() {
             </div>
           )}
 
-          {/* Gas Savings Estimate */}
           {executorRunning && executorStatus?.executedPayments?.length > 0 && (
             <div className="mt-3 pt-3 border-t border-[#2C2C2C]">
               <div className="bg-yellow-900/30 border border-yellow-500/50 rounded p-2">
@@ -329,7 +321,7 @@ export default function GlobalPaymentExecutor() {
             </div>
           )}
         </div>
-      )}
+      )} */}
     </div>
   );
 }

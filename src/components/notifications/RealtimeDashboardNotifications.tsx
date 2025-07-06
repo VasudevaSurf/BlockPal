@@ -85,7 +85,7 @@ export default function RealtimeDashboardNotifications() {
       <div className="fixed top-4 right-4 z-50">
         <div className="flex flex-col items-end space-y-2">
           {/* Status Badge */}
-          <div
+          {/* <div
             className={`flex items-center px-3 py-2 rounded-full border cursor-pointer transition-all duration-200 ${
               isMonitoring
                 ? "bg-green-900/20 border-green-500/50 hover:bg-green-900/30"
@@ -115,7 +115,7 @@ export default function RealtimeDashboardNotifications() {
                 <AlertTriangle size={12} className="text-yellow-400 ml-2" />
               )}
             </div>
-          </div>
+          </div> */}
 
           {/* Detailed Status Panel */}
           {showStatus && (

@@ -263,7 +263,7 @@ export default function DashboardPage() {
       <RealtimeDashboardNotifications />
 
       {/* Real-time Status Badge (enhanced with countdown) */}
-      {isMonitoring && (
+      {/* {isMonitoring && (
         <div className="fixed bottom-4 right-4 z-40">
           <div className="bg-black/90 backdrop-blur-sm border border-green-500/50 rounded-lg px-4 py-3">
             <div className="flex items-center space-x-3">
@@ -281,7 +281,7 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Main Dashboard Content */}
       {wallets.length === 0 ? (
@@ -336,7 +336,7 @@ export default function DashboardPage() {
       )}
 
       {/* Enhanced Real-time Status Indicator in Dashboard */}
-      {isMonitoring && realtimeData && (
+      {/* {isMonitoring && realtimeData && (
         <div className="fixed bottom-20 left-4 z-40">
           <div className="bg-black/90 backdrop-blur-sm border border-[#2C2C2C] rounded-lg p-3 max-w-xs">
             <div className="flex items-center justify-between mb-2">
@@ -388,7 +388,7 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Modals */}
       <WalletWelcomeModal

@@ -118,8 +118,8 @@ export default function NotificationPanel({
       </div>
 
       {/* Real-time Status Section */}
-      <div className="p-4 border-b border-[#2C2C2C] bg-[#0F0F0F]/50">
-        <div className="flex items-center justify-between mb-3">
+      {/* <div className="p-4 border-b border-[#2C2C2C] bg-[#0F0F0F]/50"> */}
+        {/* <div className="flex items-center justify-between mb-3">
           <div className="flex items-center">
             {isMonitoring ? (
               <Wifi size={16} className="text-green-400 animate-pulse mr-2" />
@@ -142,10 +142,10 @@ export default function NotificationPanel({
             <RefreshCw size={12} className="mr-1" />
             Refresh
           </button>
-        </div>
+        </div> */}
 
         {/* Status Details */}
-        <div className="space-y-2 text-xs">
+        {/* <div className="space-y-2 text-xs">
           {lastUpdated && (
             <div className="flex justify-between">
               <span className="text-gray-400">Last Update:</span>
@@ -183,10 +183,10 @@ export default function NotificationPanel({
             <span className="text-gray-400">Auto-refresh:</span>
             <span className="text-green-400">Every 10s</span>
           </div>
-        </div>
+        </div> */}
 
         {/* Quick Status Indicators */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#2C2C2C]">
+        {/* <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#2C2C2C]">
           <div className="flex items-center space-x-3">
             <div className="flex items-center">
               <div
@@ -216,8 +216,8 @@ export default function NotificationPanel({
               </span>
             </div>
           )}
-        </div>
-      </div>
+        </div> */}
+      {/* </div> */}
 
       {/* Notifications List */}
       <div className="max-h-64 overflow-y-auto">

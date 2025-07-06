@@ -85,7 +85,6 @@ export default function RealtimeStatusIndicator({
 
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
-      {/* Status Icon */}
       <div className="flex items-center">
         {getStatusIcon()}
         {showLabel && (
@@ -95,7 +94,6 @@ export default function RealtimeStatusIndicator({
         )}
       </div>
 
-      {/* Countdown Timer */}
       {showCountdown &&
         isMonitoring &&
         nextUpdateCountdown > 0 &&
@@ -108,7 +106,6 @@ export default function RealtimeStatusIndicator({
           </div>
         )}
 
-      {/* Pulse Animation for Active Status */}
       {isMonitoring && !isDataStale && (
         <div className="relative">
           <div
@@ -124,7 +121,6 @@ export default function RealtimeStatusIndicator({
         </div>
       )}
 
-      {/* Manual Refresh Button (optional) */}
       {isMonitoring && (
         <button
           onClick={handleManualRefresh}

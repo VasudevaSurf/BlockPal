@@ -153,8 +153,7 @@ export default function RealtimeWalletSwitcher({
                 <h2 className="text-xl font-bold text-white font-mayeka mr-2">
                   Wallets
                 </h2>
-                {/* Real-time indicator */}
-                <div className="flex items-center">
+                {/* <div className="flex items-center">
                   <Radio
                     size={12}
                     className={`mr-1 ${
@@ -171,24 +170,23 @@ export default function RealtimeWalletSwitcher({
                     {isMonitoring ? "LIVE" : "OFFLINE"}
                   </span>
                 </div>
-                {/* DB sync indicator */}
                 <div className="flex items-center ml-3">
                   <Database size={12} className="text-blue-400 mr-1" />
                   <span className="text-xs text-blue-400">DB Synced</span>
-                </div>
+                </div> */}
               </div>
-              <div className="flex items-center text-gray-400 text-sm font-satoshi mt-1">
+              {/* <div className="flex items-center text-gray-400 text-sm font-satoshi mt-1">
                 <span>Auto-updating every 15 seconds</span>
                 {lastUpdateTime && (
                   <span className="ml-2 text-xs">
                     Last: {formatTime(lastUpdateTime)}
                   </span>
                 )}
-              </div>
+              </div> */}
             </div>
             <div className="flex items-center space-x-2">
               {/* Status button */}
-              <button
+              {/* <button
                 onClick={() => setShowStatus(!showStatus)}
                 className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
                 title="Monitor status"
@@ -197,7 +195,7 @@ export default function RealtimeWalletSwitcher({
                   size={16}
                   className={isMonitoring ? "text-green-400" : "text-gray-400"}
                 />
-              </button>
+              </button> */}
 
               {/* Manual refresh button */}
               <button
@@ -472,7 +470,7 @@ export default function RealtimeWalletSwitcher({
                     <span>
                       {wallets.length} wallet{wallets.length !== 1 ? "s" : ""}
                     </span>
-                    <div className="w-1 h-1 bg-gray-400 rounded-full mx-2"></div>
+                    {/* <div className="w-1 h-1 bg-gray-400 rounded-full mx-2"></div>
                     <Radio
                       size={8}
                       className="mr-1 text-green-400 animate-pulse"
@@ -480,7 +478,7 @@ export default function RealtimeWalletSwitcher({
                     <span>Real-time</span>
                     <div className="w-1 h-1 bg-gray-400 rounded-full mx-2"></div>
                     <Database size={8} className="mr-1 text-blue-400" />
-                    <span>DB Synced</span>
+                    <span>DB Synced</span> */}
                   </div>
                 </div>
               </div>
