@@ -1,7 +1,8 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - GLOBAL HEADER with Real-time Wallet Switcher
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED GLOBAL HEADER
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import {
   Bell,
@@ -31,11 +32,63 @@ interface GlobalDashboardHeaderProps {
   children?: React.ReactNode; // For page-specific content
 }
 
+// Page title mapping based on pathname
+const getPageTitle = (
+  pathname: string
+): { title: string; subtitle?: string } => {
+  switch (pathname) {
+    case "/dashboard":
+      return {
+        title: "Dashboard",
+        subtitle: "Welcome back to your crypto portfolio",
+      };
+    case "/dashboard/scheduled-payments":
+      return {
+        title: "Scheduled Payments",
+        subtitle:
+          "Automated payments with smart contract security and automatic tax handling",
+      };
+    case "/dashboard/batch-payments":
+      return {
+        title: "Batch Payments",
+        subtitle: "Send multiple payments efficiently in a single transaction",
+      };
+    case "/dashboard/ai-chat":
+      return {
+        title: "🤖 AI Chat Assistant",
+        subtitle: "Powered by GoPlus Security & CoinGecko APIs",
+      };
+    case "/dashboard/friends":
+      return {
+        title: "Friends",
+        subtitle: "Connect with friends and request funds",
+      };
+    case "/dashboard/profile":
+      return {
+        title: "👤 User Profile",
+        subtitle: "Manage your account settings and preferences",
+      };
+    default:
+      if (pathname.startsWith("/dashboard/token/")) {
+        return {
+          title: "📊 TOKEN INFORMATION",
+          subtitle: "Detailed token analysis and portfolio insights",
+        };
+      }
+      return {
+        title: "Dashboard",
+        subtitle: "Welcome back",
+      };
+  }
+};
+
 export default function GlobalDashboardHeader({
-  title,
-  subtitle,
+  title: propTitle,
+  subtitle: propSubtitle,
   children,
 }: GlobalDashboardHeaderProps) {
+  const pathname = usePathname();
+  const router = useRouter();
   const {
     isAuthenticated,
     loading: authLoading,
@@ -60,6 +113,12 @@ export default function GlobalDashboardHeader({
   const authChecked = useRef(false);
   const walletsLoaded = useRef(false);
   const activeWalletSynced = useRef(false);
+
+  // Get page-specific title and subtitle
+  const pageInfo = getPageTitle(pathname);
+  const displayTitle = propTitle !== "Dashboard" ? propTitle : pageInfo.title;
+  const displaySubtitle =
+    propSubtitle !== "Welcome back" ? propSubtitle : pageInfo.subtitle;
 
   // Auth check effect - only run once
   useEffect(() => {
@@ -110,8 +169,10 @@ export default function GlobalDashboardHeader({
   const handleLogout = async () => {
     try {
       await dispatch(logoutUser());
+      router.push("/auth");
     } catch (error) {
       console.error("Logout error:", error);
+      router.push("/auth");
     }
   };
 
@@ -179,14 +240,14 @@ export default function GlobalDashboardHeader({
       <RealtimeBalanceNotifications />
 
       {/* Global Header - Fixed across all pages */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 flex-shrink-0 gap-4 sm:gap-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 flex-shrink-0 gap-4 sm:gap-0">
         <div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
-            {title}
+            {displayTitle}
           </h1>
-          {subtitle && (
+          {displaySubtitle && (
             <p className="text-gray-400 text-sm font-satoshi mt-1 flex items-center">
-              {subtitle}
+              {displaySubtitle}
               {/* Real-time indicator */}
               {isMonitoring && (
                 <span className="ml-2 flex items-center text-green-400">

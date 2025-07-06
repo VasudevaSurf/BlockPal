@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED WITH NAVIGATION LOADING
+// src/app/dashboard/layout.tsx - UPDATED WITH GLOBAL HEADER
 "use client";
 
 import { useSelector } from "react-redux";
@@ -8,6 +8,7 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import WalletSelector from "@/components/dashboard/WalletSelector";
 import GlobalPaymentExecutor from "@/components/payments/GlobalPaymentExecutor";
 import NavigationLoadingIndicator from "@/components/ui/NavigationLoadingIndicator";
+import GlobalDashboardHeader from "@/components/dashboard/GlobalDashboardHeader";
 import { NavigationLoadingProvider } from "@/contexts/NavigationLoadingContext";
 import { Menu, X } from "lucide-react";
 
@@ -60,9 +61,20 @@ export default function DashboardLayout({
           <Sidebar />
         </div>
 
-        {/* Main Content */}
-        <main className="flex-1 lg:ml-5 overflow-hidden min-w-0 min-h-0">
-          {children}
+        {/* Main Content with Global Header */}
+        <main className="flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col">
+          {/* Global Header Container - This stays fixed */}
+          <div className="flex-shrink-0 bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] sm:p-4 lg:p-5">
+            <GlobalDashboardHeader
+              title="Dashboard" // Default title, will be overridden by individual pages
+              subtitle="Welcome back" // Default subtitle
+            >
+              {/* This children prop will be populated by individual pages */}
+            </GlobalDashboardHeader>
+          </div>
+
+          {/* Content Area - This changes based on route */}
+          <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
         </main>
 
         {/* Global Payment Executor - Floating Button */}

@@ -1,4 +1,4 @@
-// src/components/ui/Skeleton.tsx
+// src/components/ui/Skeleton.tsx - UPDATED to remove header skeletons
 import React from "react";
 import { clsx } from "clsx";
 
@@ -49,39 +49,9 @@ export function SkeletonCard({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Header Skeleton
-export function SkeletonHeader() {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 lg:mb-6 flex-shrink-0 gap-4 sm:gap-0">
-      <div>
-        <Skeleton className="h-6 sm:h-8 lg:h-10 w-48 sm:w-64 lg:w-80 mb-2" />
-        <Skeleton className="h-4 w-32 sm:w-48" />
-      </div>
+// REMOVED: SkeletonHeader - No longer needed since header is global
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
-        {/* Wallet Selector Skeleton */}
-        <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto">
-          <Skeleton
-            variant="circular"
-            className="w-6 h-6 lg:w-8 lg:h-8 mr-2 lg:mr-3"
-          />
-          <Skeleton className="h-4 w-16 mr-2" />
-          <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
-          <Skeleton className="h-4 w-20 lg:w-24 hidden sm:block" />
-        </div>
-
-        {/* Icons Container Skeleton */}
-        <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
-          <Skeleton variant="circular" className="w-6 h-6 lg:w-8 lg:h-8" />
-          <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
-          <Skeleton variant="circular" className="w-6 h-6 lg:w-8 lg:h-8" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Token List Skeleton
+// Token List Skeleton (NO HEADER)
 export function SkeletonTokenList() {
   return (
     <SkeletonCard>
@@ -146,7 +116,7 @@ export function SkeletonTokenList() {
   );
 }
 
-// Wallet Balance Skeleton
+// Wallet Balance Skeleton (NO HEADER)
 export function SkeletonWalletBalance() {
   return (
     <SkeletonCard>
@@ -169,7 +139,7 @@ export function SkeletonWalletBalance() {
   );
 }
 
-// Swap Section Skeleton
+// Swap Section Skeleton (NO HEADER)
 export function SkeletonSwapSection() {
   return (
     <SkeletonCard>
@@ -252,11 +222,11 @@ export function SkeletonSwapSection() {
   );
 }
 
-// AI Chat Skeleton
+// AI Chat Skeleton (NO HEADER)
 export function SkeletonAIChat() {
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      <SkeletonHeader />
+      {/* Header removed - now using global header */}
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Quick Suggestions Skeleton */}
@@ -296,11 +266,11 @@ export function SkeletonAIChat() {
   );
 }
 
-// Friends Page Skeleton
+// Friends Page Skeleton (NO HEADER)
 export function SkeletonFriendsPage() {
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      <SkeletonHeader />
+      {/* Header removed - now using global header */}
 
       <div className="flex-1 flex flex-col min-h-0">
         <SkeletonCard>
@@ -368,11 +338,11 @@ export function SkeletonFriendsPage() {
   );
 }
 
-// Scheduled Payments Skeleton
+// Scheduled Payments Skeleton (NO HEADER)
 export function SkeletonScheduledPayments() {
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      <SkeletonHeader />
+      {/* Header removed - now using global header */}
 
       {/* Mobile Layout */}
       <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0">
@@ -541,7 +511,7 @@ export function SkeletonScheduledPayments() {
   );
 }
 
-// Transaction History Skeleton
+// Transaction History Skeleton (NO HEADER)
 export function SkeletonTransactionHistory() {
   return (
     <div className="flex flex-col min-h-0">
@@ -591,11 +561,11 @@ export function SkeletonTransactionHistory() {
   );
 }
 
-// Token Overview Skeleton
+// Token Overview Skeleton (NO HEADER)
 export function SkeletonTokenOverview() {
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      <SkeletonHeader />
+      {/* Header removed - now using global header */}
 
       {/* Mobile Layout */}
       <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto">
