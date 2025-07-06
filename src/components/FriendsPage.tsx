@@ -1,17 +1,14 @@
-// src/components/FriendsPage.tsx - ENHANCED with Fixed Token Dropdown
+// src/components/FriendsPage.tsx - COMPLETE VERSION with ALL functionality
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import {
-  Search,
-  UserPlus,
-  Check,
-  X,
   DollarSign,
   Clock,
   AlertCircle,
-  ChevronDown,
+  Check,
+  X,
   Bell,
   HelpCircle,
   Copy,
@@ -19,14 +16,15 @@ import {
   XCircle,
   Ban,
   ExternalLink,
-  RefreshCw,
   AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FundRequestModal from "@/components/friends/FundRequestModal";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
+import EnhancedFriendsSearch from "@/components/friends/EnhancedFriendsSearch";
 import { SkeletonFriendsPage } from "@/components/ui/Skeleton";
 
 interface User {
@@ -35,6 +33,7 @@ interface User {
   displayName: string;
   avatar?: string;
   gmail?: string;
+  walletAddress?: string;
 }
 
 interface Friend extends User {
@@ -48,6 +47,15 @@ interface FriendRequest {
   status: "pending" | "accepted" | "declined";
   requestedAt: string;
   requesterData: User;
+}
+
+interface SentRequest {
+  _id: string;
+  requesterUsername: string;
+  receiverUsername: string;
+  status: "pending";
+  requestedAt: string;
+  receiverData?: User;
 }
 
 interface FundRequest {
@@ -71,7 +79,7 @@ export default function FriendsPage() {
     (state: RootState) => state.wallet
   );
 
-  // FIXED: Add current user state to track the logged-in user
+  // Current user state to track the logged-in user
   const [currentUser, setCurrentUser] = useState<{ username: string } | null>(
     null
   );
@@ -81,18 +89,16 @@ export default function FriendsPage() {
   >("Friends");
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [sentRequests, setSentRequests] = useState<SentRequest[]>([]);
   const [fundRequests, setFundRequests] = useState<FundRequest[]>([]);
-  const [suggestions, setSuggestions] = useState<User[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Fund request modal
+  // Fund request modal states
   const [showFundRequestModal, setShowFundRequestModal] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [selectedFundRequest, setSelectedFundRequest] =
@@ -103,7 +109,7 @@ export default function FriendsPage() {
     message: "",
   });
 
-  // ADDED: Token dropdown state
+  // Token dropdown state for fund request modal
   const [showTokenDropdown, setShowTokenDropdown] = useState(false);
 
   // Track copied state for clipboard actions
@@ -118,14 +124,7 @@ export default function FriendsPage() {
     });
   };
 
-  const searchRef = useRef<HTMLDivElement>(null);
-  const searchTimeout = useRef<NodeJS.Timeout>();
-
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  // ENHANCED: Token image utilities (same as TokenList)
+  // Enhanced token utilities (same as TokenList)
   const getTokenIcon = (symbol: string, contractAddress?: string) => {
     const colors: Record<string, string> = {
       ETH: "bg-blue-500",
@@ -144,7 +143,6 @@ export default function FriendsPage() {
       LINK: "bg-blue-700",
     };
 
-    // Special handling for ETH/native token
     if (
       symbol === "ETH" ||
       contractAddress === "native" ||
@@ -174,7 +172,6 @@ export default function FriendsPage() {
       LINK: "⛓",
     };
 
-    // Special handling for ETH/native token
     if (
       symbol === "ETH" ||
       contractAddress === "native" ||
@@ -198,7 +195,7 @@ export default function FriendsPage() {
     );
   };
 
-  // ENHANCED: Render token with real images
+  // Enhanced token rendering for fund request modal
   const renderTokenOption = (token: any, isSelected: boolean = false) => {
     const symbol = token?.symbol || "ETH";
     const contractAddress = token?.contractAddress;
@@ -208,15 +205,12 @@ export default function FriendsPage() {
       <div
         className={`flex items-center ${isSelected ? "justify-between" : ""}`}
       >
-        {/* Real token image */}
         {isValidImageUrl(imageUrl) ? (
           <img
             src={imageUrl}
             alt={symbol}
             className="w-5 h-5 rounded-full mr-2 flex-shrink-0"
             onError={(e) => {
-              console.log(`❌ Image load failed for ${symbol}: ${imageUrl}`);
-              // Fallback to colored circle if image fails
               const target = e.target as HTMLImageElement;
               target.style.display = "none";
               const fallback = target.nextElementSibling as HTMLElement;
@@ -227,7 +221,6 @@ export default function FriendsPage() {
           />
         ) : null}
 
-        {/* Fallback colored circle */}
         <div
           className={`w-5 h-5 ${getTokenIcon(
             symbol,
@@ -253,44 +246,7 @@ export default function FriendsPage() {
     );
   };
 
-  // Auto-search for user suggestions
-  useEffect(() => {
-    if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current);
-    }
-
-    if (searchQuery.trim() && !isWalletAddress(searchQuery)) {
-      searchTimeout.current = setTimeout(() => {
-        searchUsers(searchQuery);
-      }, 300);
-    } else {
-      setSuggestions([]);
-      setShowSuggestions(false);
-    }
-
-    return () => {
-      if (searchTimeout.current) {
-        clearTimeout(searchTimeout.current);
-      }
-    };
-  }, [searchQuery]);
-
-  // Close suggestions when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        searchRef.current &&
-        !searchRef.current.contains(event.target as Node)
-      ) {
-        setShowSuggestions(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // ADDED: Click outside handler for token dropdown
+  // Click outside handler for token dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const dropdown = document.querySelector("[data-token-dropdown]");
@@ -306,20 +262,7 @@ export default function FriendsPage() {
     }
   }, [showTokenDropdown]);
 
-  // Load data based on active tab
-  useEffect(() => {
-    if (!initialLoading) {
-      if (activeTab === "Friends") {
-        loadFriends();
-      } else if (activeTab === "Requests") {
-        loadFriendRequests();
-      } else if (activeTab === "FundRequests") {
-        loadFundRequests();
-      }
-    }
-  }, [activeTab, initialLoading]);
-
-  // FIXED: Add function to get current user info
+  // Load current user info
   const loadCurrentUser = async () => {
     try {
       const response = await fetch("/api/auth/me", {
@@ -341,11 +284,10 @@ export default function FriendsPage() {
   const loadInitialData = async () => {
     try {
       setInitialLoading(true);
-      // Simulate API calls
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      // Load actual data here...
       if (activeTab === "Friends") {
         await loadFriends();
+        await loadSentRequests();
       } else if (activeTab === "Requests") {
         await loadFriendRequests();
       } else if (activeTab === "FundRequests") {
@@ -373,46 +315,29 @@ export default function FriendsPage() {
     }
   };
 
-  // FIXED: Load current user and initial data
+  // Load current user and initial data
   useEffect(() => {
     loadCurrentUser();
     loadInitialData();
     fetchUnreadCount();
 
-    // Set up polling for unread count
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const isWalletAddress = (input: string): boolean => {
-    return /^0x[a-fA-F0-9]{40}$/.test(input);
-  };
-
-  const searchUsers = async (query: string) => {
-    if (!query.trim()) return;
-
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `/api/friends?type=suggestions&query=${encodeURIComponent(query)}`,
-        { credentials: "include" }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setSuggestions(data.suggestions || []);
-        setShowSuggestions(true);
-      } else {
-        console.error("Search failed:", response.status);
-        setSuggestions([]);
+  // Load data based on active tab
+  useEffect(() => {
+    if (!initialLoading) {
+      if (activeTab === "Friends") {
+        loadFriends();
+        loadSentRequests();
+      } else if (activeTab === "Requests") {
+        loadFriendRequests();
+      } else if (activeTab === "FundRequests") {
+        loadFundRequests();
       }
-    } catch (error) {
-      console.error("Error searching users:", error);
-      setSuggestions([]);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [activeTab, initialLoading]);
 
   const loadFriends = async () => {
     try {
@@ -460,7 +385,29 @@ export default function FriendsPage() {
     }
   };
 
-  // STRICT: Enhanced fund requests loading with status validation
+  const loadSentRequests = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/friends?type=sent-requests", {
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSentRequests(data.sentRequests || []);
+        console.log("✅ Sent requests loaded:", data.sentRequests?.length || 0);
+      } else {
+        console.error("Load sent requests failed:", response.status);
+        setError("Failed to load sent requests");
+      }
+    } catch (error) {
+      console.error("Error loading sent requests:", error);
+      setError("Failed to load sent requests");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadFundRequests = async () => {
     try {
       setLoading(true);
@@ -474,12 +421,9 @@ export default function FriendsPage() {
         const data = await response.json();
         const requests = data.fundRequests || [];
 
-        // STRICT: Filter and validate statuses
         const validatedRequests = requests.map((request: FundRequest) => {
-          // Check if expired
           const isExpired = new Date() > new Date(request.expiresAt);
           if (isExpired && request.status === "pending") {
-            // Mark as expired in memory (API should handle this too)
             return { ...request, status: "expired" as const };
           }
           return request;
@@ -527,10 +471,8 @@ export default function FriendsPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setSearchQuery("");
-        setSuggestions([]);
-        setShowSuggestions(false);
-        // Show success message or toast here
+        // Refresh sent requests to update search suggestions
+        loadSentRequests();
         console.log("✅ Friend request sent successfully");
       } else {
         setError(data.error || "Failed to send friend request");
@@ -560,8 +502,9 @@ export default function FriendsPage() {
 
       if (response.ok) {
         loadFriendRequests();
+        loadSentRequests();
         if (action === "accept") {
-          loadFriends(); // Refresh friends list
+          loadFriends();
         }
       }
     } catch (error) {
@@ -597,7 +540,7 @@ export default function FriendsPage() {
   const openFundRequestModal = (friend: Friend) => {
     setSelectedFriend(friend);
     setShowFundRequestModal(true);
-    // ENHANCED: Set default to ETH or first available token with image
+    // Set default to ETH or first available token with image
     const defaultToken =
       tokens.find((token) => token.symbol === "ETH") ||
       tokens.find((token) => isValidImageUrl(token.icon)) ||
@@ -624,24 +567,23 @@ export default function FriendsPage() {
       setLoading(true);
       setError("");
 
-      // FIXED: Use currentUser.username instead of decoded.username
       console.log("💰 Sending fund request:", {
-        from: currentUser.username, // Current user (requester)
-        to: selectedFriend.username, // Friend (who will send)
+        from: currentUser.username,
+        to: selectedFriend.username,
         amount: fundRequestData.amount,
         token: fundRequestData.tokenSymbol,
-        requesterWallet: activeWallet.address, // Current user's active wallet
+        requesterWallet: activeWallet.address,
       });
 
       const response = await fetch("/api/friends/fund-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          friendUsername: selectedFriend.username, // Friend who will send funds
+          friendUsername: selectedFriend.username,
           tokenSymbol: fundRequestData.tokenSymbol,
           amount: fundRequestData.amount,
           message: fundRequestData.message,
-          requesterWalletAddress: activeWallet.address, // FIXED: Use current user's active wallet
+          requesterWalletAddress: activeWallet.address,
         }),
         credentials: "include",
       });
@@ -657,11 +599,7 @@ export default function FriendsPage() {
           message: "",
         });
 
-        // Show success message
         console.log("✅ Fund request sent successfully");
-
-        // You could add a toast notification here
-        // toast.success("Fund request sent successfully!");
       } else {
         setError(data.error || "Failed to send fund request");
       }
@@ -673,7 +611,7 @@ export default function FriendsPage() {
     }
   };
 
-  // STRICT: Enhanced fund request status display
+  // Fund request status display
   const getFundRequestStatusInfo = (request: FundRequest) => {
     const isExpired = new Date() > new Date(request.expiresAt);
 
@@ -738,7 +676,6 @@ export default function FriendsPage() {
     }
   };
 
-  // STRICT: Enhanced fund request click handler
   const handleFundRequestClick = (request: FundRequest) => {
     const statusInfo = getFundRequestStatusInfo(request);
 
@@ -750,38 +687,22 @@ export default function FriendsPage() {
     });
 
     if (!statusInfo.canAction) {
-      // STRICT: For processed requests, show different behavior based on status
       if (request.status === "fulfilled" && request.transactionHash) {
-        // Open transaction explorer for fulfilled requests
         window.open(
           `https://etherscan.io/tx/${request.transactionHash}`,
           "_blank"
         );
         return;
       } else {
-        // For other processed statuses, show info modal or just ignore
         console.log(`ℹ️ Request is ${request.status} - no action available`);
-        // Could show a toast here: "This request has been {status}"
         return;
       }
     }
 
-    // Only open modal for pending requests
     setSelectedFundRequest(request);
   };
 
-  // FIXED: Load current user and initial data
-  useEffect(() => {
-    loadCurrentUser();
-    loadInitialData();
-    fetchUnreadCount();
-
-    // Set up polling for unread count
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // UPDATED: Show skeleton when initially loading
+  // Show skeleton when initially loading
   if (initialLoading) {
     return <SkeletonFriendsPage />;
   }
@@ -871,7 +792,7 @@ export default function FriendsPage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0">
         <div className="bg-black rounded-[16px] lg:rounded-[20px] border border-[#2C2C2C] p-4 lg:p-6 flex-1 flex flex-col min-h-0">
-          {/* Tab Navigation with Search */}
+          {/* Tab Navigation with Enhanced Search */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 lg:mb-6 gap-4">
             {/* Tab Buttons */}
             <div className="flex">
@@ -907,79 +828,17 @@ export default function FriendsPage() {
               </button>
             </div>
 
-            {/* Search Input with Auto-suggestions */}
+            {/* Enhanced Search Component - Only show for Friends tab */}
             {activeTab === "Friends" && (
-              <div className="relative" ref={searchRef}>
-                <div className="flex items-center gap-3">
-                  <div className="relative flex-1">
-                    <Input
-                      type="text"
-                      placeholder={
-                        isWalletAddress(searchQuery)
-                          ? "Wallet address detected"
-                          : "@username or display name"
-                      }
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                        setError("");
-                      }}
-                      className="font-satoshi pr-10"
-                      style={{ fontSize: "16px" }}
-                    />
-                    <Search
-                      size={16}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                    />
-                  </div>
-
-                  {searchQuery && isWalletAddress(searchQuery) && (
-                    <Button
-                      onClick={() => sendFriendRequest(searchQuery)}
-                      disabled={loading}
-                      className="whitespace-nowrap text-sm lg:text-base"
-                    >
-                      {loading ? "Adding..." : "Add Friend"}
-                    </Button>
-                  )}
-                </div>
-
-                {/* Auto-suggestions */}
-                {showSuggestions && suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                    {suggestions.map((user) => (
-                      <div
-                        key={user._id}
-                        className="flex items-center justify-between p-3 hover:bg-[#2C2C2C] transition-colors"
-                      >
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 bg-gray-600 rounded-full mr-3 flex items-center justify-center">
-                            <span className="text-white text-sm font-medium">
-                              {user.displayName?.[0]?.toUpperCase() ||
-                                user.username[0]?.toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="text-white font-satoshi text-sm">
-                              {user.displayName || user.username}
-                            </div>
-                            <div className="text-gray-400 font-satoshi text-xs">
-                              @{user.username}
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => sendFriendRequest(user.username)}
-                          disabled={loading}
-                          className="bg-[#E2AF19] text-black px-3 py-1 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-xs flex items-center"
-                        >
-                          <UserPlus size={12} className="mr-1" />
-                          Add
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="w-full lg:w-96">
+                <EnhancedFriendsSearch
+                  friends={friends}
+                  friendRequests={friendRequests}
+                  sentRequests={sentRequests}
+                  onSendFriendRequest={sendFriendRequest}
+                  loading={loading}
+                  currentUsername={currentUser?.username}
+                />
               </div>
             )}
           </div>
@@ -998,7 +857,7 @@ export default function FriendsPage() {
                 ) : friends.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
                     <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-                      <UserPlus
+                      <DollarSign
                         size={20}
                         className="text-gray-400 lg:w-6 lg:h-6"
                       />
@@ -1007,7 +866,7 @@ export default function FriendsPage() {
                       No friends yet
                     </h3>
                     <p className="text-gray-400 font-satoshi text-sm lg:text-base mb-4">
-                      Search for friends by username above
+                      Search for friends using the search box above
                     </p>
                     <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 max-w-sm">
                       <p className="text-blue-400 text-sm font-satoshi">
@@ -1252,7 +1111,6 @@ export default function FriendsPage() {
                                 </div>
                               </div>
 
-                              {/* STRICT: Status indicator */}
                               <div
                                 className={`px-2 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
                               >
@@ -1276,7 +1134,6 @@ export default function FriendsPage() {
                               )}
                             </div>
 
-                            {/* STRICT: Different actions based on status */}
                             <div className="flex items-center justify-between pt-3 border-t border-[#2C2C2C]">
                               <div className="flex items-center text-gray-400 text-xs font-satoshi">
                                 <Clock size={12} className="mr-1" />
@@ -1300,7 +1157,6 @@ export default function FriendsPage() {
                                 )}
                               </div>
 
-                              {/* STRICT: Action indicators */}
                               {statusInfo.canAction ? (
                                 <div className="text-[#E2AF19] text-xs font-satoshi">
                                   Tap to respond
@@ -1320,7 +1176,6 @@ export default function FriendsPage() {
                               )}
                             </div>
 
-                            {/* Transaction hash for fulfilled requests */}
                             {request.status === "fulfilled" &&
                               request.transactionHash && (
                                 <div className="mt-2 p-2 bg-green-900/20 border border-green-500/50 rounded">
@@ -1389,7 +1244,6 @@ export default function FriendsPage() {
                                 {request.amount} {request.tokenSymbol}
                               </div>
 
-                              {/* STRICT: Status display */}
                               <div
                                 className={`px-3 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
                               >
@@ -1401,7 +1255,6 @@ export default function FriendsPage() {
                                 </span>
                               </div>
 
-                              {/* STRICT: Action indicators */}
                               {statusInfo.canAction ? (
                                 <div className="text-[#E2AF19] text-sm font-satoshi">
                                   Click to respond
@@ -1461,7 +1314,7 @@ export default function FriendsPage() {
                 onClick={() => {
                   setShowFundRequestModal(false);
                   setSelectedFriend(null);
-                  setShowTokenDropdown(false); // ADDED: Reset dropdown state
+                  setShowTokenDropdown(false);
                 }}
                 className="text-gray-400 hover:text-white transition-colors"
               >
@@ -1487,7 +1340,7 @@ export default function FriendsPage() {
                 </div>
               </div>
 
-              {/* FIXED: Clear explanation of fund request flow */}
+              {/* Fund request flow explanation */}
               <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] mb-4">
                 <div className="text-sm font-satoshi mb-3">
                   <span className="text-[#E2AF19] font-medium">
@@ -1580,82 +1433,29 @@ export default function FriendsPage() {
             </div>
 
             <div className="space-y-4">
-              {/* FIXED: Token Dropdown */}
+              {/* Token Dropdown */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Token
                 </label>
                 <div className="relative" data-token-dropdown>
-                  {/* Custom Select Button */}
                   <button
                     type="button"
                     onClick={() => setShowTokenDropdown(!showTokenDropdown)}
                     className="w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white font-satoshi text-left flex items-center justify-between hover:border-[#E2AF19] transition-colors focus:outline-none focus:border-[#E2AF19]"
                   >
-                    <div className="flex items-center">
-                      {(() => {
-                        const selectedToken = tokens.find(
-                          (t) => t.symbol === fundRequestData.tokenSymbol
-                        ) || {
-                          symbol: "ETH",
-                          icon: null,
-                          contractAddress: "native",
-                        };
-                        return (
-                          <>
-                            {/* Real token image */}
-                            {isValidImageUrl(selectedToken.icon) ? (
-                              <img
-                                src={selectedToken.icon}
-                                alt={selectedToken.symbol}
-                                className="w-6 h-6 rounded-full mr-3 flex-shrink-0"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = "none";
-                                  const fallback =
-                                    target.nextElementSibling as HTMLElement;
-                                  if (fallback) {
-                                    fallback.classList.remove("hidden");
-                                  }
-                                }}
-                              />
-                            ) : null}
-
-                            {/* Fallback colored circle */}
-                            <div
-                              className={`w-6 h-6 ${getTokenIcon(
-                                selectedToken.symbol,
-                                selectedToken.contractAddress
-                              )} rounded-full mr-3 flex items-center justify-center flex-shrink-0 ${
-                                isValidImageUrl(selectedToken.icon)
-                                  ? "hidden"
-                                  : ""
-                              }`}
-                            >
-                              <span className="text-white text-xs font-medium">
-                                {getTokenLetter(
-                                  selectedToken.symbol,
-                                  selectedToken.contractAddress
-                                )}
-                              </span>
-                            </div>
-
-                            <span className="text-white font-satoshi">
-                              {selectedToken.symbol}
-                            </span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                    <ChevronDown
-                      size={16}
-                      className={`text-gray-400 transition-transform ${
-                        showTokenDropdown ? "rotate-180" : ""
-                      }`}
-                    />
+                    {(() => {
+                      const selectedToken = tokens.find(
+                        (t) => t.symbol === fundRequestData.tokenSymbol
+                      ) || {
+                        symbol: "ETH",
+                        icon: null,
+                        contractAddress: "native",
+                      };
+                      return renderTokenOption(selectedToken, true);
+                    })()}
                   </button>
 
-                  {/* Custom Dropdown Menu */}
                   {showTokenDropdown && (
                     <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-64 overflow-y-auto">
                       {/* ETH Option */}
@@ -1670,12 +1470,11 @@ export default function FriendsPage() {
                         }}
                         className="w-full flex items-center px-3 py-3 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
                       >
-                        <div className="w-6 h-6 bg-blue-500 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
-                          <span className="text-white text-xs font-medium">
-                            Ξ
-                          </span>
-                        </div>
-                        <span className="text-white font-satoshi">ETH</span>
+                        {renderTokenOption({
+                          symbol: "ETH",
+                          icon: null,
+                          contractAddress: "native",
+                        })}
                       </button>
 
                       {/* Other Token Options */}
@@ -1692,44 +1491,7 @@ export default function FriendsPage() {
                           }}
                           className="w-full flex items-center px-3 py-3 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
                         >
-                          {/* Real token image */}
-                          {isValidImageUrl(token.icon) ? (
-                            <img
-                              src={token.icon}
-                              alt={token.symbol}
-                              className="w-6 h-6 rounded-full mr-3 flex-shrink-0"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = "none";
-                                const fallback =
-                                  target.nextElementSibling as HTMLElement;
-                                if (fallback) {
-                                  fallback.classList.remove("hidden");
-                                }
-                              }}
-                            />
-                          ) : null}
-
-                          {/* Fallback colored circle */}
-                          <div
-                            className={`w-6 h-6 ${getTokenIcon(
-                              token.symbol,
-                              token.contractAddress
-                            )} rounded-full mr-3 flex items-center justify-center flex-shrink-0 ${
-                              isValidImageUrl(token.icon) ? "hidden" : ""
-                            }`}
-                          >
-                            <span className="text-white text-xs font-medium">
-                              {getTokenLetter(
-                                token.symbol,
-                                token.contractAddress
-                              )}
-                            </span>
-                          </div>
-
-                          <span className="text-white font-satoshi">
-                            {token.symbol}
-                          </span>
+                          {renderTokenOption(token)}
                         </button>
                       ))}
                     </div>
@@ -1774,7 +1536,7 @@ export default function FriendsPage() {
                   onClick={() => {
                     setShowFundRequestModal(false);
                     setSelectedFriend(null);
-                    setShowTokenDropdown(false); // ADDED: Reset dropdown state
+                    setShowTokenDropdown(false);
                   }}
                   className="flex-1 px-4 py-2 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
                 >
@@ -1793,7 +1555,7 @@ export default function FriendsPage() {
         </div>
       )}
 
-      {/* Fund Request Detail Modal - STRICT: Only opens for pending requests */}
+      {/* Fund Request Detail Modal - Only opens for pending requests */}
       {selectedFundRequest && (
         <FundRequestModal
           isOpen={!!selectedFundRequest}
@@ -1801,11 +1563,11 @@ export default function FriendsPage() {
           fundRequest={selectedFundRequest}
           onFulfilled={() => {
             setSelectedFundRequest(null);
-            loadFundRequests(); // Refresh the list
+            loadFundRequests();
           }}
           onDeclined={() => {
             setSelectedFundRequest(null);
-            loadFundRequests(); // Refresh the list
+            loadFundRequests();
           }}
         />
       )}
@@ -1829,10 +1591,9 @@ export default function FriendsPage() {
           background-image: none;
         }
 
-        /* Mobile specific adjustments */
         @media (max-width: 640px) {
           input {
-            font-size: 16px; /* Prevents zoom on iOS */
+            font-size: 16px;
           }
         }
       `}</style>
