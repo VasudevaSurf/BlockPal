@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED GLOBAL HEADER
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED WITH REAL-TIME STATUS
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -13,6 +13,11 @@ import {
   TrendingUp,
   TrendingDown,
   HelpCircle,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  Clock,
+  X,
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
@@ -22,9 +27,9 @@ import {
   setActiveWalletInDB,
   getActiveWalletFromDB,
 } from "@/store/slices/walletSlice";
-import { useRealtimeWalletBalances } from "@/hooks/useRealtimeWalletBalances";
+import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
 import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
-import RealtimeBalanceNotifications from "@/components/notifications/RealtimeBalanceNotifications";
+import NotificationPanel from "@/components/notifications/NotificationPanel";
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -101,18 +106,44 @@ export default function GlobalDashboardHeader({
   } = useSelector((state: RootState) => state.wallet);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Real-time wallet balances
-  const { realtimeBalances, activeWalletBalance, isMonitoring, notifications } =
-    useRealtimeWalletBalances();
+  // Real-time dashboard hook
+  const {
+    data: realtimeData,
+    isMonitoring,
+    lastUpdated,
+    changeAmount,
+    hasChanges,
+    notifications = [], // Default to empty array to prevent undefined error
+    refreshDashboard,
+    status,
+    isDataStale,
+    getTimeSinceUpdate,
+  } = useRealtimeDashboard();
 
   // Wallet switcher state
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
   const [showRealtimeStatus, setShowRealtimeStatus] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [nextUpdateCountdown, setNextUpdateCountdown] = useState<number>(0);
 
   // Use refs to track if we've already made initial calls
   const authChecked = useRef(false);
   const walletsLoaded = useRef(false);
   const activeWalletSynced = useRef(false);
+
+  // Calculate countdown to next update
+  useEffect(() => {
+    if (!isMonitoring || !lastUpdated) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdated.getTime();
+      const timeToNextUpdate = 10000 - (timeSinceLastUpdate % 10000); // 10 second interval
+      setNextUpdateCountdown(Math.ceil(timeToNextUpdate / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isMonitoring, lastUpdated]);
 
   // Get page-specific title and subtitle
   const pageInfo = getPageTitle(pathname);
@@ -204,16 +235,14 @@ export default function GlobalDashboardHeader({
     return colors[activeIndex >= 0 ? activeIndex % colors.length : 0];
   };
 
-  // Get active wallet display data
+  // Get active wallet display data with real-time information
   const getActiveWalletDisplayData = () => {
-    const activeRealtimeWallet = realtimeBalances.find((w) => w.isActive);
-
-    if (activeRealtimeWallet) {
+    if (realtimeData && isMonitoring) {
       return {
-        name: activeRealtimeWallet.name,
-        address: activeRealtimeWallet.address,
-        balance: activeRealtimeWallet.balance,
-        changeAmount: activeRealtimeWallet.changeAmount,
+        name: activeWallet?.name || "Loading...",
+        address: activeWallet?.address || "",
+        balance: realtimeData.totalValue,
+        changeAmount: hasChanges ? changeAmount : undefined,
         hasRealtimeData: true,
       };
     }
@@ -229,6 +258,20 @@ export default function GlobalDashboardHeader({
 
   const activeWalletData = getActiveWalletDisplayData();
 
+  // Format time since last update
+  const formatTimeSince = () => {
+    if (!lastUpdated) return null;
+    const timeSince = getTimeSinceUpdate();
+    if (!timeSince) return null;
+
+    const seconds = Math.floor(timeSince / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  };
+
   // Don't render if not authenticated
   if (!isAuthenticated) {
     return null;
@@ -236,26 +279,56 @@ export default function GlobalDashboardHeader({
 
   return (
     <>
-      {/* Real-time Balance Notifications */}
-      <RealtimeBalanceNotifications />
-
       {/* Global Header - Fixed across all pages */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 flex-shrink-0 gap-4 sm:gap-0">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
-            {displayTitle}
-          </h1>
-          {displaySubtitle && (
-            <p className="text-gray-400 text-sm font-satoshi mt-1 flex items-center">
-              {displaySubtitle}
-              {/* Real-time indicator */}
-              {isMonitoring && (
-                <span className="ml-2 flex items-center text-green-400">
-                  <Radio size={12} className="mr-1 animate-pulse" />
-                  <span className="text-xs">Real-time</span>
+          <div className="flex items-center">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
+              {displayTitle}
+            </h1>
+            {/* Real-time status indicator in title */}
+            {isMonitoring && (
+              <div className="ml-3 flex items-center">
+                <Wifi
+                  size={16}
+                  className={`mr-1 ${
+                    isDataStale ? "text-yellow-400" : "text-green-400"
+                  } animate-pulse`}
+                />
+                <span
+                  className={`text-xs font-satoshi ${
+                    isDataStale ? "text-yellow-400" : "text-green-400"
+                  }`}
+                >
+                  LIVE
                 </span>
+              </div>
+            )}
+          </div>
+
+          {displaySubtitle && (
+            <div className="flex items-center">
+              <p className="text-gray-400 text-sm font-satoshi mt-1">
+                {displaySubtitle}
+              </p>
+              {/* Real-time indicator with status */}
+              {isMonitoring && (
+                <div className="ml-4 flex items-center text-green-400">
+                  <Radio size={12} className="mr-1 animate-pulse" />
+                  <span className="text-xs">Auto-refresh</span>
+                  {lastUpdated && (
+                    <span className="text-xs text-gray-400 ml-2">
+                      • {formatTimeSince()}
+                    </span>
+                  )}
+                  {isDataStale && (
+                    <span className="text-xs text-yellow-400 ml-2">
+                      • Stale
+                    </span>
+                  )}
+                </div>
               )}
-            </p>
+            </div>
           )}
         </div>
 
@@ -279,7 +352,11 @@ export default function GlobalDashboardHeader({
                 ></div>
                 {/* Real-time pulse indicator */}
                 {isMonitoring && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+                  <div
+                    className={`absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse ${
+                      isDataStale ? "bg-yellow-400" : "bg-green-400"
+                    }`}
+                  />
                 )}
               </div>
 
@@ -310,6 +387,16 @@ export default function GlobalDashboardHeader({
                         </span>
                       </span>
                     )}
+                  {/* Real-time status indicator */}
+                  {isMonitoring && (
+                    <span
+                      className={`ml-2 text-xs ${
+                        isDataStale ? "text-yellow-400" : "text-green-400"
+                      }`}
+                    >
+                      • LIVE
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -333,9 +420,63 @@ export default function GlobalDashboardHeader({
 
           {/* Action Icons Container */}
           <div className="flex items-center space-x-3">
-            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
-              <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
+            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3 relative">
+              {/* Notification Bell */}
+              <button
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
+              >
                 <Bell size={16} className="text-gray-400 lg:w-5 lg:h-5" />
+                {Array.isArray(notifications) && notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-satoshi">
+                    {notifications.length > 9 ? "9+" : notifications.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Panel */}
+              {notificationsOpen && (
+                <NotificationPanel
+                  isOpen={notificationsOpen}
+                  onClose={() => setNotificationsOpen(false)}
+                />
+              )}
+
+              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+
+              {/* Real-time status button */}
+              <button
+                onClick={() => setShowRealtimeStatus(!showRealtimeStatus)}
+                className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
+                title="Real-time status"
+              >
+                {isMonitoring ? (
+                  <Wifi
+                    size={16}
+                    className={`${
+                      isDataStale ? "text-yellow-400" : "text-green-400"
+                    } lg:w-5 lg:h-5`}
+                  />
+                ) : (
+                  <WifiOff size={16} className="text-gray-400 lg:w-5 lg:h-5" />
+                )}
+                {isMonitoring && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                )}
+              </button>
+
+              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+
+              {/* Manual refresh button */}
+              <button
+                onClick={refreshDashboard}
+                className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full"
+                title="Force refresh"
+              >
+                <RefreshCw
+                  size={16}
+                  className="text-gray-400 lg:w-5 lg:h-5 hover:text-white"
+                />
               </button>
 
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
@@ -366,6 +507,143 @@ export default function GlobalDashboardHeader({
           </div>
         </div>
       </div>
+
+      {/* Real-time Status Dropdown */}
+      {showRealtimeStatus && (
+        <div className="absolute top-16 right-4 z-50 bg-black/95 backdrop-blur-sm border border-[#2C2C2C] rounded-lg p-4 w-80 shadow-xl">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-semibold text-sm font-satoshi">
+              Real-time Dashboard Status
+            </h3>
+            <button
+              onClick={() => setShowRealtimeStatus(false)}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Monitoring Status:</span>
+              <span
+                className={isMonitoring ? "text-green-400" : "text-red-400"}
+              >
+                {isMonitoring ? "Active" : "Inactive"}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-400">Active Polling:</span>
+              <span
+                className={
+                  status.isPolling ? "text-green-400" : "text-gray-400"
+                }
+              >
+                {status.isPolling ? "Yes" : "No"}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-400">Background Refresh:</span>
+              <span
+                className={
+                  status.hasBackgroundRefresh
+                    ? "text-green-400"
+                    : "text-gray-400"
+                }
+              >
+                {status.hasBackgroundRefresh ? "Active" : "Inactive"}
+              </span>
+            </div>
+
+            {lastUpdated && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Last Update:</span>
+                <span className="text-white">
+                  {lastUpdated.toLocaleTimeString()}
+                </span>
+              </div>
+            )}
+
+            {status.dataAge && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Data Age:</span>
+                <span
+                  className={`${
+                    isDataStale ? "text-yellow-400" : "text-white"
+                  }`}
+                >
+                  {formatTimeSince()}
+                </span>
+              </div>
+            )}
+
+            {realtimeData && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Portfolio Value:</span>
+                  <span className="text-white">
+                    ${realtimeData.totalValue.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Token Count:</span>
+                  <span className="text-white">
+                    {realtimeData.tokens.length}
+                  </span>
+                </div>
+
+                {hasChanges && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Recent Change:</span>
+                    <span
+                      className={
+                        changeAmount >= 0 ? "text-green-400" : "text-red-400"
+                      }
+                    >
+                      {changeAmount >= 0 ? "+" : ""}${changeAmount.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {status.retryCount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Retry Count:</span>
+                <span className="text-yellow-400">{status.retryCount}/3</span>
+              </div>
+            )}
+          </div>
+
+          {/* Status indicators */}
+          <div className="mt-3 pt-3 border-t border-[#2C2C2C] flex items-center justify-between">
+            <div className="flex items-center">
+              {isMonitoring ? (
+                <Wifi size={14} className="text-green-400 animate-pulse mr-2" />
+              ) : (
+                <WifiOff size={14} className="text-gray-400 mr-2" />
+              )}
+              <span
+                className={`text-xs font-satoshi ${
+                  isMonitoring ? "text-green-400" : "text-gray-400"
+                }`}
+              >
+                {isMonitoring ? "CONNECTED" : "DISCONNECTED"}
+              </span>
+            </div>
+
+            <button
+              onClick={refreshDashboard}
+              className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+            >
+              Force Refresh
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Page-specific content below header */}
       {children}

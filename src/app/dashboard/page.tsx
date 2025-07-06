@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - Updated without header (now uses global header)
+// src/app/dashboard/page.tsx - Updated with automatic real-time refresh
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -12,12 +12,14 @@ import {
   setActiveWalletInDB,
   getActiveWalletFromDB,
 } from "@/store/slices/walletSlice";
-import { useRealtimeWalletBalances } from "@/hooks/useRealtimeWalletBalances";
+import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
 import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
+import RealtimeDashboardNotifications from "@/components/notifications/RealtimeDashboardNotifications";
+import RealtimeStatusIndicator from "@/components/dashboard/RealtimeStatusIndicator";
 
 export default function DashboardPage() {
   const {
@@ -33,9 +35,18 @@ export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
-  // Real-time wallet balances
-  const { realtimeBalances, activeWalletBalance, isMonitoring, notifications } =
-    useRealtimeWalletBalances();
+  // Real-time dashboard hook
+  const {
+    data: realtimeData,
+    isMonitoring,
+    lastUpdated,
+    changeAmount,
+    hasChanges,
+    notifications,
+    refreshDashboard,
+    status,
+    isDataStale,
+  } = useRealtimeDashboard();
 
   // Wallet switcher state
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
@@ -160,6 +171,30 @@ export default function DashboardPage() {
     walletsLoaded.current,
   ]);
 
+  // Real-time monitoring status logging
+  useEffect(() => {
+    if (isMonitoring) {
+      console.log("📊 Real-time dashboard monitoring active:", {
+        activeWallet: activeWallet?.address,
+        lastUpdated: lastUpdated?.toLocaleTimeString(),
+        hasChanges,
+        changeAmount,
+        dataAge: status.dataAge
+          ? `${Math.floor(status.dataAge / 1000)}s`
+          : null,
+        isDataStale,
+      });
+    }
+  }, [
+    isMonitoring,
+    lastUpdated,
+    hasChanges,
+    changeAmount,
+    status.dataAge,
+    isDataStale,
+    activeWallet?.address,
+  ]);
+
   // Handle wallet selection with DB sync
   const handleWalletSelect = async (walletId: string) => {
     console.log("🎯 Dashboard - Wallet selected:", walletId);
@@ -171,6 +206,11 @@ export default function DashboardPage() {
     try {
       await dispatch(setActiveWalletInDB(walletId));
       console.log("✅ Active wallet synced with database");
+
+      // Force refresh dashboard data for new wallet
+      setTimeout(() => {
+        refreshDashboard();
+      }, 500);
     } catch (error) {
       console.error("❌ Failed to sync active wallet with database:", error);
       // The local state is still updated, so UI remains consistent
@@ -182,6 +222,17 @@ export default function DashboardPage() {
     activeWalletSynced.current = false; // Reset sync flag
     dispatch(fetchWallets());
     setWelcomeModalOpen(false);
+  };
+
+  // Handle manual refresh
+  const handleManualRefresh = async () => {
+    console.log("🔄 Manual refresh triggered");
+    try {
+      await refreshDashboard();
+      console.log("✅ Manual refresh completed");
+    } catch (error) {
+      console.error("❌ Manual refresh failed:", error);
+    }
   };
 
   // Show loading state
@@ -202,11 +253,35 @@ export default function DashboardPage() {
   console.log("🎨 Dashboard - Rendering main content", {
     activeWalletId: activeWallet?.id,
     walletCount: wallets.length,
+    isMonitoring,
+    realtimeDataAvailable: !!realtimeData,
   });
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      {/* No header here anymore - it's in the global layout */}
+      {/* Real-time Dashboard Notifications */}
+      <RealtimeDashboardNotifications />
+
+      {/* Real-time Status Badge (enhanced with countdown) */}
+      {isMonitoring && (
+        <div className="fixed bottom-4 right-4 z-40">
+          <div className="bg-black/90 backdrop-blur-sm border border-green-500/50 rounded-lg px-4 py-3">
+            <div className="flex items-center space-x-3">
+              <RealtimeStatusIndicator showLabel={true} showCountdown={true} />
+              {hasChanges && (
+                <span className="text-green-400 text-xs font-satoshi">
+                  {changeAmount > 0 ? "+" : ""}${changeAmount.toFixed(2)}
+                </span>
+              )}
+            </div>
+            {lastUpdated && (
+              <div className="text-gray-400 text-xs font-satoshi mt-2">
+                Last: {lastUpdated.toLocaleTimeString()}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Dashboard Content */}
       {wallets.length === 0 ? (
@@ -220,6 +295,12 @@ export default function DashboardPage() {
               <p className="text-gray-400">
                 Create your first wallet to get started
               </p>
+              <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+                <p className="text-blue-400 text-sm font-satoshi">
+                  📱 Real-time monitoring will start automatically once you add
+                  a wallet
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -250,6 +331,61 @@ export default function DashboardPage() {
 
           <div className="hidden xl:block w-[400px] flex-shrink-0 h-full">
             <SwapSection />
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Real-time Status Indicator in Dashboard */}
+      {isMonitoring && realtimeData && (
+        <div className="fixed bottom-20 left-4 z-40">
+          <div className="bg-black/90 backdrop-blur-sm border border-[#2C2C2C] rounded-lg p-3 max-w-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white text-sm font-satoshi font-medium">
+                Dashboard Status
+              </span>
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            </div>
+
+            <div className="space-y-1 text-xs font-satoshi">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Portfolio:</span>
+                <span className="text-white">
+                  ${realtimeData.totalValue.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-gray-400">Tokens:</span>
+                <span className="text-white">{realtimeData.tokens.length}</span>
+              </div>
+
+              {hasChanges && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Change:</span>
+                  <span
+                    className={
+                      changeAmount >= 0 ? "text-green-400" : "text-red-400"
+                    }
+                  >
+                    {changeAmount >= 0 ? "+" : ""}${changeAmount.toFixed(2)}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-between">
+                <span className="text-gray-400">Last Update:</span>
+                <span className="text-white">
+                  {realtimeData.lastUpdated.toLocaleTimeString().slice(0, 8)}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleManualRefresh}
+              className="w-full mt-2 bg-[#E2AF19] text-black px-2 py-1 rounded text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+            >
+              Force Refresh
+            </button>
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-// src/store/slices/walletSlice.ts - Updated with DB active wallet sync
+// src/store/slices/walletSlice.ts - Updated with real-time dashboard support
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { WalletState, Wallet, Token } from "@/types";
 
@@ -296,6 +296,67 @@ const walletSlice = createSlice({
         state.tokens = [];
       }
     },
+
+    // NEW: Update tokens from real-time service
+    setTokens: (state, action: PayloadAction<Token[]>) => {
+      state.tokens = action.payload;
+      state.totalBalance = action.payload.reduce(
+        (total, token) => total + token.value,
+        0
+      );
+      console.log(
+        "📊 Tokens updated from real-time service:",
+        action.payload.length
+      );
+    },
+
+    // NEW: Update total balance from real-time service
+    setTotalBalance: (state, action: PayloadAction<number>) => {
+      state.totalBalance = action.payload;
+      // Also update active wallet balance if available
+      if (state.activeWallet) {
+        state.activeWallet.balance = action.payload;
+      }
+    },
+
+    // NEW: Update single token from real-time data
+    updateToken: (state, action: PayloadAction<Token>) => {
+      const tokenIndex = state.tokens.findIndex(
+        (t) => t.id === action.payload.id
+      );
+      if (tokenIndex !== -1) {
+        state.tokens[tokenIndex] = action.payload;
+      } else {
+        state.tokens.push(action.payload);
+      }
+
+      // Recalculate total balance
+      state.totalBalance = state.tokens.reduce(
+        (total, token) => total + token.value,
+        0
+      );
+    },
+
+    // NEW: Update multiple tokens from real-time data
+    updateTokens: (state, action: PayloadAction<Token[]>) => {
+      action.payload.forEach((updatedToken) => {
+        const tokenIndex = state.tokens.findIndex(
+          (t) => t.id === updatedToken.id
+        );
+        if (tokenIndex !== -1) {
+          state.tokens[tokenIndex] = updatedToken;
+        } else {
+          state.tokens.push(updatedToken);
+        }
+      });
+
+      // Recalculate total balance
+      state.totalBalance = state.tokens.reduce(
+        (total, token) => total + token.value,
+        0
+      );
+    },
+
     updateWalletBalances: (
       state,
       action: PayloadAction<
@@ -312,6 +373,7 @@ const walletSlice = createSlice({
         }
       });
     },
+
     updateSingleWalletBalance: (
       state,
       action: PayloadAction<{ walletId: string; balance: number }>
@@ -325,12 +387,15 @@ const walletSlice = createSlice({
         }
       }
     },
+
     clearError: (state) => {
       state.error = null;
     },
+
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
+
     updateTokenBalance: (
       state,
       action: PayloadAction<{ tokenId: string; balance: number; value: number }>
@@ -340,19 +405,40 @@ const walletSlice = createSlice({
       if (token) {
         token.balance = balance;
         token.value = value;
+
+        // Recalculate total balance
+        state.totalBalance = state.tokens.reduce(
+          (total, token) => total + token.value,
+          0
+        );
       }
     },
+
     addToken: (state, action: PayloadAction<Token>) => {
       const existingToken = state.tokens.find(
         (t) => t.id === action.payload.id
       );
       if (!existingToken) {
         state.tokens.push(action.payload);
+
+        // Recalculate total balance
+        state.totalBalance = state.tokens.reduce(
+          (total, token) => total + token.value,
+          0
+        );
       }
     },
+
     removeToken: (state, action: PayloadAction<string>) => {
       state.tokens = state.tokens.filter((t) => t.id !== action.payload);
+
+      // Recalculate total balance
+      state.totalBalance = state.tokens.reduce(
+        (total, token) => total + token.value,
+        0
+      );
     },
+
     updateWalletName: (
       state,
       action: PayloadAction<{ walletId: string; name: string }>
@@ -363,15 +449,77 @@ const walletSlice = createSlice({
         wallet.name = name;
       }
     },
+
     clearTokens: (state) => {
       state.tokens = [];
+      state.totalBalance = 0;
     },
+
     clearActiveWalletPersistence: () => {
       if (typeof window !== "undefined") {
         localStorage.removeItem("activeWalletId");
       }
     },
+
+    // NEW: Real-time update actions
+    setRealtimeData: (
+      state,
+      action: PayloadAction<{
+        tokens: Token[];
+        totalBalance: number;
+        walletBalance: number;
+      }>
+    ) => {
+      const { tokens, totalBalance, walletBalance } = action.payload;
+      state.tokens = tokens;
+      state.totalBalance = totalBalance;
+
+      if (state.activeWallet) {
+        state.activeWallet.balance = walletBalance;
+      }
+    },
+
+    // NEW: Update portfolio value from real-time service
+    updatePortfolioValue: (state, action: PayloadAction<number>) => {
+      state.totalBalance = action.payload;
+      if (state.activeWallet) {
+        state.activeWallet.balance = action.payload;
+      }
+    },
+
+    // NEW: Batch update for real-time changes
+    batchUpdateFromRealtimeService: (
+      state,
+      action: PayloadAction<{
+        tokens?: Token[];
+        totalBalance?: number;
+        activeWalletBalance?: number;
+        timestamp: Date;
+      }>
+    ) => {
+      const { tokens, totalBalance, activeWalletBalance, timestamp } =
+        action.payload;
+
+      if (tokens) {
+        state.tokens = tokens;
+      }
+
+      if (totalBalance !== undefined) {
+        state.totalBalance = totalBalance;
+      }
+
+      if (activeWalletBalance !== undefined && state.activeWallet) {
+        state.activeWallet.balance = activeWalletBalance;
+      }
+
+      console.log("📊 Batch update from real-time service:", {
+        tokensCount: tokens?.length,
+        totalBalance,
+        timestamp: timestamp.toISOString(),
+      });
+    },
   },
+
   extraReducers: (builder) => {
     // NEW: Handle setActiveWalletInDB
     builder
@@ -545,6 +693,13 @@ const walletSlice = createSlice({
 
 export const {
   setActiveWallet,
+  setTokens,
+  setTotalBalance,
+  updateToken,
+  updateTokens,
+  setRealtimeData,
+  updatePortfolioValue,
+  batchUpdateFromRealtimeService,
   clearError,
   setLoading,
   updateTokenBalance,
