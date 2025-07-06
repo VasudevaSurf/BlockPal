@@ -1,3 +1,4 @@
+// src/store/slices/walletSlice.ts - Updated with DB active wallet sync
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { WalletState, Wallet, Token } from "@/types";
 
@@ -13,7 +14,63 @@ const initialState: WalletState = {
 // Track pending requests to prevent duplicates
 const pendingRequests = new Set<string>();
 
-// Async thunks for API calls
+// NEW: Async thunk to set active wallet in database
+export const setActiveWalletInDB = createAsyncThunk(
+  "wallet/setActiveWalletInDB",
+  async (walletId: string, { rejectWithValue }) => {
+    try {
+      console.log("🎯 Setting active wallet in DB:", walletId);
+
+      const response = await fetch("/api/profile/active-wallet", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ walletId }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        return rejectWithValue(data.error || "Failed to set active wallet");
+      }
+
+      const data = await response.json();
+      console.log("✅ Active wallet set in DB:", data.activeWallet);
+      return data;
+    } catch (error) {
+      console.error("❌ Error setting active wallet in DB:", error);
+      return rejectWithValue("Network error occurred");
+    }
+  }
+);
+
+// NEW: Async thunk to get active wallet from database
+export const getActiveWalletFromDB = createAsyncThunk(
+  "wallet/getActiveWalletFromDB",
+  async (_, { rejectWithValue }) => {
+    try {
+      console.log("🔍 Getting active wallet from DB");
+
+      const response = await fetch("/api/profile/active-wallet", {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        return rejectWithValue("Failed to get active wallet");
+      }
+
+      const data = await response.json();
+      console.log("✅ Active wallet from DB:", data.activeWallet);
+      return data;
+    } catch (error) {
+      console.error("❌ Error getting active wallet from DB:", error);
+      return rejectWithValue("Network error occurred");
+    }
+  }
+);
+
+// Existing async thunks...
 export const fetchWallets = createAsyncThunk(
   "wallet/fetchWallets",
   async (_, { rejectWithValue }) => {
@@ -60,7 +117,7 @@ export const createWallet = createAsyncThunk(
       privateKey: string;
       mnemonic?: string;
     },
-    { rejectWithValue }
+    { rejectWithValue, dispatch }
   ) => {
     try {
       const response = await fetch("/api/wallets", {
@@ -78,7 +135,14 @@ export const createWallet = createAsyncThunk(
         return rejectWithValue(data.error || "Failed to create wallet");
       }
 
-      return data.wallet;
+      const newWallet = data.wallet;
+
+      // If this is the first wallet or marked as default, set it as active in DB
+      if (newWallet.isDefault) {
+        await dispatch(setActiveWalletInDB(newWallet._id || newWallet.id));
+      }
+
+      return newWallet;
     } catch (error) {
       return rejectWithValue("Network error occurred");
     }
@@ -148,7 +212,6 @@ export const updateWalletBalance = createAsyncThunk(
       );
 
       if (!response.ok) {
-        // Balance endpoint might not exist, return default
         console.log(
           "ℹ️ Balance endpoint not available (404), using default balance of 0"
         );
@@ -160,7 +223,6 @@ export const updateWalletBalance = createAsyncThunk(
       return { walletAddress, balance: data.balance };
     } catch (error) {
       console.error("❌ Error updating wallet balance:", error);
-      // Don't reject, just return default balance
       return { walletAddress, balance: 0 };
     } finally {
       pendingRequests.delete(requestKey);
@@ -202,8 +264,9 @@ const walletSlice = createSlice({
   name: "wallet",
   initialState,
   reducers: {
+    // UPDATED: setActiveWallet now syncs with database
     setActiveWallet: (state, action: PayloadAction<string>) => {
-      console.log("🎯 Setting active wallet:", action.payload);
+      console.log("🎯 Setting active wallet locally:", action.payload);
       const wallet = state.wallets.find((w) => w.id === action.payload);
       if (
         wallet &&
@@ -215,14 +278,19 @@ const walletSlice = createSlice({
         wallet.isActive = true;
         state.activeWallet = wallet;
 
-        // Store active wallet ID in localStorage for persistence
+        // Store active wallet ID in localStorage for offline access
         if (typeof window !== "undefined") {
           localStorage.setItem("activeWalletId", wallet.id);
         }
 
         // Calculate total balance for active wallet
         state.totalBalance = wallet.balance;
-        console.log("✅ Active wallet set:", wallet.name, "ID:", wallet.id);
+        console.log(
+          "✅ Active wallet set locally:",
+          wallet.name,
+          "ID:",
+          wallet.id
+        );
 
         // Clear tokens when switching wallets to trigger fresh fetch
         state.tokens = [];
@@ -238,15 +306,12 @@ const walletSlice = createSlice({
         const wallet = state.wallets.find((w) => w.id === walletId);
         if (wallet) {
           wallet.balance = balance;
-          // You can also store tokenCount if you add it to the Wallet interface
           if (wallet.isActive) {
             state.totalBalance = balance;
           }
         }
       });
     },
-
-    // Add this new action in the reducers section
     updateSingleWalletBalance: (
       state,
       action: PayloadAction<{ walletId: string; balance: number }>
@@ -298,11 +363,9 @@ const walletSlice = createSlice({
         wallet.name = name;
       }
     },
-    // Add action to clear tokens when switching wallets
     clearTokens: (state) => {
       state.tokens = [];
     },
-    // Add action to clear active wallet ID from localStorage
     clearActiveWalletPersistence: () => {
       if (typeof window !== "undefined") {
         localStorage.removeItem("activeWalletId");
@@ -310,8 +373,44 @@ const walletSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // Fetch wallets cases
+    // NEW: Handle setActiveWalletInDB
     builder
+      .addCase(setActiveWalletInDB.pending, (state) => {
+        console.log("🔄 Setting active wallet in DB...");
+      })
+      .addCase(setActiveWalletInDB.fulfilled, (state, action) => {
+        console.log("✅ Active wallet set in DB successfully");
+        // The local state is already updated by setActiveWallet reducer
+      })
+      .addCase(setActiveWalletInDB.rejected, (state, action) => {
+        console.error("❌ Failed to set active wallet in DB:", action.payload);
+        state.error = action.payload as string;
+      })
+      // NEW: Handle getActiveWalletFromDB
+      .addCase(getActiveWalletFromDB.fulfilled, (state, action) => {
+        const { activeWalletId, activeWallet } = action.payload;
+        console.log("✅ Active wallet from DB:", activeWalletId);
+
+        if (activeWalletId && activeWallet) {
+          // Find the wallet in our local state and set it as active
+          const wallet = state.wallets.find((w) => w.id === activeWalletId);
+          if (wallet) {
+            // Reset all wallets to inactive
+            state.wallets.forEach((w) => (w.isActive = false));
+            // Set DB active wallet as active
+            wallet.isActive = true;
+            state.activeWallet = wallet;
+
+            // Sync with localStorage
+            if (typeof window !== "undefined") {
+              localStorage.setItem("activeWalletId", activeWalletId);
+            }
+
+            console.log("✅ Active wallet synced from DB:", wallet.name);
+          }
+        }
+      })
+      // Existing cases...
       .addCase(fetchWallets.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -325,53 +424,10 @@ const walletSlice = createSlice({
             name: wallet.walletName || wallet.name,
             address: wallet.walletAddress || wallet.address,
             balance: 0, // Will be updated separately
-            isActive: wallet.isDefault || false,
+            isActive: false, // Will be set based on DB active wallet
           }));
 
-          // Try to restore previously active wallet from localStorage
-          let activeWalletSet = false;
-          if (typeof window !== "undefined") {
-            const savedActiveWalletId = localStorage.getItem("activeWalletId");
-            if (savedActiveWalletId) {
-              const savedWallet = state.wallets.find(
-                (w) => w.id === savedActiveWalletId
-              );
-              if (savedWallet) {
-                // Reset all wallets to inactive first
-                state.wallets.forEach((w) => (w.isActive = false));
-                // Set saved wallet as active
-                savedWallet.isActive = true;
-                state.activeWallet = savedWallet;
-                activeWalletSet = true;
-                console.log(
-                  "✅ Restored active wallet from localStorage:",
-                  savedWallet.name
-                );
-              }
-            }
-          }
-
-          // If no saved wallet or saved wallet not found, use default logic
-          if (!activeWalletSet) {
-            const activeWallet = state.wallets.find((w) => w.isActive);
-            if (
-              activeWallet &&
-              (!state.activeWallet || state.activeWallet.id !== activeWallet.id)
-            ) {
-              state.activeWallet = activeWallet;
-              // Save to localStorage
-              if (typeof window !== "undefined") {
-                localStorage.setItem("activeWalletId", activeWallet.id);
-              }
-            } else if (state.wallets.length > 0 && !state.activeWallet) {
-              state.wallets[0].isActive = true;
-              state.activeWallet = state.wallets[0];
-              // Save to localStorage
-              if (typeof window !== "undefined") {
-                localStorage.setItem("activeWalletId", state.wallets[0].id);
-              }
-            }
-          }
+          console.log("✅ Wallets loaded:", state.wallets.length);
         }
 
         state.error = null;
@@ -410,9 +466,8 @@ const walletSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       })
-      // Fetch wallet tokens cases
+      // Existing token and balance cases...
       .addCase(fetchWalletTokens.pending, (state) => {
-        // Don't set loading if we already have tokens to prevent UI flicker
         if (state.tokens.length === 0) {
           state.loading = true;
         }
@@ -422,9 +477,8 @@ const walletSlice = createSlice({
         state.loading = false;
 
         if (action.payload && action.payload.tokens) {
-          // Use real tokens from API response with proper contract addresses
           state.tokens = action.payload.tokens.map((token: any) => ({
-            id: token.contractAddress || `${token.symbol}-${Date.now()}`, // Use contract address as ID
+            id: token.contractAddress || `${token.symbol}-${Date.now()}`,
             symbol: token.symbol,
             name: token.name,
             balance: token.balance || 0,
@@ -432,11 +486,10 @@ const walletSlice = createSlice({
             change24h: token.change24h || 0,
             icon: token.logoUrl || "/icons/default-token.svg",
             price: token.price || 0,
-            contractAddress: token.contractAddress, // CRITICAL: Include contract address
+            contractAddress: token.contractAddress,
             decimals: token.decimals || 18,
           }));
 
-          // Update total balance
           state.totalBalance = state.tokens.reduce(
             (total, token) => total + token.value,
             0
@@ -446,18 +499,11 @@ const walletSlice = createSlice({
             "📊 Tokens loaded:",
             state.tokens.length,
             "Total value:",
-            state.totalBalance,
-            "Tokens with contract addresses:",
-            state.tokens.map((t) => ({
-              symbol: t.symbol,
-              contractAddress: t.contractAddress,
-            }))
+            state.totalBalance
           );
         } else {
-          // No tokens returned from API
           state.tokens = [];
           state.totalBalance = 0;
-          console.log("📊 No tokens found for wallet");
         }
 
         state.error = null;
@@ -468,19 +514,16 @@ const walletSlice = createSlice({
           state.error = action.payload as string;
         }
       })
-      // Update wallet balance cases
       .addCase(updateWalletBalance.fulfilled, (state, action) => {
         const { walletAddress, balance } = action.payload;
         const wallet = state.wallets.find((w) => w.address === walletAddress);
         if (wallet) {
           wallet.balance = balance;
           if (wallet.isActive && state.tokens.length === 0) {
-            // If no tokens, use wallet balance as total balance
             state.totalBalance = balance;
           }
         }
       })
-      // Refresh token prices cases
       .addCase(refreshTokenPrices.fulfilled, (state, action) => {
         const prices = action.payload;
         state.tokens.forEach((token) => {
@@ -492,7 +535,6 @@ const walletSlice = createSlice({
           }
         });
 
-        // Recalculate total balance
         state.totalBalance = state.tokens.reduce(
           (total, token) => total + token.value,
           0
@@ -511,6 +553,8 @@ export const {
   updateWalletName,
   clearTokens,
   clearActiveWalletPersistence,
+  updateWalletBalances,
+  updateSingleWalletBalance,
 } = walletSlice.actions;
 
 export default walletSlice.reducer;

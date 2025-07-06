@@ -1,3 +1,4 @@
+// src/app/api/profile/route.ts - Updated with active wallet management
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -46,12 +47,18 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    // Find the active wallet
+    const activeWallet =
+      wallets.find((w) => w._id.toString() === user.activeWalletId) ||
+      wallets[0];
+
     const profile = {
       username: user.username,
       displayName: user.displayName || user.username,
       gmail: user.gmail,
       avatar: user.avatar,
-      walletAddress: wallets[0]?.walletAddress || null,
+      walletAddress: activeWallet?.walletAddress || null,
+      activeWalletId: user.activeWalletId || null,
       accountCreated: user.createdAt
         ? new Date(user.createdAt).toLocaleDateString()
         : "Unknown",
@@ -98,6 +105,27 @@ export async function PUT(request: NextRequest) {
     if (updateData.currency) updateFields.currency = updateData.currency;
     if (updateData.preferences) {
       updateFields.preferences = updateData.preferences;
+    }
+
+    // IMPORTANT: Handle active wallet update
+    if (updateData.activeWalletId) {
+      // Verify the wallet belongs to this user
+      const wallet = await db.collection("wallets").findOne({
+        _id: new ObjectId(updateData.activeWalletId),
+        username: decoded.username,
+      });
+
+      if (!wallet) {
+        return NextResponse.json(
+          { error: "Wallet not found or access denied" },
+          { status: 404 }
+        );
+      }
+
+      updateFields.activeWalletId = updateData.activeWalletId;
+      console.log(
+        `✅ Setting active wallet for ${decoded.username}: ${updateData.activeWalletId}`
+      );
     }
 
     // Update user profile

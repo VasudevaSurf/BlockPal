@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED: Real-time wallet updates in header
+// src/app/dashboard/page.tsx - Updated with DB active wallet sync
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -16,7 +16,12 @@ import {
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
-import { fetchWallets, setActiveWallet } from "@/store/slices/walletSlice";
+import {
+  fetchWallets,
+  setActiveWallet,
+  setActiveWalletInDB,
+  getActiveWalletFromDB,
+} from "@/store/slices/walletSlice";
 import { useRealtimeWalletBalances } from "@/hooks/useRealtimeWalletBalances";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
@@ -51,7 +56,7 @@ export default function DashboardPage() {
   // Use refs to track if we've already made initial calls
   const authChecked = useRef(false);
   const walletsLoaded = useRef(false);
-  const activeWalletSet = useRef(false);
+  const activeWalletSynced = useRef(false);
 
   // Auth check effect - only run once
   useEffect(() => {
@@ -94,6 +99,48 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, user, dispatch]);
 
+  // NEW: Active wallet sync effect - sync with database after wallets are loaded
+  useEffect(() => {
+    console.log("🎯 Dashboard - Active wallet sync effect", {
+      isAuthenticated,
+      user: !!user,
+      walletsLength: wallets.length,
+      activeWallet: !!activeWallet,
+      activeWalletSynced: activeWalletSynced.current,
+    });
+
+    if (
+      isAuthenticated &&
+      user &&
+      wallets.length > 0 &&
+      !activeWalletSynced.current
+    ) {
+      console.log("🔄 Syncing active wallet with database...");
+      activeWalletSynced.current = true;
+      dispatch(getActiveWalletFromDB()).then((result) => {
+        if (result.type === "wallet/getActiveWalletFromDB/fulfilled") {
+          const { activeWalletId } = result.payload as any;
+          if (activeWalletId) {
+            // Set the active wallet locally (without hitting DB again)
+            dispatch(setActiveWallet(activeWalletId));
+          } else if (wallets.length > 0) {
+            // No active wallet in DB, set first wallet as active
+            const firstWallet = wallets[0];
+            dispatch(setActiveWallet(firstWallet.id));
+            dispatch(setActiveWalletInDB(firstWallet.id));
+          }
+        } else {
+          // Fallback: if DB sync fails, use first wallet
+          if (wallets.length > 0 && !activeWallet) {
+            const firstWallet = wallets[0];
+            dispatch(setActiveWallet(firstWallet.id));
+            dispatch(setActiveWalletInDB(firstWallet.id));
+          }
+        }
+      });
+    }
+  }, [isAuthenticated, user, wallets, activeWallet, dispatch]);
+
   // Welcome modal effect
   useEffect(() => {
     console.log("🎭 Welcome modal effect:", {
@@ -135,24 +182,26 @@ export default function DashboardPage() {
     }
   };
 
-  // Set active wallet effect
-  useEffect(() => {
-    console.log("🎯 Dashboard - Active wallet effect", {
-      activeWallet: !!activeWallet,
-      walletsLength: wallets.length,
-      activeWalletSet: activeWalletSet.current,
-    });
+  // UPDATED: Handle wallet selection with DB sync
+  const handleWalletSelect = async (walletId: string) => {
+    console.log("🎯 Dashboard - Wallet selected:", walletId);
 
-    if (!activeWallet && wallets.length > 0 && !activeWalletSet.current) {
-      console.log("🎯 Setting active wallet...");
-      activeWalletSet.current = true;
-      const defaultWallet = wallets.find((w) => w.isDefault) || wallets[0];
-      dispatch(setActiveWallet(defaultWallet.id));
+    // Set locally first for immediate UI response
+    dispatch(setActiveWallet(walletId));
+
+    // Then sync with database
+    try {
+      await dispatch(setActiveWalletInDB(walletId));
+      console.log("✅ Active wallet synced with database");
+    } catch (error) {
+      console.error("❌ Failed to sync active wallet with database:", error);
+      // The local state is still updated, so UI remains consistent
     }
-  }, [activeWallet, wallets, dispatch]);
+  };
 
   const handleWalletCreated = () => {
     walletsLoaded.current = false;
+    activeWalletSynced.current = false; // Reset sync flag
     dispatch(fetchWallets());
     setWelcomeModalOpen(false);
   };
@@ -356,59 +405,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Real-time Status Panel */}
-      {showRealtimeStatus && wallets.length > 0 && (
-        <div className="mb-4 p-4 bg-black border border-[#2C2C2C] rounded-xl">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white font-semibold font-satoshi">
-              Real-time Monitor
-            </h3>
-            <button
-              onClick={() => setShowRealtimeStatus(false)}
-              className="text-gray-400 hover:text-white text-sm"
-            >
-              Hide
-            </button>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="text-gray-400">Status:</span>
-              <div
-                className={`font-medium ${
-                  isMonitoring ? "text-green-400" : "text-red-400"
-                }`}
-              >
-                {isMonitoring ? "Active" : "Inactive"}
-              </div>
-            </div>
-            <div>
-              <span className="text-gray-400">Wallets:</span>
-              <div className="text-white font-medium">{wallets.length}</div>
-            </div>
-            <div>
-              <span className="text-gray-400">Updates:</span>
-              <div className="text-white font-medium">Every 15s</div>
-            </div>
-            <div>
-              <span className="text-gray-400">Notifications:</span>
-              <div className="text-white font-medium">
-                {notifications.length}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rest of your existing dashboard content */}
+      {/* Rest of your existing dashboard content remains the same */}
       {wallets.length === 0 ? (
-        // Your existing empty dashboard states
         <div className="flex flex-col xl:flex-row gap-4 lg:gap-6 flex-1 min-h-0">
-          {/* ... existing empty state code ... */}
+          {/* Your existing empty state content */}
         </div>
       ) : (
-        // Your existing normal dashboard content
         <div className="flex flex-col xl:flex-row gap-4 lg:gap-6 flex-1 min-h-0">
-          {/* ... existing dashboard content ... */}
           <div className="flex xl:hidden flex-col gap-4 lg:gap-6 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
             <div className="flex-shrink-0">
               <WalletBalance />
@@ -439,16 +442,17 @@ export default function DashboardPage() {
       {/* Existing modals */}
       <WalletWelcomeModal
         isOpen={welcomeModalOpen}
-        onClose={() => setWelcomeModalOpen(false)}
+        onClose={() => setWelletWelcomeModalOpen(false)}
         userName={user?.displayName || user?.name || "User"}
         onWalletCreated={handleWalletCreated}
       />
 
-      {/* Updated to use Real-time Wallet Switcher */}
+      {/* UPDATED: Pass wallet selection handler to RealtimeWalletSwitcher */}
       {wallets.length > 0 && (
         <RealtimeWalletSwitcher
           isOpen={walletSwitcherOpen}
           onClose={() => setWalletSwitcherOpen(false)}
+          onWalletSelect={handleWalletSelect}
         />
       )}
 

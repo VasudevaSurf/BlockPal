@@ -1,4 +1,4 @@
-// src/components/wallet/RealtimeWalletSwitcher.tsx - Real-time wallet switcher
+// src/components/wallet/RealtimeWalletSwitcher.tsx - Complete Real-time wallet switcher with DB sync
 "use client";
 
 import { useState } from "react";
@@ -10,9 +10,14 @@ import {
   Radio,
   TrendingUp,
   TrendingDown,
+  Database,
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
-import { setActiveWallet, fetchWallets } from "@/store/slices/walletSlice";
+import {
+  setActiveWallet,
+  setActiveWalletInDB,
+  fetchWallets,
+} from "@/store/slices/walletSlice";
 import { useRealtimeWalletBalances } from "@/hooks/useRealtimeWalletBalances";
 import Button from "@/components/ui/Button";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
@@ -20,11 +25,13 @@ import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
 interface RealtimeWalletSwitcherProps {
   isOpen: boolean;
   onClose: () => void;
+  onWalletSelect?: (walletId: string) => void; // Optional custom handler
 }
 
 export default function RealtimeWalletSwitcher({
   isOpen,
   onClose,
+  onWalletSelect, // NEW: Optional custom wallet selection handler
 }: RealtimeWalletSwitcherProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { wallets, activeWallet } = useSelector(
@@ -41,15 +48,40 @@ export default function RealtimeWalletSwitcher({
     getMonitoringStatus,
   } = useRealtimeWalletBalances();
 
-  // State for wallet modal
+  // State for wallet modal and UI
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
+  const [switchingWallet, setSwitchingWallet] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSelectWallet = (walletId: string) => {
-    dispatch(setActiveWallet(walletId));
-    onClose();
+  // UPDATED: Handle wallet selection with DB sync and real-time data
+  const handleSelectWallet = async (walletId: string) => {
+    console.log("🎯 RealtimeWalletSwitcher - Wallet selected:", walletId);
+
+    // Show loading state
+    setSwitchingWallet(walletId);
+
+    try {
+      if (onWalletSelect) {
+        // Use custom handler if provided (from Dashboard)
+        await onWalletSelect(walletId);
+      } else {
+        // Default behavior: set locally and sync with DB
+        dispatch(setActiveWallet(walletId));
+        await dispatch(setActiveWalletInDB(walletId));
+        console.log("✅ Wallet switched and synced with DB");
+      }
+
+      // Close the modal after successful switch
+      onClose();
+    } catch (error) {
+      console.error("❌ Failed to switch wallet:", error);
+      // Still close modal since local state was updated
+      onClose();
+    } finally {
+      setSwitchingWallet(null);
+    }
   };
 
   const handleAddWallet = () => {
@@ -122,7 +154,7 @@ export default function RealtimeWalletSwitcher({
                   Wallets
                 </h2>
                 {/* Real-time indicator */}
-                {/* <div className="flex items-center">
+                <div className="flex items-center">
                   <Radio
                     size={12}
                     className={`mr-1 ${
@@ -138,20 +170,25 @@ export default function RealtimeWalletSwitcher({
                   >
                     {isMonitoring ? "LIVE" : "OFFLINE"}
                   </span>
-                </div> */}
+                </div>
+                {/* DB sync indicator */}
+                <div className="flex items-center ml-3">
+                  <Database size={12} className="text-blue-400 mr-1" />
+                  <span className="text-xs text-blue-400">DB Synced</span>
+                </div>
               </div>
-              {/* <div className="flex items-center text-gray-400 text-sm font-satoshi mt-1">
+              <div className="flex items-center text-gray-400 text-sm font-satoshi mt-1">
                 <span>Auto-updating every 15 seconds</span>
                 {lastUpdateTime && (
                   <span className="ml-2 text-xs">
                     Last: {formatTime(lastUpdateTime)}
                   </span>
                 )}
-              </div> */}
+              </div>
             </div>
             <div className="flex items-center space-x-2">
               {/* Status button */}
-              {/* <button
+              <button
                 onClick={() => setShowStatus(!showStatus)}
                 className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
                 title="Monitor status"
@@ -160,7 +197,7 @@ export default function RealtimeWalletSwitcher({
                   size={16}
                   className={isMonitoring ? "text-green-400" : "text-gray-400"}
                 />
-              </button> */}
+              </button>
 
               {/* Manual refresh button */}
               <button
@@ -184,11 +221,11 @@ export default function RealtimeWalletSwitcher({
           {showStatus && (
             <div className="p-4 bg-[#0F0F0F] border-b border-[#2C2C2C]">
               <h3 className="text-white font-semibold text-sm mb-2">
-                Monitor Status
+                System Status
               </h3>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="text-gray-400">
-                  Status:{" "}
+                  Real-time:{" "}
                   <span
                     className={isMonitoring ? "text-green-400" : "text-red-400"}
                   >
@@ -200,6 +237,9 @@ export default function RealtimeWalletSwitcher({
                   <span className="text-white">
                     {monitoringStatus.walletsCount}
                   </span>
+                </div>
+                <div className="text-gray-400">
+                  DB Sync: <span className="text-blue-400">Connected</span>
                 </div>
                 <div className="text-gray-400">
                   Interval:{" "}
@@ -219,6 +259,12 @@ export default function RealtimeWalletSwitcher({
                     {monitoringStatus.hasWebSocket ? "Connected" : "N/A"}
                   </span>
                 </div>
+                <div className="text-gray-400">
+                  Active Wallet:{" "}
+                  <span className="text-white">
+                    {activeWallet?.name || "None"}
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -228,6 +274,7 @@ export default function RealtimeWalletSwitcher({
             <div className="space-y-3 mb-6">
               {realtimeBalances.map((wallet, index) => {
                 const isActive = activeWallet?.id === wallet.id;
+                const isSwitching = switchingWallet === wallet.id;
                 const balanceChangeIndicator =
                   getBalanceChangeIndicator(wallet);
 
@@ -235,11 +282,12 @@ export default function RealtimeWalletSwitcher({
                   <button
                     key={wallet.id}
                     onClick={() => handleSelectWallet(wallet.id)}
+                    disabled={isSwitching}
                     className={`w-full flex items-center p-4 rounded-lg transition-all duration-200 text-left relative ${
                       isActive
                         ? "bg-[#E2AF19] text-black"
                         : "bg-[#0F0F0F] border border-[#2C2C2C] text-white hover:bg-[#1A1A1A] hover:border-[#E2AF19]"
-                    }`}
+                    } ${isSwitching ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     {/* Real-time update indicator */}
                     {wallet.lastUpdated && (
@@ -248,6 +296,23 @@ export default function RealtimeWalletSwitcher({
                           isActive ? "bg-black" : "bg-green-400"
                         } opacity-60 animate-pulse`}
                       />
+                    )}
+
+                    {/* DB sync indicator for active wallet */}
+                    {isActive && (
+                      <div className="absolute top-2 left-2 flex items-center">
+                        <Database size={10} className="text-black opacity-60" />
+                      </div>
+                    )}
+
+                    {/* Loading indicator when switching */}
+                    {isSwitching && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg">
+                        <RefreshCw
+                          size={16}
+                          className="animate-spin text-white"
+                        />
+                      </div>
                     )}
 
                     {/* Wallet Icon */}
@@ -282,9 +347,23 @@ export default function RealtimeWalletSwitcher({
                           <Radio
                             size={10}
                             className={`ml-2 ${
-                              isActive ? "text-black" : "text-green-400"
+                              isActive
+                                ? "text-black opacity-60"
+                                : "text-green-400"
                             } animate-pulse`}
                           />
+                        )}
+                        {/* Active in DB indicator */}
+                        {isActive && (
+                          <span
+                            className={`ml-2 text-xs ${
+                              isActive
+                                ? "text-black opacity-60"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            • Active
+                          </span>
                         )}
                       </div>
                       <div
@@ -311,7 +390,7 @@ export default function RealtimeWalletSwitcher({
                       )}
                     </div>
 
-                    {/* Balance and Token Count */}
+                    {/* Balance and Token Count with Real-time Changes */}
                     <div className="text-right mr-3">
                       <div
                         className={`font-medium font-satoshi flex items-center ${
@@ -335,6 +414,24 @@ export default function RealtimeWalletSwitcher({
                           </span>
                         )}
                       </div>
+                      {/* Show real-time change amount if significant */}
+                      {wallet.changeAmount &&
+                        Math.abs(wallet.changeAmount) > 0.01 && (
+                          <div
+                            className={`text-xs font-satoshi ${
+                              wallet.changeAmount > 0
+                                ? isActive
+                                  ? "text-green-600"
+                                  : "text-green-400"
+                                : isActive
+                                ? "text-red-600"
+                                : "text-red-400"
+                            }`}
+                          >
+                            {wallet.changeAmount > 0 ? "+" : ""}$
+                            {wallet.changeAmount.toFixed(2)}
+                          </div>
+                        )}
                     </div>
 
                     {/* Active Indicator */}
@@ -360,7 +457,7 @@ export default function RealtimeWalletSwitcher({
             </Button>
           </div>
 
-          {/* Footer */}
+          {/* Footer with Real-time Status */}
           <div className="p-6 border-t border-[#2C2C2C] bg-[#0F0F0F]">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -375,11 +472,15 @@ export default function RealtimeWalletSwitcher({
                     <span>
                       {wallets.length} wallet{wallets.length !== 1 ? "s" : ""}
                     </span>
+                    <div className="w-1 h-1 bg-gray-400 rounded-full mx-2"></div>
                     <Radio
                       size={8}
-                      className="ml-2 text-green-400 animate-pulse"
+                      className="mr-1 text-green-400 animate-pulse"
                     />
-                    <span className="ml-1">Real-time</span>
+                    <span>Real-time</span>
+                    <div className="w-1 h-1 bg-gray-400 rounded-full mx-2"></div>
+                    <Database size={8} className="mr-1 text-blue-400" />
+                    <span>DB Synced</span>
                   </div>
                 </div>
               </div>
