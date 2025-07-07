@@ -152,7 +152,6 @@ export default function WalletBalance() {
               onClick={() => copyToClipboard(activeWallet.address)}
               className="text-black hover:bg-[#D4A853] transition-colors bg-[#E2AF19] bg-opacity-100 px-2 sm:px-3 py-1 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0"
             >
-              copy
               <Copy size={10} className="text-black sm:w-3 sm:h-3" />
             </button>
           )}

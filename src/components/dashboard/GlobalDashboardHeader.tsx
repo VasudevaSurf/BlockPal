@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED WITH REAL-TIME STATUS
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED WITH UNIFIED NOTIFICATIONS
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -113,7 +113,7 @@ export default function GlobalDashboardHeader({
     lastUpdated,
     changeAmount,
     hasChanges,
-    notifications = [], // Default to empty array to prevent undefined error
+    notifications: realtimeNotifications = [], // Real-time notifications
     refreshDashboard,
     status,
     isDataStale,
@@ -126,10 +126,15 @@ export default function GlobalDashboardHeader({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [nextUpdateCountdown, setNextUpdateCountdown] = useState<number>(0);
 
+  // Database notifications state
+  const [databaseNotifications, setDatabaseNotifications] = useState<any[]>([]);
+  const [dbNotificationsLoading, setDbNotificationsLoading] = useState(false);
+
   // Use refs to track if we've already made initial calls
   const authChecked = useRef(false);
   const walletsLoaded = useRef(false);
   const activeWalletSynced = useRef(false);
+  const notificationsFetched = useRef(false);
 
   // Calculate countdown to next update
   useEffect(() => {
@@ -144,6 +149,64 @@ export default function GlobalDashboardHeader({
 
     return () => clearInterval(interval);
   }, [isMonitoring, lastUpdated]);
+
+  // Fetch database notifications periodically
+  useEffect(() => {
+    if (isAuthenticated && user && !notificationsFetched.current) {
+      fetchDatabaseNotifications();
+      notificationsFetched.current = true;
+
+      // Set up periodic refresh for database notifications
+      const interval = setInterval(() => {
+        fetchDatabaseNotifications();
+      }, 30000); // Refresh every 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, user]);
+
+  const fetchDatabaseNotifications = async () => {
+    try {
+      setDbNotificationsLoading(true);
+      const response = await fetch("/api/notifications?limit=20", {
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDatabaseNotifications(data.notifications || []);
+        console.log(
+          "📫 Database notifications fetched:",
+          data.notifications?.length || 0
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching database notifications:", error);
+    } finally {
+      setDbNotificationsLoading(false);
+    }
+  };
+
+  // Calculate total unread notification count
+  const getTotalUnreadCount = () => {
+    // Real-time notifications are always considered "unread" until they auto-dismiss
+    const realtimeUnreadCount = realtimeNotifications.length;
+
+    // Database notifications have an isRead property
+    const databaseUnreadCount = databaseNotifications.filter(
+      (n) => !n.isRead
+    ).length;
+
+    const total = realtimeUnreadCount + databaseUnreadCount;
+
+    console.log("📊 Notification count:", {
+      realtime: realtimeUnreadCount,
+      database: databaseUnreadCount,
+      total,
+    });
+
+    return total;
+  };
 
   // Get page-specific title and subtitle
   const pageInfo = getPageTitle(pathname);
@@ -272,6 +335,8 @@ export default function GlobalDashboardHeader({
     return `${hours}h ago`;
   };
 
+  const totalUnreadCount = getTotalUnreadCount();
+
   // Don't render if not authenticated
   if (!isAuthenticated) {
     return null;
@@ -286,24 +351,6 @@ export default function GlobalDashboardHeader({
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
               {displayTitle}
             </h1>
-            {/* Real-time status indicator in title */}
-            {/* {isMonitoring && (
-              <div className="ml-3 flex items-center">
-                <Wifi
-                  size={16}
-                  className={`mr-1 ${
-                    isDataStale ? "text-yellow-400" : "text-green-400"
-                  } animate-pulse`}
-                />
-                <span
-                  className={`text-xs font-satoshi ${
-                    isDataStale ? "text-yellow-400" : "text-green-400"
-                  }`}
-                >
-                  LIVE
-                </span>
-              </div>
-            )} */}
           </div>
 
           {displaySubtitle && (
@@ -311,23 +358,6 @@ export default function GlobalDashboardHeader({
               <p className="text-gray-400 text-sm font-satoshi mt-1">
                 {displaySubtitle}
               </p>
-              {/* Real-time indicator with status */}
-              {/* {isMonitoring && (
-                <div className="ml-4 flex items-center text-green-400">
-                  <Radio size={12} className="mr-1 animate-pulse" />
-                  <span className="text-xs">Auto-refresh</span>
-                  {lastUpdated && (
-                    <span className="text-xs text-gray-400 ml-2">
-                      • {formatTimeSince()}
-                    </span>
-                  )}
-                  {isDataStale && (
-                    <span className="text-xs text-yellow-400 ml-2">
-                      • Stale
-                    </span>
-                  )}
-                </div>
-              )} */}
             </div>
           )}
         </div>
@@ -387,16 +417,6 @@ export default function GlobalDashboardHeader({
                         </span>
                       </span>
                     )}
-                  {/* Real-time status indicator */}
-                  {/* {isMonitoring && (
-                    <span
-                      className={`ml-2 text-xs ${
-                        isDataStale ? "text-yellow-400" : "text-green-400"
-                      }`}
-                    >
-                      • LIVE
-                    </span>
-                  )} */}
                 </div>
               </div>
 
@@ -421,20 +441,20 @@ export default function GlobalDashboardHeader({
           {/* Action Icons Container */}
           <div className="flex items-center space-x-3">
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3 relative">
-              {/* Notification Bell */}
+              {/* Notification Bell with UNIFIED count */}
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
               >
                 <Bell size={16} className="text-gray-400 lg:w-5 lg:h-5" />
-                {Array.isArray(notifications) && notifications.length > 0 && (
+                {totalUnreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-satoshi">
-                    {notifications.length > 9 ? "9+" : notifications.length}
+                    {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
                   </span>
                 )}
               </button>
 
-              {/* Notification Panel */}
+              {/* Unified Notification Panel */}
               {notificationsOpen && (
                 <NotificationPanel
                   isOpen={notificationsOpen}
@@ -442,44 +462,7 @@ export default function GlobalDashboardHeader({
                 />
               )}
 
-              {/* <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div> */}
-
-              {/* Real-time status button */}
-              {/* <button
-                onClick={() => setShowRealtimeStatus(!showRealtimeStatus)}
-                className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
-                title="Real-time status"
-              >
-                {isMonitoring ? (
-                  <Wifi
-                    size={16}
-                    className={`${
-                      isDataStale ? "text-yellow-400" : "text-green-400"
-                    } lg:w-5 lg:h-5`}
-                  />
-                ) : (
-                  <WifiOff size={16} className="text-gray-400 lg:w-5 lg:h-5" />
-                )}
-                {isMonitoring && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                )}
-              </button> */}
-
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
-
-              {/* Manual refresh button */}
-              {/* <button
-                onClick={refreshDashboard}
-                className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full"
-                title="Force refresh"
-              >
-                <RefreshCw
-                  size={16}
-                  className="text-gray-400 lg:w-5 lg:h-5 hover:text-white"
-                />
-              </button>
-
-              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div> */}
 
               <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
                 <HelpCircle size={16} className="text-gray-400 lg:w-5 lg:h-5" />

@@ -30,6 +30,7 @@ import Input from "@/components/ui/Input";
 import UsernameInput from "@/components/ui/UsernameInput";
 import { UserSuggestion } from "@/hooks/useUsernameSearch";
 import { SkeletonScheduledPayments } from "@/components/ui/Skeleton";
+import { DatePicker, TimePicker } from "@/components/ui/DateTimePicker";
 
 interface ScheduledPayment {
   id: string;
@@ -904,20 +905,16 @@ export default function ScheduledPaymentsPage() {
 
             {/* Date and Time Row */}
             <div className="grid grid-cols-2 gap-3">
-              <Input
-                type="date"
+              <DatePicker
                 value={formData.date}
-                onChange={(e) =>
-                  setFormData({ ...formData, date: e.target.value })
-                }
+                onChange={(value) => setFormData({ ...formData, date: value })}
+                placeholder="Select date"
                 className="font-satoshi"
               />
-              <Input
-                type="time"
+              <TimePicker
                 value={formData.time}
-                onChange={(e) =>
-                  setFormData({ ...formData, time: e.target.value })
-                }
+                onChange={(value) => setFormData({ ...formData, time: value })}
+                placeholder="Select time"
                 className="font-satoshi"
               />
             </div>
@@ -1273,24 +1270,20 @@ export default function ScheduledPaymentsPage() {
 
             {/* Date Input */}
             <div className="col-span-2">
-              <Input
-                type="date"
+              <DatePicker
                 value={formData.date}
-                onChange={(e) =>
-                  setFormData({ ...formData, date: e.target.value })
-                }
+                onChange={(value) => setFormData({ ...formData, date: value })}
+                placeholder="Select date"
                 className="font-satoshi"
               />
             </div>
 
             {/* Time Input */}
             <div className="col-span-2">
-              <Input
-                type="time"
+              <TimePicker
                 value={formData.time}
-                onChange={(e) =>
-                  setFormData({ ...formData, time: e.target.value })
-                }
+                onChange={(value) => setFormData({ ...formData, time: value })}
+                placeholder="Select time"
                 className="font-satoshi"
               />
             </div>
@@ -1913,24 +1906,7 @@ export default function ScheduledPaymentsPage() {
           display: none;
         }
 
-        input[type="date"] {
-          color-scheme: dark;
-        }
-
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          filter: invert(1);
-          cursor: pointer;
-        }
-
-        input[type="time"] {
-          color-scheme: dark;
-        }
-
-        input[type="time"]::-webkit-calendar-picker-indicator {
-          filter: invert(1);
-          cursor: pointer;
-        }
-
+        /* Custom select styling for time picker dropdowns */
         select {
           appearance: none;
           background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
@@ -1938,6 +1914,25 @@ export default function ScheduledPaymentsPage() {
           background-repeat: no-repeat;
           background-size: 1.5em 1.5em;
           padding-right: 2.5rem;
+        }
+
+        /* Custom scrollbar for select dropdowns */
+        select::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        select::-webkit-scrollbar-track {
+          background: #2c2c2c;
+          border-radius: 3px;
+        }
+
+        select::-webkit-scrollbar-thumb {
+          background: #4c4c4c;
+          border-radius: 3px;
+        }
+
+        select::-webkit-scrollbar-thumb:hover {
+          background: #e2af19;
         }
       `}</style>
     </div>

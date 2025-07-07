@@ -315,7 +315,6 @@ How can I assist you today with your crypto needs? Try asking about:
                 ) : (
                   <>
                     <Copy size={12} />
-                    Copy
                   </>
                 )}
               </button>
@@ -434,7 +433,6 @@ How can I assist you today with your crypto needs? Try asking about:
                         ) : (
                           <>
                             <Copy size={10} className="lg:w-3 lg:h-3" />
-                            Copy
                           </>
                         )}
                       </button>
