@@ -1,4 +1,4 @@
-// src/app/api/auth/forgot-password/route.ts - UPDATED with EmailJS
+// src/app/api/auth/forgot-password/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
@@ -18,10 +18,14 @@ export async function POST(request: NextRequest) {
     const user = await db.collection("users").findOne({ gmail: email });
 
     if (!user) {
-      // Don't reveal if user exists or not for security
+      // For security, don't reveal if user exists or not
+      // But don't actually send email or generate code
+      console.log("ℹ️ User not found, but showing generic success message");
       return NextResponse.json({
         message:
           "If an account with that email exists, we've sent a reset code.",
+        shouldSendEmail: false,
+        userExists: false,
       });
     }
 
@@ -54,11 +58,11 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ Reset code generated:", resetCode, "for user:", email);
 
-    // Try to send email using EmailJS (client-side approach)
-    // We'll return the code to the frontend for EmailJS to handle
+    // Return data for email sending
     return NextResponse.json({
       message: "Reset code generated. Please check your email.",
-      // For client-side email sending
+      shouldSendEmail: true,
+      userExists: true,
       emailData: {
         to_email: email,
         to_name: user.displayName || user.username || "User",

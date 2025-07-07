@@ -1,16 +1,17 @@
+// src/app/api/auth/login/route.ts - UPDATED with 2FA support
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
 import { connectToDatabase } from "@/lib/mongodb";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, twoFactorCode } = await request.json();
 
     console.log("=== LOGIN ATTEMPT START ===");
     console.log("Email:", email);
     console.log("Password provided:", !!password);
+    console.log("2FA code provided:", !!twoFactorCode);
 
     const { db } = await connectToDatabase();
 
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("✅ User found:", user.username);
+    console.log("👥 User has 2FA enabled:", !!user.twoFactorEnabled);
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
@@ -39,6 +41,85 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("✅ Password valid");
+
+    // NEW: Check if 2FA is enabled
+    if (user.twoFactorEnabled && user.twoFactorSecret) {
+      console.log("🔐 2FA is enabled, checking for code...");
+
+      if (!twoFactorCode) {
+        console.log("ℹ️ 2FA code required but not provided");
+        return NextResponse.json(
+          {
+            error: "2FA_REQUIRED",
+            message: "Two-factor authentication code is required",
+            requiresTwoFactor: true,
+          },
+          { status: 200 } // Use 200 status for 2FA required
+        );
+      }
+
+      // Verify 2FA code
+      const speakeasy = require("speakeasy");
+
+      console.log("🔍 Verifying 2FA code...");
+
+      let verified = false;
+
+      // Try TOTP verification first
+      try {
+        verified = speakeasy.totp.verify({
+          secret: user.twoFactorSecret,
+          encoding: "base32",
+          token: twoFactorCode,
+          window: 2, // Allow some time drift
+        });
+      } catch (error) {
+        console.error("❌ TOTP verification failed:", error);
+      }
+
+      // If TOTP fails, try backup codes
+      if (
+        !verified &&
+        user.twoFactorBackupCodes &&
+        user.twoFactorBackupCodes.length > 0
+      ) {
+        console.log("🔄 Trying backup codes...");
+
+        const codeIndex = user.twoFactorBackupCodes.findIndex(
+          (backupCode: string) =>
+            backupCode.toLowerCase() === twoFactorCode.toLowerCase()
+        );
+
+        if (codeIndex !== -1) {
+          verified = true;
+          console.log("✅ Backup code verified, removing used code");
+
+          // Remove used backup code
+          const updatedBackupCodes = [...user.twoFactorBackupCodes];
+          updatedBackupCodes.splice(codeIndex, 1);
+
+          await db
+            .collection("users")
+            .updateOne(
+              { _id: user._id },
+              { $set: { twoFactorBackupCodes: updatedBackupCodes } }
+            );
+        }
+      }
+
+      if (!verified) {
+        console.log("❌ Invalid 2FA code");
+        return NextResponse.json(
+          {
+            error: "Invalid two-factor authentication code",
+            requiresTwoFactor: true,
+          },
+          { status: 401 }
+        );
+      }
+
+      console.log("✅ 2FA verification successful");
+    }
 
     // Update last login
     await db

@@ -1,4 +1,4 @@
-// src/components/profile/UserProfilePage.tsx - FIXED with skeleton loading
+// src/components/profile/UserProfilePage.tsx - FIXED to hide password change for Google users
 "use client";
 
 import { useState, useEffect } from "react";
@@ -53,6 +53,10 @@ interface UserProfile {
     currency: "USD" | "INR" | "EUR";
   };
   twoFactorEnabled: boolean;
+  // NEW: Add authentication provider info
+  authProvider?: "email" | "google";
+  hasPassword?: boolean;
+  hasGoogleAuth?: boolean;
 }
 
 // Profile Statistics Skeleton Component
@@ -192,7 +196,7 @@ export default function UserProfilePage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
 
-  // FIXED: 2FA Modal State
+  // 2FA Modal State
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [is2FAEnabling, setIs2FAEnabling] = useState(false);
 
@@ -283,7 +287,7 @@ export default function UserProfilePage() {
     }
   };
 
-  // FIXED: 2FA Toggle Handler
+  // 2FA Toggle Handler
   const handleToggle2FA = async () => {
     if (!profile) {
       console.log("❌ No profile available");
@@ -307,7 +311,7 @@ export default function UserProfilePage() {
     });
   };
 
-  // FIXED: 2FA Complete Handler
+  // 2FA Complete Handler
   const handle2FAComplete = async () => {
     console.log("🎉 2FA Setup completed, refreshing profile...");
     // Refresh profile to get updated 2FA status
@@ -348,12 +352,17 @@ export default function UserProfilePage() {
     await dispatch(logoutUser());
   };
 
-  // FIXED: Show skeleton loading when loading
+  // NEW: Check if user can change password
+  const canChangePassword =
+    profile &&
+    (profile.authProvider === "email" ||
+      profile.hasPassword === true ||
+      (!profile.authProvider && !profile.hasGoogleAuth)); // Fallback for existing users
+
+  // Show skeleton loading when loading
   if (loading) {
     return (
       <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-        {/* Header Skeleton */}
-
         {/* Mobile Layout Skeleton */}
         <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
           <ProfileHeaderSkeleton />
@@ -414,7 +423,7 @@ export default function UserProfilePage() {
     );
   }
 
-  // FIXED: Get wallet color based on activeWallet index in wallets array
+  // Get wallet color based on activeWallet index in wallets array
   const getWalletColor = () => {
     const colors = [
       "bg-gradient-to-br from-blue-400 to-cyan-400",
@@ -433,8 +442,6 @@ export default function UserProfilePage() {
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      {/* Header */}
-
       {/* Mobile Layout */}
       <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
         {/* Profile Header */}
@@ -492,6 +499,18 @@ export default function UserProfilePage() {
               <p className="text-gray-400 text-sm font-satoshi">
                 @{profile.username}
               </p>
+              {/* NEW: Show authentication method */}
+              <div className="flex items-center mt-1">
+                {profile.authProvider === "google" || profile.hasGoogleAuth ? (
+                  <span className="text-xs text-blue-400 font-satoshi bg-blue-900/20 px-2 py-1 rounded">
+                    🔗 Google Account
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400 font-satoshi bg-gray-800/20 px-2 py-1 rounded">
+                    📧 Email Account
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -570,27 +589,52 @@ export default function UserProfilePage() {
           </div>
         </div>
 
-        {/* Account & Security */}
+        {/* Account & Security - UPDATED */}
         <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
           <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
             Account & Security
           </h3>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Lock size={16} className="text-gray-400 mr-3" />
-                <span className="text-white font-satoshi">Change Password</span>
+            {/* CONDITIONAL: Only show password change for non-Google users */}
+            {canChangePassword && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Lock size={16} className="text-gray-400 mr-3" />
+                  <span className="text-white font-satoshi">
+                    Change Password
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowPasswordModal(true)}
+                  className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                >
+                  Change
+                </button>
               </div>
-              <button
-                onClick={() => setShowPasswordModal(true)}
-                className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
-              >
-                Change
-              </button>
-            </div>
+            )}
 
-            {/* FIXED: 2FA Section */}
+            {/* NEW: Show info for Google users who can't change password */}
+            {!canChangePassword && (
+              <div className="flex items-center justify-between p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+                <div className="flex items-center">
+                  <Lock size={16} className="text-blue-400 mr-3" />
+                  <div>
+                    <span className="text-blue-400 font-satoshi text-sm">
+                      Password Management
+                    </span>
+                    <div className="text-blue-300 text-xs font-satoshi">
+                      Managed by Google
+                    </div>
+                  </div>
+                </div>
+                <span className="text-blue-400 text-xs font-satoshi">
+                  Sign in with Google
+                </span>
+              </div>
+            )}
+
+            {/* 2FA Section */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Shield size={16} className="text-gray-400 mr-3" />
@@ -623,6 +667,9 @@ export default function UserProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Rest of the components remain the same... */}
+        {/* Notifications, Support & Feedback, Account Actions sections */}
 
         {/* Notifications */}
         <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
@@ -776,7 +823,7 @@ export default function UserProfilePage() {
         </div>
       </div>
 
-      {/* Desktop Layout - Similar structure to mobile but in columns */}
+      {/* Desktop Layout - Similar structure but need to update Account & Security section */}
       <div className="hidden xl:flex gap-6 flex-1 min-h-0">
         {/* Left Column */}
         <div className="flex-1 space-y-6 overflow-y-auto scrollbar-hide">
@@ -838,9 +885,23 @@ export default function UserProfilePage() {
                     <h3 className="text-2xl font-bold text-white font-satoshi mb-2">
                       {profile.displayName}
                     </h3>
-                    <p className="text-gray-400 font-satoshi mb-4">
+                    <p className="text-gray-400 font-satoshi mb-2">
                       @{profile.username}
                     </p>
+
+                    {/* NEW: Show authentication method - Desktop */}
+                    <div className="flex items-center mb-4">
+                      {profile.authProvider === "google" ||
+                      profile.hasGoogleAuth ? (
+                        <span className="text-sm text-blue-400 font-satoshi bg-blue-900/20 px-3 py-1 rounded-full">
+                          🔗 Google Account
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-400 font-satoshi bg-gray-800/20 px-3 py-1 rounded-full">
+                          📧 Email Account
+                        </span>
+                      )}
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -918,29 +979,52 @@ export default function UserProfilePage() {
 
         {/* Right Column */}
         <div className="w-[400px] space-y-6 overflow-y-auto scrollbar-hide">
-          {/* Account & Security - Desktop */}
+          {/* Account & Security - Desktop - UPDATED */}
           <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
             <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
               Account & Security
             </h3>
 
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Lock size={20} className="text-gray-400 mr-3" />
-                  <span className="text-white font-satoshi">
-                    Change Password
+              {/* CONDITIONAL: Only show password change for non-Google users */}
+              {canChangePassword && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Lock size={20} className="text-gray-400 mr-3" />
+                    <span className="text-white font-satoshi">
+                      Change Password
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowPasswordModal(true)}
+                    className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                  >
+                    Change
+                  </button>
+                </div>
+              )}
+
+              {/* NEW: Show info for Google users who can't change password - Desktop */}
+              {!canChangePassword && (
+                <div className="flex items-center justify-between p-4 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+                  <div className="flex items-center">
+                    <Lock size={20} className="text-blue-400 mr-3" />
+                    <div>
+                      <span className="text-blue-400 font-satoshi">
+                        Password Management
+                      </span>
+                      <div className="text-blue-300 text-sm font-satoshi">
+                        Your password is managed by Google
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-blue-400 text-sm font-satoshi">
+                    Google Sign-In
                   </span>
                 </div>
-                <button
-                  onClick={() => setShowPasswordModal(true)}
-                  className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
-                >
-                  Change
-                </button>
-              </div>
+              )}
 
-              {/* FIXED: 2FA Section - Desktop */}
+              {/* 2FA Section - Desktop */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <Shield size={20} className="text-gray-400 mr-3" />
@@ -974,7 +1058,7 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* Notifications - Desktop */}
+          {/* Notifications - Desktop (same as before) */}
           <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
             <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
               Notifications
@@ -1082,7 +1166,7 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* Support & Account Actions - Desktop */}
+          {/* Support & Account Actions - Desktop (same as before) */}
           <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
             <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
               Support & Actions
@@ -1124,8 +1208,8 @@ export default function UserProfilePage() {
         </div>
       </div>
 
-      {/* Password Change Modal */}
-      {showPasswordModal && (
+      {/* Password Change Modal - Only show if user can change password */}
+      {showPasswordModal && canChangePassword && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
@@ -1247,7 +1331,7 @@ export default function UserProfilePage() {
         </div>
       )}
 
-      {/* FIXED: 2FA Setup Modal */}
+      {/* 2FA Setup Modal */}
       {show2FAModal && (
         <TwoFactorSetupModal
           isOpen={show2FAModal}

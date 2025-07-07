@@ -1,17 +1,19 @@
-// src/app/api/auth/google/route.ts
+// src/app/api/auth/google/route.ts - UPDATED with 2FA support
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { connectToDatabase } from "@/lib/mongodb";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, name, photoURL, uid, action } = await request.json();
+    const { email, name, photoURL, uid, action, twoFactorCode } =
+      await request.json();
 
     console.log("=== GOOGLE AUTH START ===");
     console.log("Action:", action); // "login" or "register"
     console.log("Email:", email);
     console.log("Name:", name);
     console.log("UID:", uid);
+    console.log("2FA code provided:", !!twoFactorCode);
 
     if (!email || !name || !uid || !action) {
       return NextResponse.json(
@@ -39,6 +41,7 @@ export async function POST(request: NextRequest) {
       }
 
       console.log("✅ Existing user found for login:", email);
+      console.log("👥 User has 2FA enabled:", !!user.twoFactorEnabled);
 
       // Check if this is a Google user or email/password user
       if (!user.googleId && user.passwordHash) {
@@ -51,6 +54,87 @@ export async function POST(request: NextRequest) {
           },
           { status: 400 }
         );
+      }
+
+      // NEW: Check if 2FA is enabled for Google login
+      if (user.twoFactorEnabled && user.twoFactorSecret) {
+        console.log("🔐 2FA is enabled for Google user, checking for code...");
+
+        if (!twoFactorCode) {
+          console.log("ℹ️ 2FA code required but not provided for Google login");
+          return NextResponse.json(
+            {
+              error: "2FA_REQUIRED",
+              message: "Two-factor authentication code is required",
+              requiresTwoFactor: true,
+            },
+            { status: 200 }
+          );
+        }
+
+        // Verify 2FA code
+        const speakeasy = require("speakeasy");
+
+        console.log("🔍 Verifying 2FA code for Google login...");
+
+        let verified = false;
+
+        // Try TOTP verification first
+        try {
+          verified = speakeasy.totp.verify({
+            secret: user.twoFactorSecret,
+            encoding: "base32",
+            token: twoFactorCode,
+            window: 2,
+          });
+        } catch (error) {
+          console.error("❌ TOTP verification failed:", error);
+        }
+
+        // If TOTP fails, try backup codes
+        if (
+          !verified &&
+          user.twoFactorBackupCodes &&
+          user.twoFactorBackupCodes.length > 0
+        ) {
+          console.log("🔄 Trying backup codes for Google login...");
+
+          const codeIndex = user.twoFactorBackupCodes.findIndex(
+            (backupCode: string) =>
+              backupCode.toLowerCase() === twoFactorCode.toLowerCase()
+          );
+
+          if (codeIndex !== -1) {
+            verified = true;
+            console.log(
+              "✅ Backup code verified for Google login, removing used code"
+            );
+
+            // Remove used backup code
+            const updatedBackupCodes = [...user.twoFactorBackupCodes];
+            updatedBackupCodes.splice(codeIndex, 1);
+
+            await db
+              .collection("users")
+              .updateOne(
+                { _id: user._id },
+                { $set: { twoFactorBackupCodes: updatedBackupCodes } }
+              );
+          }
+        }
+
+        if (!verified) {
+          console.log("❌ Invalid 2FA code for Google login");
+          return NextResponse.json(
+            {
+              error: "Invalid two-factor authentication code",
+              requiresTwoFactor: true,
+            },
+            { status: 401 }
+          );
+        }
+
+        console.log("✅ 2FA verification successful for Google login");
       }
 
       // Update last login and ensure Google ID is set
@@ -138,6 +222,8 @@ export async function POST(request: NextRequest) {
         createdAt: new Date(),
         lastLoginAt: new Date(),
         authProvider: "google",
+        // NEW: Google users start with 2FA disabled by default
+        twoFactorEnabled: false,
       };
 
       const result = await db.collection("users").insertOne(newUser);

@@ -1,3 +1,4 @@
+// src/store/slices/authSlice.ts - UPDATED with 2FA support
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { AuthState, User } from "@/types";
 
@@ -12,11 +13,17 @@ const initialState: AuthState = {
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async (
-    credentials: { email: string; password: string },
+    credentials: {
+      email: string;
+      password: string;
+      twoFactorCode?: string; // NEW: Optional 2FA code
+    },
     { rejectWithValue }
   ) => {
     try {
       console.log("🔐 Redux: Starting login request");
+      console.log("📧 Email:", credentials.email);
+      console.log("🔑 Has 2FA code:", !!credentials.twoFactorCode);
 
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -33,11 +40,25 @@ export const loginUser = createAsyncThunk(
         ok: response.ok,
         status: response.status,
         hasUser: !!data.user,
+        requiresTwoFactor: !!data.requiresTwoFactor,
       });
 
       if (!response.ok) {
         console.log("❌ Redux: Login failed", data.error);
+
+        // NEW: Handle 2FA requirement
+        if (data.error === "2FA_REQUIRED" || data.requiresTwoFactor) {
+          console.log("🔐 Redux: 2FA required");
+          return rejectWithValue("2FA_REQUIRED");
+        }
+
         return rejectWithValue(data.error || "Login failed");
+      }
+
+      // NEW: Handle successful response that still requires 2FA
+      if (data.requiresTwoFactor && !data.user) {
+        console.log("🔐 Redux: 2FA required (success response)");
+        return rejectWithValue("2FA_REQUIRED");
       }
 
       console.log("✅ Redux: Login successful", data.user);
@@ -179,8 +200,13 @@ const authSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         console.log("❌ Redux: Login rejected", action.payload);
         state.loading = false;
-        state.isAuthenticated = false;
-        state.user = null;
+
+        // NEW: Don't clear authentication state if 2FA is required
+        if (action.payload !== "2FA_REQUIRED") {
+          state.isAuthenticated = false;
+          state.user = null;
+        }
+
         state.error = action.payload as string;
       })
       // Register cases

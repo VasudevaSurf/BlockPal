@@ -1,4 +1,4 @@
-// src/app/api/profile/route.ts - FIXED with scheduled payments count
+// src/app/api/profile/route.ts - FIXED with auth provider info
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     console.log("🔍 Fetching profile for user:", decoded.username);
 
-    // Get user profile
+    // Get user profile with auth provider info
     const user = await db
       .collection("users")
       .findOne(
@@ -28,20 +28,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // FIXED: Get actual transaction count
+    // Get actual transaction count
     const totalTransactions = await db
       .collection("executed_transactions")
       .countDocuments({
         username: decoded.username,
       });
 
-    // FIXED: Get completed scheduled payments count only
+    // Get completed scheduled payments count only
     const scheduledPayments = await db.collection("schedules").countDocuments({
       username: decoded.username,
-      status: "completed", // Only count completed scheduled payments
+      status: "completed",
     });
 
-    // FIXED: Get friends count
+    // Get friends count
     const friendsCount = await db.collection("friends").countDocuments({
       $and: [
         {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       accountCreated: user.createdAt
         ? new Date(user.createdAt).toLocaleDateString()
         : new Date().toLocaleDateString(),
-      // FIXED: Use actual counts from database
+      // Use actual counts from database
       totalTransactions,
       scheduledPayments,
       friendsCount,
@@ -80,8 +80,12 @@ export async function GET(request: NextRequest) {
         friendRequests: user.preferences?.friendRequests || "everyone",
         currency: user.preferences?.currency || "USD",
       },
-      // FIXED: Get actual 2FA status
+      // Get actual 2FA status
       twoFactorEnabled: user.twoFactorEnabled || false,
+      // NEW: Add authentication provider information
+      authProvider: user.authProvider || (user.googleId ? "google" : "email"),
+      hasPassword: !!user.passwordHash,
+      hasGoogleAuth: !!user.googleId,
     };
 
     console.log("✅ Profile data prepared:", {
@@ -90,6 +94,9 @@ export async function GET(request: NextRequest) {
       completedScheduledPayments: profile.scheduledPayments,
       friendsCount: profile.friendsCount,
       twoFactorEnabled: profile.twoFactorEnabled,
+      authProvider: profile.authProvider,
+      hasPassword: profile.hasPassword,
+      hasGoogleAuth: profile.hasGoogleAuth,
     });
 
     return NextResponse.json({
@@ -155,7 +162,7 @@ export async function PUT(request: NextRequest) {
 
     const scheduledPayments = await db.collection("schedules").countDocuments({
       username: decoded.username,
-      status: "completed", // Only count completed scheduled payments
+      status: "completed",
     });
 
     const friendsCount = await db.collection("friends").countDocuments({
@@ -190,6 +197,11 @@ export async function PUT(request: NextRequest) {
         currency: updatedUser.preferences?.currency || "USD",
       },
       twoFactorEnabled: updatedUser.twoFactorEnabled || false,
+      // NEW: Add authentication provider information
+      authProvider:
+        updatedUser.authProvider || (updatedUser.googleId ? "google" : "email"),
+      hasPassword: !!updatedUser.passwordHash,
+      hasGoogleAuth: !!updatedUser.googleId,
     };
 
     console.log("✅ Profile updated successfully");

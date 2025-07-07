@@ -1,4 +1,4 @@
-// src/components/auth/LoginForm.tsx - UPDATED with better Google auth
+// src/components/auth/LoginForm.tsx - UPDATED with 2FA support
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,6 +8,7 @@ import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import ForgotPasswordModal from "./ForgotPasswordModal";
+import TwoFactorInput from "./TwoFactorInput";
 import { loginUser, clearError } from "@/store/slices/authSlice";
 import { RootState, AppDispatch } from "@/store";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
@@ -21,13 +22,24 @@ export default function LoginForm() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
+  // NEW: 2FA state
+  const [show2FA, setShow2FA] = useState(false);
+  const [twoFactorError, setTwoFactorError] = useState("");
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [pendingLogin, setPendingLogin] = useState<{
+    email: string;
+    password: string;
+    isGoogle?: boolean;
+    googleData?: any;
+  } | null>(null);
+
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const { loading, error, isAuthenticated, user } = useSelector(
     (state: RootState) => state.auth
   );
 
-  // Google Auth hook
+  // Google Auth hook with 2FA support
   const {
     loading: googleLoading,
     error: googleError,
@@ -42,12 +54,13 @@ export default function LoginForm() {
       loading,
       user: user ? { id: user.id, email: user.email } : null,
       error,
+      show2FA,
     });
-  }, [isAuthenticated, loading, user, error]);
+  }, [isAuthenticated, loading, user, error, show2FA]);
 
   // Handle navigation when authenticated
   useEffect(() => {
-    if (isAuthenticated && !loading && user) {
+    if (isAuthenticated && !loading && user && !show2FA) {
       console.log("🚀 NAVIGATING TO DASHBOARD");
       console.log("User authenticated:", user);
 
@@ -71,7 +84,7 @@ export default function LoginForm() {
         window.location.replace("/dashboard");
       }, 500);
     }
-  }, [isAuthenticated, loading, user, router]);
+  }, [isAuthenticated, loading, user, router, show2FA]);
 
   useEffect(() => {
     if (error) {
@@ -117,6 +130,102 @@ export default function LoginForm() {
     return Object.keys(errors).length === 0;
   };
 
+  // NEW: Handle 2FA verification
+  const handle2FAVerification = async (code: string) => {
+    if (!pendingLogin) {
+      console.error("❌ No pending login data");
+      return;
+    }
+
+    setTwoFactorLoading(true);
+    setTwoFactorError("");
+
+    try {
+      console.log("🔐 Verifying 2FA code for login...");
+
+      if (pendingLogin.isGoogle) {
+        // Handle Google login with 2FA
+        const { email, name, photoURL, uid } = pendingLogin.googleData;
+
+        const response = await fetch("/api/auth/google", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            name,
+            photoURL,
+            uid,
+            action: "login",
+            twoFactorCode: code, // Include 2FA code
+          }),
+          credentials: "include",
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (data.requiresTwoFactor) {
+            throw new Error(
+              data.error || "Invalid two-factor authentication code"
+            );
+          }
+          throw new Error(data.error || "Google authentication failed");
+        }
+
+        console.log("✅ Google auth with 2FA successful:", data.user);
+
+        // Update Redux state
+        dispatch({
+          type: "auth/loginUser/fulfilled",
+          payload: data.user,
+        });
+
+        // Close 2FA modal and clear pending login
+        setShow2FA(false);
+        setPendingLogin(null);
+        setTwoFactorError("");
+      } else {
+        // Handle regular email/password login with 2FA
+        const result = await dispatch(
+          loginUser({
+            email: pendingLogin.email,
+            password: pendingLogin.password,
+            twoFactorCode: code, // Include 2FA code
+          })
+        );
+
+        if (loginUser.fulfilled.match(result)) {
+          console.log("✅ Login with 2FA successful");
+          setShow2FA(false);
+          setPendingLogin(null);
+          setTwoFactorError("");
+        } else if (loginUser.rejected.match(result)) {
+          console.log("❌ Login with 2FA rejected:", result.error);
+          throw new Error(
+            result.error?.message || "Invalid two-factor authentication code"
+          );
+        }
+      }
+    } catch (error: any) {
+      console.error("❌ 2FA verification failed:", error);
+      setTwoFactorError(
+        error.message || "Invalid two-factor authentication code"
+      );
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  // NEW: Handle 2FA cancellation
+  const handle2FACancel = () => {
+    setShow2FA(false);
+    setPendingLogin(null);
+    setTwoFactorError("");
+    setTwoFactorLoading(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -138,6 +247,7 @@ export default function LoginForm() {
         loginUser({
           email: formData.email,
           password: formData.password,
+          // Don't include 2FA code in initial request
         })
       );
 
@@ -158,6 +268,22 @@ export default function LoginForm() {
         }, 100);
       } else if (loginUser.rejected.match(result)) {
         console.log("❌ Login rejected:", result.error);
+
+        // NEW: Check if 2FA is required
+        const errorMessage = result.error?.message || "";
+        if (
+          errorMessage === "2FA_REQUIRED" ||
+          result.payload === "2FA_REQUIRED"
+        ) {
+          console.log("🔐 2FA required, showing 2FA modal");
+          setPendingLogin({
+            email: formData.email,
+            password: formData.password,
+            isGoogle: false,
+          });
+          setShow2FA(true);
+          return;
+        }
       } else {
         console.log("⚠️ Login result unclear:", result);
       }
@@ -176,7 +302,21 @@ export default function LoginForm() {
 
     await loginWithGoogle({
       onError: (error) => {
-        setFormErrors({ google: error });
+        // Check if this is a 2FA requirement
+        if (
+          error.includes("2FA_REQUIRED") ||
+          error.includes("Two-factor authentication")
+        ) {
+          console.log("🔐 Google login requires 2FA");
+          // We need to extract the Google user data for 2FA flow
+          // This would require modifying the Google auth hook to return user data
+          setFormErrors({
+            google:
+              "This feature requires updating the Google auth flow for 2FA support.",
+          });
+        } else {
+          setFormErrors({ google: error });
+        }
       },
     });
   };
@@ -189,6 +329,7 @@ export default function LoginForm() {
     hasError: !!error,
     googleLoading,
     googleError,
+    show2FA,
   });
 
   return (
@@ -202,7 +343,7 @@ export default function LoginForm() {
         </p>
       </div>
 
-      {error && (
+      {error && !show2FA && (
         <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
           <p className="text-red-400 text-sm font-satoshi">{error}</p>
         </div>
@@ -223,7 +364,7 @@ export default function LoginForm() {
           variant="secondary"
           className="w-full flex items-center justify-center py-3 font-satoshi"
           onClick={handleGoogleLogin}
-          disabled={loading || googleLoading}
+          disabled={loading || googleLoading || show2FA}
         >
           {googleLoading ? (
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#E2AF19] mr-2"></div>
@@ -272,7 +413,7 @@ export default function LoginForm() {
           error={formErrors.email}
           icon={<Mail size={20} />}
           className="font-satoshi"
-          disabled={loading || googleLoading}
+          disabled={loading || googleLoading || show2FA}
         />
 
         <div className="relative">
@@ -289,13 +430,13 @@ export default function LoginForm() {
             error={formErrors.password}
             icon={<Lock size={20} />}
             className="font-satoshi"
-            disabled={loading || googleLoading}
+            disabled={loading || googleLoading || show2FA}
           />
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
             onClick={() => setShowPassword(!showPassword)}
-            disabled={loading || googleLoading}
+            disabled={loading || googleLoading || show2FA}
           >
             {showPassword ? (
               <EyeOff className="h-5 w-5 text-gray-400" />
@@ -313,7 +454,7 @@ export default function LoginForm() {
               type="checkbox"
               className="h-4 w-4 rounded focus:ring-2 bg-black border border-[#2C2C2C] text-[#E2AF19] focus:ring-[#E2AF19]"
               style={{ accentColor: "#E2AF19" }}
-              disabled={loading || googleLoading}
+              disabled={loading || googleLoading || show2FA}
             />
             <label
               htmlFor="remember-me"
@@ -328,7 +469,7 @@ export default function LoginForm() {
               type="button"
               onClick={() => setShowForgotPassword(true)}
               className="font-medium hover:opacity-80 text-[#E2AF19] font-satoshi"
-              disabled={loading || googleLoading}
+              disabled={loading || googleLoading || show2FA}
             >
               Forgotten Password?
             </button>
@@ -338,11 +479,22 @@ export default function LoginForm() {
         <Button
           type="submit"
           className="w-full py-3 text-base font-semibold font-satoshi"
-          disabled={loading || googleLoading}
+          disabled={loading || googleLoading || show2FA}
         >
           {loading ? "Logging in..." : "Login"}
         </Button>
       </form>
+
+      {/* NEW: 2FA Input Modal */}
+      <TwoFactorInput
+        isOpen={show2FA}
+        onVerify={handle2FAVerification}
+        onCancel={handle2FACancel}
+        loading={twoFactorLoading}
+        error={twoFactorError}
+        email={pendingLogin?.email || ""}
+        isGoogleAuth={pendingLogin?.isGoogle || false}
+      />
 
       {/* Forgot Password Modal */}
       <ForgotPasswordModal

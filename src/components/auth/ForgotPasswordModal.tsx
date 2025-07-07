@@ -1,4 +1,4 @@
-// src/components/auth/ForgotPasswordModal.tsx - UPDATED with EmailJS
+// src/components/auth/ForgotPasswordModal.tsx - FINAL FIXED VERSION
 "use client";
 
 import { useState } from "react";
@@ -56,6 +56,8 @@ export default function ForgotPasswordModal({
     setError("");
 
     try {
+      console.log("📤 Requesting reset code for:", email);
+
       // First, request reset code from backend
       const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
@@ -69,10 +71,20 @@ export default function ForgotPasswordModal({
         throw new Error(data.error || "Failed to send reset code");
       }
 
-      console.log("Backend response:", data);
+      console.log("📥 Backend response:", data);
+
+      // NEW: Check if user exists and show appropriate error
+      if (!data.userExists) {
+        console.log("❌ User doesn't exist, showing error");
+        setError(
+          "No account found with this email address. Please check your email or register for a new account."
+        );
+        return;
+      }
 
       // Check if we should actually send an email
       if (data.shouldSendEmail && data.emailData) {
+        console.log("📧 Sending email to user...");
         setEmailSending(true);
 
         try {
@@ -96,22 +108,17 @@ export default function ForgotPasswordModal({
           );
           return;
         }
-      } else if (!data.userExists) {
-        // User doesn't exist, but we show generic message for security
-        setStep("verify");
-        console.log(
-          "ℹ️ User doesn't exist, but showing generic flow for security"
-        );
       } else {
-        // Some other case
+        // Some other case - proceed to verification step
         setStep("verify");
       }
 
       // For development, log the reset code
-      if (data.resetCode) {
+      if (data.resetCode && process.env.NODE_ENV === "development") {
         console.log("🔑 Reset code for testing:", data.resetCode);
       }
     } catch (error: any) {
+      console.error("❌ Error in handleSendCode:", error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -229,13 +236,20 @@ export default function ForgotPasswordModal({
                   Enter Your Email
                 </h4>
                 <p className="text-gray-400 text-sm font-satoshi">
-                  We'll send you a 6-digit verification code
+                  We'll send you a 6-digit verification code if your account
+                  exists
                 </p>
               </div>
 
               {error && (
                 <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-                  <p className="text-red-400 text-sm font-satoshi">{error}</p>
+                  <div className="flex items-start">
+                    <AlertCircle
+                      size={16}
+                      className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
+                    />
+                    <p className="text-red-400 text-sm font-satoshi">{error}</p>
+                  </div>
                 </div>
               )}
 
@@ -261,7 +275,17 @@ export default function ForgotPasswordModal({
                 icon={<Mail size={20} />}
                 className="font-satoshi"
                 autoFocus
+                disabled={loading || emailSending}
               />
+
+              {/* NEW: Info box about account types */}
+              <div className="bg-gray-900/20 border border-gray-600/50 rounded-lg p-3">
+                <p className="text-gray-400 text-xs font-satoshi">
+                  <strong>Note:</strong> If your account uses Google sign-in,
+                  you'll need to sign in with Google instead. Password reset is
+                  only available for email/password accounts.
+                </p>
+              </div>
 
               <div className="flex gap-3">
                 <Button
@@ -274,11 +298,11 @@ export default function ForgotPasswordModal({
                 </Button>
                 <Button
                   onClick={handleSendCode}
-                  disabled={loading || emailSending}
+                  disabled={loading || emailSending || !email.trim()}
                   className="flex-1"
                 >
                   {loading
-                    ? "Sending..."
+                    ? "Processing..."
                     : emailSending
                     ? "Sending Email..."
                     : "Send Code"}
@@ -307,7 +331,13 @@ export default function ForgotPasswordModal({
 
               {error && (
                 <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-                  <p className="text-red-400 text-sm font-satoshi">{error}</p>
+                  <div className="flex items-start">
+                    <AlertCircle
+                      size={16}
+                      className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
+                    />
+                    <p className="text-red-400 text-sm font-satoshi">{error}</p>
+                  </div>
                 </div>
               )}
 
@@ -330,6 +360,7 @@ export default function ForgotPasswordModal({
                   variant="secondary"
                   onClick={() => setStep("email")}
                   className="flex-1"
+                  disabled={loading}
                 >
                   Back
                 </Button>
@@ -346,6 +377,7 @@ export default function ForgotPasswordModal({
                 <button
                   onClick={() => setStep("email")}
                   className="text-[#E2AF19] hover:opacity-80 text-sm font-satoshi"
+                  disabled={loading}
                 >
                   Didn't receive the code? Try again
                 </button>
@@ -370,7 +402,13 @@ export default function ForgotPasswordModal({
 
               {error && (
                 <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-                  <p className="text-red-400 text-sm font-satoshi">{error}</p>
+                  <div className="flex items-start">
+                    <AlertCircle
+                      size={16}
+                      className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
+                    />
+                    <p className="text-red-400 text-sm font-satoshi">{error}</p>
+                  </div>
                 </div>
               )}
 
@@ -410,12 +448,13 @@ export default function ForgotPasswordModal({
                   variant="secondary"
                   onClick={() => setStep("verify")}
                   className="flex-1"
+                  disabled={loading}
                 >
                   Back
                 </Button>
                 <Button
                   onClick={handleResetPassword}
-                  disabled={loading}
+                  disabled={loading || !newPassword || !confirmPassword}
                   className="flex-1"
                 >
                   {loading ? "Resetting..." : "Reset Password"}
