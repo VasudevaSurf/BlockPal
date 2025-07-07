@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { signInWithPopup } from "firebase/auth";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { registerUser, clearError } from "@/store/slices/authSlice";
 import { RootState, AppDispatch } from "@/store";
+import { auth, googleProvider } from "@/lib/firebase";
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -19,6 +21,7 @@ export default function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
@@ -92,8 +95,84 @@ export default function RegisterForm() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    console.log("Google registration not implemented yet");
+  const handleGoogleRegister = async () => {
+    try {
+      setGoogleLoading(true);
+      console.log("🔐 Starting Google registration...");
+
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      console.log("✅ Google auth successful:", {
+        email: user.email,
+        name: user.displayName,
+        uid: user.uid,
+      });
+
+      // Send user data to our backend with REGISTER action
+      const response = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: user.email,
+          name: user.displayName,
+          photoURL: user.photoURL,
+          uid: user.uid,
+          action: "register", // Specify this is a registration attempt
+        }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle specific error cases
+        if (response.status === 409) {
+          throw new Error(
+            "An account with this Google email already exists. Please sign in instead."
+          );
+        }
+        throw new Error(data.error || "Google registration failed");
+      }
+
+      console.log("✅ Google registration backend success:", data.user);
+
+      // Manually update Redux state
+      dispatch({
+        type: "auth/registerUser/fulfilled",
+        payload: data.user,
+      });
+
+      // Navigate to dashboard
+      router.push("/dashboard");
+    } catch (error: any) {
+      console.error("❌ Google registration error:", error);
+
+      // Clear any error state first
+      setFormErrors({});
+
+      // Set the appropriate error message
+      if (error.message.includes("already exists")) {
+        setFormErrors({
+          google:
+            "An account with this Google email already exists. Please sign in instead.",
+        });
+      } else if (error.message.includes("popup")) {
+        setFormErrors({
+          google:
+            "Registration popup was blocked. Please allow popups and try again.",
+        });
+      } else {
+        setFormErrors({
+          google:
+            error.message || "Google registration failed. Please try again.",
+        });
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -113,33 +192,46 @@ export default function RegisterForm() {
         </div>
       )}
 
+      {/* Google Error */}
+      {formErrors.google && (
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+          <p className="text-red-400 text-sm font-satoshi">
+            {formErrors.google}
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <Button
           type="button"
           variant="secondary"
           className="w-full flex items-center justify-center py-3 font-satoshi"
-          onClick={handleGoogleLogin}
-          disabled={loading}
+          onClick={handleGoogleRegister}
+          disabled={loading || googleLoading}
         >
-          <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-            <path
-              fill="#4285F4"
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-            />
-            <path
-              fill="#FBBC05"
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-            />
-            <path
-              fill="#EA4335"
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-            />
-          </svg>
-          Register with Google
+          {googleLoading ? (
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#E2AF19] mr-2"></div>
+          ) : (
+            <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+              />
+            </svg>
+          )}
+          {googleLoading ? "Creating account..." : "Register with Google"}
         </Button>
 
         <div className="relative">
@@ -164,7 +256,7 @@ export default function RegisterForm() {
           error={formErrors.name}
           icon={<User size={20} />}
           className="font-satoshi"
-          disabled={loading}
+          disabled={loading || googleLoading}
         />
 
         <Input
@@ -180,7 +272,7 @@ export default function RegisterForm() {
           error={formErrors.email}
           icon={<Mail size={20} />}
           className="font-satoshi"
-          disabled={loading}
+          disabled={loading || googleLoading}
         />
 
         <div className="relative">
@@ -197,13 +289,13 @@ export default function RegisterForm() {
             error={formErrors.password}
             icon={<Lock size={20} />}
             className="font-satoshi"
-            disabled={loading}
+            disabled={loading || googleLoading}
           />
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
             onClick={() => setShowPassword(!showPassword)}
-            disabled={loading}
+            disabled={loading || googleLoading}
           >
             {showPassword ? (
               <EyeOff className="h-5 w-5 text-gray-400" />
@@ -227,13 +319,13 @@ export default function RegisterForm() {
             error={formErrors.confirmPassword}
             icon={<Lock size={20} />}
             className="font-satoshi"
-            disabled={loading}
+            disabled={loading || googleLoading}
           />
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            disabled={loading}
+            disabled={loading || googleLoading}
           >
             {showConfirmPassword ? (
               <EyeOff className="h-5 w-5 text-gray-400" />
@@ -246,7 +338,7 @@ export default function RegisterForm() {
         <Button
           type="submit"
           className="w-full py-3 text-base font-semibold font-satoshi"
-          disabled={loading}
+          disabled={loading || googleLoading}
         >
           {loading ? "Creating account..." : "Create account"}
         </Button>
