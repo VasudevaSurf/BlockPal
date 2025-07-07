@@ -1,9 +1,9 @@
-// src/components/dashboard/TokenList.tsx - UPDATED WITH NAVIGATION LOADING
+// src/components/dashboard/TokenList.tsx - UPDATED WITH BETTER LOADING STATES
 "use client";
 
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RootState, AppDispatch } from "@/store";
 import { fetchWalletTokens } from "@/store/slices/walletSlice";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
@@ -19,24 +19,22 @@ export default function TokenList() {
   );
   const { isLoading: isNavigating, startLoading } = useNavigationLoading();
 
+  // Enhanced loading state management
+  const [tokenLoadingState, setTokenLoadingState] = useState({
+    isInitialLoad: true,
+    hasAttemptedLoad: false,
+    tokensLoaded: false,
+  });
+
   // Use ref to prevent duplicate API calls
   const tokensLoaded = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (
-      activeWallet?.address &&
-      tokensLoaded.current !== activeWallet.address
-    ) {
-      tokensLoaded.current = activeWallet.address;
-      dispatch(fetchWalletTokens(activeWallet.address));
-    }
-  }, [activeWallet?.address, dispatch]);
 
   useEffect(() => {
     console.log("🪙 TokenList - Effect triggered", {
       activeWalletAddress: activeWallet?.address,
       tokensLoadedFor: tokensLoaded.current,
       tokensLength: tokens.length,
+      loading,
       shouldFetch:
         activeWallet?.address && tokensLoaded.current !== activeWallet.address,
     });
@@ -50,10 +48,50 @@ export default function TokenList() {
         "📡 TokenList - Fetching tokens for wallet:",
         activeWallet.address
       );
+
       tokensLoaded.current = activeWallet.address;
-      dispatch(fetchWalletTokens(activeWallet.address));
+      setTokenLoadingState((prev) => ({
+        ...prev,
+        hasAttemptedLoad: true,
+        isInitialLoad: true,
+      }));
+
+      dispatch(fetchWalletTokens(activeWallet.address)).then(() => {
+        setTokenLoadingState((prev) => ({
+          ...prev,
+          tokensLoaded: true,
+          isInitialLoad: false,
+        }));
+      });
+    } else if (tokens.length > 0 && !tokenLoadingState.tokensLoaded) {
+      // If we already have tokens, mark as loaded
+      setTokenLoadingState((prev) => ({
+        ...prev,
+        tokensLoaded: true,
+        isInitialLoad: false,
+        hasAttemptedLoad: true,
+      }));
     }
-  }, [activeWallet?.address, dispatch]);
+  }, [
+    activeWallet?.address,
+    dispatch,
+    tokens.length,
+    tokenLoadingState.tokensLoaded,
+  ]);
+
+  // Reset loading state when active wallet changes
+  useEffect(() => {
+    if (
+      activeWallet?.address &&
+      tokensLoaded.current !== activeWallet.address
+    ) {
+      setTokenLoadingState({
+        isInitialLoad: true,
+        hasAttemptedLoad: false,
+        tokensLoaded: false,
+      });
+    }
+  }, [activeWallet?.address]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -225,7 +263,20 @@ export default function TokenList() {
 
   const displayTokens = tokens;
 
-  if (loading && tokens.length === 0) {
+  // UPDATED: Show skeleton during initial load or when loading and no tokens yet
+  const shouldShowSkeleton =
+    tokenLoadingState.isInitialLoad ||
+    (loading && tokens.length === 0) ||
+    (!tokenLoadingState.hasAttemptedLoad && activeWallet?.address);
+
+  if (shouldShowSkeleton) {
+    console.log("🔄 TokenList - Showing skeleton", {
+      isInitialLoad: tokenLoadingState.isInitialLoad,
+      loading,
+      tokensLength: tokens.length,
+      hasAttemptedLoad: tokenLoadingState.hasAttemptedLoad,
+      activeWallet: !!activeWallet?.address,
+    });
     return <SkeletonTokenList />;
   }
 
@@ -253,7 +304,13 @@ export default function TokenList() {
     );
   }
 
-  if (displayTokens.length === 0 && !loading) {
+  // UPDATED: Only show "no tokens" if we've attempted to load and confirmed no tokens
+  if (
+    displayTokens.length === 0 &&
+    tokenLoadingState.hasAttemptedLoad &&
+    tokenLoadingState.tokensLoaded &&
+    !loading
+  ) {
     return (
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         <div className="flex items-center justify-between mb-4 lg:mb-6">
