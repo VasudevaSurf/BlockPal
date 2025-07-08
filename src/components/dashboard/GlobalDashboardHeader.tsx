@@ -30,6 +30,7 @@ import {
 import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
 import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
 import NotificationPanel from "@/components/notifications/NotificationPanel";
+import SettingsIcon from "../icons/SettingsIcon";
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -49,7 +50,7 @@ const getPageTitle = (
       };
     case "/dashboard/scheduled-payments":
       return {
-        title: "Scheduled Payments",
+        title: "Manage Payments",
         subtitle:
           "Automated payments with smart contract security and automatic tax handling",
       };
@@ -353,13 +354,13 @@ export default function GlobalDashboardHeader({
             </h1>
           </div>
 
-          {displaySubtitle && (
+          {/* {displaySubtitle && (
             <div className="flex items-center">
               <p className="text-gray-400 text-sm font-satoshi mt-1">
                 {displaySubtitle}
               </p>
             </div>
-          )}
+          )} */}
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
@@ -396,7 +397,7 @@ export default function GlobalDashboardHeader({
                 </span>
 
                 {/* Real-time balance display */}
-                <div className="flex items-center text-xs text-gray-400">
+                {/* <div className="flex items-center text-xs text-gray-400">
                   <span>${activeWalletData.balance.toFixed(2)}</span>
                   {activeWalletData.changeAmount &&
                     Math.abs(activeWalletData.changeAmount) > 0.01 && (
@@ -407,7 +408,7 @@ export default function GlobalDashboardHeader({
                             : "text-red-400"
                         }`}
                       >
-                        {activeWalletData.changeAmount > 0 ? (
+                        {activeWalletData.changeAmount > 0 ? ( 
                           <TrendingUp size={10} />
                         ) : (
                           <TrendingDown size={10} />
@@ -417,24 +418,24 @@ export default function GlobalDashboardHeader({
                         </span>
                       </span>
                     )}
-                </div>
+                </div> */}
               </div>
 
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
 
-              <span className="text-gray-400 text-xs sm:text-sm font-satoshi mr-2 lg:mr-3 hidden sm:block truncate">
+              <span className="text-gray-400 text-xs sm:text-sm font-satoshi italic mr-2 lg:mr-3 hidden sm:block truncate">
                 {activeWalletData.address
                   ? `${activeWalletData.address.slice(
                       0,
-                      6
-                    )}...${activeWalletData.address.slice(-4)}`
+                      10
+                    )}...${activeWalletData.address.slice(-8)}`
                   : "Loading..."}
               </span>
 
-              <ChevronDown
+              {/* <ChevronDown
                 size={14}
                 className="text-gray-400 group-hover:text-[#E2AF19] transition-colors lg:w-4 lg:h-4"
-              />
+              /> */}
             </button>
           )}
 
@@ -465,18 +466,15 @@ export default function GlobalDashboardHeader({
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
 
               <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
-                <HelpCircle size={16} className="text-gray-400 lg:w-5 lg:h-5" />
+                <SettingsIcon
+                  size={16}
+                  className="text-gray-400 lg:w-5 lg:h-5"
+                />
               </button>
 
-              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+              {/* <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div> */}
 
-              <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
-                <Settings size={16} className="text-gray-400 lg:w-5 lg:h-5" />
-              </button>
-
-              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
-
-              <button
+              {/* <button
                 onClick={handleLogout}
                 className="p-1.5 lg:p-2 transition-colors hover:bg-red-600 hover:bg-opacity-20 rounded-full group"
                 title="Logout"
@@ -485,7 +483,7 @@ export default function GlobalDashboardHeader({
                   size={16}
                   className="text-gray-400 lg:w-5 lg:h-5 group-hover:text-red-400 transition-colors"
                 />
-              </button>
+              </button> */}
             </div>
           </div>
         </div>

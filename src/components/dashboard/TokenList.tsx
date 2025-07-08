@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - UPDATED WITH BETTER LOADING STATES
+// src/components/dashboard/TokenList.tsx - UPDATED WITH COLORED BACKGROUNDS
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -107,7 +107,43 @@ export default function TokenList() {
     return `${sign}${value.toFixed(2)}%`;
   };
 
-  // FIXED: Proper ETH icon handling and fallback colors
+  // UPDATED: Enhanced token background colors
+  const getTokenBackgroundColor = (
+    symbol: string,
+    contractAddress?: string
+  ) => {
+    const colors: Record<string, string> = {
+      ETH: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
+      ETHEREUM: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
+      SOL: "bg-gradient-to-br from-purple-500/20 to-purple-600/30",
+      BTC: "bg-gradient-to-br from-orange-500/20 to-orange-600/30",
+      SUI: "bg-gradient-to-br from-cyan-500/20 to-cyan-600/30",
+      XRP: "bg-gradient-to-br from-gray-500/20 to-gray-600/30",
+      ADA: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
+      AVAX: "bg-gradient-to-br from-red-500/20 to-red-600/30",
+      TON: "bg-gradient-to-br from-blue-400/20 to-blue-500/30",
+      DOT: "bg-gradient-to-br from-pink-500/20 to-pink-600/30",
+      USDT: "bg-gradient-to-br from-green-500/20 to-green-600/30",
+      USDC: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
+      YAI: "bg-gradient-to-br from-yellow-500/20 to-yellow-600/30",
+      LINK: "bg-gradient-to-br from-blue-700/20 to-blue-800/30",
+    };
+
+    // Special handling for ETH/native token
+    if (
+      symbol === "ETH" ||
+      contractAddress === "native" ||
+      symbol === "ETHEREUM"
+    ) {
+      return colors.ETH || "bg-gradient-to-br from-blue-500/20 to-blue-600/30";
+    }
+
+    return (
+      colors[symbol] || "bg-gradient-to-br from-gray-500/20 to-gray-600/30"
+    );
+  };
+
+  // UPDATED: Enhanced icon colors
   const getTokenIcon = (symbol: string, contractAddress?: string) => {
     const colors: Record<string, string> = {
       ETH: "bg-blue-500",
@@ -284,7 +320,7 @@ export default function TokenList() {
     return (
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         <div className="flex items-center justify-between mb-4 lg:mb-6">
-          <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
+          <h2 className="text-base lg:text-lg font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
             Token Holdings (0)
           </h2>
           <WalletRefreshButton />
@@ -314,7 +350,7 @@ export default function TokenList() {
     return (
       <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         <div className="flex items-center justify-between mb-4 lg:mb-6">
-          <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
+          <h2 className="text-base lg:text-lg font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
             Token Holdings (0)
           </h2>
           <WalletRefreshButton />
@@ -343,9 +379,10 @@ export default function TokenList() {
 
   return (
     <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between mb-4 lg:mb-6">
-        <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi flex-shrink-0">
-          Token Holdings ({displayTokens.length})
+      <div className="flex items-center justify-between mb-4 lg:mb-6 px-3">
+        <h2 className="text-base lg:text-lg font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
+          Token Holdings
+          {/* ({displayTokens.length}) */}
         </h2>
         <WalletRefreshButton />
       </div>
@@ -369,13 +406,18 @@ export default function TokenList() {
                   {isNavigating ? (
                     <RefreshCw className="w-8 h-8 text-[#E2AF19] animate-spin mr-3 flex-shrink-0" />
                   ) : (
-                    <>
-                      {/* FIXED: Better icon handling - check API icon first */}
+                    <div
+                      className={`w-10 h-10 ${getTokenBackgroundColor(
+                        token.symbol,
+                        token.contractAddress
+                      )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 p-1`}
+                    >
+                      {/* UPDATED: Better icon handling with background */}
                       {isValidImageUrl(token.icon) ? (
                         <img
                           src={token.icon}
                           alt={token.symbol}
-                          className="w-8 h-8 rounded-full mr-3 flex-shrink-0"
+                          className="w-8 h-8 rounded-full"
                           onError={(e) => {
                             console.log(
                               `❌ Image load failed for ${token.symbol}: ${token.icon}`
@@ -396,7 +438,7 @@ export default function TokenList() {
                         className={`w-8 h-8 ${getTokenIcon(
                           token.symbol,
                           token.contractAddress
-                        )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
+                        )} rounded-full flex items-center justify-center ${
                           isValidImageUrl(token.icon) ? "hidden" : ""
                         }`}
                       >
@@ -404,7 +446,7 @@ export default function TokenList() {
                           {getTokenLetter(token.symbol, token.contractAddress)}
                         </span>
                       </div>
-                    </>
+                    </div>
                   )}
 
                   <div className="min-w-0">
@@ -452,13 +494,18 @@ export default function TokenList() {
                 {isNavigating ? (
                   <RefreshCw className="w-10 h-10 text-[#E2AF19] animate-spin mr-3 flex-shrink-0" />
                 ) : (
-                  <>
-                    {/* FIXED: Better icon handling - check API icon first */}
+                  <div
+                    className={`w-12 h-12 ${getTokenBackgroundColor(
+                      token.symbol,
+                      token.contractAddress
+                    )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 p-1`}
+                  >
+                    {/* UPDATED: Better icon handling with background */}
                     {isValidImageUrl(token.icon) ? (
                       <img
                         src={token.icon}
                         alt={token.symbol}
-                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-full mr-3 flex-shrink-0"
+                        className="w-10 h-10 rounded-full"
                         onError={(e) => {
                           console.log(
                             `❌ Image load failed for ${token.symbol}: ${token.icon}`
@@ -476,10 +523,10 @@ export default function TokenList() {
                     ) : null}
 
                     <div
-                      className={`w-8 h-8 sm:w-10 sm:h-10 ${getTokenIcon(
+                      className={`w-10 h-10 ${getTokenIcon(
                         token.symbol,
                         token.contractAddress
-                      )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
+                      )} rounded-full flex items-center justify-center ${
                         isValidImageUrl(token.icon) ? "hidden" : ""
                       }`}
                     >
@@ -487,7 +534,7 @@ export default function TokenList() {
                         {getTokenLetter(token.symbol, token.contractAddress)}
                       </span>
                     </div>
-                  </>
+                  </div>
                 )}
 
                 <div className="min-w-0 flex-1">

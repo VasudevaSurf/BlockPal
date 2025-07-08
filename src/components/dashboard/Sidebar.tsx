@@ -1,46 +1,45 @@
-// src/components/dashboard/Sidebar.tsx (UPDATED - Added Navigation Loading)
+// src/components/dashboard/Sidebar.tsx (UPDATED - Fixed Logout)
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Calendar,
-  CreditCard,
-  MessageCircle,
-  Users,
-  User,
-  ExternalLink,
-  Moon,
-  RefreshCw,
-} from "lucide-react";
+import { User, ExternalLink, RefreshCw } from "lucide-react";
 import { RootState } from "@/store";
 import { toggleTheme } from "@/store/slices/uiSlice";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
+import DashboardIcon from "@/components/icons/DashboardIcon";
+import ScheduleIcon from "@/components/icons/ScheduleIcon";
+import BatchIcon from "@/components/icons/BatchIcon";
+import AIIcon from "@/components/icons/AIIcon";
+import FriendsIcon from "@/components/icons/FriendsIcon";
+import WebsiteIcon from "@/components/icons/WebsiteIcon";
+import DarkModeIcon from "@/components/icons/DarkModeIcon";
+import LogoutIcon from "@/components/icons/LogoutIcon";
+import { logoutUser } from "@/store/slices/authSlice";
 
 const menuItems = [
   {
-    icon: LayoutDashboard,
+    icon: DashboardIcon,
     label: "Dashboard",
     href: "/dashboard",
   },
   {
-    icon: Calendar,
+    icon: ScheduleIcon,
     label: "Schedule Payments",
     href: "/dashboard/scheduled-payments",
   },
   {
-    icon: CreditCard,
+    icon: BatchIcon,
     label: "Batch Payments",
     href: "/dashboard/batch-payments",
   },
   {
-    icon: MessageCircle,
+    icon: AIIcon,
     label: "AI Chat",
     href: "/dashboard/ai-chat",
   },
   {
-    icon: Users,
+    icon: FriendsIcon,
     label: "Friends",
     href: "/dashboard/friends",
   },
@@ -86,6 +85,23 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       router.push(href);
       onItemClick?.();
     }, 100);
+  };
+
+  const handleLogout = async (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (isLoading) return;
+
+    try {
+      await dispatch(logoutUser());
+      router.push("/auth");
+      onItemClick?.();
+    } catch (error) {
+      console.error("Logout error:", error);
+      router.push("/auth");
+      onItemClick?.();
+    }
   };
 
   return (
@@ -172,7 +188,11 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                     className="mr-3 flex-shrink-0 animate-spin"
                   />
                 ) : (
-                  <item.icon size={18} className="mr-3 flex-shrink-0" />
+                  <item.icon
+                    size={18}
+                    className="mr-3 flex-shrink-0"
+                    filled={isActive}
+                  />
                 )}
                 <span className={isActive ? "font-medium" : ""}>
                   {item.label}
@@ -197,7 +217,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         </div>
 
         <div className="space-y-2 lg:space-y-3">
-          {/* User Profile Link */}
+          {/* User Profile Link with Logout */}
           {otherItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -205,7 +225,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 key={item.label}
                 onClick={(e) => handleNavigation(item.href, e)}
                 disabled={isLoading}
-                className={`w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
+                className={`w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base group ${
                   isActive
                     ? "bg-[#E2AF19] text-black font-medium"
                     : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
@@ -222,27 +242,40 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 <span className={isActive ? "font-medium" : ""}>
                   {item.label}
                 </span>
+                {/* Logout Icon at the end */}
+                <div
+                  className="ml-auto flex-shrink-0 p-1 rounded hover:bg-red-900/20 transition-colors"
+                  onClick={handleLogout}
+                >
+                  <LogoutIcon
+                    size={16}
+                    className="group-hover:opacity-80 transition-opacity"
+                    color="#E74C3C"
+                  />
+                </div>
               </button>
             );
           })}
 
+          {/* Go to Website Button */}
           <button
             className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
             disabled={isLoading}
           >
-            <ExternalLink size={18} className="mr-3 flex-shrink-0" />
+            <WebsiteIcon size={18} className="mr-3 flex-shrink-0" />
             <span className="truncate">Go to website</span>
             <div className="ml-auto flex-shrink-0">
               <ExternalLink size={14} className="text-gray-400" />
             </div>
           </button>
 
+          {/* Dark Mode Toggle */}
           <button
             onClick={() => dispatch(toggleTheme())}
             disabled={isLoading}
             className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
           >
-            <Moon size={18} className="mr-3 flex-shrink-0" />
+            <DarkModeIcon size={18} className="mr-3 flex-shrink-0" />
             <span className="truncate">Dark Mode</span>
             <div className="ml-auto flex-shrink-0">
               <div className="w-8 lg:w-10 h-5 lg:h-6 rounded-full relative bg-[#E2AF19]">

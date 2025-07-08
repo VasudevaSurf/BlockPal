@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - UPDATED WITH BETTER LOADING STATES
+// src/components/dashboard/WalletBalance.tsx - UPDATED WITH ITALIC ADDRESS
 "use client";
 
 import { useSelector, useDispatch } from "react-redux";
@@ -133,18 +133,18 @@ export default function WalletBalance() {
     <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
       {/* Header - Responsive layout */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 sm:gap-0">
-        <h2 className="text-base lg:text-lg font-semibold text-white font-satoshi">
+        <h2 className="text-base lg:text-lg font-semibold text-white font-mayeka-demi-bold-demo">
           Wallet Balance
         </h2>
 
         {/* Address and Copy Button - Responsive */}
         <div className="flex items-center space-x-2 sm:space-x-3">
-          <span className="text-gray-400 text-xs sm:text-sm font-satoshi truncate max-w-[150px] sm:max-w-none">
+          <span className="text-gray-400 text-xs sm:text-sm font-satoshi italic font-medium truncate max-w-[150px] sm:max-w-none tracking-wide">
             {activeWallet?.address
               ? `${activeWallet.address.slice(
                   0,
-                  6
-                )}...${activeWallet.address.slice(-4)}`
+                  10
+                )}...${activeWallet.address.slice(-8)}`
               : "No wallet selected"}
           </span>
           {activeWallet?.address && (
@@ -152,6 +152,7 @@ export default function WalletBalance() {
               onClick={() => copyToClipboard(activeWallet.address)}
               className="text-black hover:bg-[#D4A853] transition-colors bg-[#E2AF19] bg-opacity-100 px-2 sm:px-3 py-1 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0"
             >
+              Copy
               <Copy size={10} className="text-black sm:w-3 sm:h-3" />
             </button>
           )}

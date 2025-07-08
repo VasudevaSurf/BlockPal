@@ -15,7 +15,7 @@ export default function SwapSection() {
   return (
     <div className="bg-black rounded-[16px] lg:rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-4 lg:p-6 overflow-hidden">
       {/* Header */}
-      <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-satoshi">
+      <h2 className="text-base lg:text-lg font-semibold text-white mb-4 lg:mb-6 font-mayeka-demi-bold-demo">
         Swap
       </h2>
 
@@ -54,7 +54,7 @@ export default function SwapSection() {
                   type="text"
                   value={sellAmount}
                   onChange={(e) => setSellAmount(e.target.value)}
-                  className="bg-transparent text-xl lg:text-2xl font-bold text-white focus:outline-none font-satoshi w-full"
+                  className="bg-transparent text-xl lg:text-2xl font-bold text-white focus:outline-none font-mayeka-demi-bold-demo w-full"
                   placeholder="0"
                   style={{
                     fontSize:
@@ -96,7 +96,7 @@ export default function SwapSection() {
                   type="text"
                   value={buyAmount}
                   onChange={(e) => setBuyAmount(e.target.value)}
-                  className="bg-transparent text-xl lg:text-2xl font-bold text-white focus:outline-none font-satoshi w-full"
+                  className="bg-transparent text-xl lg:text-2xl font-bold text-white focus:outline-none font-mayeka-demi-bold-demo w-full"
                   placeholder="0"
                   style={{
                     fontSize:

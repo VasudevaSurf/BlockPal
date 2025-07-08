@@ -30,7 +30,7 @@ import Input from "@/components/ui/Input";
 import UsernameInput from "@/components/ui/UsernameInput";
 import { UserSuggestion } from "@/hooks/useUsernameSearch";
 import { SkeletonScheduledPayments } from "@/components/ui/Skeleton";
-import { DatePicker, TimePicker } from "@/components/ui/DateTimePicker";
+import { DateTimePicker } from "@/components/ui/DateTimePicker";
 
 interface ScheduledPayment {
   id: string;
@@ -244,8 +244,26 @@ export default function ScheduledPaymentsPage() {
   const [copied, setCopied] = useState<string>("");
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // NEW: Selected user state for username input
+  // Selected user state for username input
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest(".token-dropdown") && isTokenDropdownOpen) {
+        setIsTokenDropdownOpen(false);
+      }
+      if (!target.closest(".timezone-dropdown") && isTimezoneDropdownOpen) {
+        setIsTimezoneDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isTokenDropdownOpen, isTimezoneDropdownOpen]);
 
   // Initialize with first available token
   useEffect(() => {
@@ -315,7 +333,7 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  // NEW: Handle username/address input change
+  // Handle username/address input change
   const handleRecipientChange = (
     value: string,
     suggestion?: UserSuggestion
@@ -335,7 +353,7 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  // NEW: Handle user selection from dropdown
+  // Handle user selection from dropdown
   const handleUserSelect = (user: UserSuggestion) => {
     setSelectedUser(user);
     setFormData({ ...formData, recipient: user.walletAddress });
@@ -457,7 +475,7 @@ export default function ScheduledPaymentsPage() {
       return false;
     }
 
-    // NEW: Enhanced validation for username/address
+    // Enhanced validation for username/address
     if (selectedUser) {
       // User selected from dropdown - use their wallet address
       if (
@@ -514,7 +532,7 @@ export default function ScheduledPaymentsPage() {
       const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
-      // NEW: Use selected user's wallet address if available, otherwise use direct input
+      // Use selected user's wallet address if available, otherwise use direct input
       const recipientAddress = selectedUser
         ? selectedUser.walletAddress
         : formData.recipient;
@@ -575,7 +593,7 @@ export default function ScheduledPaymentsPage() {
       const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
-      // NEW: Use selected user's wallet address if available
+      // Use selected user's wallet address if available
       const recipientAddress = selectedUser
         ? selectedUser.walletAddress
         : formData.recipient;
@@ -626,7 +644,7 @@ export default function ScheduledPaymentsPage() {
         time: "",
         description: "",
       });
-      setSelectedUser(null); // NEW: Reset selected user
+      setSelectedUser(null);
       setRecurringEnabled(false);
 
       console.log("✅ Smart contract scheduled payment created successfully");
@@ -782,6 +800,41 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
+  const getTokenBackgroundColor = (
+    symbol: string,
+    contractAddress?: string
+  ) => {
+    const colors: Record<string, string> = {
+      ETH: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
+      ETHEREUM: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
+      SOL: "bg-gradient-to-br from-purple-500/20 to-purple-600/30",
+      BTC: "bg-gradient-to-br from-orange-500/20 to-orange-600/30",
+      SUI: "bg-gradient-to-br from-cyan-500/20 to-cyan-600/30",
+      XRP: "bg-gradient-to-br from-gray-500/20 to-gray-600/30",
+      ADA: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
+      AVAX: "bg-gradient-to-br from-red-500/20 to-red-600/30",
+      TON: "bg-gradient-to-br from-blue-400/20 to-blue-500/30",
+      DOT: "bg-gradient-to-br from-pink-500/20 to-pink-600/30",
+      USDT: "bg-gradient-to-br from-green-500/20 to-green-600/30",
+      USDC: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
+      YAI: "bg-gradient-to-br from-yellow-500/20 to-yellow-600/30",
+      LINK: "bg-gradient-to-br from-blue-700/20 to-blue-800/30",
+    };
+
+    // Special handling for ETH/native token
+    if (
+      symbol === "ETH" ||
+      contractAddress === "native" ||
+      symbol === "ETHEREUM"
+    ) {
+      return colors.ETH || "bg-gradient-to-br from-blue-500/20 to-blue-600/30";
+    }
+
+    return (
+      colors[symbol] || "bg-gradient-to-br from-gray-500/20 to-gray-600/30"
+    );
+  };
+
   const filteredPayments = scheduledPayments.filter(
     (payment) => payment.status === activeTab
   );
@@ -798,9 +851,7 @@ export default function ScheduledPaymentsPage() {
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      {/* Header with Smart Contract Badge */}
-
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
       {/* Error Display */}
       {error && (
         <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
@@ -818,24 +869,24 @@ export default function ScheduledPaymentsPage() {
       <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
         {/* Schedule Payment Form - Mobile */}
         <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-white mb-4 font-satoshi">
+          <h2 className="text-lg font-semibold text-white mb-4 font-mayeka-demi-bold-demo">
             Schedule Payment
           </h2>
 
           <div className="space-y-4">
-            {/* NEW: Username/Address Input */}
+            {/* Username/Address Input - Full width (larger) */}
             <div>
               <UsernameInput
                 value={formData.recipient}
                 onChange={handleRecipientChange}
                 onUserSelect={handleUserSelect}
-                placeholder="@username or 0x... address"
+                placeholder="@username or address"
                 className="font-satoshi text-gray-400"
               />
             </div>
 
-            {/* Token and Amount Row */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Token, Amount, and Timezone Row */}
+            <div className="grid grid-cols-3 gap-3">
               {/* Token Selector */}
               <div className="relative">
                 <button
@@ -855,7 +906,7 @@ export default function ScheduledPaymentsPage() {
                   <ChevronDown size={16} className="text-gray-400" />
                 </button>
 
-                {/* Dropdown with real token icons */}
+                {/* Token Dropdown */}
                 {isTokenDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {tokens.map((token) => (
@@ -901,89 +952,82 @@ export default function ScheduledPaymentsPage() {
                 }
                 className="font-satoshi"
               />
+
+              {/* Timezone Selector */}
+              <div className="relative">
+                <button
+                  onClick={() =>
+                    setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)
+                  }
+                  className="flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 w-full"
+                >
+                  <span className="text-white font-satoshi text-sm truncate">
+                    {selectedTimezone.tz}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className="text-gray-400 flex-shrink-0"
+                  />
+                </button>
+
+                {isTimezoneDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    {timezones.map((timezone) => (
+                      <button
+                        key={timezone.idx}
+                        onClick={() => {
+                          setSelectedTimezone(timezone);
+                          setIsTimezoneDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
+                      >
+                        <span className="text-white font-satoshi text-sm">
+                          {timezone.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Date and Time Row */}
-            <div className="grid grid-cols-2 gap-3">
-              <DatePicker
-                value={formData.date}
-                onChange={(value) => setFormData({ ...formData, date: value })}
-                placeholder="Select date"
-                className="font-satoshi"
-              />
-              <TimePicker
-                value={formData.time}
-                onChange={(value) => setFormData({ ...formData, time: value })}
-                placeholder="Select time"
-                className="font-satoshi"
-              />
-            </div>
+            {/* Mobile Layout - Date and Time Row */}
+            <div className="xl:hidden space-y-4">
+              {/* Date Time Picker - Full width on mobile */}
+              <div>
+                <DateTimePicker
+                  dateValue={formData.date}
+                  timeValue={formData.time}
+                  onDateChange={(value) =>
+                    setFormData({ ...formData, date: value })
+                  }
+                  onTimeChange={(value) =>
+                    setFormData({ ...formData, time: value })
+                  }
+                  placeholder="Select date & time"
+                  className="font-satoshi"
+                />
+              </div>
 
-            {/* Timezone Selector */}
-            <div className="relative">
-              <button
-                onClick={() =>
-                  setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)
-                }
-                className="flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 w-full"
-              >
-                <span className="text-white font-satoshi text-sm">
-                  {selectedTimezone.name}
-                </span>
-                <ChevronDown size={16} className="text-gray-400" />
-              </button>
-
-              {isTimezoneDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {timezones.map((timezone) => (
-                    <button
-                      key={timezone.idx}
-                      onClick={() => {
-                        setSelectedTimezone(timezone);
-                        setIsTimezoneDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
-                    >
-                      <span className="text-white font-satoshi text-sm">
-                        {timezone.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Description */}
-            <Input
-              type="text"
-              placeholder="Description (optional)"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              className="font-satoshi"
-            />
-
-            {/* Recurring Toggle */}
-            <div className="flex items-center justify-between bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+              {/* Recurring Toggle - Next line on mobile */}
               <div className="flex items-center">
                 <Repeat size={16} className="text-gray-400 mr-2" />
-                <span className="text-white font-satoshi text-sm">
+                <span className="text-white font-satoshi text-sm mr-3">
                   Enable recurring payments
                 </span>
-              </div>
-              <button
-                onClick={() => setRecurringEnabled(!recurringEnabled)}
-                className={`relative w-10 h-6 rounded-full transition-colors ${
-                  recurringEnabled ? "bg-[#E2AF19]" : "bg-gray-600"
-                }`}
-              >
-                <div
-                  className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                    recurringEnabled ? "translate-x-5" : "translate-x-1"
+                <button
+                  onClick={() => setRecurringEnabled(!recurringEnabled)}
+                  className={`relative w-10 h-6 rounded-full transition-colors ${
+                    recurringEnabled ? "bg-[#E2AF19]" : "bg-gray-600"
                   }`}
-                />
-              </button>
+                >
+                  <div
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      recurringEnabled ? "translate-x-5" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Frequency Selector */}
@@ -1013,7 +1057,7 @@ export default function ScheduledPaymentsPage() {
                     time: "",
                     description: "",
                   });
-                  setSelectedUser(null); // NEW: Reset selected user
+                  setSelectedUser(null);
                   setRecurringEnabled(false);
                   setError("");
                 }}
@@ -1026,7 +1070,7 @@ export default function ScheduledPaymentsPage() {
                 disabled={loading}
                 className="flex-1 font-satoshi"
               >
-                {loading ? "Loading..." : "Schedule Payment"}
+                {loading ? "Loading..." : "Create Schedule"}
               </Button>
             </div>
           </div>
@@ -1183,25 +1227,25 @@ export default function ScheduledPaymentsPage() {
       <div className="hidden xl:flex flex-col gap-6 flex-1 min-h-0">
         {/* Schedule Payment Form */}
         <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-white mb-6 font-satoshi">
+          <h2 className="text-lg font-semibold text-white mb-6 font-mayeka-demi-bold-demo">
             Schedule Payment
           </h2>
 
-          {/* Form Row */}
-          <div className="grid grid-cols-12 gap-4 mb-6">
-            {/* NEW: Username/Address Input */}
-            <div className="col-span-3">
+          {/* Form Row 1 - Username/Address (spans 6 columns) */}
+          <div className="grid grid-cols-12 gap-4 mb-4">
+            {/* Username/Address Input - Takes up 6 columns (double width) */}
+            <div className="col-span-6">
               <UsernameInput
                 value={formData.recipient}
                 onChange={handleRecipientChange}
                 onUserSelect={handleUserSelect}
-                placeholder="@username or 0x... address"
+                placeholder="@username or address"
                 className="font-satoshi text-gray-400"
               />
             </div>
 
             {/* Token Selector */}
-            <div className="col-span-2 relative">
+            <div className="col-span-2 relative token-dropdown">
               <button
                 onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
                 className="w-full h-full flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-left hover:border-[#E2AF19] transition-colors"
@@ -1209,7 +1253,16 @@ export default function ScheduledPaymentsPage() {
                 <div className="flex items-center">
                   {selectedToken && (
                     <>
-                      <TokenIcon token={selectedToken} size="w-5 h-5" />
+                      <div
+                        className={`w-6 h-6 ${getTokenBackgroundColor(
+                          selectedToken.symbol,
+                          selectedToken.contractAddress
+                        )} rounded-full flex items-center justify-center`}
+                      >
+                        <div className="w-4 h-4 flex items-center justify-center">
+                          <TokenIcon token={selectedToken} size="w-4 h-4" />
+                        </div>
+                      </div>
                       <span className="text-white font-satoshi text-sm ml-2">
                         {selectedToken.symbol}
                       </span>
@@ -1219,9 +1272,9 @@ export default function ScheduledPaymentsPage() {
                 <ChevronDown size={14} className="text-gray-400" />
               </button>
 
-              {/* Desktop dropdown with real token icons */}
+              {/* Token dropdown */}
               {isTokenDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-48 overflow-y-auto">
                   {tokens.map((token) => (
                     <button
                       key={token.id}
@@ -1240,7 +1293,16 @@ export default function ScheduledPaymentsPage() {
                       }}
                       className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
                     >
-                      <TokenIcon token={token} size="w-5 h-5" />
+                      <div
+                        className={`w-6 h-6 ${getTokenBackgroundColor(
+                          token.symbol,
+                          token.contractAddress
+                        )} rounded-full flex items-center justify-center`}
+                      >
+                        <div className="w-4 h-4 flex items-center justify-center">
+                          <TokenIcon token={token} size="w-4 h-4" />
+                        </div>
+                      </div>
                       <div className="flex-1 ml-2">
                         <div className="text-white font-satoshi text-sm">
                           {token.symbol}
@@ -1268,81 +1330,70 @@ export default function ScheduledPaymentsPage() {
               />
             </div>
 
-            {/* Date Input */}
-            <div className="col-span-2">
-              <DatePicker
-                value={formData.date}
-                onChange={(value) => setFormData({ ...formData, date: value })}
-                placeholder="Select date"
-                className="font-satoshi"
-              />
-            </div>
-
-            {/* Time Input */}
-            <div className="col-span-2">
-              <TimePicker
-                value={formData.time}
-                onChange={(value) => setFormData({ ...formData, time: value })}
-                placeholder="Select time"
-                className="font-satoshi"
-              />
-            </div>
-
-            {/* Schedule Button */}
-            <div className="col-span-1">
-              <Button
-                onClick={handleCreatePreview}
-                disabled={loading}
-                className="w-full h-full font-satoshi text-xs"
+            {/* Timezone Selector */}
+            <div className="col-span-2 relative timezone-dropdown">
+              <button
+                onClick={() =>
+                  setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)
+                }
+                className="w-full h-full flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-left hover:border-[#E2AF19] transition-colors"
               >
-                {loading ? "..." : "Schedule"}
-              </Button>
+                <span className="text-white font-satoshi text-sm truncate">
+                  {selectedTimezone.tz}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className="text-gray-400 ml-2 flex-shrink-0"
+                />
+              </button>
+
+              {isTimezoneDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                  {timezones.map((timezone) => (
+                    <button
+                      key={timezone.idx}
+                      onClick={() => {
+                        setSelectedTimezone(timezone);
+                        setIsTimezoneDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
+                    >
+                      <span className="text-white font-satoshi text-sm">
+                        {timezone.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Additional Options Row */}
-          <div className="flex items-center justify-between mb-6">
-            {/* Timezone Selector */}
-            <div className="flex items-center space-x-4">
-              <span className="text-white font-satoshi">Timezone:</span>
-              <div className="relative">
-                <button
-                  onClick={() =>
-                    setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)
-                  }
-                  className="flex items-center bg-black border border-[#2C2C2C] rounded-lg px-3 py-2"
-                >
-                  <span className="text-white font-satoshi text-sm mr-2">
-                    {selectedTimezone.name}
-                  </span>
-                  <ChevronDown size={14} className="text-gray-400" />
-                </button>
-
-                {isTimezoneDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {timezones.map((timezone) => (
-                      <button
-                        key={timezone.idx}
-                        onClick={() => {
-                          setSelectedTimezone(timezone);
-                          setIsTimezoneDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
-                      >
-                        <span className="text-white font-satoshi text-sm">
-                          {timezone.name}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+          {/* Desktop Layout - Form Row 2 - Date with Time and Recurring Toggle */}
+          <div className="hidden xl:grid xl:grid-cols-12 xl:gap-4 xl:mb-4">
+            {/* Date with Time Input - Takes up 3 columns (reduced from 4) */}
+            <div className="col-span-3">
+              <DateTimePicker
+                dateValue={formData.date}
+                timeValue={formData.time}
+                onDateChange={(value) =>
+                  setFormData({ ...formData, date: value })
+                }
+                onTimeChange={(value) =>
+                  setFormData({ ...formData, time: value })
+                }
+                placeholder="Select date & time"
+                className="font-satoshi"
+              />
             </div>
 
-            {/* Recurring Options */}
-            <div className="flex items-center space-x-4">
+            {/* Spacer - Takes up 4 columns (increased from 3) */}
+            <div className="col-span-4"></div>
+
+            {/* Recurring Toggle - Takes up 5 columns at the end */}
+            <div className="col-span-5 flex items-center justify-end">
               <div className="flex items-center">
-                <span className="text-white font-satoshi mr-4">
+                <Repeat size={16} className="text-gray-400 mr-2" />
+                <span className="text-white font-satoshi text-sm mr-3">
                   Enable recurring payments
                 </span>
                 <button
@@ -1358,34 +1409,24 @@ export default function ScheduledPaymentsPage() {
                   />
                 </button>
               </div>
-
-              {recurringEnabled && (
-                <select
-                  value={recurringFrequency}
-                  onChange={(e) => setRecurringFrequency(e.target.value)}
-                  className="bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-white font-satoshi"
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
-              )}
             </div>
           </div>
 
-          {/* Description */}
-          <div className="mb-6">
-            <Input
-              type="text"
-              placeholder="Description (optional)"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              className="font-satoshi w-full"
-            />
-          </div>
+          {/* Frequency Selector (only shows when recurring is enabled) */}
+          {recurringEnabled && (
+            <div className="mb-6">
+              <select
+                value={recurringFrequency}
+                onChange={(e) => setRecurringFrequency(e.target.value)}
+                className="bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white font-satoshi text-sm"
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          )}
 
           {/* Buttons */}
           <div className="flex justify-end space-x-3">
@@ -1398,7 +1439,7 @@ export default function ScheduledPaymentsPage() {
                   time: "",
                   description: "",
                 });
-                setSelectedUser(null); // NEW: Reset selected user
+                setSelectedUser(null);
                 setRecurringEnabled(false);
                 setError("");
               }}
@@ -1411,7 +1452,7 @@ export default function ScheduledPaymentsPage() {
               disabled={loading}
               className="font-satoshi"
             >
-              {loading ? "Loading..." : "Create Schedule"}
+              {loading ? "Loading..." : "Transfer"}
             </Button>
           </div>
         </div>
@@ -1596,7 +1637,7 @@ export default function ScheduledPaymentsPage() {
         </div>
       </div>
 
-      {/* Preview Modal */}
+      {/* Updated Preview Modal with Description Input */}
       {showPreview && preview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-2xl max-h-[90vh] overflow-hidden">
@@ -1625,6 +1666,26 @@ export default function ScheduledPaymentsPage() {
 
             <div className="p-6 max-h-[60vh] overflow-y-auto">
               <div className="space-y-6">
+                {/* Description Input Field */}
+                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
+                  <h3 className="text-white font-semibold font-satoshi mb-3">
+                    Payment Description
+                  </h3>
+                  <Input
+                    type="text"
+                    placeholder="Add a description for this payment (optional)"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    className="font-satoshi w-full"
+                  />
+                  <p className="text-gray-400 text-xs font-satoshi mt-2">
+                    This description will help you identify this payment in your
+                    transaction history.
+                  </p>
+                </div>
+
                 {/* Smart Contract Features */}
                 <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/50 rounded-lg p-4">
                   <div className="flex items-center mb-3">
@@ -1668,8 +1729,12 @@ export default function ScheduledPaymentsPage() {
                         Recipient
                       </div>
                       <div className="text-white font-bold font-satoshi">
-                        {preview.recipient.slice(0, 10)}...
-                        {preview.recipient.slice(-6)}
+                        {selectedUser
+                          ? `@${selectedUser.username}`
+                          : `${preview.recipient.slice(
+                              0,
+                              10
+                            )}...${preview.recipient.slice(-6)}`}
                       </div>
                     </div>
                     <div>
@@ -1680,6 +1745,22 @@ export default function ScheduledPaymentsPage() {
                         {preview.frequency === "once"
                           ? "One-time"
                           : preview.frequency}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-400 text-sm font-satoshi">
+                        Timezone
+                      </div>
+                      <div className="text-white font-bold font-satoshi">
+                        {selectedTimezone.tz}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-400 text-sm font-satoshi">
+                        Scheduled For
+                      </div>
+                      <div className="text-white font-bold font-satoshi">
+                        {formatDateTime(preview.scheduledFor)}
                       </div>
                     </div>
                   </div>

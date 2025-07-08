@@ -396,7 +396,7 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
       {/* Real-time Dashboard Notifications */}
       <RealtimeDashboardNotifications />
 
