@@ -23,6 +23,8 @@ import {
   Pause,
   Zap,
   Shield,
+  Edit3,
+  Save,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
@@ -114,6 +116,37 @@ const getTokenIconColor = (symbol: string) => {
   return colors[symbol] || "bg-gray-500";
 };
 
+// Generate random background color for tokens
+const getRandomTokenBgColor = (symbol: string) => {
+  const colors = [
+    "bg-red-500",
+    "bg-blue-500",
+    "bg-green-500",
+    "bg-yellow-500",
+    "bg-purple-500",
+    "bg-pink-500",
+    "bg-indigo-500",
+    "bg-cyan-500",
+    "bg-orange-500",
+    "bg-teal-500",
+    "bg-emerald-500",
+    "bg-lime-500",
+    "bg-amber-500",
+    "bg-violet-500",
+    "bg-fuchsia-500",
+    "bg-rose-500",
+    "bg-sky-500",
+  ];
+
+  // Use symbol to generate consistent color for same token
+  let hash = 0;
+  for (let i = 0; i < symbol.length; i++) {
+    hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
+
 const getTokenLetter = (symbol: string) => {
   const letters: Record<string, string> = {
     Ethereum: "Ξ",
@@ -152,12 +185,45 @@ const isValidImageUrl = (url: string | null | undefined): boolean => {
 const TokenIcon = ({
   token,
   size = "w-5 h-5",
+  showBg = false,
 }: {
   token: any;
   size?: string;
+  showBg?: boolean;
 }) => {
   const [imageError, setImageError] = useState(false);
   const showImage = !imageError && isValidImageUrl(token.icon);
+
+  if (showBg) {
+    // Show token with random background circle
+    return (
+      <div
+        className={`${size} ${getRandomTokenBgColor(
+          token.symbol
+        )} rounded-full flex items-center justify-center flex-shrink-0`}
+      >
+        {showImage ? (
+          <img
+            src={token.icon}
+            alt={token.symbol}
+            className={`${size
+              .replace("w-", "w-")
+              .replace("h-", "h-")} rounded-full`}
+            onError={(e) => {
+              console.log(
+                `❌ Image load failed for ${token.symbol}: ${token.icon}`
+              );
+              setImageError(true);
+            }}
+          />
+        ) : (
+          <span className="text-white text-xs font-medium">
+            {getTokenLetter(token.symbol)}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex-shrink-0">
@@ -243,6 +309,25 @@ export default function ScheduledPaymentsPage() {
   const [showResult, setShowResult] = useState(false);
   const [copied, setCopied] = useState<string>("");
   const [initialLoading, setInitialLoading] = useState(true);
+
+  // Edit state
+  const [editingPayment, setEditingPayment] = useState<ScheduledPayment | null>(
+    null
+  );
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    amount: "",
+    date: "",
+    time: "",
+    description: "",
+    frequency: "once",
+  });
+  const [editRecurringEnabled, setEditRecurringEnabled] = useState(false);
+  const [editSelectedTimezone, setEditSelectedTimezone] = useState(
+    timezones[1]
+  );
+  const [updating, setUpdating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Selected user state for username input
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
@@ -358,6 +443,128 @@ export default function ScheduledPaymentsPage() {
     setSelectedUser(user);
     setFormData({ ...formData, recipient: user.walletAddress });
     console.log("✅ User selected from dropdown:", user);
+  };
+
+  // Handle edit payment
+  const handleEditPayment = (payment: ScheduledPayment) => {
+    setEditingPayment(payment);
+    setIsEditing(true);
+
+    // Parse the scheduled date
+    const scheduledDate = new Date(
+      payment.nextExecution || payment.scheduledFor
+    );
+    const dateStr = scheduledDate.toISOString().split("T")[0];
+    const timeStr = scheduledDate.toTimeString().slice(0, 5);
+
+    setEditFormData({
+      amount: payment.amount,
+      date: dateStr,
+      time: timeStr,
+      description: payment.description || "",
+      frequency: payment.frequency || "once",
+    });
+
+    setEditRecurringEnabled(payment.frequency !== "once");
+    setShowEditModal(true);
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = (payment: ScheduledPayment) => {
+    setIsEditing(false);
+    setEditingPayment(null);
+    setShowEditModal(false);
+  };
+
+  // Handle update payment - Since the API doesn't support update, we'll cancel and recreate
+  const handleUpdatePayment = async () => {
+    if (!editingPayment) return;
+
+    try {
+      setUpdating(true);
+      setError("");
+
+      // Validate form
+      if (!editFormData.amount || !editFormData.date || !editFormData.time) {
+        setError("Please fill in all required fields");
+        return;
+      }
+
+      const scheduledDateTime = new Date(
+        `${editFormData.date}T${editFormData.time}`
+      );
+      if (scheduledDateTime <= new Date()) {
+        setError("Scheduled time must be in the future");
+        return;
+      }
+
+      // Since update isn't supported, we'll need to cancel and recreate
+      // First cancel the existing payment
+      const cancelResponse = await fetch(
+        `/api/scheduled-payments/${editingPayment.scheduleId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "cancel",
+            status: "cancelled",
+          }),
+          credentials: "include",
+        }
+      );
+
+      if (!cancelResponse.ok) {
+        throw new Error("Failed to cancel existing payment");
+      }
+
+      // Create new payment with updated details
+      const frequency = editRecurringEnabled ? editFormData.frequency : "once";
+
+      const createBody = {
+        action: "create",
+        tokenInfo: {
+          name: editingPayment.tokenName,
+          symbol: editingPayment.tokenSymbol,
+          contractAddress: editingPayment.contractAddress,
+          decimals: 18, // Default, you might want to store this
+          isETH: editingPayment.tokenSymbol === "ETH",
+        },
+        fromAddress: editingPayment.walletAddress,
+        recipient: editingPayment.recipient,
+        amount: editFormData.amount,
+        scheduledFor: scheduledDateTime.toISOString(),
+        frequency,
+        timezone: editSelectedTimezone.tz,
+        description: editFormData.description,
+      };
+
+      const createResponse = await fetch("/api/scheduled-payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(createBody),
+        credentials: "include",
+      });
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json();
+        throw new Error(errorData.error || "Failed to create updated payment");
+      }
+
+      console.log("✅ Payment updated successfully (recreated)");
+      setShowEditModal(false);
+      setEditingPayment(null);
+      setIsEditing(false);
+      fetchScheduledPayments();
+    } catch (error: any) {
+      console.error("❌ Error updating payment:", error);
+      setError("Failed to update payment: " + error.message);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleDeletePayment = async (scheduleId: string) => {
@@ -696,26 +903,39 @@ export default function ScheduledPaymentsPage() {
 
   const renderMobileActionButtons = (payment: ScheduledPayment) => {
     if (activeTab === "active") {
-      return (
-        <>
+      if (!isEditing || editingPayment?.id !== payment.id) {
+        // Show only Edit button initially
+        return (
           <button
-            onClick={() => handleCancelPayment(payment.scheduleId)}
-            disabled={loading}
-            className="bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
+            onClick={() => handleEditPayment(payment)}
+            className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
           >
-            <Pause size={12} className="mr-1" />
-            {loading ? "..." : "Cancel"}
+            <Edit3 size={12} className="mr-1" />
+            Edit
           </button>
-          <button
-            onClick={() => handleDeletePayment(payment.scheduleId)}
-            disabled={loading}
-            className="bg-gray-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
-          >
-            <Trash2 size={12} className="mr-1" />
-            {loading ? "..." : "Delete"}
-          </button>
-        </>
-      );
+        );
+      } else {
+        // Show Cancel and Delete when editing
+        return (
+          <>
+            <button
+              onClick={() => handleCancelEdit(payment)}
+              className="bg-gray-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+            >
+              <X size={12} className="mr-1" />
+              Cancel
+            </button>
+            <button
+              onClick={() => handleDeletePayment(payment.scheduleId)}
+              disabled={loading}
+              className="bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
+            >
+              <Trash2 size={12} className="mr-1" />
+              {loading ? "..." : "Delete"}
+            </button>
+          </>
+        );
+      }
     } else {
       return (
         <>
@@ -745,26 +965,42 @@ export default function ScheduledPaymentsPage() {
 
   const renderDesktopActionButtons = (payment: ScheduledPayment) => {
     if (activeTab === "active") {
-      return (
-        <div className="flex items-center justify-center space-x-1">
-          <button
-            onClick={() => handleCancelPayment(payment.scheduleId)}
-            disabled={loading}
-            className="bg-red-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
-            title="Cancel"
-          >
-            <Pause size={10} />
-          </button>
-          <button
-            onClick={() => handleDeletePayment(payment.scheduleId)}
-            disabled={loading}
-            className="bg-gray-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
-            title="Delete"
-          >
-            <Trash2 size={10} />
-          </button>
-        </div>
-      );
+      if (!isEditing || editingPayment?.id !== payment.id) {
+        // Show only Edit button initially
+        return (
+          <div className="flex items-center justify-center space-x-1">
+            <button
+              onClick={() => handleEditPayment(payment)}
+              className="bg-[#E2AF19] text-black px-2 gap-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+              title="Edit"
+            >
+              Edit
+              <Edit3 size={10} />
+            </button>
+          </div>
+        );
+      } else {
+        // Show Cancel and Delete when editing
+        return (
+          <div className="flex items-center justify-center space-x-1">
+            <button
+              onClick={() => handleCancelEdit(payment)}
+              className="bg-gray-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+              title="Cancel Edit"
+            >
+              <X size={10} />
+            </button>
+            <button
+              onClick={() => handleDeletePayment(payment.scheduleId)}
+              disabled={loading}
+              className="bg-red-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
+              title="Delete"
+            >
+              <Trash2 size={10} />
+            </button>
+          </div>
+        );
+      }
     } else {
       return (
         <div className="flex items-center justify-center space-x-2">
@@ -1079,8 +1315,8 @@ export default function ScheduledPaymentsPage() {
         {/* Tab Navigation - Mobile */}
         <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-white font-satoshi">
-              Scheduled Payments
+            <h3 className="text-lg font-semibold text-white font-mayeka-demi-bold-demo">
+              Transaction History
             </h3>
 
             {/* Tab Buttons */}
@@ -1093,7 +1329,8 @@ export default function ScheduledPaymentsPage() {
                     : "text-gray-400 hover:text-white"
                 }`}
               >
-                Active ({activeCount})
+                Active
+                {/* ({activeCount}) */}
               </button>
               <button
                 onClick={() => setActiveTab("completed")}
@@ -1103,7 +1340,8 @@ export default function ScheduledPaymentsPage() {
                     : "text-gray-400 hover:text-white"
                 }`}
               >
-                Completed ({completedCount})
+                Completed
+                {/* ({completedCount}) */}
               </button>
             </div>
           </div>
@@ -1157,7 +1395,11 @@ export default function ScheduledPaymentsPage() {
                             {payment.recipient.slice(-6)}
                           </div>
                           <div className="flex items-center mt-1">
-                            <TokenIcon token={paymentToken} size="w-4 h-4" />
+                            <TokenIcon
+                              token={paymentToken}
+                              size="w-4 h-4"
+                              showBg={true}
+                            />
                             <span className="text-gray-400 text-xs font-satoshi ml-1">
                               {payment.tokenSymbol}
                             </span>
@@ -1175,7 +1417,7 @@ export default function ScheduledPaymentsPage() {
                       </div>
                     </div>
 
-                    {/* Status and Frequency */}
+                    {/* Status and Next Execution */}
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-2">
                         {payment.status === "active" && (
@@ -1186,12 +1428,6 @@ export default function ScheduledPaymentsPage() {
                         {payment.status === "completed" && (
                           <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-satoshi font-medium">
                             Completed
-                          </span>
-                        )}
-                        {payment.frequency && payment.frequency !== "once" && (
-                          <span className="bg-[#2C2C2C] text-gray-300 px-2 py-1 rounded-full text-xs font-satoshi flex items-center">
-                            <Repeat size={10} className="mr-1" />
-                            {payment.frequency}
                           </span>
                         )}
                         {payment.frequency === "once" && (
@@ -1294,14 +1530,11 @@ export default function ScheduledPaymentsPage() {
                       className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
                     >
                       <div
-                        className={`w-6 h-6 ${getTokenBackgroundColor(
-                          token.symbol,
-                          token.contractAddress
+                        className={`w-6 h-6 ${getRandomTokenBgColor(
+                          token.symbol
                         )} rounded-full flex items-center justify-center`}
                       >
-                        <div className="w-4 h-4 flex items-center justify-center">
-                          <TokenIcon token={token} size="w-4 h-4" />
-                        </div>
+                        <TokenIcon token={token} size="w-4 h-4" />
                       </div>
                       <div className="flex-1 ml-2">
                         <div className="text-white font-satoshi text-sm">
@@ -1461,8 +1694,8 @@ export default function ScheduledPaymentsPage() {
         <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-1 flex flex-col min-h-0">
           {/* Header with Radio Options */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-white font-satoshi">
-              Scheduled Payments
+            <h2 className="text-lg font-semibold text-white font-mayeka-demi-bold-demo">
+              Transaction History
             </h2>
 
             {/* Radio Options */}
@@ -1481,7 +1714,8 @@ export default function ScheduledPaymentsPage() {
                   htmlFor="active-radio"
                   className="text-white font-satoshi text-sm"
                 >
-                  Active ({activeCount})
+                  Active
+                  {/* ({activeCount}) */}
                 </label>
               </div>
 
@@ -1499,32 +1733,30 @@ export default function ScheduledPaymentsPage() {
                   htmlFor="completed-radio"
                   className="text-white font-satoshi text-sm"
                 >
-                  Completed ({completedCount})
+                  Completed
+                  {/* ({completedCount}) */}
                 </label>
               </div>
             </div>
           </div>
 
-          {/* Table Header */}
+          {/* Table Header - Updated to remove Frequency column */}
           <div className="bg-[#0F0F0F] rounded-lg mb-2">
-            <div className="grid grid-cols-6 gap-2 px-3 py-3">
+            <div className="grid grid-cols-5 gap-2 px-3 py-3">
               <div className="text-gray-400 text-sm font-satoshi text-left">
-                Recipient
+                Username/Address
               </div>
               <div className="text-gray-400 text-sm font-satoshi text-left">
-                Token
+                Token Name
               </div>
               <div className="text-gray-400 text-sm font-satoshi text-left">
                 Amount
               </div>
               <div className="text-gray-400 text-sm font-satoshi text-left">
-                Frequency
-              </div>
-              <div className="text-gray-400 text-sm font-satoshi text-left">
-                Next Execution
+                Date
               </div>
               <div className="text-gray-400 text-sm font-satoshi text-center">
-                Actions
+                Edit
               </div>
             </div>
           </div>
@@ -1565,7 +1797,7 @@ export default function ScheduledPaymentsPage() {
 
                 return (
                   <div key={payment.id}>
-                    <div className="grid grid-cols-6 gap-2 items-center py-2 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors">
+                    <div className="grid grid-cols-5 gap-2 items-center py-2 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors">
                       <div className="flex items-center min-w-0">
                         <div className="w-6 h-6 bg-gray-600 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
                           <span className="text-white text-xs">
@@ -1581,7 +1813,11 @@ export default function ScheduledPaymentsPage() {
                       </div>
 
                       <div className="flex items-center min-w-0">
-                        <TokenIcon token={paymentToken} size="w-5 h-5" />
+                        <TokenIcon
+                          token={paymentToken}
+                          size="w-5 h-5"
+                          showBg={true}
+                        />
                         <span className="text-white font-satoshi text-sm truncate ml-2">
                           {payment.tokenSymbol}
                         </span>
@@ -1589,20 +1825,6 @@ export default function ScheduledPaymentsPage() {
 
                       <div className="text-white font-satoshi text-sm">
                         {payment.amount} {payment.tokenSymbol}
-                      </div>
-
-                      <div className="flex items-center">
-                        {payment.frequency === "once" ? (
-                          <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-satoshi flex items-center">
-                            <Clock size={10} className="mr-1" />
-                            One-time
-                          </span>
-                        ) : (
-                          <span className="bg-[#2C2C2C] text-gray-300 px-2 py-1 rounded-full text-xs font-satoshi flex items-center">
-                            <Repeat size={10} className="mr-1" />
-                            {payment.frequency}
-                          </span>
-                        )}
                       </div>
 
                       <div className="text-white font-satoshi text-sm">
@@ -1636,6 +1858,243 @@ export default function ScheduledPaymentsPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Payment Modal */}
+      {showEditModal && editingPayment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="text-xl font-bold text-white font-mayeka">
+                    Edit Scheduled Payment
+                  </h2>
+                  <div className="flex items-center bg-[#E2AF19] px-2 py-1 rounded-full">
+                    <Edit3 size={12} className="text-black mr-1" />
+                    <span className="text-black text-xs font-semibold">
+                      Edit
+                    </span>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-sm font-satoshi">
+                  Modify your scheduled payment details
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingPayment(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-4">
+                {/* Current Payment Info */}
+                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
+                  <h3 className="text-white font-semibold font-satoshi mb-3">
+                    Current Payment
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Token:</span>
+                      <span className="text-white ml-2">
+                        {editingPayment.tokenSymbol}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Recipient:</span>
+                      <span className="text-white ml-2">
+                        {editingPayment.recipient.slice(0, 10)}...
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Edit Form */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-white font-satoshi text-sm mb-2">
+                      Amount
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Enter amount"
+                      value={editFormData.amount}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          amount: e.target.value,
+                        })
+                      }
+                      className="font-satoshi"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-white font-satoshi text-sm mb-2">
+                      Scheduled Date & Time
+                    </label>
+                    <DateTimePicker
+                      dateValue={editFormData.date}
+                      timeValue={editFormData.time}
+                      onDateChange={(value) =>
+                        setEditFormData({ ...editFormData, date: value })
+                      }
+                      onTimeChange={(value) =>
+                        setEditFormData({ ...editFormData, time: value })
+                      }
+                      placeholder="Select date & time"
+                      className="font-satoshi"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-white font-satoshi text-sm mb-2">
+                      Description (Optional)
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Add a description"
+                      value={editFormData.description}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          description: e.target.value,
+                        })
+                      }
+                      className="font-satoshi"
+                    />
+                  </div>
+
+                  {/* Recurring Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Repeat size={16} className="text-gray-400 mr-2" />
+                      <span className="text-white font-satoshi text-sm">
+                        Enable recurring payments
+                      </span>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setEditRecurringEnabled(!editRecurringEnabled)
+                      }
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        editRecurringEnabled ? "bg-[#E2AF19]" : "bg-gray-600"
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          editRecurringEnabled
+                            ? "translate-x-7"
+                            : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {editRecurringEnabled && (
+                    <div>
+                      <label className="block text-white font-satoshi text-sm mb-2">
+                        Frequency
+                      </label>
+                      <select
+                        value={editFormData.frequency}
+                        onChange={(e) =>
+                          setEditFormData({
+                            ...editFormData,
+                            frequency: e.target.value,
+                          })
+                        }
+                        className="w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white font-satoshi text-sm"
+                      >
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Timezone Selector */}
+                  <div>
+                    <label className="block text-white font-satoshi text-sm mb-2">
+                      Timezone
+                    </label>
+                    <div className="relative">
+                      <button
+                        onClick={() =>
+                          setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)
+                        }
+                        className="w-full flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-left hover:border-[#E2AF19] transition-colors"
+                      >
+                        <span className="text-white font-satoshi text-sm">
+                          {editSelectedTimezone.name}
+                        </span>
+                        <ChevronDown size={14} className="text-gray-400" />
+                      </button>
+
+                      {isTimezoneDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                          {timezones.map((timezone) => (
+                            <button
+                              key={timezone.idx}
+                              onClick={() => {
+                                setEditSelectedTimezone(timezone);
+                                setIsTimezoneDropdownOpen(false);
+                              }}
+                              className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
+                            >
+                              <span className="text-white font-satoshi text-sm">
+                                {timezone.name}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+              <div className="flex space-x-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingPayment(null);
+                  }}
+                  className="flex-1 font-satoshi"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdatePayment}
+                  disabled={updating}
+                  className="flex-1 font-satoshi bg-[#E2AF19] hover:bg-[#E2AF19]/90 text-black"
+                >
+                  {updating ? (
+                    <>
+                      <RefreshCw size={16} className="mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} className="mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Updated Preview Modal with Description Input */}
       {showPreview && preview && (
