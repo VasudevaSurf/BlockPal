@@ -21,3 +21,39 @@
 .font-satoshi {
   font-family: "Inter", Arial, sans-serif;
 }
+
+@font-face {
+  font-family: "Mayeka Bold Demo";
+  src: url("/fonts/mayeka-bold-demo.woff2") format("woff2"),
+    url("/fonts/mayeka-bold-demo.woff") format("woff");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/satoshi-regular.woff2") format("woff2"),
+    url("/fonts/satoshi-regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/satoshi-medium.woff2") format("woff2"),
+    url("/fonts/satoshi-medium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/satoshi-bold.woff2") format("woff2"),
+    url("/fonts/satoshi-bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

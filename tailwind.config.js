@@ -17,8 +17,8 @@ module.exports = {
         "gray-text": "#9CA3AF",
       },
       fontFamily: {
-        mayeka: ["Mayeka Bold Demo", "Inter", "Arial", "sans-serif"],
-        satoshi: ["Satoshi", "Inter", "Arial", "sans-serif"],
+        mayeka: ["var(--font-mayeka)", "serif"],
+        satoshi: ["var(--font-satoshi)", "sans-serif"],
       },
     },
   },
