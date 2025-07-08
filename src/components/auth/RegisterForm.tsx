@@ -3,13 +3,17 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
-import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { signInWithPopup } from "firebase/auth";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { registerUser, clearError } from "@/store/slices/authSlice";
 import { RootState, AppDispatch } from "@/store";
 import { auth, googleProvider } from "@/lib/firebase";
+import EyeOff from "../icons/EyeOffIcon";
+import Eye from "../icons/EyeIcon";
+import UserIcon from "../icons/UserIcon";
+import MailIcon from "../icons/MailIcon";
+import LockIcon from "../icons/LockIcon";
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -177,8 +181,8 @@ export default function RegisterForm() {
 
   return (
     <div className="w-full">
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-white mb-2 font-mayeka-demi-bold-demo">
+      <div className="mb-6 text-center">
+        <h1 className="text-2xl font-bold text-white mb-2 font-mayeka-bold-demo">
           Create your Account
         </h1>
         <p className="text-gray-400 font-satoshi">
@@ -201,11 +205,11 @@ export default function RegisterForm() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-3">
         <Button
           type="button"
           variant="secondary"
-          className="w-full flex items-center justify-center py-3 font-satoshi"
+          className="w-full flex items-center justify-center py-4 px-6 text-base font-satoshi"
           onClick={handleGoogleRegister}
           disabled={loading || googleLoading}
         >
@@ -234,12 +238,12 @@ export default function RegisterForm() {
           {googleLoading ? "Creating account..." : "Register with Google"}
         </Button>
 
-        <div className="relative">
+        <div className="relative my-3">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-[#2C2C2C]" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 text-gray-400 bg-black font-satoshi">OR</span>
+            <span className="px-3 text-gray-400 bg-black font-satoshi">OR</span>
           </div>
         </div>
 
@@ -254,8 +258,8 @@ export default function RegisterForm() {
             }
           }}
           error={formErrors.name}
-          icon={<User size={20} />}
-          className="font-satoshi"
+          icon={<UserIcon size={16} color="#6E6E6E" />}
+          className="font-satoshi w-full h-14 text-base px-4"
           disabled={loading || googleLoading}
         />
 
@@ -270,8 +274,8 @@ export default function RegisterForm() {
             }
           }}
           error={formErrors.email}
-          icon={<Mail size={20} />}
-          className="font-satoshi"
+          icon={<MailIcon size={22} color="#6E6E6E" />}
+          className="font-satoshi w-full h-14 text-base px-4"
           disabled={loading || googleLoading}
         />
 
@@ -287,20 +291,20 @@ export default function RegisterForm() {
               }
             }}
             error={formErrors.password}
-            icon={<Lock size={20} />}
-            className="font-satoshi"
+            icon={<LockIcon size={22} color="#6E6E6E" />}
+            className="font-satoshi w-full h-14 text-base px-4"
             disabled={loading || googleLoading}
           />
           <button
             type="button"
-            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            className="absolute inset-y-0 right-0 pr-4 flex items-center"
             onClick={() => setShowPassword(!showPassword)}
             disabled={loading || googleLoading}
           >
             {showPassword ? (
-              <EyeOff className="h-5 w-5 text-gray-400" />
+              <EyeOff size={22} color="#9CA3AF" />
             ) : (
-              <Eye className="h-5 w-5 text-gray-400" />
+              <Eye size={22} color="#9CA3AF" />
             )}
           </button>
         </div>
@@ -317,27 +321,27 @@ export default function RegisterForm() {
               }
             }}
             error={formErrors.confirmPassword}
-            icon={<Lock size={20} />}
-            className="font-satoshi"
+            icon={<LockIcon size={22} color="#6E6E6E" />}
+            className="font-satoshi w-full h-14 text-base px-4"
             disabled={loading || googleLoading}
           />
           <button
             type="button"
-            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            className="absolute inset-y-0 right-0 pr-4 flex items-center"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
             disabled={loading || googleLoading}
           >
             {showConfirmPassword ? (
-              <EyeOff className="h-5 w-5 text-gray-400" />
+              <EyeOff size={22} color="#9CA3AF" />
             ) : (
-              <Eye className="h-5 w-5 text-gray-400" />
+              <Eye size={22} color="#9CA3AF" />
             )}
           </button>
         </div>
 
         <Button
           type="submit"
-          className="w-full py-3 text-base font-semibold font-satoshi"
+          className="w-full py-4 px-6 text-lg font-semibold font-satoshi mt-4"
           disabled={loading || googleLoading}
         >
           {loading ? "Creating account..." : "Create account"}

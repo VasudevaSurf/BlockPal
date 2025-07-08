@@ -125,41 +125,38 @@
   font-display: swap;
 }
 
-/* Font utility classes */
+/* Font utility classes - CORRECTED */
 .font-mayeka-bold-demo {
-  font-family: "Mayeka Bold Demo", "Inter", Arial, sans-serif;
-  font-weight: 700;
+  font-family: "Mayeka Bold Demo", "Inter", Arial, sans-serif !important;
+  font-weight: 700 !important;
 }
 
 .font-mayeka-demi-bold-demo {
-  font-family: "Mayeka Demi Bold Demo", "Inter", Arial, sans-serif;
-  font-weight: 600;
+  font-family: "Mayeka Demi Bold Demo", "Inter", Arial, sans-serif !important;
+  font-weight: 600 !important;
 }
 
 .font-mayeka {
-  font-family: "Mayeka Regular Demo", "Inter", Arial, sans-serif;
+  font-family: "Mayeka Regular Demo", "Inter", Arial, sans-serif !important;
+  font-weight: 400 !important;
 }
 
 .font-satoshi {
-  font-family: "Satoshi", "Inter", Arial, sans-serif;
+  font-family: "Satoshi", "Inter", Arial, sans-serif !important;
 }
 
-/* Fallback styles */
-.font-mayeka-bold-demo {
-  font-family: "Inter", Arial, sans-serif;
-  font-weight: 700;
+/* Additional utility classes for explicit font weights */
+.font-mayeka-thin {
+  font-family: "Mayeka Thin Demo", "Inter", Arial, sans-serif !important;
+  font-weight: 100 !important;
 }
 
-.font-mayeka-demi-bold-demo {
-  font-family: "Inter", Arial, sans-serif;
-  font-weight: 600;
+.font-mayeka-light {
+  font-family: "Mayeka Light Demo", "Inter", Arial, sans-serif !important;
+  font-weight: 300 !important;
 }
 
-.font-mayeka {
-  font-family: "Inter", Arial, sans-serif;
-  font-weight: 400;
-}
-
-.font-satoshi {
-  font-family: "Inter", Arial, sans-serif;
+.font-mayeka-regular {
+  font-family: "Mayeka Regular Demo", "Inter", Arial, sans-serif !important;
+  font-weight: 400 !important;
 }

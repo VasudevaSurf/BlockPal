@@ -1,14 +1,17 @@
-// src/components/auth/LoginForm.tsx - UPDATED with 2FA support
+// src/components/auth/LoginForm.tsx - UPDATED with dark styled checkbox
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import ForgotPasswordModal from "./ForgotPasswordModal";
 import TwoFactorInput from "./TwoFactorInput";
+import MailIcon from "../icons/MailIcon";
+import LockIcon from "../icons/LockIcon";
+import EyeIcon from "../icons/EyeIcon";
+import EyeOffIcon from "../icons/EyeOffIcon";
 import { loginUser, clearError } from "@/store/slices/authSlice";
 import { RootState, AppDispatch } from "@/store";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
@@ -335,7 +338,7 @@ export default function LoginForm() {
   return (
     <div className="w-full">
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-white mb-2 font-mayeka">
+        <h1 className="text-2xl font-bold text-white mb-2 font-mayeka-bold-demo">
           Login into your Account
         </h1>
         <p className="text-gray-400 font-satoshi">
@@ -411,7 +414,7 @@ export default function LoginForm() {
             }
           }}
           error={formErrors.email}
-          icon={<Mail size={20} />}
+          icon={<MailIcon size={20} color="#6E6E6E" />}
           className="font-satoshi"
           disabled={loading || googleLoading || show2FA}
         />
@@ -428,7 +431,7 @@ export default function LoginForm() {
               }
             }}
             error={formErrors.password}
-            icon={<Lock size={20} />}
+            icon={<LockIcon size={20} color="#6E6E6E" />}
             className="font-satoshi"
             disabled={loading || googleLoading || show2FA}
           />
@@ -439,9 +442,9 @@ export default function LoginForm() {
             disabled={loading || googleLoading || show2FA}
           >
             {showPassword ? (
-              <EyeOff className="h-5 w-5 text-gray-400" />
+              <EyeOffIcon size={20} color="#9CA3AF" />
             ) : (
-              <Eye className="h-5 w-5 text-gray-400" />
+              <EyeIcon size={20} color="#9CA3AF" />
             )}
           </button>
         </div>
@@ -452,13 +455,19 @@ export default function LoginForm() {
               id="remember-me"
               name="remember-me"
               type="checkbox"
-              className="h-4 w-4 rounded focus:ring-2 bg-black border border-[#2C2C2C] text-[#E2AF19] focus:ring-[#E2AF19]"
-              style={{ accentColor: "#E2AF19" }}
+              className="h-4 w-4 rounded-sm bg-transparent border-2 border-[#2C2C2C] text-[#E2AF19] 
+                         focus:ring-2 focus:ring-[#E2AF19] focus:ring-offset-0 focus:border-[#E2AF19]
+                         checked:bg-transparent checked:border-[#E2AF19] 
+                         appearance-none relative cursor-pointer
+                         before:content-[''] before:absolute before:inset-0 before:bg-transparent
+                         checked:before:content-['✓'] checked:before:text-[#E2AF19] checked:before:text-xs 
+                         checked:before:flex checked:before:items-center checked:before:justify-center 
+                         checked:before:font-bold"
               disabled={loading || googleLoading || show2FA}
             />
             <label
               htmlFor="remember-me"
-              className="ml-2 block text-sm text-gray-400 font-satoshi"
+              className="ml-2 block text-sm text-gray-400 font-satoshi cursor-pointer"
             >
               Remember me
             </label>

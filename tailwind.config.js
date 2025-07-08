@@ -17,10 +17,22 @@ module.exports = {
         "gray-text": "#9CA3AF",
       },
       fontFamily: {
-        "mayeka-bold-demo": ["var(--font-mayeka-bold-demo)", "serif"],
-        "mayeka-demi-bold-demo": ["var(--font-mayeka-demi-bold-demo)", "serif"],
-        mayeka: ["var(--font-mayeka)", "serif"],
-        satoshi: ["var(--font-satoshi)", "sans-serif"],
+        "mayeka-bold-demo": [
+          "Mayeka Bold Demo",
+          "Inter",
+          "Arial",
+          "sans-serif",
+        ],
+        "mayeka-demi-bold-demo": [
+          "Mayeka Demi Bold Demo",
+          "Inter",
+          "Arial",
+          "sans-serif",
+        ],
+        mayeka: ["Mayeka Regular Demo", "Inter", "Arial", "sans-serif"],
+        "mayeka-light": ["Mayeka Light Demo", "Inter", "Arial", "sans-serif"],
+        "mayeka-thin": ["Mayeka Thin Demo", "Inter", "Arial", "sans-serif"],
+        satoshi: ["Satoshi", "Inter", "Arial", "sans-serif"],
       },
       fontWeight: {
         "mayeka-thin": "100",
