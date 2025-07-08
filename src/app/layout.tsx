@@ -3,7 +3,12 @@
 import "./globals.css";
 import { Provider } from "react-redux";
 import { store } from "@/store";
-import { mayekaBoldDemo, mayeka, satoshi } from "@/lib/fonts";
+import {
+  mayekaBoldDemo,
+  mayekaDemiBoldDemo,
+  mayeka,
+  satoshi,
+} from "@/lib/fonts";
 
 export default function RootLayout({
   children,
@@ -29,19 +34,23 @@ export default function RootLayout({
             __html: `
             @font-face {
               font-family: 'Mayeka Bold Demo';
-              src: url('/fonts/MayekaBoldDemo.woff2') format('woff2'),
-                   url('/fonts/MayekaBoldDemo.woff') format('woff'),
-                   url('/fonts/MayekaBoldDemo.ttf') format('truetype');
-              font-weight: bold;
+              src: url('/fonts/Mayeka_Bold_Demo.otf') format('opentype');
+              font-weight: 700;
+              font-style: normal;
+              font-display: swap;
+            }
+            
+            @font-face {
+              font-family: 'Mayeka Demi Bold Demo';
+              src: url('/fonts/Mayeka_Demi_Bold_Demo.otf') format('opentype');
+              font-weight: 600;
               font-style: normal;
               font-display: swap;
             }
             
             @font-face {
               font-family: 'Satoshi';
-              src: url('/fonts/Satoshi-Regular.woff2') format('woff2'),
-                   url('/fonts/Satoshi-Regular.woff') format('woff'),
-                   url('/fonts/Satoshi-Regular.ttf') format('truetype');
+              src: url('/fonts/Satoshi-Regular.otf') format('opentype');
               font-weight: 400;
               font-style: normal;
               font-display: swap;
@@ -49,9 +58,7 @@ export default function RootLayout({
             
             @font-face {
               font-family: 'Satoshi';
-              src: url('/fonts/Satoshi-Medium.woff2') format('woff2'),
-                   url('/fonts/Satoshi-Medium.woff') format('woff'),
-                   url('/fonts/Satoshi-Medium.ttf') format('truetype');
+              src: url('/fonts/Satoshi-Medium.otf') format('opentype');
               font-weight: 500;
               font-style: normal;
               font-display: swap;
@@ -59,9 +66,7 @@ export default function RootLayout({
             
             @font-face {
               font-family: 'Satoshi';
-              src: url('/fonts/Satoshi-Bold.woff2') format('woff2'),
-                   url('/fonts/Satoshi-Bold.woff') format('woff'),
-                   url('/fonts/Satoshi-Bold.ttf') format('truetype');
+              src: url('/fonts/Satoshi-Bold.otf') format('opentype');
               font-weight: 700;
               font-style: normal;
               font-display: swap;
@@ -71,9 +76,8 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${mayekaBoldDemo.variable} ${mayeka.variable} ${satoshi.variable} antialiased`}
+        className={`${mayekaBoldDemo.variable} ${mayekaDemiBoldDemo.variable} ${mayeka.variable} ${satoshi.variable} antialiased`}
       >
-        {" "}
         <Provider store={store}>{children}</Provider>
       </body>
     </html>

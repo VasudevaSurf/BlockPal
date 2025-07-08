@@ -131,6 +131,11 @@
   font-weight: 700;
 }
 
+.font-mayeka-demi-bold-demo {
+  font-family: "Mayeka Demi Bold Demo", "Inter", Arial, sans-serif;
+  font-weight: 600;
+}
+
 .font-mayeka {
   font-family: "Mayeka Regular Demo", "Inter", Arial, sans-serif;
 }
@@ -143,6 +148,11 @@
 .font-mayeka-bold-demo {
   font-family: "Inter", Arial, sans-serif;
   font-weight: 700;
+}
+
+.font-mayeka-demi-bold-demo {
+  font-family: "Inter", Arial, sans-serif;
+  font-weight: 600;
 }
 
 .font-mayeka {

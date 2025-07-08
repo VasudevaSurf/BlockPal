@@ -18,6 +18,7 @@ module.exports = {
       },
       fontFamily: {
         "mayeka-bold-demo": ["var(--font-mayeka-bold-demo)", "serif"],
+        "mayeka-demi-bold-demo": ["var(--font-mayeka-demi-bold-demo)", "serif"],
         mayeka: ["var(--font-mayeka)", "serif"],
         satoshi: ["var(--font-satoshi)", "sans-serif"],
       },

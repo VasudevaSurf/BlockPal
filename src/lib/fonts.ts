@@ -7,6 +7,14 @@ export const mayekaBoldDemo = localFont({
   display: "swap",
 });
 
+// NEW: Add Demi Bold as a separate font
+export const mayekaDemiBoldDemo = localFont({
+  src: "../../public/fonts/Mayeka_Demi_Bold_Demo.otf",
+  variable: "--font-mayeka-demi-bold-demo",
+  weight: "600",
+  display: "swap",
+});
+
 export const mayeka = localFont({
   src: [
     {
