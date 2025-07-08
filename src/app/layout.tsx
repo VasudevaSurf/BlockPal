@@ -3,6 +3,7 @@
 import "./globals.css";
 import { Provider } from "react-redux";
 import { store } from "@/store";
+import { mayekaBoldDemo, mayeka, satoshi } from "@/lib/fonts";
 
 export default function RootLayout({
   children,
@@ -69,7 +70,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-black text-white">
+      <body
+        className={`${mayekaBoldDemo.variable} ${mayeka.variable} ${satoshi.variable} antialiased`}
+      >
+        {" "}
         <Provider store={store}>{children}</Provider>
       </body>
     </html>
