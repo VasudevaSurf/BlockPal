@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx - Updated without header (uses global header)
+// src/components/AIChatPage.tsx - Fixed WhatsApp-like layout
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -194,11 +194,10 @@ export default function AIChatPage() {
     }
   };
 
-  const copyMessage = async (content: string) => {
+  const copyMessage = async (content: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(content);
       // Visual feedback for successful copy
-      const messageId = `message-${Date.now()}`;
       setCopiedItems((prev) => new Set(prev).add(messageId));
       setTimeout(() => {
         setCopiedItems((prev) => {
@@ -364,96 +363,78 @@ How can I assist you today with your crypto needs? Try asking about:
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      {/* No header here anymore - it's in the global layout */}
-
-      {/* Chat Container */}
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] flex flex-col overflow-hidden">
+      {/* Chat Container - Normal WhatsApp-like layout */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Quick Suggestions - Only show if no messages or just welcome */}
-        {messages.length <= 1 && (
-          <div className="mb-4 flex-shrink-0">
-            <p className="text-gray-400 text-sm font-satoshi mb-3">
-              💡 Try these examples:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {quickSuggestions.map((suggestion, index) => (
-                <button
-                  key={index}
-                  onClick={() => setInputMessage(suggestion)}
-                  className="bg-[#1A1A1A] text-gray-300 px-3 py-2 text-xs sm:text-sm font-satoshi rounded-lg hover:bg-[#2C2C2C] transition-colors border border-[#2C2C2C]"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
+        {/* Messages Area - Messages stick to bottom like WhatsApp */}
+        <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 flex flex-col justify-end scrollbar-hide">
+          <div className="space-y-4 lg:space-y-6 py-4">
+            {/* Messages in normal order */}
+            {messages.map((message, index) => (
+              <div key={message.id} className="flex flex-col space-y-2">
+                {message.type === "assistant" ? (
+                  <div className="flex flex-col items-start space-y-2">
+                    {/* Message Content */}
+                    <div className="max-w-full sm:max-w-4xl bg-black p-3 lg:p-4 rounded-2xl border border-[#2C2C2C]">
+                      {message.processing && !message.content ? (
+                        <div className="flex items-center space-x-2">
+                          <RefreshCw
+                            size={16}
+                            className="text-[#E2AF19] animate-spin"
+                          />
+                          <span className="text-[#F9EFD1] text-xs sm:text-sm font-satoshi">
+                            🧠 AI analyzing your request...
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-[#F9EFD1] text-xs sm:text-sm leading-relaxed font-satoshi message-content">
+                          {formatMessage(message.content, message.id)}
+                          {message.typing && (
+                            <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1"></span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Copy Button - Below message */}
+                    {!message.processing &&
+                      !message.typing &&
+                      message.content && (
+                        <button
+                          onClick={() =>
+                            copyMessage(message.content, message.id)
+                          }
+                          className="bg-[#E2AF19] text-black px-2 lg:px-3 py-1 rounded-md text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1"
+                        >
+                          {copiedItems.has(message.id) ? (
+                            <>
+                              <Check size={10} className="lg:w-3 lg:h-3" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>copy</>
+                          )}
+                        </button>
+                      )}
+                  </div>
+                ) : (
+                  <div className="flex justify-end">
+                    <div className="bg-[#F9EFD1] text-black p-3 lg:p-4 max-w-full sm:max-w-2xl rounded-2xl">
+                      <p className="text-xs sm:text-sm font-satoshi">
+                        {message.content}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Scroll anchor at the bottom */}
+            <div ref={messagesEndRef} />
           </div>
-        )}
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 space-y-4 lg:space-y-6 flex flex-col pb-4 scrollbar-hide">
-          {messages.map((message) => (
-            <div key={message.id} className="flex flex-col space-y-2">
-              {message.type === "assistant" ? (
-                <div className="flex flex-col items-start space-y-2">
-                  {/* Message Content */}
-                  <div className="max-w-full sm:max-w-4xl bg-black p-3 lg:p-4 rounded-2xl border border-[#2C2C2C]">
-                    {message.processing && !message.content ? (
-                      <div className="flex items-center space-x-2">
-                        <RefreshCw
-                          size={16}
-                          className="text-[#E2AF19] animate-spin"
-                        />
-                        <span className="text-[#F9EFD1] text-xs sm:text-sm font-satoshi">
-                          🧠 AI analyzing your request...
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="text-[#F9EFD1] text-xs sm:text-sm leading-relaxed font-satoshi message-content">
-                        {formatMessage(message.content, message.id)}
-                        {message.typing && (
-                          <span className="inline-block w-2 h-4 bg-[#E2AF19] ml-1 animate-pulse"></span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Copy Button - Only for non-processing messages */}
-                  {!message.processing &&
-                    !message.typing &&
-                    message.content && (
-                      <button
-                        onClick={() => copyMessage(message.content)}
-                        className="bg-[#E2AF19] text-black px-2 lg:px-3 py-1 rounded-md text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1"
-                      >
-                        {copiedItems.has(`message-${message.id}`) ? (
-                          <>
-                            <Check size={10} className="lg:w-3 lg:h-3" />
-                            Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={10} className="lg:w-3 lg:h-3" />
-                          </>
-                        )}
-                      </button>
-                    )}
-                </div>
-              ) : (
-                <div className="flex justify-end">
-                  <div className="bg-[#E2AF19] text-black p-3 lg:p-4 max-w-full sm:max-w-2xl rounded-2xl">
-                    <p className="text-xs sm:text-sm font-satoshi">
-                      {message.content}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area - Responsive */}
+        {/* Input Area at bottom */}
         <div className="p-3 sm:p-4 lg:p-6 flex-shrink-0">
           <div className="relative">
             <textarea
@@ -497,7 +478,7 @@ How can I assist you today with your crypto needs? Try asking about:
           {/* Status indicator */}
           {isTyping && (
             <div className="flex items-center justify-center mt-2">
-              <div className="flex space-x-1">
+              <div className="flex space-x-1 mr-2">
                 <div className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"></div>
                 <div
                   className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"
@@ -508,7 +489,7 @@ How can I assist you today with your crypto needs? Try asking about:
                   style={{ animationDelay: "0.2s" }}
                 ></div>
               </div>
-              <span className="text-gray-400 text-xs font-satoshi ml-2">
+              <span className="text-gray-400 text-xs font-satoshi">
                 AI is thinking...
               </span>
             </div>

@@ -362,7 +362,7 @@ export default function UserProfilePage() {
   // Show skeleton loading when loading
   if (loading) {
     return (
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
         {/* Mobile Layout Skeleton */}
         <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
           <ProfileHeaderSkeleton />

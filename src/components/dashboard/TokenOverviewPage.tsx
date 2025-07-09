@@ -21,6 +21,7 @@ import {
   Calendar,
   Activity,
   MoreHorizontal,
+  QrCode,
 } from "lucide-react";
 import { RootState } from "@/store";
 import SimpleTransferModal from "@/components/transfer/SimpleTransferModal";
@@ -61,6 +62,15 @@ interface ChartData {
   timeframe: number;
 }
 
+// Time period configuration
+const TIME_PERIODS = [
+  { label: "1H", value: "1H", days: 1, interval: "hourly" },
+  { label: "1D", value: "1D", days: 1, interval: "hourly" },
+  { label: "1W", value: "1W", days: 7, interval: "daily" },
+  { label: "1M", value: "1M", days: 30, interval: "daily" },
+  { label: "1Y", value: "1Y", days: 365, interval: "daily" },
+];
+
 export default function TokenOverviewPage() {
   const router = useRouter();
   const params = useParams();
@@ -71,9 +81,15 @@ export default function TokenOverviewPage() {
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(false);
-  const [selectedTimeframe, setSelectedTimeframe] = useState(7);
+  const [selectedTimeframe, setSelectedTimeframe] = useState("1D");
   const [copied, setCopied] = useState<string>("");
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [hoveredPoint, setHoveredPoint] = useState<{
+    x: number;
+    y: number;
+    price: number;
+    date: string;
+  } | null>(null);
 
   const contractAddress = params.tokenId as string;
   const walletAddress = searchParams.get("wallet") || activeWallet?.address;
@@ -113,13 +129,18 @@ export default function TokenOverviewPage() {
     }
   };
 
-  const fetchChartData = async (days: number) => {
+  const fetchChartData = async (period: string) => {
     if (!tokenInfo?.priceData?.id) return;
 
     try {
       setChartLoading(true);
+
+      // Get the period configuration
+      const periodConfig = TIME_PERIODS.find((p) => p.value === period);
+      if (!periodConfig) return;
+
       const response = await fetch(
-        `/api/tokens/chart?tokenId=${tokenInfo.priceData.id}&days=${days}`,
+        `/api/tokens/chart?tokenId=${tokenInfo.priceData.id}&days=${periodConfig.days}&interval=${periodConfig.interval}`,
         { credentials: "include" }
       );
 
@@ -128,12 +149,173 @@ export default function TokenOverviewPage() {
         setChartData(data.chartData);
       } else {
         console.error("Failed to fetch chart data");
+        // Fallback: create mock data for demo
+        createMockChartData(period);
       }
     } catch (error) {
       console.error("Error fetching chart data:", error);
+      // Fallback: create mock data for demo
+      createMockChartData(period);
     } finally {
       setChartLoading(false);
     }
+  };
+
+  // Create mock data for demonstration
+  const createMockChartData = (period: string) => {
+    const basePrice = tokenInfo?.priceData?.current_price || 2400;
+    const prices = [];
+    const now = Date.now();
+    let dataPoints = 24;
+    let timeInterval = 60 * 60 * 1000; // 1 hour
+
+    switch (period) {
+      case "1H":
+        dataPoints = 60;
+        timeInterval = 60 * 1000; // 1 minute
+        break;
+      case "1D":
+        dataPoints = 24;
+        timeInterval = 60 * 60 * 1000; // 1 hour
+        break;
+      case "1W":
+        dataPoints = 7;
+        timeInterval = 24 * 60 * 60 * 1000; // 1 day
+        break;
+      case "1M":
+        dataPoints = 30;
+        timeInterval = 24 * 60 * 60 * 1000; // 1 day
+        break;
+      case "1Y":
+        dataPoints = 12;
+        timeInterval = 30 * 24 * 60 * 60 * 1000; // 1 month
+        break;
+    }
+
+    for (let i = 0; i < dataPoints; i++) {
+      const timestamp = (now - (dataPoints - i - 1) * timeInterval) / 1000;
+      const date = new Date(timestamp * 1000);
+      const variation = (Math.random() - 0.5) * 0.1; // ±5% variation
+      const price = basePrice * (1 + variation * (i / dataPoints));
+
+      prices.push({
+        timestamp,
+        price,
+        date: date.toLocaleDateString(),
+        time: date.toLocaleTimeString(),
+      });
+    }
+
+    setChartData({
+      prices,
+      timeframe: dataPoints,
+    });
+  };
+
+  // Generate X-axis labels based on time period
+  const generateXAxisLabels = (
+    prices: Array<{ timestamp: number; date: string; time: string }>,
+    period: string,
+    chartWidth: number = 800
+  ) => {
+    if (!prices || prices.length === 0) return [];
+
+    const labels = [];
+    const totalPoints = prices.length;
+
+    // Fixed number of labels to prevent overlapping
+    const maxLabels = 4; // Always show exactly 4 labels to prevent overlap
+    const skipInterval = Math.max(1, Math.floor(totalPoints / (maxLabels - 1)));
+
+    // Generate labels at evenly spaced intervals
+    for (let i = 0; i < totalPoints; i += skipInterval) {
+      // Ensure we don't exceed array bounds
+      const index = Math.min(i, totalPoints - 1);
+      const point = prices[index];
+      const date = new Date(point.timestamp * 1000);
+      let label = "";
+
+      switch (period) {
+        case "1H":
+          label = date.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          break;
+        case "1D":
+          label = date.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          break;
+        case "1W":
+          label = date.toLocaleDateString([], { weekday: "short" });
+          break;
+        case "1M":
+          label = date.toLocaleDateString([], {
+            month: "short",
+            day: "numeric",
+          });
+          break;
+        case "1Y":
+          label = date.toLocaleDateString([], {
+            month: "short",
+            year: "2-digit",
+          });
+          break;
+        default:
+          label = date.toLocaleDateString();
+      }
+
+      const x = (index / (totalPoints - 1)) * chartWidth;
+      labels.push({ x, label, index });
+    }
+
+    // Always include the last point if not already included
+    if (
+      labels.length > 0 &&
+      labels[labels.length - 1].index !== totalPoints - 1
+    ) {
+      const lastPoint = prices[totalPoints - 1];
+      const lastDate = new Date(lastPoint.timestamp * 1000);
+      let lastLabel = "";
+
+      switch (period) {
+        case "1H":
+          lastLabel = lastDate.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          break;
+        case "1D":
+          lastLabel = lastDate.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          break;
+        case "1W":
+          lastLabel = lastDate.toLocaleDateString([], { weekday: "short" });
+          break;
+        case "1M":
+          lastLabel = lastDate.toLocaleDateString([], {
+            month: "short",
+            day: "numeric",
+          });
+          break;
+        case "1Y":
+          lastLabel = lastDate.toLocaleDateString([], {
+            month: "short",
+            year: "2-digit",
+          });
+          break;
+        default:
+          lastLabel = lastDate.toLocaleDateString();
+      }
+
+      labels.push({ x: chartWidth, label: lastLabel, index: totalPoints - 1 });
+    }
+
+    return labels;
   };
 
   const copyToClipboard = async (text: string, type: string) => {
@@ -184,6 +366,28 @@ export default function TokenOverviewPage() {
     return letters[symbol] || symbol.charAt(0);
   };
 
+  // Add random token background function
+  const getRandomTokenBg = (symbol: string) => {
+    const backgrounds = [
+      "bg-blue-500/20",
+      "bg-purple-500/20",
+      "bg-green-500/20",
+      "bg-yellow-500/20",
+      "bg-red-500/20",
+      "bg-cyan-500/20",
+      "bg-pink-500/20",
+      "bg-orange-500/20",
+      "bg-indigo-500/20",
+      "bg-teal-500/20",
+    ];
+
+    // Use symbol to get consistent color for same token
+    const index =
+      symbol.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) %
+      backgrounds.length;
+    return backgrounds[index];
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -205,25 +409,304 @@ export default function TokenOverviewPage() {
     return `${sign}${value.toFixed(2)}%`;
   };
 
-  // Generate SVG path for chart
-  const generateChartPath = (
-    prices: Array<{ price: number }>,
+  // Enhanced chart path generation with interactive features
+  const generateInteractiveChart = (
+    prices: Array<{ price: number; date: string; time: string }>,
     width = 800,
-    height = 200
-  ): string => {
-    if (!prices || prices.length === 0) return "";
+    height = 200,
+    isMobile = false
+  ) => {
+    if (!prices || prices.length === 0)
+      return { path: "", points: [], yAxisValues: [], xAxisLabels: [] };
 
     const minPrice = Math.min(...prices.map((p) => p.price));
     const maxPrice = Math.max(...prices.map((p) => p.price));
     const priceRange = maxPrice - minPrice || 1;
 
+    // Add padding to top and bottom (15% of range)
+    const paddingRatio = 0.15;
+    const paddedRange = priceRange * (1 + 2 * paddingRatio);
+    const paddedMin = minPrice - priceRange * paddingRatio;
+    const paddedMax = maxPrice + priceRange * paddingRatio;
+
+    // Generate Y-axis values (5 evenly spaced values)
+    const yAxisValues = [];
+    for (let i = 0; i < 5; i++) {
+      const value = paddedMin + (paddedRange * i) / 4;
+      const y = height - (i * height) / 4;
+      yAxisValues.push({ value, y });
+    }
+
+    // Generate X-axis labels
+    const xAxisLabels = generateXAxisLabels(
+      prices.map((p, i) => ({
+        timestamp: Date.now() / 1000 - (prices.length - i - 1) * 3600, // Mock timestamp
+        date: p.date,
+        time: p.time,
+      })),
+      selectedTimeframe,
+      width
+    );
+
     const points = prices.map((point, index) => {
       const x = (index / (prices.length - 1)) * width;
-      const y = height - ((point.price - minPrice) / priceRange) * height;
-      return `${x},${y}`;
+      const y = height - ((point.price - paddedMin) / paddedRange) * height;
+      return {
+        x,
+        y,
+        price: point.price,
+        date: point.date,
+        time: point.time,
+      };
     });
 
-    return `M ${points.join(" L ")}`;
+    const pathPoints = points.map((p) => `${p.x},${p.y}`);
+    const path = `M ${pathPoints.join(" L ")}`;
+
+    // Create filled area path
+    const areaPath = `${path} L ${width},${height} L 0,${height} Z`;
+
+    return { path, areaPath, points, yAxisValues, xAxisLabels };
+  };
+
+  // Handle mouse movement on chart
+  const handleChartMouseMove = (
+    event: React.MouseEvent<SVGSVGElement>,
+    points: Array<{
+      x: number;
+      y: number;
+      price: number;
+      date: string;
+      time: string;
+    }>,
+    svgRect: DOMRect
+  ) => {
+    const mouseX = event.clientX - svgRect.left;
+    const scaledMouseX =
+      (mouseX / svgRect.width) * event.currentTarget.viewBox.baseVal.width;
+
+    // Find closest point
+    const closestPoint = points.reduce((prev, curr) => {
+      return Math.abs(curr.x - scaledMouseX) < Math.abs(prev.x - scaledMouseX)
+        ? curr
+        : prev;
+    });
+
+    setHoveredPoint(closestPoint);
+  };
+
+  // Handle time period change
+  const handleTimeframeChange = (period: string) => {
+    setSelectedTimeframe(period);
+    setChartLoading(true);
+  };
+
+  // Time Period Buttons Component
+  const TimePeriodButtons = ({ className = "" }: { className?: string }) => (
+    <div className={`flex gap-1 ${className}`}>
+      {TIME_PERIODS.map((period) => (
+        <button
+          key={period.value}
+          onClick={() => handleTimeframeChange(period.value)}
+          className={`px-2 py-1 rounded-md text-xs font-satoshi transition-colors ${
+            selectedTimeframe === period.value
+              ? "bg-[#E2AF19] text-black font-semibold"
+              : "bg-[#2C2C2C] text-white hover:bg-[#3C3C3C]"
+          }`}
+        >
+          {period.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  // Enhanced Chart Component
+  const EnhancedChart = ({
+    width = 800,
+    height = 240,
+    className = "",
+    showXAxisLabels = true,
+  }: {
+    width?: number;
+    height?: number;
+    className?: string;
+    showXAxisLabels?: boolean;
+  }) => {
+    if (chartLoading) {
+      return (
+        <div className={`h-80 flex items-center justify-center ${className}`}>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19]"></div>
+        </div>
+      );
+    }
+
+    if (!chartData || chartData.prices.length === 0) {
+      return (
+        <div className={`h-80 flex items-center justify-center ${className}`}>
+          <p className="text-gray-400 font-satoshi">No chart data available</p>
+        </div>
+      );
+    }
+
+    const { path, areaPath, points, yAxisValues, xAxisLabels } =
+      generateInteractiveChart(chartData.prices, width, height);
+
+    return (
+      <div className={`relative ${className}`}>
+        {/* Hover Price Display */}
+        {hoveredPoint && (
+          <div className="absolute top-4 left-4 bg-black bg-opacity-90 border border-[#2C2C2C] rounded-lg p-4 z-10">
+            <div className="text-white font-semibold text-xl">
+              {formatCurrency(hoveredPoint.price)}
+            </div>
+            <div className="text-gray-400 text-sm">
+              {hoveredPoint.date} {hoveredPoint.time}
+            </div>
+          </div>
+        )}
+
+        <div className="relative h-80 mb-6 flex">
+          {/* Y-axis labels */}
+          <div className="w-20 flex flex-col justify-between py-2 pr-3">
+            {yAxisValues.map((yAxis, index) => (
+              <div
+                key={index}
+                className="text-sm text-gray-400 font-satoshi text-right"
+              >
+                ${yAxis.value.toFixed(2)}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex-1 flex flex-col">
+            <svg
+              className="w-full flex-1 cursor-crosshair"
+              viewBox={`0 0 ${width} ${height}`}
+              onMouseMove={(e) => {
+                const svgRect = e.currentTarget.getBoundingClientRect();
+                handleChartMouseMove(e, points, svgRect);
+              }}
+              onMouseLeave={() => setHoveredPoint(null)}
+            >
+              <defs>
+                <linearGradient
+                  id="priceGradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="0%"
+                  y2="100%"
+                >
+                  <stop
+                    offset="0%"
+                    stopColor={
+                      tokenInfo?.priceData?.price_change_percentage_24h >= 0
+                        ? "rgba(34, 197, 94, 0.4)"
+                        : "rgba(239, 68, 68, 0.4)"
+                    }
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={
+                      tokenInfo?.priceData?.price_change_percentage_24h >= 0
+                        ? "rgba(34, 197, 94, 0.0)"
+                        : "rgba(239, 68, 68, 0.0)"
+                    }
+                  />
+                </linearGradient>
+              </defs>
+
+              {/* Enhanced Grid lines */}
+              {[0, height / 4, height / 2, (3 * height) / 4, height].map(
+                (y) => (
+                  <line
+                    key={y}
+                    x1="0"
+                    y1={y}
+                    x2={width}
+                    y2={y}
+                    stroke="#2C2C2C"
+                    strokeWidth="0.5"
+                    opacity="0.6"
+                  />
+                )
+              )}
+              {xAxisLabels.map((label) => (
+                <line
+                  key={label.x}
+                  x1={label.x}
+                  y1="0"
+                  x2={label.x}
+                  y2={height}
+                  stroke="#2C2C2C"
+                  strokeWidth="0.5"
+                  opacity="0.3"
+                />
+              ))}
+
+              {/* Filled area */}
+              <path d={areaPath} fill="url(#priceGradient)" />
+
+              {/* Price line */}
+              <path
+                d={path}
+                fill="none"
+                stroke={
+                  tokenInfo?.priceData?.price_change_percentage_24h >= 0
+                    ? "#22C55E"
+                    : "#EF4444"
+                }
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              {/* Hover effects */}
+              {hoveredPoint && (
+                <>
+                  {/* Vertical line */}
+                  <line
+                    x1={hoveredPoint.x}
+                    y1="0"
+                    x2={hoveredPoint.x}
+                    y2={height}
+                    stroke="#E2AF19"
+                    strokeWidth="1.5"
+                    strokeDasharray="6,6"
+                  />
+                  {/* Hover dot */}
+                  <circle
+                    cx={hoveredPoint.x}
+                    cy={hoveredPoint.y}
+                    r="6"
+                    fill="#E2AF19"
+                    stroke="#000"
+                    strokeWidth="2"
+                  />
+                </>
+              )}
+            </svg>
+
+            {/* X-axis labels - Hidden when showXAxisLabels is false */}
+            {showXAxisLabels && (
+              <div className="relative h-8 mt-2">
+                {xAxisLabels.map((label, index) => (
+                  <div
+                    key={index}
+                    className="absolute text-xs text-gray-400 font-satoshi transform -translate-x-1/2 whitespace-nowrap"
+                    style={{
+                      left: `${(label.x / width) * 100}%`,
+                      top: "0px",
+                    }}
+                  >
+                    {label.label}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // FIXED: Proper token filter for transaction history
@@ -276,9 +759,7 @@ export default function TokenOverviewPage() {
   const tokenValue = tokenBalance * (tokenInfo.priceData?.current_price || 0);
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      {/* Header - Responsive */}
-
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
       {/* Mobile Layout */}
       <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
         {/* Token Header */}
@@ -291,16 +772,22 @@ export default function TokenOverviewPage() {
               <ArrowLeft size={20} className="text-white" />
             </button>
             {tokenInfo.priceData?.image ? (
-              <img
-                src={tokenInfo.priceData.image}
-                alt={tokenInfo.symbol}
-                className="w-10 h-10 rounded-full mr-3"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = "none";
-                  target.nextElementSibling?.classList.remove("hidden");
-                }}
-              />
+              <div
+                className={`w-10 h-10 ${getRandomTokenBg(
+                  tokenInfo.symbol
+                )} rounded-full mr-3 flex items-center justify-center p-1`}
+              >
+                <img
+                  src={tokenInfo.priceData.image}
+                  alt={tokenInfo.symbol}
+                  className="w-full h-full rounded-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = "none";
+                    target.nextElementSibling?.classList.remove("hidden");
+                  }}
+                />
+              </div>
             ) : null}
             <div
               className={`w-10 h-10 ${getTokenIcon(
@@ -323,62 +810,14 @@ export default function TokenOverviewPage() {
             </div>
           </div>
 
-          {/* Basic Token Info */}
-          <div className="space-y-3 mb-4">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400 text-sm font-satoshi">
-                Token Name:
-              </span>
-              <span className="text-white font-satoshi">{tokenInfo.name}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400 text-sm font-satoshi">
-                Token Symbol:
-              </span>
-              <span className="text-white font-satoshi">
-                {tokenInfo.symbol}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400 text-sm font-satoshi">
-                Contract Address:
-              </span>
-              <div className="flex items-center">
-                <span className="text-white font-satoshi text-sm mr-2">
-                  {tokenInfo.contractAddress === "native"
-                    ? "Native Token"
-                    : `${tokenInfo.contractAddress.slice(
-                        0,
-                        8
-                      )}...${tokenInfo.contractAddress.slice(-6)}`}
-                </span>
-                {tokenInfo.contractAddress !== "native" && (
-                  <button
-                    onClick={() =>
-                      copyToClipboard(tokenInfo.contractAddress, "contract")
-                    }
-                    className="hover:text-white transition-colors"
-                  >
-                    <Copy size={14} className="text-gray-400" />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400 text-sm font-satoshi">
-                Your Holdings:
-              </span>
-              <span className="text-white font-satoshi">
-                {tokenBalance.toFixed(6)} {tokenInfo.symbol}
-              </span>
-            </div>
-          </div>
-
-          {/* Price Information */}
+          {/* Price Information with Time Period Buttons - Mobile */}
           {tokenInfo.priceData && (
             <div className="mb-4">
-              <div className="text-2xl sm:text-3xl font-bold text-white font-satoshi mb-2">
-                {formatCurrency(tokenInfo.priceData.current_price)}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+                <div className="text-2xl sm:text-3xl font-bold text-white font-satoshi">
+                  {formatCurrency(tokenInfo.priceData.current_price)}
+                </div>
+                <TimePeriodButtons className="flex-shrink-0" />
               </div>
               <div className="flex items-center">
                 {tokenInfo.priceData.price_change_percentage_24h >= 0 ? (
@@ -399,189 +838,45 @@ export default function TokenOverviewPage() {
                   (24h)
                 </span>
               </div>
-              <div className="text-gray-400 text-sm font-satoshi mt-1">
-                Market Cap: {formatLargeNumber(tokenInfo.priceData.market_cap)}
-              </div>
-              <div className="text-gray-400 text-sm font-satoshi">
-                24h Volume:{" "}
-                {formatLargeNumber(tokenInfo.priceData.total_volume)}
-              </div>
-            </div>
-          )}
-
-          {/* Official Links - Mobile */}
-          {tokenInfo.priceData && (
-            <div className="flex flex-wrap gap-2">
-              {tokenInfo.priceData.homepage && (
-                <a
-                  href={tokenInfo.priceData.homepage}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm flex items-center"
-                >
-                  <Globe size={14} className="mr-1" />
-                  Website
-                </a>
-              )}
-              {tokenInfo.priceData.whitepaper && (
-                <a
-                  href={tokenInfo.priceData.whitepaper}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm flex items-center"
-                >
-                  <FileText size={14} className="mr-1" />
-                  Docs
-                </a>
-              )}
-              {tokenInfo.priceData.blockchain_site && (
-                <a
-                  href={tokenInfo.priceData.blockchain_site}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm flex items-center"
-                >
-                  <ExternalLink size={14} className="mr-1" />
-                  Explorer
-                </a>
-              )}
             </div>
           )}
         </div>
 
-        {/* Price Chart - Mobile */}
+        {/* Enhanced Price Chart - Mobile */}
         <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          <div className="flex items-center justify-between mb-4">
+          {/* Contract Address - Mobile */}
+          <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-white font-satoshi">
-              📈 Price Chart
+              Price Chart
             </h3>
-            <button
-              onClick={() => fetchChartData(selectedTimeframe)}
-              className="text-gray-400 hover:text-white transition-colors"
-              disabled={chartLoading}
-            >
-              <RefreshCw
-                size={16}
-                className={chartLoading ? "animate-spin" : ""}
-              />
-            </button>
-          </div>
-
-          {/* Timeframe Selector */}
-          <div className="flex space-x-2 mb-4">
-            {[1, 7, 30].map((days) => (
-              <button
-                key={days}
-                onClick={() => setSelectedTimeframe(days)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-satoshi transition-colors ${
-                  selectedTimeframe === days
-                    ? "bg-[#E2AF19] text-black font-medium"
-                    : "bg-[#2C2C2C] text-gray-400 hover:text-white"
-                }`}
-              >
-                {days === 1 ? "24h" : `${days}d`}
-              </button>
-            ))}
-          </div>
-
-          {/* Chart Display */}
-          {chartLoading ? (
-            <div className="h-48 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19]"></div>
-            </div>
-          ) : chartData && chartData.prices.length > 0 ? (
-            <div className="relative h-48">
-              <svg className="w-full h-full" viewBox="0 0 400 150">
-                <defs>
-                  <linearGradient
-                    id="priceGradientMobile"
-                    x1="0%"
-                    y1="0%"
-                    x2="0%"
-                    y2="100%"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor={
-                        tokenInfo.priceData?.price_change_percentage_24h >= 0
-                          ? "rgba(34, 197, 94, 0.3)"
-                          : "rgba(239, 68, 68, 0.3)"
-                      }
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor={
-                        tokenInfo.priceData?.price_change_percentage_24h >= 0
-                          ? "rgba(34, 197, 94, 0.0)"
-                          : "rgba(239, 68, 68, 0.0)"
-                      }
-                    />
-                  </linearGradient>
-                </defs>
-
-                {/* Grid lines */}
-                {[0, 37.5, 75, 112.5, 150].map((y) => (
-                  <line
-                    key={y}
-                    x1="0"
-                    y1={y}
-                    x2="400"
-                    y2={y}
-                    stroke="#2C2C2C"
-                    strokeWidth="1"
-                  />
-                ))}
-
-                {/* Price line */}
-                <path
-                  d={generateChartPath(chartData.prices, 400, 150)}
-                  fill="url(#priceGradientMobile)"
-                  stroke={
-                    tokenInfo.priceData?.price_change_percentage_24h >= 0
-                      ? "#22C55E"
-                      : "#EF4444"
+            <div className="flex items-center gap-2">
+              <span className="text-white text-sm font-satoshi">
+                {tokenInfo.contractAddress === "native"
+                  ? "Native Token"
+                  : `${tokenInfo.contractAddress.slice(
+                      0,
+                      6
+                    )}...${tokenInfo.contractAddress.slice(-4)}`}
+              </span>
+              {tokenInfo.contractAddress !== "native" && (
+                <button
+                  onClick={() =>
+                    copyToClipboard(tokenInfo.contractAddress, "contract")
                   }
-                  strokeWidth="2"
-                />
-              </svg>
+                  className="hover:text-white transition-colors"
+                >
+                  <Copy size={14} className="text-gray-400" />
+                </button>
+              )}
             </div>
-          ) : (
-            <div className="h-48 flex items-center justify-center">
-              <p className="text-gray-400 font-satoshi">
-                No chart data available
-              </p>
-            </div>
-          )}
+          </div>
 
-          {/* Price History Table */}
-          {chartData && chartData.prices.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-white font-semibold mb-2 font-satoshi">
-                📊 Price History (Last {selectedTimeframe} day
-                {selectedTimeframe > 1 ? "s" : ""}):
-              </h4>
-              <div className="max-h-32 overflow-y-auto">
-                {chartData.prices
-                  .filter(
-                    (_, index) =>
-                      index %
-                        Math.max(1, Math.floor(chartData.prices.length / 8)) ===
-                      0
-                  )
-                  .slice(-8)
-                  .map((point, index) => (
-                    <div key={index} className="flex justify-between py-1">
-                      <span className="text-gray-400 text-sm font-satoshi">
-                        {point.date}:
-                      </span>
-                      <span className="text-white text-sm font-satoshi">
-                        {formatCurrency(point.price)}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
+          <EnhancedChart
+            width={400}
+            height={200}
+            className="h-60"
+            showXAxisLabels={false}
+          />
         </div>
 
         {/* Portfolio Section - Mobile */}
@@ -589,11 +884,17 @@ export default function TokenOverviewPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center">
               {tokenInfo.priceData?.image ? (
-                <img
-                  src={tokenInfo.priceData.image}
-                  alt={tokenInfo.symbol}
-                  className="w-8 h-8 rounded-full mr-3"
-                />
+                <div
+                  className={`w-8 h-8 ${getRandomTokenBg(
+                    tokenInfo.symbol
+                  )} rounded-full mr-3 flex items-center justify-center p-1`}
+                >
+                  <img
+                    src={tokenInfo.priceData.image}
+                    alt={tokenInfo.symbol}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                </div>
               ) : (
                 <div
                   className={`w-8 h-8 ${getTokenIcon(
@@ -627,21 +928,23 @@ export default function TokenOverviewPage() {
               <div className="text-2xl font-bold text-white mb-1 font-satoshi">
                 {formatCurrency(tokenValue)}
               </div>
-              <div
-                className={`text-sm font-satoshi ${
-                  tokenInfo.priceData?.price_change_percentage_24h >= 0
-                    ? "text-green-400"
-                    : "text-red-400"
-                }`}
-              >
-                {tokenInfo.priceData
-                  ? formatPercentage(
-                      tokenInfo.priceData.price_change_percentage_24h
-                    )
-                  : "N/A"}
-                <span className="text-gray-400 ml-1">
-                  ({tokenBalance.toFixed(6)} {tokenInfo.symbol})
-                </span>
+              <div className="flex items-center gap-2 text-sm">
+                <div
+                  className={`font-satoshi ${
+                    tokenInfo.priceData?.price_change_percentage_24h >= 0
+                      ? "text-green-400"
+                      : "text-red-400"
+                  }`}
+                >
+                  {tokenInfo.priceData
+                    ? formatPercentage(
+                        tokenInfo.priceData.price_change_percentage_24h
+                      )
+                    : "N/A"}
+                </div>
+                <div className="text-gray-400 font-satoshi">
+                  {tokenBalance.toFixed(6)} {tokenInfo.symbol}
+                </div>
               </div>
             </div>
           </div>
@@ -660,6 +963,100 @@ export default function TokenOverviewPage() {
           </div>
         </div>
 
+        {/* About Token and Links - Mobile */}
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+          {/* Official Links at Top - Mobile */}
+          {tokenInfo.priceData && (
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              {tokenInfo.priceData.homepage && (
+                <a
+                  href={tokenInfo.priceData.homepage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                >
+                  <Globe size={14} className="mr-2" />
+                  Website
+                </a>
+              )}
+              {tokenInfo.priceData.whitepaper && (
+                <a
+                  href={tokenInfo.priceData.whitepaper}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                >
+                  <FileText size={14} className="mr-2" />
+                  Whitepaper
+                </a>
+              )}
+              {tokenInfo.priceData.twitter_screen_name && (
+                <a
+                  href={`https://twitter.com/${tokenInfo.priceData.twitter_screen_name}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                >
+                  <Twitter size={14} className="mr-2" />
+                  Twitter
+                </a>
+              )}
+              {tokenInfo.priceData.telegram_channel && (
+                <a
+                  href={`https://t.me/${tokenInfo.priceData.telegram_channel}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                >
+                  <MessageCircle size={14} className="mr-2" />
+                  Telegram
+                </a>
+              )}
+              {tokenInfo.priceData.blockchain_site && (
+                <a
+                  href={tokenInfo.priceData.blockchain_site}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                >
+                  <ExternalLink size={14} className="mr-2" />
+                  Explorer
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* About Section - Mobile */}
+          <h3 className="text-lg font-semibold text-white mb-3 font-satoshi">
+            📝 About {tokenInfo.name}
+          </h3>
+          {tokenInfo.priceData?.description ? (
+            <p className="text-gray-400 text-sm leading-relaxed font-satoshi mb-4">
+              {tokenInfo.priceData.description}
+            </p>
+          ) : (
+            <p className="text-gray-400 text-sm leading-relaxed font-satoshi mb-4">
+              {tokenInfo.symbol === "ETH" ? (
+                <>
+                  Ethereum is a global, open-source platform for decentralized
+                  applications. In other words, the vision is to create a world
+                  computer that anyone can build applications in a decentralized
+                  manner; while all states and data are distributed and publicly
+                  accessible.
+                </>
+              ) : (
+                <>
+                  {tokenInfo.name} is a cryptocurrency token that provides
+                  various utilities and features within its ecosystem. It
+                  enables users to participate in the network's governance,
+                  facilitate transactions, and access various decentralized
+                  applications and services.
+                </>
+              )}
+            </p>
+          )}
+        </div>
+
         {/* Transaction History - Mobile */}
         <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
@@ -674,8 +1071,8 @@ export default function TokenOverviewPage() {
           <div className="max-h-64 overflow-y-auto">
             <TransactionHistory
               walletAddress={walletAddress}
-              tokenFilter={getTokenFilterForTransactions()} // FIXED: Use proper token filter
-              transactionTypeFilter={getTransactionTypeFilter()} // FIXED: Add transaction type filter
+              tokenFilter={getTokenFilterForTransactions()}
+              transactionTypeFilter={getTransactionTypeFilter()}
               limit={20}
               showFilter={false}
               compact={true}
@@ -683,78 +1080,9 @@ export default function TokenOverviewPage() {
             />
           </div>
         </div>
-
-        {/* About Token - Mobile */}
-        {tokenInfo.priceData?.description && (
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
-              📝 About {tokenInfo.name}
-            </h3>
-            <p className="text-gray-400 text-sm leading-relaxed font-satoshi">
-              {tokenInfo.priceData.description.length > 300
-                ? `${tokenInfo.priceData.description.substring(0, 300)}...`
-                : tokenInfo.priceData.description}
-            </p>
-          </div>
-        )}
-
-        {/* Official Links Section - Mobile */}
-        {tokenInfo.priceData && (
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
-              🔗 Official Links
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {tokenInfo.priceData.homepage && (
-                <a
-                  href={tokenInfo.priceData.homepage}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center bg-[#0F0F0F] text-white px-3 py-3 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm"
-                >
-                  <Globe size={16} className="mr-2" />
-                  Website
-                </a>
-              )}
-              {tokenInfo.priceData.twitter_screen_name && (
-                <a
-                  href={`https://twitter.com/${tokenInfo.priceData.twitter_screen_name}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center bg-[#0F0F0F] text-white px-3 py-3 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm"
-                >
-                  <Twitter size={16} className="mr-2" />
-                  Twitter
-                </a>
-              )}
-              {tokenInfo.priceData.telegram_channel && (
-                <a
-                  href={`https://t.me/${tokenInfo.priceData.telegram_channel}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center bg-[#0F0F0F] text-white px-3 py-3 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm"
-                >
-                  <MessageCircle size={16} className="mr-2" />
-                  Telegram
-                </a>
-              )}
-              {tokenInfo.priceData.blockchain_site && (
-                <a
-                  href={tokenInfo.priceData.blockchain_site}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center bg-[#0F0F0F] text-white px-3 py-3 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi text-sm"
-                >
-                  <ExternalLink size={16} className="mr-2" />
-                  Explorer
-                </a>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Desktop Layout - Similar structure but horizontal */}
+      {/* Desktop Layout */}
       <div className="hidden xl:flex gap-6 flex-1 min-h-0">
         {/* Left Column - Main Info */}
         <div className="flex-1 flex flex-col gap-6 min-w-0 max-h-full overflow-hidden">
@@ -772,11 +1100,17 @@ export default function TokenOverviewPage() {
                       <ArrowLeft size={20} className="text-white" />
                     </button>
                     {tokenInfo.priceData?.image ? (
-                      <img
-                        src={tokenInfo.priceData.image}
-                        alt={tokenInfo.symbol}
-                        className="w-12 h-12 rounded-full mr-4"
-                      />
+                      <div
+                        className={`w-12 h-12 ${getRandomTokenBg(
+                          tokenInfo.symbol
+                        )} rounded-full mr-4 flex items-center justify-center p-1`}
+                      >
+                        <img
+                          src={tokenInfo.priceData.image}
+                          alt={tokenInfo.symbol}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      </div>
                     ) : (
                       <div
                         className={`w-12 h-12 ${getTokenIcon(
@@ -798,7 +1132,7 @@ export default function TokenOverviewPage() {
                     </div>
                   </div>
 
-                  {/* Price Information */}
+                  {/* Price Information - Desktop */}
                   {tokenInfo.priceData && (
                     <div className="flex items-center space-x-6">
                       <div className="text-4xl font-bold text-white font-satoshi">
@@ -822,7 +1156,7 @@ export default function TokenOverviewPage() {
                   )}
                 </div>
 
-                {/* Contract Address */}
+                {/* Contract Address - Desktop */}
                 <div className="text-right">
                   <div className="text-white text-sm font-satoshi mb-1">
                     Contract Address
@@ -847,153 +1181,61 @@ export default function TokenOverviewPage() {
                       </button>
                     )}
                   </div>
+                  {/* Time Period Buttons below contract address */}
+                  <div className="mt-3">
+                    <TimePeriodButtons />
+                  </div>
                 </div>
               </div>
 
-              {/* Chart Section - Desktop */}
+              {/* Enhanced Chart Section - Desktop */}
               <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white font-satoshi">
-                    📈 Price Chart
-                  </h3>
-                  <div className="flex items-center space-x-3">
-                    <div className="flex space-x-2">
-                      {[1, 7, 30].map((days) => (
-                        <button
-                          key={days}
-                          onClick={() => setSelectedTimeframe(days)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-satoshi transition-colors ${
-                            selectedTimeframe === days
-                              ? "bg-[#E2AF19] text-black font-medium"
-                              : "bg-[#2C2C2C] text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          {days === 1 ? "24h" : `${days}d`}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => fetchChartData(selectedTimeframe)}
-                      className="text-gray-400 hover:text-white transition-colors"
-                      disabled={chartLoading}
-                    >
-                      <RefreshCw
-                        size={16}
-                        className={chartLoading ? "animate-spin" : ""}
-                      />
-                    </button>
+                <EnhancedChart
+                  width={800}
+                  height={240}
+                  showXAxisLabels={false}
+                />
+              </div>
+
+              {/* Market Stats - Desktop */}
+              {tokenInfo.priceData && (
+                <div className="flex items-center justify-between w-full text-sm my-6">
+                  <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
+                    <span className="text-white font-satoshi">FDV</span>
+                    <span className="text-gray-400 ml-2 font-satoshi">
+                      {formatLargeNumber(tokenInfo.priceData.market_cap * 2)}
+                    </span>
+                  </div>
+                  <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
+                    <span className="text-white font-satoshi">MARKET CAP</span>
+                    <span className="text-gray-400 ml-2 font-satoshi">
+                      {formatLargeNumber(tokenInfo.priceData.market_cap)}
+                    </span>
+                  </div>
+                  <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
+                    <span className="text-white font-satoshi">24H VOLUME</span>
+                    <span className="text-gray-400 ml-2 font-satoshi">
+                      {formatLargeNumber(tokenInfo.priceData.total_volume)}
+                    </span>
+                  </div>
+                  <div
+                    className="bg-[#2C2C2C] px-4 py-3 rounded-full cursor-pointer hover:bg-[#3C3C3C] transition-colors"
+                    onClick={() => {
+                      if (tokenInfo.priceData?.blockchain_site) {
+                        window.open(
+                          tokenInfo.priceData.blockchain_site,
+                          "_blank"
+                        );
+                      }
+                    }}
+                  >
+                    <span className="text-white font-satoshi flex items-center">
+                      EXPLORER
+                      <ExternalLink size={14} className="ml-2" />
+                    </span>
                   </div>
                 </div>
-
-                {/* Chart Display - Desktop */}
-                {chartLoading ? (
-                  <div className="h-64 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19]"></div>
-                  </div>
-                ) : chartData && chartData.prices.length > 0 ? (
-                  <div className="relative h-64 mb-6">
-                    <svg className="w-full h-full" viewBox="0 0 800 200">
-                      <defs>
-                        <linearGradient
-                          id="priceGradient"
-                          x1="0%"
-                          y1="0%"
-                          x2="0%"
-                          y2="100%"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor={
-                              tokenInfo.priceData
-                                ?.price_change_percentage_24h >= 0
-                                ? "rgba(34, 197, 94, 0.3)"
-                                : "rgba(239, 68, 68, 0.3)"
-                            }
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor={
-                              tokenInfo.priceData
-                                ?.price_change_percentage_24h >= 0
-                                ? "rgba(34, 197, 94, 0.0)"
-                                : "rgba(239, 68, 68, 0.0)"
-                            }
-                          />
-                        </linearGradient>
-                      </defs>
-
-                      {/* Grid lines */}
-                      {[0, 50, 100, 150, 200].map((y) => (
-                        <line
-                          key={y}
-                          x1="0"
-                          y1={y}
-                          x2="800"
-                          y2={y}
-                          stroke="#2C2C2C"
-                          strokeWidth="1"
-                        />
-                      ))}
-
-                      {/* Price line */}
-                      <path
-                        d={generateChartPath(chartData.prices, 800, 200)}
-                        fill="url(#priceGradient)"
-                        stroke={
-                          tokenInfo.priceData?.price_change_percentage_24h >= 0
-                            ? "#22C55E"
-                            : "#EF4444"
-                        }
-                        strokeWidth="3"
-                      />
-                    </svg>
-                  </div>
-                ) : (
-                  <div className="h-64 flex items-center justify-center">
-                    <p className="text-gray-400 font-satoshi">
-                      No chart data available
-                    </p>
-                  </div>
-                )}
-
-                {/* Market Stats - Desktop */}
-                {tokenInfo.priceData && (
-                  <div className="flex items-center justify-between w-full text-sm my-6">
-                    <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
-                      <span className="text-white font-satoshi">
-                        YOUR HOLDINGS
-                      </span>
-                      <span className="text-gray-400 ml-2 font-satoshi">
-                        {tokenBalance.toFixed(6)} {tokenInfo.symbol}
-                      </span>
-                    </div>
-                    <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
-                      <span className="text-white font-satoshi">
-                        MARKET CAP
-                      </span>
-                      <span className="text-gray-400 ml-2 font-satoshi">
-                        {formatLargeNumber(tokenInfo.priceData.market_cap)}
-                      </span>
-                    </div>
-                    <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
-                      <span className="text-white font-satoshi">
-                        24H VOLUME
-                      </span>
-                      <span className="text-gray-400 ml-2 font-satoshi">
-                        {formatLargeNumber(tokenInfo.priceData.total_volume)}
-                      </span>
-                    </div>
-                    <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
-                      <span className="text-white font-satoshi">
-                        CURRENT PRICE
-                      </span>
-                      <span className="text-gray-400 ml-2 font-satoshi">
-                        {formatCurrency(tokenInfo.priceData.current_price)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
 
             {/* About Token and Links - Desktop */}
@@ -1098,11 +1340,17 @@ export default function TokenOverviewPage() {
             <div className="flex items-center mb-6">
               <div className="flex items-center">
                 {tokenInfo.priceData?.image ? (
-                  <img
-                    src={tokenInfo.priceData.image}
-                    alt={tokenInfo.symbol}
-                    className="w-8 h-8 rounded-full mr-3"
-                  />
+                  <div
+                    className={`w-8 h-8 ${getRandomTokenBg(
+                      tokenInfo.symbol
+                    )} rounded-full mr-3 flex items-center justify-center p-1`}
+                  >
+                    <img
+                      src={tokenInfo.priceData.image}
+                      alt={tokenInfo.symbol}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  </div>
                 ) : (
                   <div
                     className={`w-8 h-8 ${getTokenIcon(
@@ -1134,25 +1382,47 @@ export default function TokenOverviewPage() {
                 </button>
               </div>
 
-              <div className="mb-4">
-                <div className="text-3xl font-bold text-white mb-1 font-satoshi">
-                  {formatCurrency(tokenValue)}
+              {/* Token Banner Image and Value in same row */}
+              <div className="flex items-center gap-4 mb-4">
+                {/* Token Banner Image */}
+                <div className="flex-shrink-0">
+                  <img
+                    src="/tokenIconBanner.png"
+                    alt="Token Banner"
+                    className="rounded-[11px]"
+                    style={{
+                      width: "80px",
+                      height: "75px",
+                      transform: "rotate(0deg)",
+                      opacity: 1,
+                    }}
+                  />
                 </div>
-                <div
-                  className={`text-sm font-satoshi ${
-                    tokenInfo.priceData?.price_change_percentage_24h >= 0
-                      ? "text-green-400"
-                      : "text-red-400"
-                  }`}
-                >
-                  {tokenInfo.priceData
-                    ? formatPercentage(
-                        tokenInfo.priceData.price_change_percentage_24h
-                      )
-                    : "N/A"}
-                  <span className="text-gray-400 ml-1">
-                    ({tokenBalance.toFixed(6)} {tokenInfo.symbol})
-                  </span>
+
+                {/* Value and percentage */}
+                <div className="flex-1">
+                  <div className="text-3xl font-bold text-white mb-1 font-satoshi">
+                    {formatCurrency(tokenValue)}
+                  </div>
+                  {/* Percentage and token amount in same row */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <div
+                      className={`font-satoshi ${
+                        tokenInfo.priceData?.price_change_percentage_24h >= 0
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }`}
+                    >
+                      {tokenInfo.priceData
+                        ? formatPercentage(
+                            tokenInfo.priceData.price_change_percentage_24h
+                          )
+                        : "N/A"}
+                    </div>
+                    <div className="text-gray-400 font-satoshi">
+                      {tokenBalance.toFixed(6)} {tokenInfo.symbol}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1160,19 +1430,21 @@ export default function TokenOverviewPage() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setTransferModalOpen(true)}
-                  className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi"
+                  className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi flex items-center justify-center"
                 >
-                  Send {tokenInfo.symbol}
+                  Send
+                  <Send size={16} className="ml-2" />
                 </button>
-                <button className="bg-[#4B3A08] text-[#E2AF19] p-3 rounded-xl hover:bg-[#5A4509] transition-colors">
-                  <Send size={16} />
+                <button className="flex-1 bg-[#4B3A08] text-[#E2AF19] py-3 rounded-xl hover:bg-[#5A4509] transition-colors font-satoshi flex items-center justify-center">
+                  Receive
+                  <QrCode size={16} className="ml-2" />
                 </button>
               </div>
             </div>
 
-            {/* FIXED: Transaction History - Desktop with proper filtering */}
+            {/* Transaction History - Desktop with proper filtering */}
             <div className="flex-1 min-h-0 flex flex-col">
-              <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              {/* <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <h3 className="text-lg font-semibold text-white font-satoshi">
                   <Activity size={20} className="inline mr-2" />
                   {tokenInfo.symbol} Transactions
@@ -1180,13 +1452,13 @@ export default function TokenOverviewPage() {
                 <button className="text-gray-400 hover:text-white transition-colors">
                   <MoreHorizontal size={16} />
                 </button>
-              </div>
+              </div> */}
 
               <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
                 <TransactionHistory
                   walletAddress={walletAddress}
-                  tokenFilter={getTokenFilterForTransactions()} // FIXED: Use proper token filter
-                  transactionTypeFilter={getTransactionTypeFilter()} // FIXED: Add transaction type filter
+                  tokenFilter={getTokenFilterForTransactions()}
+                  transactionTypeFilter={getTransactionTypeFilter()}
                   limit={50}
                   showFilter={false}
                   compact={true}

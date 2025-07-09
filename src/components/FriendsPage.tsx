@@ -708,7 +708,7 @@ export default function FriendsPage() {
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
       {/* Header */}
 
       {/* Error Display */}
@@ -843,7 +843,6 @@ export default function FriendsPage() {
                               onClick={() => openFundRequestModal(friend)}
                               className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex-1 flex items-center justify-center"
                             >
-                              <DollarSign size={14} className="mr-1" />
                               Request Funds
                             </button>
                             <button
@@ -881,7 +880,6 @@ export default function FriendsPage() {
                               onClick={() => openFundRequestModal(friend)}
                               className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex items-center"
                             >
-                              <DollarSign size={14} className="mr-1" />
                               Request Funds
                             </button>
                             <button

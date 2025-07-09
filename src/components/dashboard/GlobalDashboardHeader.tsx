@@ -61,7 +61,7 @@ const getPageTitle = (
       };
     case "/dashboard/ai-chat":
       return {
-        title: "🤖 AI Chat Assistant",
+        title: "AI Chat",
         subtitle: "Powered by GoPlus Security & CoinGecko APIs",
       };
     case "/dashboard/friends":
@@ -71,13 +71,13 @@ const getPageTitle = (
       };
     case "/dashboard/profile":
       return {
-        title: "👤 User Profile",
+        title: "User Profile",
         subtitle: "Manage your account settings and preferences",
       };
     default:
       if (pathname.startsWith("/dashboard/token/")) {
         return {
-          title: "📊 TOKEN INFORMATION",
+          title: "Token Overview",
           subtitle: "Detailed token analysis and portfolio insights",
         };
       }

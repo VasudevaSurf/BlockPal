@@ -223,35 +223,30 @@ export function SkeletonSwapSection() {
 }
 
 // AI Chat Skeleton (NO HEADER)
+// Updated AI Chat Skeleton (NO HEADER) - WhatsApp-like normal layout
 export function SkeletonAIChat() {
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      {/* Header removed - now using global header */}
-
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] flex flex-col overflow-hidden">
+      {/* Chat Container - Normal WhatsApp-like layout */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Quick Suggestions Skeleton */}
-        <div className="mb-4 flex-shrink-0">
-          <Skeleton className="h-4 w-32 mb-3" />
-          <div className="flex flex-wrap gap-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} variant="rounded" className="h-8 w-32" />
-            ))}
-          </div>
-        </div>
-
-        {/* Messages Area Skeleton */}
-        <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 space-y-4 lg:space-y-6 flex flex-col pb-4">
-          {/* Welcome Message */}
-          <div className="flex flex-col items-start space-y-2">
-            <div className="max-w-full sm:max-w-4xl bg-black p-3 lg:p-4 rounded-2xl border border-[#2C2C2C]">
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-3/4" />
+        {/* Messages Area - Messages stick to bottom like WhatsApp */}
+        <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 flex flex-col justify-end scrollbar-hide">
+          <div className="space-y-4 lg:space-y-6 py-4">
+            {/* Single Welcome Message */}
+            <div className="flex flex-col items-start space-y-2">
+              <div className="max-w-full sm:max-w-4xl bg-black p-3 lg:p-4 rounded-2xl border border-[#2C2C2C]">
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+              <Skeleton variant="rounded" className="h-6 w-12" />
             </div>
-            <Skeleton variant="rounded" className="h-6 w-16" />
+
+            {/* Scroll anchor at the bottom */}
+            <div className="h-0"></div>
           </div>
         </div>
 
-        {/* Input Area Skeleton */}
+        {/* Input Area at bottom */}
         <div className="p-3 sm:p-4 lg:p-6 flex-shrink-0">
           <div className="relative">
             <Skeleton className="w-full h-12 sm:h-14 rounded-full" />
@@ -259,6 +254,16 @@ export function SkeletonAIChat() {
               variant="circular"
               className="absolute right-1 sm:right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12"
             />
+          </div>
+
+          {/* Status indicator skeleton */}
+          <div className="flex items-center justify-center mt-2">
+            <div className="flex space-x-1 mr-2">
+              <Skeleton variant="circular" className="w-2 h-2" />
+              <Skeleton variant="circular" className="w-2 h-2" />
+              <Skeleton variant="circular" className="w-2 h-2" />
+            </div>
+            <Skeleton className="h-3 w-24" />
           </div>
         </div>
       </div>

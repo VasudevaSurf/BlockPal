@@ -316,7 +316,7 @@ export default function TransactionHistory({
     <div className={`flex flex-col min-h-0 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h3 className="text-lg font-semibold text-white font-satoshi">
+        <h3 className="text-lg font-semibold text-white font-mayeka-demi-bold-demo">
           {title}
         </h3>
         {showRefresh && (
@@ -329,22 +329,6 @@ export default function TransactionHistory({
           </button>
         )}
       </div>
-
-      {/* Filter Info */}
-      {(tokenFilter || transactionTypeFilter) && !compact && (
-        <div className="mb-4 flex items-center gap-2 flex-shrink-0">
-          {tokenFilter && (
-            <span className="px-3 py-1 bg-[#2C2C2C] text-gray-300 text-sm rounded-full font-satoshi">
-              {tokenFilter}
-            </span>
-          )}
-          {transactionTypeFilter && (
-            <span className="px-3 py-1 bg-blue-900/30 text-blue-400 text-sm rounded-full font-satoshi">
-              {transactionTypeFilter}
-            </span>
-          )}
-        </div>
-      )}
 
       {/* Transaction List */}
       <div className="flex-1 overflow-y-auto scrollbar-hide">
@@ -406,7 +390,7 @@ export default function TransactionHistory({
                       {/* Token Info */}
                       <div className="flex items-center space-x-2">
                         {txInfo.displaySymbol === "MIXED" ? (
-                          <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                          <div className="w-6 h-6 bg-[#E2AF19] rounded-full flex items-center justify-center">
                             <span className="text-white text-xs font-bold">
                               M
                             </span>
@@ -428,12 +412,12 @@ export default function TransactionHistory({
                             </span>
 
                             {/* Transaction Type Badges */}
-                            {txInfo.isBatch && (
+                            {/* {txInfo.isBatch && (
                               <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full flex items-center font-satoshi">
                                 <Users size={8} className="mr-1" />
                                 Batch
                               </span>
-                            )}
+                            )} */}
 
                             {tx.type?.includes("scheduled") && (
                               <span className="px-2 py-0.5 bg-purple-500 text-white text-xs rounded-full font-satoshi">
