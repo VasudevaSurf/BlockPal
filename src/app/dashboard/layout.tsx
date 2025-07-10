@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED WITH GLOBAL HEADER
+// src/app/dashboard/layout.tsx - UPDATED WITH MODAL BACKDROP SUPPORT
 "use client";
 
 import { useSelector } from "react-redux";
@@ -45,7 +45,7 @@ export default function DashboardLayout({
 
         {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50">
+          <div className="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50">
             <div className="absolute left-0 top-0 h-full w-80 max-w-[85vw]">
               <Sidebar onItemClick={() => setMobileMenuOpen(false)} />
             </div>
@@ -103,6 +103,28 @@ export default function DashboardLayout({
             body {
               overflow: hidden;
             }
+          }
+
+          /* Modal backdrop styles for subtle blurred background */
+          .modal-backdrop-blur {
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+          }
+
+          /* Custom backdrop blur utilities */
+          .backdrop-blur-xs {
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+          }
+
+          /* Ensure modals appear above everything */
+          .modal-container {
+            z-index: 9999;
+          }
+
+          /* Prevent body scroll when modals are open */
+          body.modal-open {
+            overflow: hidden;
           }
         `}</style>
       </div>

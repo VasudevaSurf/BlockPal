@@ -288,11 +288,8 @@ export default function WalletWelcomeModal({
   const renderWelcomeStep = () => (
     <div className="text-center">
       <div className="mb-6">
-        <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-black text-2xl font-bold">B</span>
-        </div>
         <h2 className="text-2xl font-bold text-white font-mayeka mb-2">
-          Welcome {userName}! 👋
+          Welcome {userName}
         </h2>
         <p className="text-gray-400 font-satoshi">
           Select a method to add your wallet
@@ -302,18 +299,21 @@ export default function WalletWelcomeModal({
       <div className="space-y-4">
         <Button
           onClick={() => setCurrentStep("create-wallet")}
-          className="w-full"
+          variant="secondary"
+          className="w-full flex items-center justify-center"
           size="lg"
         >
+          <div className="w-6 h-6 border border-white rounded-full flex items-center justify-center mr-2">
+            <Plus size={14} className="text-white" />
+          </div>
           Create a new wallet
         </Button>
-
         <Button
           onClick={() => setCurrentStep("import-options")}
-          variant="secondary"
-          className="w-full"
+          className="w-full flex items-center justify-center"
           size="lg"
         >
+          <Download size={20} className="mr-2" />
           Import existing wallet
         </Button>
       </div>
@@ -322,7 +322,7 @@ export default function WalletWelcomeModal({
 
   const renderCreateWallet = () => (
     <div>
-      <div className="flex items-center mb-6">
+      <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => setCurrentStep("welcome")}
           className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
@@ -332,6 +332,7 @@ export default function WalletWelcomeModal({
         <h2 className="text-xl font-bold text-white font-mayeka">
           Create new wallet
         </h2>
+        <div className="w-8"></div>
       </div>
 
       <div className="space-y-4">
@@ -362,60 +363,69 @@ export default function WalletWelcomeModal({
 
   const renderImportOptions = () => (
     <div>
-      <div className="flex items-center mb-6">
+      <div className="flex items-center justify-between mb-8 px-4 py-0">
         <button
           onClick={() => setCurrentStep("welcome")}
-          className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+          className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
         >
           <ArrowLeft size={20} className="text-white" />
         </button>
-        <h2 className="text-xl font-bold text-white font-mayeka">
+        <h2 className="text-xl font-bold text-white font-satoshi">
           Import existing wallet
         </h2>
+        <div className="w-8"></div>
       </div>
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-6 px-0">
         <button
           onClick={() => setCurrentStep("import-recovery-phrase")}
-          className="w-full bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-4 hover:bg-[#1A1A1A] transition-colors text-left"
+          className="flex flex-col items-center p-6 bg-[#0F0F0F] rounded-xl hover:bg-[#1A1A1A] transition-all duration-200 group"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-[#E2AF19] rounded-lg flex items-center justify-center mr-3">
-                <Key size={20} className="text-black" />
-              </div>
-              <div>
-                <div className="text-white font-medium font-satoshi">
-                  Recovery Phrase
-                </div>
-                <div className="text-gray-400 text-sm font-satoshi">
-                  Use your recovery phrase
-                </div>
-              </div>
-            </div>
-            <ChevronRight size={20} className="text-gray-400" />
+          <div className="w-12 h-12 bg-[#4B3A08] rounded-full flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 25 24"
+              fill="none"
+            >
+              <path
+                d="M15.75 2.5V4C15.75 5.41421 15.75 6.12132 16.1893 6.56066C16.6287 7 17.3358 7 18.75 7H20.25"
+                stroke="#E2AF19"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M4.75 16V8C4.75 5.17157 4.75 3.75736 5.62868 2.87868C6.50736 2 7.92157 2 10.75 2H14.9216C15.3303 2 15.5347 2 15.7185 2.07612C15.9022 2.15224 16.0468 2.29676 16.3358 2.58579L20.1642 6.41421C20.4532 6.70324 20.5978 6.84776 20.6739 7.03153C20.75 7.2153 20.75 7.41968 20.75 7.82843V16C20.75 18.8284 20.75 20.2426 19.8713 21.1213C18.9926 22 17.5784 22 14.75 22H10.75C7.92157 22 6.50736 22 5.62868 21.1213C4.75 20.2426 4.75 18.8284 4.75 16Z"
+                stroke="#E2AF19"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M8.75 11H16.75M8.75 14H16.75M8.75 17H12.9208"
+                stroke="#E2AF19"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <div className="text-white font-medium font-satoshi text-center">
+            Recovery Phrase
           </div>
         </button>
 
         <button
           onClick={() => setCurrentStep("import-private-key")}
-          className="w-full bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-4 hover:bg-[#1A1A1A] transition-colors text-left"
+          className="flex flex-col items-center p-6 bg-[#0F0F0F] rounded-xl hover:bg-[#1A1A1A] transition-all duration-200 group"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-[#E2AF19] rounded-lg flex items-center justify-center mr-3">
-                <Key size={20} className="text-black" />
-              </div>
-              <div>
-                <div className="text-white font-medium font-satoshi">
-                  Private Key
-                </div>
-                <div className="text-gray-400 text-sm font-satoshi">
-                  Use your private key
-                </div>
-              </div>
-            </div>
-            <ChevronRight size={20} className="text-gray-400" />
+          <div className="w-12 h-12 bg-[#4B3A08] rounded-full flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+            <Download size={16} className="text-[#E2AF19]" />
+          </div>
+          <div className="text-white font-medium font-satoshi text-center">
+            Private Key
           </div>
         </button>
       </div>
@@ -431,9 +441,10 @@ export default function WalletWelcomeModal({
         >
           <ArrowLeft size={20} className="text-white" />
         </button>
-        <h2 className="text-xl font-bold text-white font-mayeka">
+        <h2 className="text-xl font-bold text-white font-satoshi text-center flex-1">
           Import with recovery phrase
         </h2>
+        <div className="w-10"></div>
       </div>
 
       <div className="text-center mb-6">
@@ -445,45 +456,50 @@ export default function WalletWelcomeModal({
         </p>
       </div>
 
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex space-x-2">
-          {[12, 18, 24].map((length) => (
-            <button
-              key={length}
-              onClick={() => handlePhraseLength(length)}
-              className={`px-4 py-2 rounded-lg font-satoshi transition-colors ${
-                phraseLength === length
-                  ? "bg-[#E2AF19] text-black"
-                  : "bg-[#2C2C2C] text-gray-400 hover:text-white"
-              }`}
-            >
-              {length}
-            </button>
+      {/* Unified container with background for controls and input grid */}
+      <div className="bg-[#0F0F0F] rounded-lg p-4 mb-6">
+        {/* Controls section */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex bg-[#2C2C2C] rounded-lg p-1 space-x-1">
+            {[12, 18, 24].map((length) => (
+              <button
+                key={length}
+                onClick={() => handlePhraseLength(length)}
+                className={`px-3 py-1.5 rounded-md font-satoshi text-sm transition-colors ${
+                  phraseLength === length
+                    ? "bg-[#494949] text-white"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                {length}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handlePastePhrase}
+            className="bg-[#2C2C2C] text-white px-4 py-2 rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
+          >
+            Paste
+          </button>
+        </div>
+
+        {/* Input grid */}
+        <div className="grid grid-cols-3 gap-3">
+          {Array.from({ length: phraseLength }).map((_, index) => (
+            <div key={index} className="relative">
+              <input
+                type="text"
+                placeholder=""
+                value={phraseWords[index] || ""}
+                onChange={(e) => handlePhraseWordChange(index, e.target.value)}
+                className="w-full px-3 py-3 pl-8 bg-black border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-[#E2AF19] font-satoshi"
+              />
+              <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 font-satoshi">
+                {index + 1}.
+              </span>
+            </div>
           ))}
         </div>
-        <button
-          onClick={handlePastePhrase}
-          className="bg-[#2C2C2C] text-white px-4 py-2 rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
-        >
-          Paste
-        </button>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        {Array.from({ length: phraseLength }).map((_, index) => (
-          <div key={index} className="relative">
-            <input
-              type="text"
-              placeholder={`${index + 1}.`}
-              value={phraseWords[index] || ""}
-              onChange={(e) => handlePhraseWordChange(index, e.target.value)}
-              className="w-full px-3 py-3 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-[#E2AF19] font-satoshi"
-            />
-            <span className="absolute left-2 top-1 text-xs text-gray-500">
-              {index + 1}.
-            </span>
-          </div>
-        ))}
       </div>
 
       <Button
@@ -514,31 +530,28 @@ export default function WalletWelcomeModal({
         >
           <ArrowLeft size={20} className="text-white" />
         </button>
-        <h2 className="text-xl font-bold text-white font-mayeka">
+        <h2 className="text-xl font-bold text-white font-satoshi text-center flex-1">
           Import with private key
         </h2>
+        <div className="w-10"></div>
       </div>
 
       <div className="space-y-4">
         <Input
-          label="Wallet name"
           placeholder="Enter wallet name"
           value={walletName}
           onChange={(e) => setWalletName(e.target.value)}
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Private key
-          </label>
-          <div className="relative">
-            <textarea
-              value={privateKey}
-              onChange={(e) => setPrivateKey(e.target.value)}
-              placeholder="Enter your private key"
-              className="w-full h-32 px-3 py-3 pr-16 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-400 focus:outline-none focus:border-[#E2AF19] resize-none font-satoshi"
-              style={{ fontSize: "16px" }}
-            />
+          <textarea
+            value={privateKey}
+            onChange={(e) => setPrivateKey(e.target.value)}
+            placeholder="Enter your private key"
+            className="w-full h-32 px-3 py-3 border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-400 focus:outline-none focus:border-[#E2AF19] resize-none font-satoshi"
+            style={{ fontSize: "16px" }}
+          />
+          <div className="flex justify-end mt-2">
             <button
               onClick={async () => {
                 try {
@@ -548,7 +561,7 @@ export default function WalletWelcomeModal({
                   setError("Failed to paste from clipboard");
                 }
               }}
-              className="absolute bottom-3 right-3 bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-sm font-satoshi hover:bg-[#D4A853] transition-colors"
+              className="bg-[#2C2C2C] text-white px-3 py-1.5 rounded-lg text-sm font-satoshi hover:bg-[#3C3C3C] transition-colors"
             >
               Paste
             </button>
@@ -561,7 +574,7 @@ export default function WalletWelcomeModal({
           className="w-full"
           size="lg"
         >
-          {loading ? "Importing..." : "Import Wallet"}
+          {loading ? "Importing..." : "Import"}
         </Button>
       </div>
 
@@ -661,25 +674,11 @@ export default function WalletWelcomeModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl">
-        {currentStep !== "welcome" && currentStep !== "wallet-created" && (
-          <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
-            <div className="w-6" />
-            <div className="text-center">
-              <div className="w-8 h-8 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto">
-                <span className="text-black text-lg font-bold">B</span>
-              </div>
-            </div>
-            <button
-              onClick={handleClose}
-              className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* UPDATED: Subtle whitish fade overlay with visible dashboard background */}
+      <div className="absolute inset-0 bg-white/10" />
 
+      <div className="relative bg-black/95 border border-[#2C2C2C] rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl">
         <div className="p-6 max-h-[80vh] overflow-y-auto">
           {stepComponents[currentStep]()}
         </div>

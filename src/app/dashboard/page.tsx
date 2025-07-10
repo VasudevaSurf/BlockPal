@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED: Better loading states and skeleton handling
+// src/app/dashboard/page.tsx - FIXED: Better welcome modal logic
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -41,13 +41,14 @@ export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
-  // Enhanced loading states
+  // Enhanced loading state management
   const [dashboardLoadingState, setDashboardLoadingState] = useState({
     authChecked: false,
     walletsLoaded: false,
     activeWalletSet: false,
     tokensLoaded: false,
     initialDataReady: false,
+    walletsFetched: false, // NEW: Track if we've attempted to fetch wallets
   });
 
   // Wallet switcher state
@@ -109,18 +110,39 @@ export default function DashboardPage() {
       user: !!user,
       walletsLoaded: walletsLoaded.current,
       walletsLength: wallets.length,
+      walletsFetched: dashboardLoadingState.walletsFetched,
     });
 
     if (isAuthenticated && user && !walletsLoaded.current) {
       console.log("📡 Fetching wallets...");
       walletsLoaded.current = true;
-      dispatch(fetchWallets()).then(() => {
-        setDashboardLoadingState((prev) => ({ ...prev, walletsLoaded: true }));
+
+      dispatch(fetchWallets()).then((result) => {
+        console.log("📦 Wallets fetch completed:", {
+          type: result.type,
+          payload: result.payload,
+        });
+
+        setDashboardLoadingState((prev) => ({
+          ...prev,
+          walletsLoaded: true,
+          walletsFetched: true,
+        }));
       });
     } else if (wallets.length > 0 && !dashboardLoadingState.walletsLoaded) {
-      setDashboardLoadingState((prev) => ({ ...prev, walletsLoaded: true }));
+      setDashboardLoadingState((prev) => ({
+        ...prev,
+        walletsLoaded: true,
+        walletsFetched: true,
+      }));
     }
-  }, [isAuthenticated, user, dispatch, wallets.length]);
+  }, [
+    isAuthenticated,
+    user,
+    dispatch,
+    wallets.length,
+    dashboardLoadingState.walletsFetched,
+  ]);
 
   // Active wallet sync effect - sync with database after wallets are loaded
   useEffect(() => {
@@ -181,7 +203,7 @@ export default function DashboardPage() {
     dashboardLoadingState.walletsLoaded,
   ]);
 
-  // Tokens loading effect - NEW: Wait for active wallet to be set
+  // Tokens loading effect - Wait for active wallet to be set
   useEffect(() => {
     console.log("🪙 Dashboard - Tokens loading effect", {
       activeWalletAddress: activeWallet?.address,
@@ -219,29 +241,36 @@ export default function DashboardPage() {
     tokens.length,
   ]);
 
-  // Welcome modal effect - UPDATED: Check initial data ready state
+  // FIXED: Welcome modal effect - Better condition checking
   useEffect(() => {
     console.log("🎭 Welcome modal effect:", {
       isAuthenticated,
+      user: !!user,
       walletLoading,
       walletsLength: wallets.length,
       walletsLoaded: dashboardLoadingState.walletsLoaded,
+      walletsFetched: dashboardLoadingState.walletsFetched,
       initialDataReady: dashboardLoadingState.initialDataReady,
-      user: !!user,
+      authChecked: dashboardLoadingState.authChecked,
     });
 
+    // FIXED: Show modal when we have confirmed no wallets exist
     if (
       isAuthenticated &&
       user &&
+      dashboardLoadingState.authChecked &&
+      dashboardLoadingState.walletsFetched && // NEW: Ensure we've actually fetched wallets
       !walletLoading &&
-      wallets.length === 0 &&
-      dashboardLoadingState.walletsLoaded &&
-      dashboardLoadingState.initialDataReady
+      wallets.length === 0
     ) {
-      console.log("🎭 Showing welcome modal - no wallets found");
+      console.log("🎭 Showing welcome modal - no wallets found after fetch");
       setWelcomeModalOpen(true);
     } else {
-      console.log("🎭 Not showing welcome modal");
+      console.log("🎭 Not showing welcome modal:", {
+        hasWallets: wallets.length > 0,
+        stillLoading: walletLoading,
+        notFetched: !dashboardLoadingState.walletsFetched,
+      });
       setWelcomeModalOpen(false);
     }
   }, [
@@ -250,7 +279,8 @@ export default function DashboardPage() {
     walletLoading,
     wallets.length,
     dashboardLoadingState.walletsLoaded,
-    dashboardLoadingState.initialDataReady,
+    dashboardLoadingState.walletsFetched, // NEW: Include this in dependencies
+    dashboardLoadingState.authChecked,
   ]);
 
   // Real-time monitoring status logging
@@ -318,6 +348,7 @@ export default function DashboardPage() {
       activeWalletSet: false,
       tokensLoaded: false,
       initialDataReady: false,
+      walletsFetched: false, // NEW: Reset this too
     });
 
     dispatch(fetchWallets());
@@ -337,12 +368,16 @@ export default function DashboardPage() {
 
   // UPDATED: Better loading state determination
   const isInitialLoading =
-    !dashboardLoadingState.initialDataReady ||
+    !dashboardLoadingState.authChecked ||
     (!isAuthenticated && !authChecked.current) ||
-    authLoading;
+    authLoading ||
+    (isAuthenticated && user && !dashboardLoadingState.walletsFetched); // NEW: Wait for wallet fetch
 
   const shouldShowContent =
-    dashboardLoadingState.initialDataReady && isAuthenticated && !authLoading;
+    dashboardLoadingState.authChecked &&
+    isAuthenticated &&
+    !authLoading &&
+    dashboardLoadingState.walletsFetched; // NEW: Ensure wallets have been fetched
 
   // Show loading state during initial setup
   if (isInitialLoading) {
@@ -352,6 +387,7 @@ export default function DashboardPage() {
       activeWalletSet: dashboardLoadingState.activeWalletSet,
       tokensLoaded: dashboardLoadingState.tokensLoaded,
       initialDataReady: dashboardLoadingState.initialDataReady,
+      walletsFetched: dashboardLoadingState.walletsFetched,
     });
 
     return (
@@ -393,6 +429,7 @@ export default function DashboardPage() {
     isMonitoring,
     realtimeDataAvailable: !!realtimeData,
     initialDataReady: dashboardLoadingState.initialDataReady,
+    welcomeModalOpen,
   });
 
   return (
@@ -406,10 +443,10 @@ export default function DashboardPage() {
           {/* Empty state content */}
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <h2 className="text-xl font-bold text-white mb-2">
+              {/* <h2 className="text-xl font-bold text-white mb-2">
                 Welcome to Blockpal
-              </h2>
-              <p className="text-gray-400">
+              </h2> */}
+              {/* <p className="text-gray-400">
                 Create your first wallet to get started
               </p>
               <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
@@ -417,7 +454,7 @@ export default function DashboardPage() {
                   📱 Real-time monitoring will start automatically once you add
                   a wallet
                 </p>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
