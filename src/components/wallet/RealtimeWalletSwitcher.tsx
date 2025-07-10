@@ -1,17 +1,9 @@
-// src/components/wallet/RealtimeWalletSwitcher.tsx - Complete Real-time wallet switcher with DB sync
+// src/components/wallet/RealtimeWalletSwitcher.tsx - Dropdown style below button
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import {
-  X,
-  Plus,
-  RefreshCw,
-  Radio,
-  TrendingUp,
-  TrendingDown,
-  Database,
-} from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import {
   setActiveWallet,
@@ -25,37 +17,98 @@ import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
 interface RealtimeWalletSwitcherProps {
   isOpen: boolean;
   onClose: () => void;
-  onWalletSelect?: (walletId: string) => void; // Optional custom handler
+  onWalletSelect?: (walletId: string) => void;
+  triggerRef?: React.RefObject<HTMLElement>; // Reference to the trigger button
 }
 
 export default function RealtimeWalletSwitcher({
   isOpen,
   onClose,
-  onWalletSelect, // NEW: Optional custom wallet selection handler
+  onWalletSelect,
+  triggerRef,
 }: RealtimeWalletSwitcherProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { wallets, activeWallet } = useSelector(
     (state: RootState) => state.wallet
   );
   const { user } = useSelector((state: RootState) => state.auth);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Use the real-time wallet balances hook
-  const {
-    realtimeBalances,
-    isMonitoring,
-    lastUpdateTime,
-    refreshAllWallets,
-    getMonitoringStatus,
-  } = useRealtimeWalletBalances();
+  const { realtimeBalances, isMonitoring, lastUpdateTime, refreshAllWallets } =
+    useRealtimeWalletBalances();
 
   // State for wallet modal and UI
   const [walletModalOpen, setWalletModalOpen] = useState(false);
-  const [showStatus, setShowStatus] = useState(false);
   const [switchingWallet, setSwitchingWallet] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 320,
+  });
+
+  // Calculate dropdown position to stretch from wallet button to end of header icons
+  useEffect(() => {
+    if (isOpen && triggerRef?.current) {
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+
+      // Find the header container to get the right edge
+      const headerContainer = triggerRef.current.closest(
+        ".flex.flex-col.sm\\:flex-row"
+      );
+      let rightEdge = window.innerWidth - 16; // Default fallback with padding
+
+      if (headerContainer) {
+        const headerRect = headerContainer.getBoundingClientRect();
+        rightEdge = headerRect.right;
+      }
+
+      const dropdownHeight = 400; // Approximate dropdown height
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - triggerRect.bottom;
+      const spaceAbove = triggerRect.top;
+
+      let top = triggerRect.bottom + 8; // 8px gap below button
+      let left = triggerRect.left;
+      let width = rightEdge - triggerRect.left; // Stretch to the end of header
+
+      // If not enough space below, show above
+      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+        top = triggerRect.top - dropdownHeight - 8;
+      }
+
+      // Ensure minimum width
+      if (width < 320) {
+        width = 320;
+      }
+
+      setDropdownPosition({ top, left, width });
+    }
+  }, [isOpen, triggerRef]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        triggerRef?.current &&
+        !triggerRef.current.contains(event.target as Node)
+      ) {
+        onClose();
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen, onClose, triggerRef]);
 
   if (!isOpen) return null;
 
-  // UPDATED: Handle wallet selection with DB sync and real-time data
+  // Handle wallet selection with DB sync and real-time data
   const handleSelectWallet = async (walletId: string) => {
     console.log("🎯 RealtimeWalletSwitcher - Wallet selected:", walletId);
 
@@ -64,20 +117,14 @@ export default function RealtimeWalletSwitcher({
 
     try {
       if (onWalletSelect) {
-        // Use custom handler if provided (from Dashboard)
         await onWalletSelect(walletId);
       } else {
-        // Default behavior: set locally and sync with DB
         dispatch(setActiveWallet(walletId));
         await dispatch(setActiveWalletInDB(walletId));
-        console.log("✅ Wallet switched and synced with DB");
       }
-
-      // Close the modal after successful switch
       onClose();
     } catch (error) {
       console.error("❌ Failed to switch wallet:", error);
-      // Still close modal since local state was updated
       onClose();
     } finally {
       setSwitchingWallet(null);
@@ -93,22 +140,6 @@ export default function RealtimeWalletSwitcher({
     setWalletModalOpen(false);
   };
 
-  const formatBalance = (balance: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-    }).format(balance);
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  };
-
   const getWalletColor = (index: number) => {
     const colors = [
       "bg-gradient-to-br from-blue-400 to-cyan-400",
@@ -120,194 +151,63 @@ export default function RealtimeWalletSwitcher({
     return colors[index % colors.length];
   };
 
-  const getBalanceChangeIndicator = (wallet: any) => {
-    if (!wallet.changeAmount || Math.abs(wallet.changeAmount) < 0.01)
-      return null;
-
-    const isPositive = wallet.changeAmount > 0;
-    return (
-      <div
-        className={`flex items-center text-xs ${
-          isPositive ? "text-green-400" : "text-red-400"
-        }`}
-      >
-        {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-        <span className="ml-1">
-          ${Math.abs(wallet.changeAmount).toFixed(2)}
-        </span>
-      </div>
-    );
-  };
-
-  const monitoringStatus = getMonitoringStatus();
-
   return (
     <>
-      {/* Main Wallet Switcher Modal */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md max-h-[90vh] overflow-hidden shadow-2xl">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
-            <div>
-              <div className="flex items-center">
-                <h2 className="text-xl font-bold text-white font-mayeka mr-2">
-                  Wallets
-                </h2>
-                {/* <div className="flex items-center">
-                  <Radio
-                    size={12}
-                    className={`mr-1 ${
-                      isMonitoring
-                        ? "text-green-400 animate-pulse"
-                        : "text-gray-400"
-                    }`}
-                  />
-                  <span
-                    className={`text-xs ${
-                      isMonitoring ? "text-green-400" : "text-gray-400"
-                    }`}
-                  >
-                    {isMonitoring ? "LIVE" : "OFFLINE"}
-                  </span>
-                </div>
-                <div className="flex items-center ml-3">
-                  <Database size={12} className="text-blue-400 mr-1" />
-                  <span className="text-xs text-blue-400">DB Synced</span>
-                </div> */}
-              </div>
-              {/* <div className="flex items-center text-gray-400 text-sm font-satoshi mt-1">
-                <span>Auto-updating every 15 seconds</span>
-                {lastUpdateTime && (
-                  <span className="ml-2 text-xs">
-                    Last: {formatTime(lastUpdateTime)}
-                  </span>
-                )}
-              </div> */}
-            </div>
-            <div className="flex items-center space-x-2">
-              {/* Status button */}
-              {/* <button
-                onClick={() => setShowStatus(!showStatus)}
-                className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
-                title="Monitor status"
-              >
-                <Radio
-                  size={16}
-                  className={isMonitoring ? "text-green-400" : "text-gray-400"}
-                />
-              </button> */}
-
-              {/* Manual refresh button */}
-              <button
-                onClick={refreshAllWallets}
-                className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
-                title="Force refresh all balances"
-              >
-                <RefreshCw size={16} />
-              </button>
-
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {/* Dropdown positioned below trigger button */}
+      <div
+        ref={dropdownRef}
+        className="fixed z-50 bg-black border border-[#2C2C2C] rounded-[16px] shadow-2xl overflow-hidden"
+        style={{
+          top: `${dropdownPosition.top}px`,
+          left: `${dropdownPosition.left}px`,
+          width: `${dropdownPosition.width}px`,
+          maxHeight: "400px",
+        }}
+      >
+        {/* Header */}
+        <div className="p-4 flex items-center justify-between">
+          <h3 className="text-white font-semibold text-sm font-satoshi">
+            Select Wallet
+          </h3>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={refreshAllWallets}
+              className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
+              title="Refresh balances"
+            >
+              <RefreshCw size={14} />
+            </button>
+            <span className="text-xs text-gray-400 font-satoshi">
+              {realtimeBalances.length} wallet
+              {realtimeBalances.length !== 1 ? "s" : ""}
+            </span>
           </div>
+        </div>
 
-          {/* Status Panel */}
-          {showStatus && (
-            <div className="p-4 bg-[#0F0F0F] border-b border-[#2C2C2C]">
-              <h3 className="text-white font-semibold text-sm mb-2">
-                System Status
-              </h3>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="text-gray-400">
-                  Real-time:{" "}
-                  <span
-                    className={isMonitoring ? "text-green-400" : "text-red-400"}
-                  >
-                    {isMonitoring ? "Active" : "Inactive"}
-                  </span>
-                </div>
-                <div className="text-gray-400">
-                  Wallets:{" "}
-                  <span className="text-white">
-                    {monitoringStatus.walletsCount}
-                  </span>
-                </div>
-                <div className="text-gray-400">
-                  DB Sync: <span className="text-blue-400">Connected</span>
-                </div>
-                <div className="text-gray-400">
-                  Interval:{" "}
-                  <span className="text-white">
-                    {monitoringStatus.pollInterval / 1000}s
-                  </span>
-                </div>
-                <div className="text-gray-400">
-                  WebSocket:{" "}
-                  <span
-                    className={
-                      monitoringStatus.hasWebSocket
-                        ? "text-green-400"
-                        : "text-gray-400"
-                    }
-                  >
-                    {monitoringStatus.hasWebSocket ? "Connected" : "N/A"}
-                  </span>
-                </div>
-                <div className="text-gray-400">
-                  Active Wallet:{" "}
-                  <span className="text-white">
-                    {activeWallet?.name || "None"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
+        {/* Wallets List */}
+        <div className="px-4 max-h-[280px] overflow-y-auto scrollbar-hide">
+          <div className="space-y-2">
+            {realtimeBalances.map((wallet, index) => {
+              const isActive = activeWallet?.id === wallet.id;
+              const isSwitching = switchingWallet === wallet.id;
 
-          {/* Wallets List */}
-          <div className="p-6 max-h-[60vh] overflow-y-auto">
-            <div className="space-y-3 mb-6">
-              {realtimeBalances.map((wallet, index) => {
-                const isActive = activeWallet?.id === wallet.id;
-                const isSwitching = switchingWallet === wallet.id;
-                const balanceChangeIndicator =
-                  getBalanceChangeIndicator(wallet);
-
-                return (
+              return (
+                <div
+                  key={wallet.id}
+                  className="w-full border border-[#6E6E6E] rounded-lg overflow-hidden"
+                >
                   <button
-                    key={wallet.id}
                     onClick={() => handleSelectWallet(wallet.id)}
                     disabled={isSwitching}
-                    className={`w-full flex items-center p-4 rounded-lg transition-all duration-200 text-left relative ${
-                      isActive
-                        ? "bg-[#E2AF19] text-black"
-                        : "bg-[#0F0F0F] border border-[#2C2C2C] text-white hover:bg-[#1A1A1A] hover:border-[#E2AF19]"
-                    } ${isSwitching ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`w-full flex items-center p-3 hover:bg-[#1A1A1A] transition-colors text-left relative ${
+                      isSwitching ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
-                    {/* Real-time update indicator */}
-                    {wallet.lastUpdated && (
-                      <div
-                        className={`absolute top-2 right-2 w-2 h-2 rounded-full ${
-                          isActive ? "bg-black" : "bg-green-400"
-                        } opacity-60 animate-pulse`}
-                      />
-                    )}
-
-                    {/* DB sync indicator for active wallet */}
-                    {isActive && (
-                      <div className="absolute top-2 left-2 flex items-center">
-                        <Database size={10} className="text-black opacity-60" />
-                      </div>
-                    )}
-
                     {/* Loading indicator when switching */}
                     {isSwitching && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg">
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
                         <RefreshCw
-                          size={16}
+                          size={14}
                           className="animate-spin text-white"
                         />
                       </div>
@@ -315,9 +215,9 @@ export default function RealtimeWalletSwitcher({
 
                     {/* Wallet Icon */}
                     <div
-                      className={`w-10 h-10 ${getWalletColor(
+                      className={`w-8 h-8 ${getWalletColor(
                         index
-                      )} rounded-full mr-3 flex items-center justify-center relative flex-shrink-0`}
+                      )} rounded-full flex items-center justify-center relative flex-shrink-0`}
                     >
                       {/* Grid pattern overlay */}
                       <div
@@ -325,171 +225,51 @@ export default function RealtimeWalletSwitcher({
                         style={{
                           backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
                                          linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
-                          backgroundSize: "8px 8px",
+                          backgroundSize: "6px 6px",
                         }}
                       ></div>
                     </div>
 
+                    {/* Divider after icon */}
+                    <div className="w-px h-4 bg-[#6E6E6E] mx-3 flex-shrink-0"></div>
+
                     {/* Wallet Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center">
-                        <div
-                          className={`font-medium font-satoshi ${
-                            isActive ? "text-black" : "text-white"
-                          }`}
-                        >
-                          {wallet.name}
-                        </div>
-                        {/* Live indicator */}
-                        {isMonitoring && (
-                          <Radio
-                            size={10}
-                            className={`ml-2 ${
-                              isActive
-                                ? "text-black opacity-60"
-                                : "text-green-400"
-                            } animate-pulse`}
-                          />
-                        )}
-                        {/* Active in DB indicator */}
-                        {isActive && (
-                          <span
-                            className={`ml-2 text-xs ${
-                              isActive
-                                ? "text-black opacity-60"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            • Active
-                          </span>
-                        )}
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="text-white font-medium text-sm font-satoshi truncate">
+                        {wallet.name}
                       </div>
-                      <div
-                        className={`text-sm font-satoshi truncate ${
-                          isActive ? "text-black opacity-70" : "text-gray-400"
-                        }`}
-                      >
+                      <div className="text-gray-400 text-xs font-satoshi truncate">
                         {wallet.address
                           ? `${wallet.address.slice(
                               0,
-                              8
-                            )}...${wallet.address.slice(-6)}`
+                              6
+                            )}...${wallet.address.slice(-4)}`
                           : "Loading..."}
                       </div>
-                      {/* Last update time */}
-                      {wallet.lastUpdated && (
-                        <div
-                          className={`text-xs font-satoshi ${
-                            isActive ? "text-black opacity-50" : "text-gray-500"
-                          }`}
-                        >
-                          Updated: {formatTime(wallet.lastUpdated)}
-                        </div>
+                    </div>
+
+                    {/* Active indicator (yellow radio button) */}
+                    <div className="w-4 h-4 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-3">
+                      {isActive && (
+                        <div className="w-2 h-2 bg-[#E2AF19] rounded-full" />
                       )}
                     </div>
-
-                    {/* Balance and Token Count with Real-time Changes */}
-                    <div className="text-right mr-3">
-                      <div
-                        className={`font-medium font-satoshi flex items-center ${
-                          isActive ? "text-black" : "text-white"
-                        }`}
-                      >
-                        {formatBalance(wallet.balance)}
-                        {balanceChangeIndicator && (
-                          <div className="ml-2">{balanceChangeIndicator}</div>
-                        )}
-                      </div>
-                      <div
-                        className={`text-sm font-satoshi flex items-center ${
-                          isActive ? "text-black opacity-70" : "text-gray-400"
-                        }`}
-                      >
-                        <span>{wallet.tokenCount || 0} tokens</span>
-                        {wallet.isIncreasing !== undefined && (
-                          <span className="ml-1">
-                            {wallet.isIncreasing ? "📈" : "📉"}
-                          </span>
-                        )}
-                      </div>
-                      {/* Show real-time change amount if significant */}
-                      {wallet.changeAmount &&
-                        Math.abs(wallet.changeAmount) > 0.01 && (
-                          <div
-                            className={`text-xs font-satoshi ${
-                              wallet.changeAmount > 0
-                                ? isActive
-                                  ? "text-green-600"
-                                  : "text-green-400"
-                                : isActive
-                                ? "text-red-600"
-                                : "text-red-400"
-                            }`}
-                          >
-                            {wallet.changeAmount > 0 ? "+" : ""}$
-                            {wallet.changeAmount.toFixed(2)}
-                          </div>
-                        )}
-                    </div>
-
-                    {/* Active Indicator */}
-                    {isActive && (
-                      <div className="flex-shrink-0">
-                        <div className="w-2 h-2 bg-black rounded-full"></div>
-                      </div>
-                    )}
                   </button>
-                );
-              })}
-            </div>
-
-            {/* Add Wallet Button */}
-            <Button
-              onClick={handleAddWallet}
-              variant="secondary"
-              className="w-full font-satoshi"
-              size="lg"
-            >
-              <Plus size={18} className="mr-2" />
-              Add Wallet
-            </Button>
-          </div>
-
-          {/* Footer with Real-time Status */}
-          <div className="p-6 border-t border-[#2C2C2C] bg-[#0F0F0F]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-[#E2AF19] rounded-full flex items-center justify-center mr-3">
-                  <span className="text-black text-sm font-bold">B</span>
                 </div>
-                <div>
-                  <div className="text-white text-sm font-satoshi font-medium">
-                    {user?.displayName || user?.name || "User"}
-                  </div>
-                  <div className="text-gray-400 text-xs font-satoshi flex items-center">
-                    <span>
-                      {wallets.length} wallet{wallets.length !== 1 ? "s" : ""}
-                    </span>
-                    {/* <div className="w-1 h-1 bg-gray-400 rounded-full mx-2"></div>
-                    <Radio
-                      size={8}
-                      className="mr-1 text-green-400 animate-pulse"
-                    />
-                    <span>Real-time</span>
-                    <div className="w-1 h-1 bg-gray-400 rounded-full mx-2"></div>
-                    <Database size={8} className="mr-1 text-blue-400" />
-                    <span>DB Synced</span> */}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-white transition-colors text-sm font-satoshi"
-              >
-                Close
-              </button>
-            </div>
+              );
+            })}
           </div>
+        </div>
+
+        {/* Footer with Add Wallet */}
+        <div className="p-4">
+          <button
+            onClick={handleAddWallet}
+            className="w-full bg-[#E2AF19] text-black py-2.5 rounded-[12px] font-satoshi font-medium text-sm hover:bg-[#D4A853] transition-colors flex items-center justify-center"
+          >
+            <Plus size={16} className="mr-2" />
+            Add wallet
+          </button>
         </div>
       </div>
 

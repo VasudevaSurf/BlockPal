@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED WITH UNIFIED NOTIFICATIONS
+// src/components/dashboard/GlobalDashboardHeader.tsx - Updated with trigger ref for dropdown
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -35,7 +35,7 @@ import SettingsIcon from "../icons/SettingsIcon";
 interface GlobalDashboardHeaderProps {
   title: string;
   subtitle?: string;
-  children?: React.ReactNode; // For page-specific content
+  children?: React.ReactNode;
 }
 
 // Page title mapping based on pathname
@@ -114,15 +114,16 @@ export default function GlobalDashboardHeader({
     lastUpdated,
     changeAmount,
     hasChanges,
-    notifications: realtimeNotifications = [], // Real-time notifications
+    notifications: realtimeNotifications = [],
     refreshDashboard,
     status,
     isDataStale,
     getTimeSinceUpdate,
   } = useRealtimeDashboard();
 
-  // Wallet switcher state
+  // Wallet switcher state and ref
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
+  const walletButtonRef = useRef<HTMLButtonElement>(null);
   const [showRealtimeStatus, setShowRealtimeStatus] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [nextUpdateCountdown, setNextUpdateCountdown] = useState<number>(0);
@@ -144,7 +145,7 @@ export default function GlobalDashboardHeader({
     const interval = setInterval(() => {
       const now = Date.now();
       const timeSinceLastUpdate = now - lastUpdated.getTime();
-      const timeToNextUpdate = 10000 - (timeSinceLastUpdate % 10000); // 10 second interval
+      const timeToNextUpdate = 10000 - (timeSinceLastUpdate % 10000);
       setNextUpdateCountdown(Math.ceil(timeToNextUpdate / 1000));
     }, 1000);
 
@@ -157,10 +158,9 @@ export default function GlobalDashboardHeader({
       fetchDatabaseNotifications();
       notificationsFetched.current = true;
 
-      // Set up periodic refresh for database notifications
       const interval = setInterval(() => {
         fetchDatabaseNotifications();
-      }, 30000); // Refresh every 30 seconds
+      }, 30000);
 
       return () => clearInterval(interval);
     }
@@ -190,23 +190,11 @@ export default function GlobalDashboardHeader({
 
   // Calculate total unread notification count
   const getTotalUnreadCount = () => {
-    // Real-time notifications are always considered "unread" until they auto-dismiss
     const realtimeUnreadCount = realtimeNotifications.length;
-
-    // Database notifications have an isRead property
     const databaseUnreadCount = databaseNotifications.filter(
       (n) => !n.isRead
     ).length;
-
-    const total = realtimeUnreadCount + databaseUnreadCount;
-
-    console.log("📊 Notification count:", {
-      realtime: realtimeUnreadCount,
-      database: databaseUnreadCount,
-      total,
-    });
-
-    return total;
+    return realtimeUnreadCount + databaseUnreadCount;
   };
 
   // Get page-specific title and subtitle
@@ -273,10 +261,8 @@ export default function GlobalDashboardHeader({
 
   // Handle wallet selection with DB sync
   const handleWalletSelect = async (walletId: string) => {
-    // Set locally first for immediate UI response
     dispatch(setActiveWallet(walletId));
 
-    // Then sync with database
     try {
       await dispatch(setActiveWalletInDB(walletId));
     } catch (error) {
@@ -353,20 +339,13 @@ export default function GlobalDashboardHeader({
               {displayTitle}
             </h1>
           </div>
-
-          {/* {displaySubtitle && (
-            <div className="flex items-center">
-              <p className="text-gray-400 text-sm font-satoshi mt-1">
-                {displaySubtitle}
-              </p>
-            </div>
-          )} */}
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
           {/* Wallet Selector with Real-time Data */}
           {wallets.length > 0 && (
             <button
+              ref={walletButtonRef}
               onClick={() => setWalletSwitcherOpen(true)}
               className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto hover:border-[#E2AF19] transition-colors group"
             >
@@ -395,30 +374,6 @@ export default function GlobalDashboardHeader({
                 <span className="text-white text-xs sm:text-sm font-satoshi mr-2 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors block">
                   {activeWalletData.name}
                 </span>
-
-                {/* Real-time balance display */}
-                {/* <div className="flex items-center text-xs text-gray-400">
-                  <span>${activeWalletData.balance.toFixed(2)}</span>
-                  {activeWalletData.changeAmount &&
-                    Math.abs(activeWalletData.changeAmount) > 0.01 && (
-                      <span
-                        className={`ml-1 flex items-center ${
-                          activeWalletData.changeAmount > 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {activeWalletData.changeAmount > 0 ? ( 
-                          <TrendingUp size={10} />
-                        ) : (
-                          <TrendingDown size={10} />
-                        )}
-                        <span className="ml-1">
-                          ${Math.abs(activeWalletData.changeAmount).toFixed(2)}
-                        </span>
-                      </span>
-                    )}
-                </div> */}
               </div>
 
               <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
@@ -432,10 +387,12 @@ export default function GlobalDashboardHeader({
                   : "Loading..."}
               </span>
 
-              {/* <ChevronDown
+              <ChevronDown
                 size={14}
-                className="text-gray-400 group-hover:text-[#E2AF19] transition-colors lg:w-4 lg:h-4"
-              /> */}
+                className={`text-gray-400 group-hover:text-[#E2AF19] transition-all lg:w-4 lg:h-4 ${
+                  walletSwitcherOpen ? "rotate-180" : ""
+                }`}
+              />
             </button>
           )}
 
@@ -471,19 +428,6 @@ export default function GlobalDashboardHeader({
                   className="text-gray-400 lg:w-5 lg:h-5"
                 />
               </button>
-
-              {/* <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div> */}
-
-              {/* <button
-                onClick={handleLogout}
-                className="p-1.5 lg:p-2 transition-colors hover:bg-red-600 hover:bg-opacity-20 rounded-full group"
-                title="Logout"
-              >
-                <LogOut
-                  size={16}
-                  className="text-gray-400 lg:w-5 lg:h-5 group-hover:text-red-400 transition-colors"
-                />
-              </button> */}
             </div>
           </div>
         </div>
@@ -599,7 +543,6 @@ export default function GlobalDashboardHeader({
             )}
           </div>
 
-          {/* Status indicators */}
           <div className="mt-3 pt-3 border-t border-[#2C2C2C] flex items-center justify-between">
             <div className="flex items-center">
               {isMonitoring ? (
@@ -629,12 +572,13 @@ export default function GlobalDashboardHeader({
       {/* Page-specific content below header */}
       {children}
 
-      {/* Wallet Switcher Modal */}
+      {/* Wallet Switcher Dropdown */}
       {wallets.length > 0 && (
         <RealtimeWalletSwitcher
           isOpen={walletSwitcherOpen}
           onClose={() => setWalletSwitcherOpen(false)}
           onWalletSelect={handleWalletSelect}
+          triggerRef={walletButtonRef}
         />
       )}
     </>
