@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx (UPDATED - Fixed Logout)
+// src/components/dashboard/Sidebar.tsx (MINIMAL UPDATE - Only logout clickable when no wallet)
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -62,11 +62,21 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { wallets } = useSelector((state: RootState) => state.wallet);
   const { isLoading, startLoading } = useNavigationLoading();
+
+  // Check if user has wallets
+  const hasWallets = wallets && wallets.length > 0;
 
   const handleNavigation = (href: string, event?: React.MouseEvent) => {
     // Prevent navigation if already loading
     if (isLoading) {
+      event?.preventDefault();
+      return;
+    }
+
+    // Prevent navigation if no wallets (except dashboard)
+    if (!hasWallets && href !== "/dashboard") {
       event?.preventDefault();
       return;
     }
@@ -171,14 +181,18 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         <nav className="space-y-2 lg:space-y-3 mb-6 lg:mb-8">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
+            const isDisabled = !hasWallets && item.href !== "/dashboard";
+
             return (
               <button
                 key={item.label}
                 onClick={(e) => handleNavigation(item.href, e)}
-                disabled={isLoading}
+                disabled={isLoading || isDisabled}
                 className={`w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
                   isActive
                     ? "bg-[#E2AF19] text-black font-medium"
+                    : isDisabled
+                    ? "text-gray-500 cursor-not-allowed opacity-50"
                     : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
                 } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
               >
@@ -220,40 +234,50 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
           {/* User Profile Link with Logout */}
           {otherItems.map((item) => {
             const isActive = pathname === item.href;
+            const isProfileDisabled = !hasWallets;
+
             return (
-              <button
-                key={item.label}
-                onClick={(e) => handleNavigation(item.href, e)}
-                disabled={isLoading}
-                className={`w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base group ${
-                  isActive
-                    ? "bg-[#E2AF19] text-black font-medium"
-                    : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
-                } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                {isLoading && pathname !== item.href ? (
-                  <RefreshCw
-                    size={18}
-                    className="mr-3 flex-shrink-0 animate-spin"
-                  />
-                ) : (
-                  <item.icon size={18} className="mr-3 flex-shrink-0" />
-                )}
-                <span className={isActive ? "font-medium" : ""}>
-                  {item.label}
-                </span>
-                {/* Logout Icon at the end */}
-                <div
-                  className="ml-auto flex-shrink-0 p-1 rounded hover:bg-red-900/20 transition-colors"
+              <div key={item.label} className="w-full flex items-center">
+                {/* Profile Button - Can be disabled */}
+                <button
+                  onClick={(e) =>
+                    !isProfileDisabled && handleNavigation(item.href, e)
+                  }
+                  disabled={isLoading || isProfileDisabled}
+                  className={`flex-1 flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
+                    isActive
+                      ? "bg-[#E2AF19] text-black font-medium"
+                      : isProfileDisabled
+                      ? "text-gray-500 cursor-not-allowed opacity-50"
+                      : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
+                  } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  {isLoading && pathname !== item.href ? (
+                    <RefreshCw
+                      size={18}
+                      className="mr-3 flex-shrink-0 animate-spin"
+                    />
+                  ) : (
+                    <item.icon size={18} className="mr-3 flex-shrink-0" />
+                  )}
+                  <span className={isActive ? "font-medium" : ""}>
+                    {item.label}
+                  </span>
+                </button>
+
+                {/* Logout Button - Always enabled and separate */}
+                <button
+                  className="ml-2 flex-shrink-0 p-2 rounded hover:bg-red-900/20 transition-colors"
                   onClick={handleLogout}
+                  title="Logout"
                 >
                   <LogoutIcon
                     size={16}
-                    className="group-hover:opacity-80 transition-opacity"
+                    className="hover:opacity-80 transition-opacity"
                     color="#E74C3C"
                   />
-                </div>
-              </button>
+                </button>
+              </div>
             );
           })}
 

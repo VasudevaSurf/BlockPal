@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   Key,
@@ -37,6 +37,7 @@ export default function WalletWelcomeModal({
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // Recovery phrase states
   const [phraseWords, setPhraseWords] = useState<string[]>(
@@ -55,6 +56,27 @@ export default function WalletWelcomeModal({
     privateKey: string;
     mnemonic: string;
   } | null>(null);
+
+  // Handle outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isOpen &&
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
+        handleClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -675,10 +697,14 @@ export default function WalletWelcomeModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* UPDATED: Subtle whitish fade overlay with visible dashboard background */}
+      {/* Modal backdrop - clicking here will close the modal */}
       <div className="absolute inset-0 bg-white/10" />
 
-      <div className="relative bg-black/95 border border-[#2C2C2C] rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl">
+      {/* Modal content */}
+      <div
+        ref={modalRef}
+        className="relative bg-black/95 border border-[#2C2C2C] rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl"
+      >
         <div className="p-6 max-h-[80vh] overflow-y-auto">
           {stepComponents[currentStep]()}
         </div>
