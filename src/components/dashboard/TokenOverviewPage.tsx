@@ -26,6 +26,7 @@ import {
 import { RootState } from "@/store";
 import SimpleTransferModal from "@/components/transfer/SimpleTransferModal";
 import TransactionHistory from "@/components/transactions/TransactionHistory";
+import UserQRCodeModal from "@/components/profile/UserQRCodeModal"; // Add this import
 import { SkeletonTokenOverview } from "@/components/ui/Skeleton";
 
 interface TokenInfo {
@@ -84,6 +85,7 @@ export default function TokenOverviewPage() {
   const [selectedTimeframe, setSelectedTimeframe] = useState("1D");
   const [copied, setCopied] = useState<string>("");
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false); // Add QR modal state
   const [hoveredPoint, setHoveredPoint] = useState<{
     x: number;
     y: number;
@@ -794,686 +796,692 @@ export default function TokenOverviewPage() {
   const tokenValue = tokenBalance * (tokenInfo.priceData?.current_price || 0);
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
-      {/* Mobile Layout */}
-      <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-        {/* Token Header */}
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          <div className="flex items-center mb-4">
-            <button
-              onClick={() => router.back()}
-              className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
-            >
-              <ArrowLeft size={20} className="text-white" />
-            </button>
-            {tokenInfo.priceData?.image ? (
-              <div
-                className={`w-10 h-10 ${getRandomTokenBg(
-                  tokenInfo.symbol
-                )} rounded-full mr-3 flex items-center justify-center p-1`}
+    <>
+      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
+        {/* Mobile Layout */}
+        <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+          {/* Token Header */}
+          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+            <div className="flex items-center mb-4">
+              <button
+                onClick={() => router.back()}
+                className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
               >
-                <img
-                  src={tokenInfo.priceData.image}
-                  alt={tokenInfo.symbol}
-                  className="w-full h-full rounded-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = "none";
-                    target.nextElementSibling?.classList.remove("hidden");
-                  }}
-                />
-              </div>
-            ) : null}
-            <div
-              className={`w-10 h-10 ${getTokenIcon(
-                tokenInfo.symbol
-              )} rounded-full mr-3 flex items-center justify-center ${
-                tokenInfo.priceData?.image ? "hidden" : ""
-              }`}
-            >
-              <span className="text-white text-lg font-bold">
-                {getTokenLetter(tokenInfo.symbol)}
-              </span>
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white font-mayeka">
-                {tokenInfo.name}
-              </h2>
-              <p className="text-gray-400 text-sm font-satoshi">
-                {tokenInfo.symbol}
-              </p>
-            </div>
-          </div>
-
-          {/* Price Information with Time Period Buttons - Mobile */}
-          {tokenInfo.priceData && (
-            <div className="mb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-                <div className="text-2xl sm:text-3xl font-bold text-white font-satoshi">
-                  {formatCurrency(tokenInfo.priceData.current_price)}
-                </div>
-                <TimePeriodButtons className="flex-shrink-0" />
-              </div>
-              <div className="flex items-center">
-                {tokenInfo.priceData.price_change_percentage_24h >= 0 ? (
-                  <TrendingUp size={16} className="text-green-400 mr-1" />
-                ) : (
-                  <TrendingDown size={16} className="text-red-400 mr-1" />
-                )}
-                <span
-                  className={`text-sm font-satoshi ${
-                    tokenInfo.priceData.price_change_percentage_24h >= 0
-                      ? "text-green-400"
-                      : "text-red-400"
-                  }`}
+                <ArrowLeft size={20} className="text-white" />
+              </button>
+              {tokenInfo.priceData?.image ? (
+                <div
+                  className={`w-10 h-10 ${getRandomTokenBg(
+                    tokenInfo.symbol
+                  )} rounded-full mr-3 flex items-center justify-center p-1`}
                 >
-                  {formatPercentage(
-                    tokenInfo.priceData.price_change_percentage_24h
-                  )}{" "}
-                  (24h)
+                  <img
+                    src={tokenInfo.priceData.image}
+                    alt={tokenInfo.symbol}
+                    className="w-full h-full rounded-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                      target.nextElementSibling?.classList.remove("hidden");
+                    }}
+                  />
+                </div>
+              ) : null}
+              <div
+                className={`w-10 h-10 ${getTokenIcon(
+                  tokenInfo.symbol
+                )} rounded-full mr-3 flex items-center justify-center ${
+                  tokenInfo.priceData?.image ? "hidden" : ""
+                }`}
+              >
+                <span className="text-white text-lg font-bold">
+                  {getTokenLetter(tokenInfo.symbol)}
                 </span>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Enhanced Price Chart - Mobile */}
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          {/* Contract Address - Mobile */}
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-white font-satoshi">
-              Price Chart
-            </h3>
-            <div className="flex items-center gap-2">
-              <span className="text-white text-sm font-satoshi">
-                {tokenInfo.contractAddress === "native"
-                  ? "Native Token"
-                  : `${tokenInfo.contractAddress.slice(
-                      0,
-                      6
-                    )}...${tokenInfo.contractAddress.slice(-4)}`}
-              </span>
-              {tokenInfo.contractAddress !== "native" && (
-                <button
-                  onClick={() =>
-                    copyToClipboard(tokenInfo.contractAddress, "contract")
-                  }
-                  className="hover:text-white transition-colors"
-                >
-                  <Copy size={14} className="text-gray-400" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <EnhancedChart
-            width={400}
-            height={200}
-            className="h-60"
-            showXAxisLabels={false}
-          />
-        </div>
-
-        {/* Portfolio Section - Mobile */}
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <span className="text-white font-semibold font-mayeka-demi-bold-demo">
-                {tokenInfo.name}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-white text-sm font-satoshi">
-                {walletAddress?.slice(0, 8)}...{walletAddress?.slice(-6)}
-              </span>
-              <button
-                onClick={() => copyToClipboard(walletAddress!, "wallet")}
-                className="hover:text-white transition-colors"
-              >
-                <Copy size={14} className="text-gray-400" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="text-2xl font-bold text-white mb-1 font-satoshi">
-                {formatCurrency(tokenValue)}
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div
-                  className={`font-satoshi ${
-                    tokenInfo.priceData?.price_change_percentage_24h >= 0
-                      ? "text-green-400"
-                      : "text-red-400"
-                  }`}
-                >
-                  {tokenInfo.priceData
-                    ? formatPercentage(
-                        tokenInfo.priceData.price_change_percentage_24h
-                      )
-                    : "N/A"}
-                </div>
-                <div className="text-gray-400 font-satoshi">
-                  {tokenBalance.toFixed(6)} {tokenInfo.symbol}
-                </div>
+              <div>
+                <h2 className="text-xl font-bold text-white font-mayeka">
+                  {tokenInfo.name}
+                </h2>
+                <p className="text-gray-400 text-sm font-satoshi">
+                  {tokenInfo.symbol}
+                </p>
               </div>
             </div>
+
+            {/* Price Information with Time Period Buttons - Mobile */}
+            {tokenInfo.priceData && (
+              <div className="mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+                  <div className="text-2xl sm:text-3xl font-bold text-white font-satoshi">
+                    {formatCurrency(tokenInfo.priceData.current_price)}
+                  </div>
+                  <TimePeriodButtons className="flex-shrink-0" />
+                </div>
+                <div className="flex items-center">
+                  {tokenInfo.priceData.price_change_percentage_24h >= 0 ? (
+                    <TrendingUp size={16} className="text-green-400 mr-1" />
+                  ) : (
+                    <TrendingDown size={16} className="text-red-400 mr-1" />
+                  )}
+                  <span
+                    className={`text-sm font-satoshi ${
+                      tokenInfo.priceData.price_change_percentage_24h >= 0
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {formatPercentage(
+                      tokenInfo.priceData.price_change_percentage_24h
+                    )}{" "}
+                    (24h)
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3">
-            <button
-              onClick={() => setTransferModalOpen(true)}
-              className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi"
-            >
-              Send {tokenInfo.symbol}
-            </button>
-            <button className="bg-[#4B3A08] text-[#E2AF19] p-3 rounded-xl hover:bg-[#5A4509] transition-colors">
-              <Send size={16} />
-            </button>
-          </div>
-        </div>
-
-        {/* About Token and Links - Mobile */}
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          {/* Official Links at Top - Mobile */}
-          {tokenInfo.priceData && (
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              {tokenInfo.priceData.homepage && (
-                <a
-                  href={tokenInfo.priceData.homepage}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                >
-                  <Globe size={14} className="mr-2" />
-                  Website
-                </a>
-              )}
-              {tokenInfo.priceData.whitepaper && (
-                <a
-                  href={tokenInfo.priceData.whitepaper}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                >
-                  <FileText size={14} className="mr-2" />
-                  Whitepaper
-                </a>
-              )}
-              {tokenInfo.priceData.twitter_screen_name && (
-                <a
-                  href={`https://twitter.com/${tokenInfo.priceData.twitter_screen_name}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                >
-                  <Twitter size={14} className="mr-2" />
-                  Twitter
-                </a>
-              )}
-              {tokenInfo.priceData.telegram_channel && (
-                <a
-                  href={`https://t.me/${tokenInfo.priceData.telegram_channel}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                >
-                  <MessageCircle size={14} className="mr-2" />
-                  Telegram
-                </a>
-              )}
-              {tokenInfo.priceData.blockchain_site && (
-                <a
-                  href={tokenInfo.priceData.blockchain_site}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                >
-                  <ExternalLink size={14} className="mr-2" />
-                  Explorer
-                </a>
-              )}
+          {/* Enhanced Price Chart - Mobile */}
+          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+            {/* Contract Address - Mobile */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-white font-satoshi">
+                Price Chart
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-white text-sm font-satoshi">
+                  {tokenInfo.contractAddress === "native"
+                    ? "Native Token"
+                    : `${tokenInfo.contractAddress.slice(
+                        0,
+                        6
+                      )}...${tokenInfo.contractAddress.slice(-4)}`}
+                </span>
+                {tokenInfo.contractAddress !== "native" && (
+                  <button
+                    onClick={() =>
+                      copyToClipboard(tokenInfo.contractAddress, "contract")
+                    }
+                    className="hover:text-white transition-colors"
+                  >
+                    <Copy size={14} className="text-gray-400" />
+                  </button>
+                )}
+              </div>
             </div>
-          )}
 
-          {/* About Section - Mobile */}
-          <h3 className="text-lg font-semibold text-white mb-3 font-mayeka-demi-bold-demo">
-            About {tokenInfo.name}
-          </h3>
-          {tokenInfo.priceData?.description ? (
-            <p className="text-gray-400 text-sm leading-relaxed font-satoshi mb-4">
-              {tokenInfo.priceData.description}
-            </p>
-          ) : (
-            <p className="text-gray-400 text-sm leading-relaxed font-satoshi mb-4">
-              {tokenInfo.symbol === "ETH" ? (
-                <>
-                  Ethereum is a global, open-source platform for decentralized
-                  applications. In other words, the vision is to create a world
-                  computer that anyone can build applications in a decentralized
-                  manner; while all states and data are distributed and publicly
-                  accessible.
-                </>
-              ) : (
-                <>
-                  {tokenInfo.name} is a cryptocurrency token that provides
-                  various utilities and features within its ecosystem. It
-                  enables users to participate in the network's governance,
-                  facilitate transactions, and access various decentralized
-                  applications and services.
-                </>
-              )}
-            </p>
-          )}
-        </div>
-
-        {/* Transaction History - Mobile */}
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          {/* <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white font-satoshi">
-              <Activity size={20} className="inline mr-2" />
-              {tokenInfo.symbol} Transaction History
-            </h3>
-            <button className="text-gray-400 hover:text-white transition-colors">
-              <MoreHorizontal size={16} />
-            </button>
-          </div> */}
-          <div className="max-h-64 overflow-y-auto">
-            <TransactionHistory
-              walletAddress={walletAddress}
-              tokenFilter={getTokenFilterForTransactions()}
-              transactionTypeFilter={getTransactionTypeFilter()}
-              limit={20}
-              showFilter={false}
-              compact={true}
-              className="min-h-0"
+            <EnhancedChart
+              width={400}
+              height={200}
+              className="h-60"
+              showXAxisLabels={false}
             />
           </div>
-        </div>
-      </div>
 
-      {/* Desktop Layout */}
-      <div className="hidden xl:flex gap-6 flex-1 min-h-0">
-        {/* Left Column - Main Info - MAIN SECTION */}
-        <div className="flex-1 flex flex-col gap-6 min-w-0 max-h-full overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6 scrollbar-hide">
-            {/* Token Header and Chart - Desktop */}
-            <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-shrink-0">
-              {/* Back Button and Token Info */}
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex flex-col">
-                  <div className="flex items-center mb-4">
-                    <button
-                      onClick={() => router.back()}
-                      className="mr-4 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
-                    >
-                      <ArrowLeft size={20} className="text-white" />
-                    </button>
-                    {tokenInfo.priceData?.image ? (
-                      <div
-                        className={`w-12 h-12 ${getRandomTokenBg(
-                          tokenInfo.symbol
-                        )} rounded-full mr-4 flex items-center justify-center p-1`}
-                      >
-                        <img
-                          src={tokenInfo.priceData.image}
-                          alt={tokenInfo.symbol}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        className={`w-12 h-12 ${getTokenIcon(
-                          tokenInfo.symbol
-                        )} rounded-full mr-4 flex items-center justify-center`}
-                      >
-                        <span className="text-white text-xl font-bold">
-                          {getTokenLetter(tokenInfo.symbol)}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <h2 className="text-2xl font-bold text-white font-mayeka">
-                        {tokenInfo.name}
-                      </h2>
-                      <p className="text-gray-400 font-satoshi">
-                        {tokenInfo.symbol}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Price Information - Desktop */}
-                  {tokenInfo.priceData && (
-                    <div className="flex items-center space-x-6">
-                      <div className="text-4xl font-bold text-white font-satoshi">
-                        {formatCurrency(tokenInfo.priceData.current_price)}
-                      </div>
-                      <div
-                        className={`text-lg font-satoshi flex items-center ${
-                          tokenInfo.priceData.price_change_percentage_24h >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {tokenInfo.priceData.price_change_percentage_24h >= 0
-                          ? "▲"
-                          : "▼"}{" "}
-                        {formatPercentage(
-                          tokenInfo.priceData.price_change_percentage_24h
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Contract Address - Desktop */}
-                <div className="text-right">
-                  <div className="text-white text-sm font-satoshi mb-1">
-                    Contract Address
-                  </div>
-                  <div className="flex items-center space-x-2 mb-3">
-                    <span className="text-gray-400 text-sm font-satoshi">
-                      {tokenInfo.contractAddress === "native"
-                        ? "Native Token"
-                        : `${tokenInfo.contractAddress.slice(
-                            0,
-                            10
-                          )}...${tokenInfo.contractAddress.slice(-8)}`}
-                    </span>
-                    {tokenInfo.contractAddress !== "native" && (
-                      <button
-                        onClick={() =>
-                          copyToClipboard(tokenInfo.contractAddress, "contract")
-                        }
-                        className="hover:text-white transition-colors"
-                      >
-                        <Copy size={16} className="text-gray-400" />
-                      </button>
-                    )}
-                  </div>
-                  {/* Time Period Buttons below contract address */}
-                  <TimePeriodButtons />
-                </div>
+          {/* Portfolio Section - Mobile */}
+          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <span className="text-white font-semibold font-mayeka-demi-bold-demo">
+                  {tokenInfo.name}
+                </span>
               </div>
-
-              {/* Enhanced Chart Section - Desktop */}
-              <div className="mb-6">
-                <EnhancedChart
-                  width={800}
-                  height={240}
-                  showXAxisLabels={false}
-                />
-              </div>
-
-              {/* Market Stats - Desktop */}
-              {tokenInfo.priceData && (
-                <div className="flex items-center justify-between w-full text-sm my-6">
-                  <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
-                    <span className="text-white font-satoshi">FDV</span>
-                    <span className="text-gray-400 ml-2 font-satoshi">
-                      {formatLargeNumber(tokenInfo.priceData.market_cap * 2)}
-                    </span>
-                  </div>
-                  <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
-                    <span className="text-white font-satoshi">MARKET CAP</span>
-                    <span className="text-gray-400 ml-2 font-satoshi">
-                      {formatLargeNumber(tokenInfo.priceData.market_cap)}
-                    </span>
-                  </div>
-                  <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
-                    <span className="text-white font-satoshi">24H VOLUME</span>
-                    <span className="text-gray-400 ml-2 font-satoshi">
-                      {formatLargeNumber(tokenInfo.priceData.total_volume)}
-                    </span>
-                  </div>
-                  <div
-                    className="bg-[#2C2C2C] px-4 py-3 rounded-full cursor-pointer hover:bg-[#3C3C3C] transition-colors"
-                    onClick={() => {
-                      if (tokenInfo.priceData?.blockchain_site) {
-                        window.open(
-                          tokenInfo.priceData.blockchain_site,
-                          "_blank"
-                        );
-                      }
-                    }}
-                  >
-                    <span className="text-white font-satoshi flex items-center">
-                      EXPLORER
-                      <ExternalLink size={14} className="ml-2" />
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* About Token and Links - Desktop */}
-            <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-shrink-0">
-              {/* Official Links at Top */}
-              {tokenInfo.priceData && (
-                <div className="flex items-center space-x-4 mb-6">
-                  {tokenInfo.priceData.homepage && (
-                    <a
-                      href={tokenInfo.priceData.homepage}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                    >
-                      <Globe size={14} className="mr-2" />
-                      Website
-                    </a>
-                  )}
-                  {tokenInfo.priceData.whitepaper && (
-                    <a
-                      href={tokenInfo.priceData.whitepaper}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                    >
-                      <FileText size={14} className="mr-2" />
-                      Whitepaper
-                    </a>
-                  )}
-                  {tokenInfo.priceData.twitter_screen_name && (
-                    <a
-                      href={`https://twitter.com/${tokenInfo.priceData.twitter_screen_name}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                    >
-                      <Twitter size={14} className="mr-2" />
-                      Twitter
-                    </a>
-                  )}
-                  {tokenInfo.priceData.telegram_channel && (
-                    <a
-                      href={`https://t.me/${tokenInfo.priceData.telegram_channel}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                    >
-                      <MessageCircle size={14} className="mr-2" />
-                      Telegram
-                    </a>
-                  )}
-                  {tokenInfo.priceData.blockchain_site && (
-                    <a
-                      href={tokenInfo.priceData.blockchain_site}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
-                    >
-                      <ExternalLink size={14} className="mr-2" />
-                      Explorer
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {/* About Section */}
-              <h3 className="text-lg font-semibold text-white mb-4 font-mayeka-demi-bold-demo">
-                About {tokenInfo.name}
-              </h3>
-              {tokenInfo.priceData?.description ? (
-                <p className="text-gray-400 text-sm leading-relaxed font-satoshi">
-                  {tokenInfo.priceData.description}
-                </p>
-              ) : (
-                <p className="text-gray-400 text-sm leading-relaxed font-satoshi">
-                  {tokenInfo.symbol === "ETH" ? (
-                    <>
-                      Ethereum is a global, open-source platform for
-                      decentralized applications. In other words, the vision is
-                      to create a world computer that anyone can build
-                      applications in a decentralized manner; while all states
-                      and data are distributed and publicly accessible.
-                    </>
-                  ) : (
-                    <>
-                      {tokenInfo.name} is a cryptocurrency token that provides
-                      various utilities and features within its ecosystem. It
-                      enables users to participate in the network's governance,
-                      facilitate transactions, and access various decentralized
-                      applications and services.
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Portfolio Section */}
-        <div className="w-[450px] flex-shrink-0 h-full">
-          <div className="bg-black rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-6">
-            {/* Portfolio Header */}
-            <div className="flex items-center mb-6">
-              <span className="text-white font-semibold font-mayeka-demi-bold-demo">
-                {tokenInfo.name}
-              </span>
-            </div>
-
-            {/* Portfolio Value */}
-            <div className="bg-[#000000] rounded-[16px] border border-[#2C2C2C] p-6 mb-6">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="text-white font-satoshi">
+              <div className="flex items-center gap-2">
+                <span className="text-white text-sm font-satoshi">
                   {walletAddress?.slice(0, 8)}...{walletAddress?.slice(-6)}
-                </div>
+                </span>
                 <button
                   onClick={() => copyToClipboard(walletAddress!, "wallet")}
                   className="hover:text-white transition-colors"
                 >
-                  <Copy size={16} className="text-gray-400" />
-                </button>
-              </div>
-
-              {/* Token Banner Image and Value in same row */}
-              <div className="flex items-center gap-6 mb-6">
-                {/* Token Banner Image */}
-                <div className="flex-shrink-0">
-                  <div
-                    className={`${getRandomTokenBg(
-                      tokenInfo.symbol
-                    )} rounded-lg p-2 border border-[#2C2C2C]`}
-                  >
-                    {tokenInfo.priceData?.image ? (
-                      <img
-                        src={tokenInfo.priceData.image}
-                        alt={tokenInfo.symbol}
-                        className="rounded-md object-cover"
-                        style={{
-                          width: "70px",
-                          height: "65px",
-                          transform: "rotate(0deg)",
-                          opacity: 1,
-                        }}
-                      />
-                    ) : (
-                      <img
-                        src="/tokenIconBanner.png"
-                        alt="Token Banner"
-                        className="rounded-md"
-                        style={{
-                          width: "70px",
-                          height: "65px",
-                          transform: "rotate(0deg)",
-                          opacity: 1,
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {/* Value and percentage */}
-                <div className="flex-1">
-                  <div className="text-3xl font-bold text-white mb-2 font-satoshi">
-                    {formatCurrency(tokenValue)}
-                  </div>
-                  {/* Percentage and token amount in same row */}
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`font-satoshi ${
-                        tokenInfo.priceData?.price_change_percentage_24h >= 0
-                          ? "text-green-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {tokenInfo.priceData
-                        ? formatPercentage(
-                            tokenInfo.priceData.price_change_percentage_24h
-                          )
-                        : "N/A"}
-                    </div>
-                    <div className="text-gray-400 font-satoshi">
-                      {tokenBalance.toFixed(6)} {tokenInfo.symbol}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setTransferModalOpen(true)}
-                  className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi flex items-center justify-center"
-                >
-                  Send
-                  <Send fill="#000000" size={16} className="ml-2" />
-                </button>
-                <button className="flex-1 bg-[#E2AF19] text-black py-3 rounded-xl hover:bg-[#E2AF19] transition-colors font-satoshi flex items-center justify-center">
-                  Receive
-                  <QrCode size={16} className="ml-2" />
+                  <Copy size={14} className="text-gray-400" />
                 </button>
               </div>
             </div>
 
-            {/* Transaction History - Desktop with proper filtering */}
-            <div className="flex-1 min-h-0 flex flex-col">
-              {/* <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                <h3 className="text-lg font-semibold text-white font-satoshi">
-                  <Activity size={20} className="inline mr-2" />
-                  {tokenInfo.symbol} Transactions
-                </h3>
-                <button className="text-gray-400 hover:text-white transition-colors">
-                  <MoreHorizontal size={16} />
-                </button>
-              </div> */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-2xl font-bold text-white mb-1 font-satoshi">
+                  {formatCurrency(tokenValue)}
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <div
+                    className={`font-satoshi ${
+                      tokenInfo.priceData?.price_change_percentage_24h >= 0
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {tokenInfo.priceData
+                      ? formatPercentage(
+                          tokenInfo.priceData.price_change_percentage_24h
+                        )
+                      : "N/A"}
+                  </div>
+                  <div className="text-gray-400 font-satoshi">
+                    {tokenBalance.toFixed(6)} {tokenInfo.symbol}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-              <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
-                <TransactionHistory
-                  walletAddress={walletAddress}
-                  tokenFilter={getTokenFilterForTransactions()}
-                  transactionTypeFilter={getTransactionTypeFilter()}
-                  limit={50}
-                  showFilter={false}
-                  compact={true}
-                  className="flex-1 min-h-0"
-                />
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setTransferModalOpen(true)}
+                className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi"
+              >
+                Send {tokenInfo.symbol}
+              </button>
+              <button
+                onClick={() => setQrModalOpen(true)}
+                className="bg-[#4B3A08] text-[#E2AF19] p-3 rounded-xl hover:bg-[#5A4509] transition-colors"
+              >
+                <QrCode size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* About Token and Links - Mobile */}
+          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+            {/* Official Links at Top - Mobile */}
+            {tokenInfo.priceData && (
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                {tokenInfo.priceData.homepage && (
+                  <a
+                    href={tokenInfo.priceData.homepage}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                  >
+                    <Globe size={14} className="mr-2" />
+                    Website
+                  </a>
+                )}
+                {tokenInfo.priceData.whitepaper && (
+                  <a
+                    href={tokenInfo.priceData.whitepaper}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                  >
+                    <FileText size={14} className="mr-2" />
+                    Whitepaper
+                  </a>
+                )}
+                {tokenInfo.priceData.twitter_screen_name && (
+                  <a
+                    href={`https://twitter.com/${tokenInfo.priceData.twitter_screen_name}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                  >
+                    <Twitter size={14} className="mr-2" />
+                    Twitter
+                  </a>
+                )}
+                {tokenInfo.priceData.telegram_channel && (
+                  <a
+                    href={`https://t.me/${tokenInfo.priceData.telegram_channel}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                  >
+                    <MessageCircle size={14} className="mr-2" />
+                    Telegram
+                  </a>
+                )}
+                {tokenInfo.priceData.blockchain_site && (
+                  <a
+                    href={tokenInfo.priceData.blockchain_site}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                  >
+                    <ExternalLink size={14} className="mr-2" />
+                    Explorer
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* About Section - Mobile */}
+            <h3 className="text-lg font-semibold text-white mb-3 font-mayeka-demi-bold-demo">
+              About {tokenInfo.name}
+            </h3>
+            {tokenInfo.priceData?.description ? (
+              <p className="text-gray-400 text-sm leading-relaxed font-satoshi mb-4">
+                {tokenInfo.priceData.description}
+              </p>
+            ) : (
+              <p className="text-gray-400 text-sm leading-relaxed font-satoshi mb-4">
+                {tokenInfo.symbol === "ETH" ? (
+                  <>
+                    Ethereum is a global, open-source platform for decentralized
+                    applications. In other words, the vision is to create a
+                    world computer that anyone can build applications in a
+                    decentralized manner; while all states and data are
+                    distributed and publicly accessible.
+                  </>
+                ) : (
+                  <>
+                    {tokenInfo.name} is a cryptocurrency token that provides
+                    various utilities and features within its ecosystem. It
+                    enables users to participate in the network's governance,
+                    facilitate transactions, and access various decentralized
+                    applications and services.
+                  </>
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* Transaction History - Mobile */}
+          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+            <div className="max-h-64 overflow-y-auto">
+              <TransactionHistory
+                walletAddress={walletAddress}
+                tokenFilter={getTokenFilterForTransactions()}
+                transactionTypeFilter={getTransactionTypeFilter()}
+                limit={20}
+                showFilter={false}
+                compact={true}
+                className="min-h-0"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden xl:flex gap-6 flex-1 min-h-0">
+          {/* Left Column - Main Info - MAIN SECTION */}
+          <div className="flex-1 flex flex-col gap-6 min-w-0 max-h-full overflow-hidden">
+            <div className="flex-1 overflow-y-auto space-y-6 scrollbar-hide">
+              {/* Token Header and Chart - Desktop */}
+              <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-shrink-0">
+                {/* Back Button and Token Info */}
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex flex-col">
+                    <div className="flex items-center mb-4">
+                      <button
+                        onClick={() => router.back()}
+                        className="mr-4 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                      >
+                        <ArrowLeft size={20} className="text-white" />
+                      </button>
+                      {tokenInfo.priceData?.image ? (
+                        <div
+                          className={`w-12 h-12 ${getRandomTokenBg(
+                            tokenInfo.symbol
+                          )} rounded-full mr-4 flex items-center justify-center p-1`}
+                        >
+                          <img
+                            src={tokenInfo.priceData.image}
+                            alt={tokenInfo.symbol}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className={`w-12 h-12 ${getTokenIcon(
+                            tokenInfo.symbol
+                          )} rounded-full mr-4 flex items-center justify-center`}
+                        >
+                          <span className="text-white text-xl font-bold">
+                            {getTokenLetter(tokenInfo.symbol)}
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <h2 className="text-2xl font-bold text-white font-mayeka">
+                          {tokenInfo.name}
+                        </h2>
+                        <p className="text-gray-400 font-satoshi">
+                          {tokenInfo.symbol}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Price Information - Desktop */}
+                    {tokenInfo.priceData && (
+                      <div className="flex items-center space-x-6">
+                        <div className="text-4xl font-bold text-white font-satoshi">
+                          {formatCurrency(tokenInfo.priceData.current_price)}
+                        </div>
+                        <div
+                          className={`text-lg font-satoshi flex items-center ${
+                            tokenInfo.priceData.price_change_percentage_24h >= 0
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {tokenInfo.priceData.price_change_percentage_24h >= 0
+                            ? "▲"
+                            : "▼"}{" "}
+                          {formatPercentage(
+                            tokenInfo.priceData.price_change_percentage_24h
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contract Address - Desktop */}
+                  <div className="text-right">
+                    <div className="text-white text-sm font-satoshi mb-1">
+                      Contract Address
+                    </div>
+                    <div className="flex items-center space-x-2 mb-3">
+                      <span className="text-gray-400 text-sm font-satoshi">
+                        {tokenInfo.contractAddress === "native"
+                          ? "Native Token"
+                          : `${tokenInfo.contractAddress.slice(
+                              0,
+                              10
+                            )}...${tokenInfo.contractAddress.slice(-8)}`}
+                      </span>
+                      {tokenInfo.contractAddress !== "native" && (
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              tokenInfo.contractAddress,
+                              "contract"
+                            )
+                          }
+                          className="hover:text-white transition-colors"
+                        >
+                          <Copy size={16} className="text-gray-400" />
+                        </button>
+                      )}
+                    </div>
+                    {/* Time Period Buttons below contract address */}
+                    <TimePeriodButtons />
+                  </div>
+                </div>
+
+                {/* Enhanced Chart Section - Desktop */}
+                <div className="mb-6">
+                  <EnhancedChart
+                    width={800}
+                    height={240}
+                    showXAxisLabels={false}
+                  />
+                </div>
+
+                {/* Market Stats - Desktop */}
+                {tokenInfo.priceData && (
+                  <div className="flex items-center justify-between w-full text-sm my-6">
+                    <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
+                      <span className="text-white font-satoshi">FDV</span>
+                      <span className="text-gray-400 ml-2 font-satoshi">
+                        {formatLargeNumber(tokenInfo.priceData.market_cap * 2)}
+                      </span>
+                    </div>
+                    <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
+                      <span className="text-white font-satoshi">
+                        MARKET CAP
+                      </span>
+                      <span className="text-gray-400 ml-2 font-satoshi">
+                        {formatLargeNumber(tokenInfo.priceData.market_cap)}
+                      </span>
+                    </div>
+                    <div className="bg-[#2C2C2C] px-4 py-3 rounded-full">
+                      <span className="text-white font-satoshi">
+                        24H VOLUME
+                      </span>
+                      <span className="text-gray-400 ml-2 font-satoshi">
+                        {formatLargeNumber(tokenInfo.priceData.total_volume)}
+                      </span>
+                    </div>
+                    <div
+                      className="bg-[#2C2C2C] px-4 py-3 rounded-full cursor-pointer hover:bg-[#3C3C3C] transition-colors"
+                      onClick={() => {
+                        if (tokenInfo.priceData?.blockchain_site) {
+                          window.open(
+                            tokenInfo.priceData.blockchain_site,
+                            "_blank"
+                          );
+                        }
+                      }}
+                    >
+                      <span className="text-white font-satoshi flex items-center">
+                        EXPLORER
+                        <ExternalLink size={14} className="ml-2" />
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* About Token and Links - Desktop */}
+              <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-shrink-0">
+                {/* Official Links at Top */}
+                {tokenInfo.priceData && (
+                  <div className="flex items-center space-x-4 mb-6">
+                    {tokenInfo.priceData.homepage && (
+                      <a
+                        href={tokenInfo.priceData.homepage}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                      >
+                        <Globe size={14} className="mr-2" />
+                        Website
+                      </a>
+                    )}
+                    {tokenInfo.priceData.whitepaper && (
+                      <a
+                        href={tokenInfo.priceData.whitepaper}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                      >
+                        <FileText size={14} className="mr-2" />
+                        Whitepaper
+                      </a>
+                    )}
+                    {tokenInfo.priceData.twitter_screen_name && (
+                      <a
+                        href={`https://twitter.com/${tokenInfo.priceData.twitter_screen_name}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                      >
+                        <Twitter size={14} className="mr-2" />
+                        Twitter
+                      </a>
+                    )}
+                    {tokenInfo.priceData.telegram_channel && (
+                      <a
+                        href={`https://t.me/${tokenInfo.priceData.telegram_channel}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                      >
+                        <MessageCircle size={14} className="mr-2" />
+                        Telegram
+                      </a>
+                    )}
+                    {tokenInfo.priceData.blockchain_site && (
+                      <a
+                        href={tokenInfo.priceData.blockchain_site}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#0F0F0F] text-white px-3 py-2 rounded-lg border border-[#2C2C2C] hover:bg-[#2C2C2C] transition-colors font-satoshi flex items-center text-sm"
+                      >
+                        <ExternalLink size={14} className="mr-2" />
+                        Explorer
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* About Section */}
+                <h3 className="text-lg font-semibold text-white mb-4 font-mayeka-demi-bold-demo">
+                  About {tokenInfo.name}
+                </h3>
+                {tokenInfo.priceData?.description ? (
+                  <p className="text-gray-400 text-sm leading-relaxed font-satoshi">
+                    {tokenInfo.priceData.description}
+                  </p>
+                ) : (
+                  <p className="text-gray-400 text-sm leading-relaxed font-satoshi">
+                    {tokenInfo.symbol === "ETH" ? (
+                      <>
+                        Ethereum is a global, open-source platform for
+                        decentralized applications. In other words, the vision
+                        is to create a world computer that anyone can build
+                        applications in a decentralized manner; while all states
+                        and data are distributed and publicly accessible.
+                      </>
+                    ) : (
+                      <>
+                        {tokenInfo.name} is a cryptocurrency token that provides
+                        various utilities and features within its ecosystem. It
+                        enables users to participate in the network's
+                        governance, facilitate transactions, and access various
+                        decentralized applications and services.
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Portfolio Section */}
+          <div className="w-[450px] flex-shrink-0 h-full">
+            <div className="bg-black rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-6">
+              {/* Portfolio Header */}
+              <div className="flex items-center mb-6">
+                <span className="text-white font-semibold font-mayeka-demi-bold-demo">
+                  {tokenInfo.name}
+                </span>
+              </div>
+
+              {/* Portfolio Value */}
+              <div className="bg-[#000000] rounded-[16px] border border-[#2C2C2C] p-6 mb-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="text-white font-satoshi">
+                    {walletAddress?.slice(0, 8)}...{walletAddress?.slice(-6)}
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(walletAddress!, "wallet")}
+                    className="hover:text-white transition-colors"
+                  >
+                    <Copy size={16} className="text-gray-400" />
+                  </button>
+                </div>
+
+                {/* Token Banner Image and Value in same row */}
+                <div className="flex items-center gap-6 mb-6">
+                  {/* Token Banner Image */}
+                  <div className="flex-shrink-0">
+                    <div
+                      className={`${getRandomTokenBg(
+                        tokenInfo.symbol
+                      )} rounded-lg p-2 border border-[#2C2C2C]`}
+                    >
+                      {tokenInfo.priceData?.image ? (
+                        <img
+                          src={tokenInfo.priceData.image}
+                          alt={tokenInfo.symbol}
+                          className="rounded-md object-cover"
+                          style={{
+                            width: "70px",
+                            height: "65px",
+                            transform: "rotate(0deg)",
+                            opacity: 1,
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src="/tokenIconBanner.png"
+                          alt="Token Banner"
+                          className="rounded-md"
+                          style={{
+                            width: "70px",
+                            height: "65px",
+                            transform: "rotate(0deg)",
+                            opacity: 1,
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Value and percentage */}
+                  <div className="flex-1">
+                    <div className="text-3xl font-bold text-white mb-2 font-satoshi">
+                      {formatCurrency(tokenValue)}
+                    </div>
+                    {/* Percentage and token amount in same row */}
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`font-satoshi ${
+                          tokenInfo.priceData?.price_change_percentage_24h >= 0
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {tokenInfo.priceData
+                          ? formatPercentage(
+                              tokenInfo.priceData.price_change_percentage_24h
+                            )
+                          : "N/A"}
+                      </div>
+                      <div className="text-gray-400 font-satoshi">
+                        {tokenBalance.toFixed(6)} {tokenInfo.symbol}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setTransferModalOpen(true)}
+                    className="flex-1 bg-[#E2AF19] text-black font-semibold py-3 rounded-xl hover:bg-[#D4A853] transition-colors font-satoshi flex items-center justify-center"
+                  >
+                    Send
+                    <Send fill="#000000" size={16} className="ml-2" />
+                  </button>
+                  <button
+                    onClick={() => setQrModalOpen(true)}
+                    className="flex-1 bg-[#E2AF19] text-black py-3 rounded-xl hover:bg-[#E2AF19] transition-colors font-satoshi flex items-center justify-center"
+                  >
+                    Receive
+                    <QrCode size={16} className="ml-2" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Transaction History - Desktop with proper filtering */}
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
+                  <TransactionHistory
+                    walletAddress={walletAddress}
+                    tokenFilter={getTokenFilterForTransactions()}
+                    transactionTypeFilter={getTransactionTypeFilter()}
+                    limit={50}
+                    showFilter={false}
+                    compact={true}
+                    className="flex-1 min-h-0"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <style>{`
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
       </div>
 
       {/* SimpleTransfer Modal */}
@@ -1493,15 +1501,11 @@ export default function TokenOverviewPage() {
         />
       )}
 
-      <style>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
-    </div>
+      {/* QR Code Modal */}
+      <UserQRCodeModal
+        isOpen={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+      />
+    </>
   );
 }
