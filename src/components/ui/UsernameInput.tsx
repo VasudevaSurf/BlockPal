@@ -1,4 +1,4 @@
-// src/components/ui/UsernameInput.tsx - UPDATED with backdrop for suggestions
+// src/components/ui/UsernameInput.tsx - UPDATED with backdrop for suggestions and NO SCROLL INDICATORS
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -162,11 +162,11 @@ export default function UsernameInput({
         <p className="text-red-400 text-sm mt-1 font-satoshi">{error}</p>
       )}
 
-      {/* Suggestions dropdown */}
+      {/* Suggestions dropdown - REMOVED SCROLLBAR */}
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto"
+          className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto scrollbar-hide"
         >
           {suggestions.map((suggestion, index) => (
             <button
@@ -200,7 +200,7 @@ export default function UsernameInput({
                   </div>
                 )}
                 {/* UPDATED: Show active wallet address with indicator */}
-                <div className="text-gray-500 text-xs font-satoshi truncate flex items-center">
+                {/* <div className="text-gray-500 text-xs font-satoshi truncate flex items-center">
                   <Wallet size={10} className="mr-1 text-green-400" />
                   <span className="text-green-400 mr-1">Active:</span>
                   {suggestion.walletAddress
@@ -209,7 +209,7 @@ export default function UsernameInput({
                         8
                       )}...${suggestion.walletAddress.slice(-4)}`
                     : "No wallet"}
-                </div>
+                </div> */}
               </div>
 
               {/* Active wallet indicator */}
@@ -233,6 +233,17 @@ export default function UsernameInput({
             </div>
           </div>
         )}
+
+      {/* CSS to hide scrollbar */}
+      <style jsx>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }
