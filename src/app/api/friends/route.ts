@@ -1,4 +1,4 @@
-// src/app/api/friends/route.ts - FIXED
+// src/app/api/friends/route.ts - FIXED: Server-side validation for self-requests
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         .toArray();
 
       const excludeUsernames = [
-        decoded.username,
+        decoded.username, // FIXED: Always exclude current user
         ...existingFriends.map((f) => f.requesterUsername),
         ...existingFriends.map((f) => f.receiverUsername),
       ];
@@ -136,7 +136,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ requests });
     }
 
-    // FIXED: Add sent-requests type
     if (type === "sent-requests") {
       // Get pending friend requests (sent by current user)
       const sentRequests = await db
@@ -203,6 +202,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // FIXED: Prevent self-requests at API level
+    if (targetUsername.toLowerCase() === decoded.username.toLowerCase()) {
+      return NextResponse.json(
+        { error: "You cannot send a friend request to yourself" },
+        { status: 400 }
+      );
+    }
+
     const { db } = await connectToDatabase();
 
     // Check if target user exists
@@ -215,6 +222,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "send_request") {
+      // FIXED: Additional validation for self-requests
+      if (targetUsername === decoded.username) {
+        return NextResponse.json(
+          { error: "Cannot send friend request to yourself" },
+          { status: 400 }
+        );
+      }
+
       // Check if friendship already exists
       const existingFriendship = await db.collection("friends").findOne({
         $or: [
@@ -246,7 +261,7 @@ export async function POST(request: NextRequest) {
 
       await db.collection("friends").insertOne(friendRequest);
 
-      // FIXED: Create notification for the receiver
+      // Create notification for the receiver
       const notification = {
         username: targetUsername,
         type: "friend_request",
@@ -274,6 +289,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "accept_request") {
+      // FIXED: Validate that user isn't accepting their own request
+      if (targetUsername === decoded.username) {
+        return NextResponse.json(
+          { error: "Cannot accept your own friend request" },
+          { status: 400 }
+        );
+      }
+
       const result = await db.collection("friends").updateOne(
         {
           requesterUsername: targetUsername,
@@ -295,7 +318,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // FIXED: Create notification for the requester when request is accepted
+      // Create notification for the requester when request is accepted
       const acceptNotification = {
         username: targetUsername,
         type: "friend_request_response",
@@ -323,6 +346,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "decline_request") {
+      // FIXED: Validate that user isn't declining their own request
+      if (targetUsername === decoded.username) {
+        return NextResponse.json(
+          { error: "Cannot decline your own friend request" },
+          { status: 400 }
+        );
+      }
+
       const result = await db.collection("friends").updateOne(
         {
           requesterUsername: targetUsername,
@@ -344,7 +375,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // FIXED: Create notification for the requester when request is declined
+      // Create notification for the requester when request is declined
       const declineNotification = {
         username: targetUsername,
         type: "friend_request_response",
@@ -372,6 +403,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "remove_friend") {
+      // FIXED: Validate that user isn't removing themselves
+      if (targetUsername === decoded.username) {
+        return NextResponse.json(
+          { error: "Cannot remove yourself as a friend" },
+          { status: 400 }
+        );
+      }
+
       const result = await db.collection("friends").deleteOne({
         $or: [
           {
@@ -404,7 +443,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // FIXED: Add cancel_request action for sent requests
     if (action === "cancel_request") {
       const result = await db.collection("friends").deleteOne({
         requesterUsername: decoded.username,

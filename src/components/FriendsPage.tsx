@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - COMPLETE VERSION with backdrop effects and optimized errors
+// src/components/FriendsPage.tsx - FIXED: Prevent self friend/fund requests
 "use client";
 
 import { useState, useEffect } from "react";
@@ -95,6 +95,9 @@ const parseErrorMessage = (error: string): string => {
   if (error.includes("user denied") || error.includes("user rejected")) {
     return "Transaction was cancelled.";
   }
+  if (error.includes("cannot send to yourself") || error.includes("self")) {
+    return "You cannot send requests to yourself.";
+  }
 
   // For any other technical errors, return a generic user-friendly message
   return "Request failed. Please try again or contact support if the issue persists.";
@@ -105,10 +108,9 @@ export default function FriendsPage() {
     (state: RootState) => state.wallet
   );
 
-  // Current user state to track the logged-in user
-  const [currentUser, setCurrentUser] = useState<{ username: string } | null>(
-    null
-  );
+  // FIXED: Get current user from auth state
+  const { user } = useSelector((state: RootState) => state.auth);
+  const currentUsername = user?.username;
 
   const [activeTab, setActiveTab] = useState<
     "Friends" | "Requests" | "FundRequests"
@@ -293,22 +295,6 @@ export default function FriendsPage() {
     }
   }, [showTokenDropdown]);
 
-  // Load current user info
-  const loadCurrentUser = async () => {
-    try {
-      const response = await fetch("/api/auth/me", {
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        setCurrentUser({ username: userData.username });
-      }
-    } catch (error) {
-      console.error("Error loading current user:", error);
-    }
-  };
-
   const loadInitialData = async () => {
     try {
       setInitialLoading(true);
@@ -343,9 +329,8 @@ export default function FriendsPage() {
     }
   };
 
-  // Load current user and initial data
+  // Load initial data
   useEffect(() => {
-    loadCurrentUser();
     loadInitialData();
     fetchUnreadCount();
 
@@ -458,8 +443,15 @@ export default function FriendsPage() {
     }
   };
 
+  // FIXED: Enhanced friend request validation
   const sendFriendRequest = async (username: string) => {
     try {
+      // FIXED: Check if trying to send request to self
+      if (username === currentUsername) {
+        setError("You cannot send a friend request to yourself.");
+        return;
+      }
+
       setLoading(true);
       setError("");
       setSuccessMessage("");
@@ -576,7 +568,14 @@ export default function FriendsPage() {
     setShowRemoveConfirmation(true);
   };
 
+  // FIXED: Enhanced fund request validation
   const openFundRequestModal = (friend: Friend) => {
+    // FIXED: Check if trying to request funds from self
+    if (friend.username === currentUsername) {
+      setError("You cannot request funds from yourself.");
+      return;
+    }
+
     setSelectedFriend(friend);
     setShowFundRequestModal(true);
     // Set default to ETH or first available token with image
@@ -591,14 +590,21 @@ export default function FriendsPage() {
     });
   };
 
+  // FIXED: Enhanced fund request validation
   const sendFundRequest = async () => {
     if (
       !selectedFriend ||
       !fundRequestData.amount ||
       !activeWallet?.address ||
-      !currentUser
+      !currentUsername
     ) {
       setError("Missing required information or no active wallet selected");
+      return;
+    }
+
+    // FIXED: Additional check to prevent self fund requests
+    if (selectedFriend.username === currentUsername) {
+      setError("You cannot request funds from yourself.");
       return;
     }
 
@@ -838,7 +844,7 @@ export default function FriendsPage() {
                     sentRequests={sentRequests}
                     onSendFriendRequest={sendFriendRequest}
                     loading={loading}
-                    currentUsername={currentUser?.username}
+                    currentUsername={currentUsername}
                   />
                 </div>
               )}
@@ -1305,7 +1311,7 @@ export default function FriendsPage() {
           </div>
         </div>
 
-        {/* UPDATED: Fund Request Modal with improved UI */}
+        {/* Fund Request Modal */}
         {showFundRequestModal && selectedFriend && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
@@ -1351,7 +1357,7 @@ export default function FriendsPage() {
               </div>
 
               <div className="space-y-4">
-                {/* Token Dropdown - No label, improved spacing */}
+                {/* Token Dropdown */}
                 <div className="relative" data-token-dropdown>
                   <button
                     type="button"
@@ -1393,7 +1399,7 @@ export default function FriendsPage() {
                   )}
                 </div>
 
-                {/* Amount Input - No label */}
+                {/* Amount Input */}
                 <input
                   type="text"
                   placeholder="Amount (e.g., 0.5)"
@@ -1407,7 +1413,7 @@ export default function FriendsPage() {
                   className="w-full p-3 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi transition-colors"
                 />
 
-                {/* Message Input - No label */}
+                {/* Message Input */}
                 <textarea
                   placeholder="Message (optional) - What's this request for?"
                   value={fundRequestData.message}
@@ -1421,7 +1427,7 @@ export default function FriendsPage() {
                   rows={3}
                 />
 
-                {/* Single Send Button */}
+                {/* Send Button */}
                 <div className="pt-4">
                   <button
                     onClick={sendFundRequest}
@@ -1438,7 +1444,7 @@ export default function FriendsPage() {
           </div>
         )}
 
-        {/* Fund Request Detail Modal - Only opens for pending requests */}
+        {/* Fund Request Detail Modal */}
         {selectedFundRequest && (
           <FundRequestModal
             isOpen={!!selectedFundRequest}

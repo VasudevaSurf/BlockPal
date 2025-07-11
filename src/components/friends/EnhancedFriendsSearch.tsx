@@ -1,4 +1,4 @@
-// src/components/friends/EnhancedFriendsSearch.tsx - UPDATED with backdrop effect
+// src/components/friends/EnhancedFriendsSearch.tsx - FIXED: Better self-user filtering
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -49,7 +49,7 @@ interface EnhancedFriendsSearchProps {
   sentRequests: SentRequest[];
   onSendFriendRequest: (username: string) => Promise<void>;
   loading: boolean;
-  currentUsername?: string; // Add current user's username to filter out
+  currentUsername?: string;
 }
 
 export default function EnhancedFriendsSearch({
@@ -74,6 +74,12 @@ export default function EnhancedFriendsSearch({
     return /^0x[a-fA-F0-9]{40}$/.test(input);
   };
 
+  // FIXED: Enhanced validation to prevent self-requests
+  const isCurrentUser = (username: string): boolean => {
+    if (!currentUsername) return false;
+    return username.toLowerCase() === currentUsername.toLowerCase();
+  };
+
   // Enhanced search that includes existing relationships
   const searchUsers = async (query: string) => {
     if (!query.trim() || query.length < 2) {
@@ -84,6 +90,13 @@ export default function EnhancedFriendsSearch({
 
     // Don't search if it's a wallet address
     if (isWalletAddress(query)) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    // FIXED: Don't search if query matches current user
+    if (isCurrentUser(query)) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -110,8 +123,9 @@ export default function EnhancedFriendsSearch({
       // Add existing friends
       friends.forEach((friend) => {
         if (
-          friend.username.toLowerCase().includes(query.toLowerCase()) ||
-          friend.displayName?.toLowerCase().includes(query.toLowerCase())
+          !isCurrentUser(friend.username) && // FIXED: Exclude current user
+          (friend.username.toLowerCase().includes(query.toLowerCase()) ||
+            friend.displayName?.toLowerCase().includes(query.toLowerCase()))
         ) {
           userRelationships.set(friend.username, {
             ...friend,
@@ -125,6 +139,7 @@ export default function EnhancedFriendsSearch({
         const user = request.requesterData;
         if (
           user &&
+          !isCurrentUser(user.username) && // FIXED: Exclude current user
           (user.username.toLowerCase().includes(query.toLowerCase()) ||
             user.displayName?.toLowerCase().includes(query.toLowerCase()))
         ) {
@@ -141,6 +156,7 @@ export default function EnhancedFriendsSearch({
         const user = request.receiverData;
         if (
           user &&
+          !isCurrentUser(user.username) && // FIXED: Exclude current user
           (user.username.toLowerCase().includes(query.toLowerCase()) ||
             user.displayName?.toLowerCase().includes(query.toLowerCase()))
         ) {
@@ -152,13 +168,13 @@ export default function EnhancedFriendsSearch({
         }
       });
 
-      // Add API results (new users) - FILTER OUT CURRENT USER
+      // Add API results (new users) - ENHANCED: Multiple checks for current user
       apiUsers.forEach((user) => {
         if (
           !userRelationships.has(user.username) &&
-          user.username !== currentUsername
+          !isCurrentUser(user.username) && // FIXED: Exclude current user
+          user.username !== currentUsername // FIXED: Double check
         ) {
-          // Don't show current user
           userRelationships.set(user.username, {
             ...user,
             relationshipType: "none",
@@ -210,7 +226,7 @@ export default function EnhancedFriendsSearch({
         clearTimeout(searchTimeout.current);
       }
     };
-  }, [searchQuery, friends, friendRequests, sentRequests]);
+  }, [searchQuery, friends, friendRequests, sentRequests, currentUsername]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -266,6 +282,15 @@ export default function EnhancedFriendsSearch({
   }, []);
 
   const handleSuggestionClick = async (suggestion: SearchSuggestion) => {
+    // FIXED: Final check before sending request
+    if (isCurrentUser(suggestion.username)) {
+      console.warn(
+        "Attempted to send friend request to self:",
+        suggestion.username
+      );
+      return;
+    }
+
     if (suggestion.relationshipType === "none") {
       try {
         await onSendFriendRequest(suggestion.username);
@@ -283,8 +308,15 @@ export default function EnhancedFriendsSearch({
     }
   };
 
+  // FIXED: Enhanced wallet address validation
   const handleWalletAddressSubmit = async () => {
     if (isWalletAddress(searchQuery)) {
+      // FIXED: Check if wallet address belongs to current user
+      if (searchQuery.toLowerCase() === currentUsername?.toLowerCase()) {
+        console.warn("Attempted to send friend request to own wallet address");
+        return;
+      }
+
       try {
         await onSendFriendRequest(searchQuery);
         setSearchQuery("");
@@ -334,7 +366,8 @@ export default function EnhancedFriendsSearch({
       suggestions.length === 0 &&
       searchQuery.length >= 2 &&
       !searchLoading &&
-      !isWalletAddress(searchQuery));
+      !isWalletAddress(searchQuery) &&
+      !isCurrentUser(searchQuery)); // FIXED: Don't show "no results" for current user
 
   return (
     <>
@@ -350,16 +383,20 @@ export default function EnhancedFriendsSearch({
               placeholder={
                 isWalletAddress(searchQuery)
                   ? "Wallet address detected"
+                  : isCurrentUser(searchQuery)
+                  ? "Cannot add yourself as friend"
                   : "Search by @username or display name"
               }
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
               }}
-              className="font-satoshi pr-10"
+              className={`font-satoshi pr-10 ${
+                isCurrentUser(searchQuery) ? "border-red-500 text-red-400" : ""
+              }`}
               style={{ fontSize: "16px" }}
               onFocus={() => {
-                if (suggestions.length > 0) {
+                if (suggestions.length > 0 && !isCurrentUser(searchQuery)) {
                   setShowSuggestions(true);
                 }
               }}
@@ -377,132 +414,146 @@ export default function EnhancedFriendsSearch({
             )}
           </div>
 
-          {/* Wallet Address Add Button */}
-          {searchQuery && isWalletAddress(searchQuery) && (
-            <Button
-              onClick={handleWalletAddressSubmit}
-              disabled={loading}
-              className="whitespace-nowrap text-sm lg:text-base"
-            >
-              {loading ? "Adding..." : "Add Friend"}
-            </Button>
-          )}
+          {/* Wallet Address Add Button - FIXED: Disable for current user */}
+          {searchQuery &&
+            isWalletAddress(searchQuery) &&
+            !isCurrentUser(searchQuery) && (
+              <Button
+                onClick={handleWalletAddressSubmit}
+                disabled={loading}
+                className="whitespace-nowrap text-sm lg:text-base"
+              >
+                {loading ? "Adding..." : "Add Friend"}
+              </Button>
+            )}
+
+          {/* FIXED: Show warning for current user wallet */}
+          {searchQuery &&
+            isWalletAddress(searchQuery) &&
+            isCurrentUser(searchQuery) && (
+              <div className="text-red-400 text-sm font-satoshi whitespace-nowrap">
+                Your wallet
+              </div>
+            )}
         </div>
 
-        {/* Enhanced Suggestions Dropdown */}
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-80 overflow-y-auto scrollbar-hide">
-            {/* Search Results Header */}
-            <div className="px-4 py-3 border-b border-[#2C2C2C] bg-[#0F0F0F]">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400 text-sm font-satoshi">
-                  Search Results
-                </span>
-                <span className="text-gray-500 text-xs font-satoshi">
-                  {suggestions.length} found
-                </span>
+        {/* Enhanced Suggestions Dropdown - FIXED: Don't show for current user */}
+        {showSuggestions &&
+          suggestions.length > 0 &&
+          !isCurrentUser(searchQuery) && (
+            <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-80 overflow-y-auto scrollbar-hide">
+              {/* Search Results Header */}
+              <div className="px-4 py-3 border-b border-[#2C2C2C] bg-[#0F0F0F]">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400 text-sm font-satoshi">
+                    Search Results
+                  </span>
+                  <span className="text-gray-500 text-xs font-satoshi">
+                    {suggestions.length} found
+                  </span>
+                </div>
               </div>
-            </div>
 
-            {/* Suggestions List */}
-            <div className="py-2">
-              {suggestions.map((suggestion, index) => {
-                const relationshipDisplay = getRelationshipDisplay(suggestion);
-                const isSelected = index === selectedIndex;
+              {/* Suggestions List */}
+              <div className="py-2">
+                {suggestions.map((suggestion, index) => {
+                  const relationshipDisplay =
+                    getRelationshipDisplay(suggestion);
+                  const isSelected = index === selectedIndex;
 
-                return (
-                  <div
-                    key={suggestion._id}
-                    className={`flex items-center justify-between px-4 py-3 transition-colors cursor-pointer ${
-                      isSelected ? "bg-[#2C2C2C]" : "hover:bg-[#1A1A1A]"
-                    }`}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                  >
-                    {/* User Info */}
-                    <div className="flex items-center flex-1 min-w-0">
-                      {/* Avatar */}
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
-                        <span className="text-white text-sm font-medium">
-                          {suggestion.displayName?.[0]?.toUpperCase() ||
-                            suggestion.username[0]?.toUpperCase()}
-                        </span>
+                  return (
+                    <div
+                      key={suggestion._id}
+                      className={`flex items-center justify-between px-4 py-3 transition-colors cursor-pointer ${
+                        isSelected ? "bg-[#2C2C2C]" : "hover:bg-[#1A1A1A]"
+                      }`}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      onMouseEnter={() => setSelectedIndex(index)}
+                    >
+                      {/* User Info */}
+                      <div className="flex items-center flex-1 min-w-0">
+                        {/* Avatar */}
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-sm font-medium">
+                            {suggestion.displayName?.[0]?.toUpperCase() ||
+                              suggestion.username[0]?.toUpperCase()}
+                          </span>
+                        </div>
+
+                        {/* User Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-white font-satoshi text-sm truncate">
+                              {suggestion.displayName || suggestion.username}
+                            </span>
+                            {relationshipDisplay.icon}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 font-satoshi text-xs truncate">
+                              @{suggestion.username}
+                            </span>
+                            <span
+                              className={`text-xs font-satoshi ${relationshipDisplay.color}`}
+                            >
+                              {relationshipDisplay.label}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* User Details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-white font-satoshi text-sm truncate">
-                            {suggestion.displayName || suggestion.username}
-                          </span>
-                          {relationshipDisplay.icon}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 font-satoshi text-xs truncate">
-                            @{suggestion.username}
-                          </span>
-                          <span
-                            className={`text-xs font-satoshi ${relationshipDisplay.color}`}
+                      {/* Action Button */}
+                      <div className="flex-shrink-0 ml-3">
+                        {!relationshipDisplay.actionDisabled ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSuggestionClick(suggestion);
+                            }}
+                            disabled={loading}
+                            className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-xs flex items-center gap-1 disabled:opacity-50"
                           >
+                            <UserPlus size={12} />
+                            Add
+                          </button>
+                        ) : (
+                          <div
+                            className={`px-3 py-1.5 rounded-lg text-xs font-satoshi ${relationshipDisplay.color} bg-opacity-10 flex items-center gap-1`}
+                            style={{
+                              backgroundColor:
+                                relationshipDisplay.color.includes("green")
+                                  ? "rgba(34, 197, 94, 0.1)"
+                                  : relationshipDisplay.color.includes("blue")
+                                  ? "rgba(59, 130, 246, 0.1)"
+                                  : "rgba(251, 146, 60, 0.1)",
+                            }}
+                          >
+                            {relationshipDisplay.icon}
                             {relationshipDisplay.label}
-                          </span>
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    {/* Action Button */}
-                    <div className="flex-shrink-0 ml-3">
-                      {!relationshipDisplay.actionDisabled ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSuggestionClick(suggestion);
-                          }}
-                          disabled={loading}
-                          className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-xs flex items-center gap-1 disabled:opacity-50"
-                        >
-                          <UserPlus size={12} />
-                          Add
-                        </button>
-                      ) : (
-                        <div
-                          className={`px-3 py-1.5 rounded-lg text-xs font-satoshi ${relationshipDisplay.color} bg-opacity-10 flex items-center gap-1`}
-                          style={{
-                            backgroundColor: relationshipDisplay.color.includes(
-                              "green"
-                            )
-                              ? "rgba(34, 197, 94, 0.1)"
-                              : relationshipDisplay.color.includes("blue")
-                              ? "rgba(59, 130, 246, 0.1)"
-                              : "rgba(251, 146, 60, 0.1)",
-                          }}
-                        >
-                          {relationshipDisplay.icon}
-                          {relationshipDisplay.label}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Footer with shortcut hints */}
-            <div className="px-4 py-2 border-t border-[#2C2C2C] bg-[#0F0F0F]">
-              <div className="flex items-center justify-between text-xs text-gray-500 font-satoshi">
-                <span>Use ↑↓ to navigate, Enter to select</span>
-                <span>ESC to close</span>
+              {/* Footer with shortcut hints */}
+              <div className="px-4 py-2 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+                <div className="flex items-center justify-between text-xs text-gray-500 font-satoshi">
+                  <span>Use ↑↓ to navigate, Enter to select</span>
+                  <span>ESC to close</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* No Results Message */}
+        {/* No Results Message - FIXED: Don't show for current user */}
         {showSuggestions &&
           suggestions.length === 0 &&
           searchQuery.length >= 2 &&
           !searchLoading &&
-          !isWalletAddress(searchQuery) && (
+          !isWalletAddress(searchQuery) &&
+          !isCurrentUser(searchQuery) && (
             <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-4">
               <div className="text-center">
                 <div className="text-gray-400 text-sm font-satoshi mb-2">
@@ -514,6 +565,20 @@ export default function EnhancedFriendsSearch({
               </div>
             </div>
           )}
+
+        {/* FIXED: Self-user warning message */}
+        {isCurrentUser(searchQuery) && searchQuery.length >= 2 && (
+          <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-red-900/20 border border-red-500/50 rounded-lg shadow-xl p-4">
+            <div className="text-center">
+              <div className="text-red-400 text-sm font-satoshi mb-2">
+                You cannot add yourself as a friend
+              </div>
+              <div className="text-red-400 text-xs font-satoshi">
+                Try searching for other users instead
+              </div>
+            </div>
+          </div>
+        )}
 
         <style jsx global>{`
           .scrollbar-hide {
