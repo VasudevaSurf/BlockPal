@@ -1,93 +1,47 @@
-// src/hooks/useGoogleAuth.ts
+// src/hooks/useGoogleAuth.ts - Complete Google Auth Hook with 2FA Support
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
-import { signInWithPopup, AuthError } from "firebase/auth";
+import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { AppDispatch } from "@/store";
 
 interface GoogleAuthOptions {
-  action: "login" | "register";
-  onSuccess?: () => void;
   onError?: (error: string) => void;
+  onSuccess?: (user: any) => void;
+  on2FARequired?: (email: string, googleData: any) => void;
 }
 
-export const useGoogleAuth = () => {
+export function useGoogleAuth() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>("");
-  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
   const dispatch = useDispatch<AppDispatch>();
 
-  const authenticateWithGoogle = async ({
-    action,
-    onSuccess,
-    onError,
-  }: GoogleAuthOptions) => {
+  const clearError = () => setError(null);
+
+  const loginWithGoogle = async (options: GoogleAuthOptions = {}) => {
     try {
       setLoading(true);
-      setError("");
+      setError(null);
+      console.log("🔐 useGoogleAuth: Starting Google login...");
+      console.log("🔐 useGoogleAuth: Options provided:", {
+        hasOnError: !!options.onError,
+        hasOnSuccess: !!options.onSuccess,
+        hasOn2FARequired: !!options.on2FARequired,
+      });
 
-      console.log(`🔐 Starting Google ${action}...`);
-
-      // Step 1: Firebase Google Auth
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      if (!user.email) {
-        throw new Error("Google account email is required");
-      }
-
-      console.log("✅ Firebase Google auth successful:", {
+      console.log("✅ useGoogleAuth: Google auth successful:", {
         email: user.email,
         name: user.displayName,
         uid: user.uid,
       });
 
-      // Step 1.5: Pre-check account status for better error messages
-      console.log("🔍 Checking account status...");
-      const checkResponse = await fetch("/api/auth/check-account", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email: user.email }),
-        credentials: "include",
-      });
-
-      if (checkResponse.ok) {
-        const accountStatus = await checkResponse.json();
-        console.log("📊 Account status:", accountStatus);
-
-        // Handle specific scenarios based on action and account status
-        if (action === "register" && accountStatus.exists) {
-          if (accountStatus.hasGoogleAuth) {
-            throw new Error(
-              "An account with this Google email already exists. Please sign in with Google instead."
-            );
-          } else if (accountStatus.hasPassword) {
-            throw new Error(
-              `An account with this email already exists. Please sign in with email and password instead, or use 'Forgot Password' if you don't remember your password.`
-            );
-          }
-        } else if (action === "login" && !accountStatus.exists) {
-          throw new Error(
-            "No account found with this Google email. Please register first, or if you have an account with this email, sign in using email and password."
-          );
-        } else if (
-          action === "login" &&
-          accountStatus.exists &&
-          !accountStatus.hasGoogleAuth &&
-          accountStatus.hasPassword
-        ) {
-          throw new Error(
-            "This email is associated with an email/password account. Please sign in using your email and password instead, or use 'Forgot Password' if needed."
-          );
-        }
-      }
-
-      // Step 2: Send to our backend
+      // First attempt - login without 2FA code
+      console.log("📤 useGoogleAuth: Sending login request to backend...");
       const response = await fetch("/api/auth/google", {
         method: "POST",
         headers: {
@@ -95,10 +49,104 @@ export const useGoogleAuth = () => {
         },
         body: JSON.stringify({
           email: user.email,
-          name: user.displayName || user.email.split("@")[0],
+          name: user.displayName,
           photoURL: user.photoURL,
           uid: user.uid,
-          action: action,
+          action: "login",
+          // No twoFactorCode in first attempt
+        }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      console.log("📥 useGoogleAuth: Google auth response:", {
+        status: response.status,
+        ok: response.ok,
+        data: data,
+        has2FAError: data.error === "2FA_REQUIRED",
+        requiresTwoFactor: data.requiresTwoFactor,
+      });
+
+      // FIXED: Check for 2FA requirement in both success (200) and error responses
+      if (data.error === "2FA_REQUIRED" || data.requiresTwoFactor) {
+        console.log(
+          "🔐 useGoogleAuth: Google login requires 2FA - triggering callback"
+        );
+
+        // Store Google user data for 2FA flow
+        const googleData = {
+          email: user.email,
+          name: user.displayName,
+          photoURL: user.photoURL,
+          uid: user.uid,
+        };
+
+        console.log("🔐 useGoogleAuth: Calling on2FARequired callback with:", {
+          email: user.email,
+          hasCallback: !!options.on2FARequired,
+        });
+
+        if (options.on2FARequired) {
+          options.on2FARequired(user.email!, googleData);
+          console.log("✅ useGoogleAuth: on2FARequired callback executed");
+        } else if (options.onError) {
+          options.onError("Two-factor authentication required");
+        }
+        return;
+      }
+
+      if (!response.ok) {
+        // Handle other errors
+        throw new Error(data.error || "Google authentication failed");
+      }
+
+      console.log("✅ useGoogleAuth: Google login successful:", data.user);
+
+      // Update Redux state
+      dispatch({
+        type: "auth/loginUser/fulfilled",
+        payload: data.user,
+      });
+
+      if (options.onSuccess) {
+        options.onSuccess(data.user);
+      }
+    } catch (error: any) {
+      console.error("❌ useGoogleAuth: Google login error:", error);
+      const errorMessage = error.message || "Google login failed";
+      setError(errorMessage);
+
+      if (options.onError) {
+        options.onError(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to complete Google login with 2FA code
+  const completeGoogleLoginWith2FA = async (
+    googleData: any,
+    twoFactorCode: string
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log("🔐 useGoogleAuth: Completing Google login with 2FA...");
+
+      const response = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: googleData.email,
+          name: googleData.name,
+          photoURL: googleData.photoURL,
+          uid: googleData.uid,
+          action: "login",
+          twoFactorCode: twoFactorCode, // Include 2FA code
         }),
         credentials: "include",
       });
@@ -106,123 +154,104 @@ export const useGoogleAuth = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        // Handle specific HTTP status codes
-        switch (response.status) {
-          case 404:
-            if (action === "login") {
-              throw new Error(
-                "No account found with this Google email. Please register first, or if you have an account with this email, sign in using email and password."
-              );
-            } else {
-              throw new Error("Account not found.");
-            }
-          case 409:
-            if (action === "register") {
-              // Check the specific error message to determine account type
-              if (data.error.includes("Google email")) {
-                throw new Error(
-                  "An account with this Google email already exists. Please sign in with Google instead."
-                );
-              } else {
-                throw new Error(
-                  "An account with this email already exists. Please sign in with email and password, or use 'Forgot Password' if you don't remember your password."
-                );
-              }
-            } else {
-              throw new Error("Account conflict occurred.");
-            }
-          case 400:
-            if (data.error.includes("email/password account")) {
-              throw new Error(
-                "This email is associated with an email/password account. Please sign in using your email and password instead."
-              );
-            } else {
-              throw new Error(
-                data.error || "Invalid request. Please try again."
-              );
-            }
-          default:
-            throw new Error(data.error || `Google ${action} failed`);
+        if (data.requiresTwoFactor) {
+          throw new Error(
+            data.error || "Invalid two-factor authentication code"
+          );
         }
+        throw new Error(data.error || "Google authentication failed");
       }
 
-      console.log(`✅ Google ${action} backend success:`, data.user);
+      console.log(
+        "✅ useGoogleAuth: Google auth with 2FA successful:",
+        data.user
+      );
 
-      // Step 3: Update Redux state
-      const actionType =
-        action === "login"
-          ? "auth/loginUser/fulfilled"
-          : "auth/registerUser/fulfilled";
-
+      // Update Redux state
       dispatch({
-        type: actionType,
+        type: "auth/loginUser/fulfilled",
         payload: data.user,
       });
 
-      // Step 4: Handle success
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        router.push("/dashboard");
-      }
-
-      return { success: true, user: data.user };
+      return data.user;
     } catch (error: any) {
-      console.error(`❌ Google ${action} error:`, error);
-
-      // Handle Firebase Auth errors
-      if (error.code) {
-        const authError = error as AuthError;
-        switch (authError.code) {
-          case "auth/popup-blocked":
-            setError(
-              "Login popup was blocked. Please allow popups and try again."
-            );
-            break;
-          case "auth/popup-closed-by-user":
-            setError("Login was cancelled. Please try again.");
-            break;
-          case "auth/cancelled-popup-request":
-            setError("Another login attempt is in progress. Please wait.");
-            break;
-          case "auth/network-request-failed":
-            setError(
-              "Network error. Please check your connection and try again."
-            );
-            break;
-          case "auth/too-many-requests":
-            setError(
-              "Too many login attempts. Please wait a moment and try again."
-            );
-            break;
-          default:
-            setError("Google authentication failed. Please try again.");
-        }
-      } else {
-        // Handle our custom errors
-        setError(error.message || `Google ${action} failed. Please try again.`);
-      }
-
-      if (onError) {
-        onError(error.message || `Google ${action} failed`);
-      }
-
-      return { success: false, error: error.message };
+      console.error("❌ useGoogleAuth: Google 2FA login error:", error);
+      const errorMessage = error.message || "Google 2FA login failed";
+      setError(errorMessage);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const loginWithGoogle = (options?: Omit<GoogleAuthOptions, "action">) => {
-    return authenticateWithGoogle({ action: "login", ...options });
-  };
+  const registerWithGoogle = async (options: GoogleAuthOptions = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log("🔐 useGoogleAuth: Starting Google registration...");
 
-  const registerWithGoogle = (options?: Omit<GoogleAuthOptions, "action">) => {
-    return authenticateWithGoogle({ action: "register", ...options });
-  };
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
 
-  const clearError = () => {
-    setError("");
+      console.log("✅ useGoogleAuth: Google auth successful:", {
+        email: user.email,
+        name: user.displayName,
+        uid: user.uid,
+      });
+
+      // Send user data to our backend with REGISTER action
+      const response = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: user.email,
+          name: user.displayName,
+          photoURL: user.photoURL,
+          uid: user.uid,
+          action: "register",
+        }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle specific error cases
+        if (response.status === 409) {
+          throw new Error(
+            "An account with this Google email already exists. Please sign in instead."
+          );
+        }
+        throw new Error(data.error || "Google registration failed");
+      }
+
+      console.log(
+        "✅ useGoogleAuth: Google registration backend success:",
+        data.user
+      );
+
+      // Update Redux state
+      dispatch({
+        type: "auth/registerUser/fulfilled",
+        payload: data.user,
+      });
+
+      if (options.onSuccess) {
+        options.onSuccess(data.user);
+      }
+    } catch (error: any) {
+      console.error("❌ useGoogleAuth: Google registration error:", error);
+      const errorMessage = error.message || "Google registration failed";
+      setError(errorMessage);
+
+      if (options.onError) {
+        options.onError(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return {
@@ -230,6 +259,7 @@ export const useGoogleAuth = () => {
     error,
     loginWithGoogle,
     registerWithGoogle,
+    completeGoogleLoginWith2FA,
     clearError,
   };
-};
+}

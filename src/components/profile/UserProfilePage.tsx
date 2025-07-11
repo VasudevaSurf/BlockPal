@@ -1,4 +1,4 @@
-// src/components/profile/UserProfilePage.tsx - FIXED with proper avatar refresh
+// src/components/profile/UserProfilePage.tsx - UPDATED with enhanced 2FA support
 "use client";
 
 import { useState, useEffect } from "react";
@@ -239,7 +239,7 @@ export default function UserProfilePage() {
     }
   };
 
-  // FIXED: Enhanced avatar update handler
+  // Enhanced avatar update handler
   const handleAvatarUpdate = async (newAvatarUrl: string) => {
     console.log("🖼️ Avatar update received:", newAvatarUrl);
 
@@ -1074,6 +1074,7 @@ export default function UserProfilePage() {
               </div>
             </div>
 
+            {/* Rest of the desktop layout sections... */}
             {/* Notifications - Desktop */}
             <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
               <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
@@ -1241,7 +1242,7 @@ export default function UserProfilePage() {
           </div>
         </div>
 
-        {/* Modals remain the same... */}
+        {/* Modals */}
         {/* Password Change Modal - Only show if user can change password */}
         {showPasswordModal && canChangePassword && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
@@ -1365,7 +1366,7 @@ export default function UserProfilePage() {
           </div>
         )}
 
-        {/* 2FA Setup Modal */}
+        {/* 2FA Setup Modal with user profile data */}
         {show2FAModal && (
           <TwoFactorSetupModal
             isOpen={show2FAModal}
@@ -1375,6 +1376,12 @@ export default function UserProfilePage() {
             }}
             onComplete={handle2FAComplete}
             isEnabling={is2FAEnabling}
+            userProfile={{
+              email: profile.gmail,
+              displayName: profile.displayName,
+              authProvider: profile.authProvider,
+              hasPassword: profile.hasPassword,
+            }}
           />
         )}
 

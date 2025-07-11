@@ -1,4 +1,4 @@
-// src/app/api/auth/google/route.ts - UPDATED with 2FA support
+// src/app/api/auth/google/route.ts - FIXED with proper 2FA support
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // NEW: Check if 2FA is enabled for Google login
+      // FIXED: Proper 2FA check for Google login
       if (user.twoFactorEnabled && user.twoFactorSecret) {
         console.log("🔐 2FA is enabled for Google user, checking for code...");
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
               message: "Two-factor authentication code is required",
               requiresTwoFactor: true,
             },
-            { status: 200 }
+            { status: 200 } // FIXED: Use 200 status so frontend knows this is a 2FA requirement, not an error
           );
         }
 
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
         createdAt: new Date(),
         lastLoginAt: new Date(),
         authProvider: "google",
-        // NEW: Google users start with 2FA disabled by default
+        // Google users start with 2FA disabled by default
         twoFactorEnabled: false,
       };
 
