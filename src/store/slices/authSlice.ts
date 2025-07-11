@@ -1,4 +1,4 @@
-// src/store/slices/authSlice.ts - UPDATED with 2FA support
+// src/store/slices/authSlice.ts - FIXED with proper error handling
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { AuthState, User } from "@/types";
 
@@ -9,6 +9,23 @@ const initialState: AuthState = {
   error: null,
 };
 
+// Helper function to safely parse JSON responses
+const safeJsonParse = async (response: Response) => {
+  const text = await response.text();
+
+  if (!text.trim()) {
+    throw new Error("Empty response from server");
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("JSON parse error:", error);
+    console.error("Raw response:", text);
+    throw new Error("Invalid response format from server");
+  }
+};
+
 // Async thunks for API calls
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
@@ -16,7 +33,7 @@ export const loginUser = createAsyncThunk(
     credentials: {
       email: string;
       password: string;
-      twoFactorCode?: string; // NEW: Optional 2FA code
+      twoFactorCode?: string;
     },
     { rejectWithValue }
   ) => {
@@ -31,49 +48,77 @@ export const loginUser = createAsyncThunk(
           "Content-Type": "application/json",
         },
         body: JSON.stringify(credentials),
-        credentials: "include", // Important: Include cookies
+        credentials: "include",
       });
-
-      const data = await response.json();
 
       console.log("📥 Redux: Login response received", {
         ok: response.ok,
         status: response.status,
+        statusText: response.statusText,
+      });
+
+      // Handle different response types
+      let data;
+      try {
+        data = await safeJsonParse(response);
+      } catch (parseError) {
+        console.error("❌ Failed to parse login response:", parseError);
+        return rejectWithValue("Server returned invalid response");
+      }
+
+      console.log("📋 Redux: Parsed response data:", {
         hasUser: !!data.user,
+        error: data.error,
         requiresTwoFactor: !!data.requiresTwoFactor,
       });
 
       if (!response.ok) {
         console.log("❌ Redux: Login failed", data.error);
 
-        // NEW: Handle 2FA requirement
+        // Handle 2FA requirement
         if (data.error === "2FA_REQUIRED" || data.requiresTwoFactor) {
           console.log("🔐 Redux: 2FA required");
           return rejectWithValue("2FA_REQUIRED");
         }
 
-        return rejectWithValue(data.error || "Login failed");
+        return rejectWithValue(
+          data.error || `Server error: ${response.status}`
+        );
       }
 
-      // NEW: Handle successful response that still requires 2FA
+      // Handle successful response that still requires 2FA
       if (data.requiresTwoFactor && !data.user) {
         console.log("🔐 Redux: 2FA required (success response)");
         return rejectWithValue("2FA_REQUIRED");
       }
 
+      if (!data.user) {
+        console.error("❌ Redux: No user data in successful response");
+        return rejectWithValue("Authentication failed - no user data");
+      }
+
       console.log("✅ Redux: Login successful", data.user);
 
-      // Verify cookie was set by checking document.cookie
+      // Verify cookie was set
       setTimeout(() => {
-        const cookies = document.cookie;
-        const hasAuthToken = cookies.includes("auth-token");
-        console.log("🍪 Redux: Cookie check after login:", hasAuthToken);
+        if (typeof window !== "undefined") {
+          const cookies = document.cookie;
+          const hasAuthToken = cookies.includes("auth-token");
+          console.log("🍪 Redux: Cookie check after login:", hasAuthToken);
+        }
       }, 100);
 
       return data.user;
     } catch (error) {
-      console.error("💥 Redux: Network error", error);
-      return rejectWithValue("Network error occurred");
+      console.error("💥 Redux: Network error during login:", error);
+
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        return rejectWithValue(
+          "Network connection failed. Please check your internet connection."
+        );
+      }
+
+      return rejectWithValue("An unexpected error occurred during login");
     }
   }
 );
@@ -85,24 +130,49 @@ export const registerUser = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
+      console.log("📝 Redux: Starting registration request");
+
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(userData),
-        credentials: "include", // Important: Include cookies
+        credentials: "include",
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.error || "Registration failed");
+      let data;
+      try {
+        data = await safeJsonParse(response);
+      } catch (parseError) {
+        console.error("❌ Failed to parse registration response:", parseError);
+        return rejectWithValue("Server returned invalid response");
       }
 
+      if (!response.ok) {
+        return rejectWithValue(
+          data.error || `Server error: ${response.status}`
+        );
+      }
+
+      if (!data.user) {
+        return rejectWithValue("Registration failed - no user data");
+      }
+
+      console.log("✅ Redux: Registration successful");
       return data.user;
     } catch (error) {
-      return rejectWithValue("Network error occurred");
+      console.error("💥 Redux: Network error during registration:", error);
+
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        return rejectWithValue(
+          "Network connection failed. Please check your internet connection."
+        );
+      }
+
+      return rejectWithValue(
+        "An unexpected error occurred during registration"
+      );
     }
   }
 );
@@ -111,18 +181,52 @@ export const logoutUser = createAsyncThunk(
   "auth/logoutUser",
   async (_, { rejectWithValue }) => {
     try {
+      console.log("🚪 Redux: Starting logout request");
+
       const response = await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
 
+      // Don't parse response for logout - just check if it succeeded
       if (!response.ok) {
-        return rejectWithValue("Logout failed");
+        console.warn(
+          "⚠️ Redux: Logout API failed, but continuing with local cleanup"
+        );
+        // Don't reject - we still want to clear local state
+      } else {
+        console.log("✅ Redux: Logout API successful");
+      }
+
+      // Always clear local storage regardless of API response
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("activeWalletId");
+        localStorage.removeItem("auth-token");
+
+        // Clear any other cached data
+        const keys = Object.keys(localStorage);
+        keys.forEach((key) => {
+          if (
+            key.startsWith("wallet-") ||
+            key.startsWith("token-") ||
+            key.startsWith("blockpal-")
+          ) {
+            localStorage.removeItem(key);
+          }
+        });
       }
 
       return null;
     } catch (error) {
-      return rejectWithValue("Network error occurred");
+      console.error("💥 Redux: Network error during logout:", error);
+
+      // Still clear local state even if network fails
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+      }
+
+      // Don't reject logout - we want to clear state regardless
+      return null;
     }
   }
 );
@@ -147,12 +251,28 @@ export const checkAuthStatus = createAsyncThunk(
         return rejectWithValue("Not authenticated");
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await safeJsonParse(response);
+      } catch (parseError) {
+        console.error("❌ Failed to parse auth check response:", parseError);
+        return rejectWithValue("Server returned invalid response");
+      }
+
+      if (!data.user) {
+        return rejectWithValue("No user data in auth response");
+      }
+
       console.log("✅ Redux: Auth check successful", data.user);
       return data.user;
     } catch (error) {
-      console.error("💥 Redux: Auth check error", error);
-      return rejectWithValue("Network error occurred");
+      console.error("💥 Redux: Network error during auth check:", error);
+
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        return rejectWithValue("Network connection failed");
+      }
+
+      return rejectWithValue("An unexpected error occurred");
     }
   }
 );
@@ -181,6 +301,13 @@ const authSlice = createSlice({
       state.error = null;
       state.loading = false;
     },
+    // Reset auth state completely
+    resetAuthState: (state) => {
+      state.user = null;
+      state.isAuthenticated = false;
+      state.loading = false;
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     // Login cases
@@ -201,7 +328,7 @@ const authSlice = createSlice({
         console.log("❌ Redux: Login rejected", action.payload);
         state.loading = false;
 
-        // NEW: Don't clear authentication state if 2FA is required
+        // Don't clear authentication state if 2FA is required
         if (action.payload !== "2FA_REQUIRED") {
           state.isAuthenticated = false;
           state.user = null;
@@ -211,16 +338,19 @@ const authSlice = createSlice({
       })
       // Register cases
       .addCase(registerUser.pending, (state) => {
+        console.log("🔄 Redux: Registration pending");
         state.loading = true;
         state.error = null;
       })
       .addCase(registerUser.fulfilled, (state, action) => {
+        console.log("✅ Redux: Registration fulfilled", action.payload);
         state.loading = false;
         state.isAuthenticated = true;
         state.user = action.payload;
         state.error = null;
       })
       .addCase(registerUser.rejected, (state, action) => {
+        console.log("❌ Redux: Registration rejected", action.payload);
         state.loading = false;
         state.isAuthenticated = false;
         state.user = null;
@@ -228,17 +358,23 @@ const authSlice = createSlice({
       })
       // Logout cases
       .addCase(logoutUser.pending, (state) => {
+        console.log("🔄 Redux: Logout pending");
         state.loading = true;
       })
       .addCase(logoutUser.fulfilled, (state) => {
+        console.log("✅ Redux: Logout fulfilled");
         state.loading = false;
         state.isAuthenticated = false;
         state.user = null;
         state.error = null;
       })
       .addCase(logoutUser.rejected, (state, action) => {
+        console.log("⚠️ Redux: Logout rejected, but clearing state anyway");
+        // Even if logout API fails, clear the state
         state.loading = false;
-        state.error = action.payload as string;
+        state.isAuthenticated = false;
+        state.user = null;
+        state.error = null; // Don't show error for logout
       })
       // Check auth status cases
       .addCase(checkAuthStatus.pending, (state) => {
@@ -252,8 +388,8 @@ const authSlice = createSlice({
         state.user = action.payload;
         state.error = null;
       })
-      .addCase(checkAuthStatus.rejected, (state) => {
-        console.log("❌ Redux: Auth status check rejected");
+      .addCase(checkAuthStatus.rejected, (state, action) => {
+        console.log("❌ Redux: Auth status check rejected", action.payload);
         state.loading = false;
         state.isAuthenticated = false;
         state.user = null;
@@ -262,6 +398,12 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setLoading, setAuthenticated, setUnauthenticated } =
-  authSlice.actions;
+export const {
+  clearError,
+  setLoading,
+  setAuthenticated,
+  setUnauthenticated,
+  resetAuthState,
+} = authSlice.actions;
+
 export default authSlice.reducer;

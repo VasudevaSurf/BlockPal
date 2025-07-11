@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx (UPDATED - Increased sidebar width)
+// src/components/dashboard/Sidebar.tsx - FIXED LOGOUT FUNCTION
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -97,6 +97,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
     }, 100);
   };
 
+  // FIXED: Proper logout handler with error handling
   const handleLogout = async (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -104,13 +105,65 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
     if (isLoading) return;
 
     try {
-      await dispatch(logoutUser());
-      router.push("/auth");
-      onItemClick?.();
+      console.log("🚪 Starting logout process...");
+
+      // Show loading state
+      startLoading();
+
+      // Clear any local storage
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("activeWalletId");
+        localStorage.removeItem("auth-token");
+
+        // Clear any other cached data
+        const keys = Object.keys(localStorage);
+        keys.forEach((key) => {
+          if (
+            key.startsWith("wallet-") ||
+            key.startsWith("token-") ||
+            key.startsWith("blockpal-")
+          ) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+
+      // Dispatch logout action
+      const result = await dispatch(logoutUser());
+
+      if (logoutUser.fulfilled.match(result)) {
+        console.log("✅ Logout successful");
+      } else if (logoutUser.rejected.match(result)) {
+        console.warn(
+          "⚠️ Logout API failed, but continuing with local cleanup:",
+          result.payload
+        );
+      }
+
+      // Always redirect regardless of API response
+      console.log("🔄 Redirecting to auth page...");
+      router.replace("/auth");
+
+      if (onItemClick) {
+        onItemClick();
+      }
     } catch (error) {
-      console.error("Logout error:", error);
-      router.push("/auth");
-      onItemClick?.();
+      console.error("❌ Logout error:", error);
+
+      // Even if logout fails, clear local state and redirect
+      try {
+        // Manual cleanup
+        dispatch({ type: "auth/setUnauthenticated" });
+        router.replace("/auth");
+
+        if (onItemClick) {
+          onItemClick();
+        }
+      } catch (redirectError) {
+        console.error("❌ Emergency redirect failed:", redirectError);
+        // Force page reload as last resort
+        window.location.href = "/auth";
+      }
     }
   };
 
@@ -267,15 +320,24 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
                 {/* Logout Button - Always enabled and separate */}
                 <button
-                  className="ml-2 flex-shrink-0 p-3 rounded hover:bg-red-900/20 transition-colors"
+                  className="ml-2 flex-shrink-0 p-3 rounded hover:bg-red-900/20 transition-colors disabled:opacity-50"
                   onClick={handleLogout}
+                  disabled={isLoading}
                   title="Logout"
                 >
-                  <LogoutIcon
-                    size={18}
-                    className="hover:opacity-80 transition-opacity"
-                    color="#E74C3C"
-                  />
+                  {isLoading ? (
+                    <RefreshCw
+                      size={18}
+                      className="animate-spin"
+                      color="#E74C3C"
+                    />
+                  ) : (
+                    <LogoutIcon
+                      size={18}
+                      className="hover:opacity-80 transition-opacity"
+                      color="#E74C3C"
+                    />
+                  )}
                 </button>
               </div>
             );
