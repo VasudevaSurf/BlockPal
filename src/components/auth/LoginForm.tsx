@@ -1,4 +1,4 @@
-// src/components/auth/LoginForm.tsx - COMPLETE FIXED VERSION with Google 2FA
+// src/components/auth/LoginForm.tsx - COMPLETE FIXED VERSION with Google 2FA (No scroll indicators)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -279,7 +279,15 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="w-full">
+    <div
+      className="w-full overflow-hidden"
+      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+    >
+      <style jsx>{`
+        div::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-bold text-white mb-2 font-mayeka-bold-demo">
           Login into your Account

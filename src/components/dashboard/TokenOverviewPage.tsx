@@ -1071,7 +1071,7 @@ export default function TokenOverviewPage() {
 
         {/* Transaction History - Mobile */}
         <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          <div className="flex items-center justify-between mb-4">
+          {/* <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-white font-satoshi">
               <Activity size={20} className="inline mr-2" />
               {tokenInfo.symbol} Transaction History
@@ -1079,7 +1079,7 @@ export default function TokenOverviewPage() {
             <button className="text-gray-400 hover:text-white transition-colors">
               <MoreHorizontal size={16} />
             </button>
-          </div>
+          </div> */}
           <div className="max-h-64 overflow-y-auto">
             <TransactionHistory
               walletAddress={walletAddress}
@@ -1450,7 +1450,7 @@ export default function TokenOverviewPage() {
 
             {/* Transaction History - Desktop with proper filtering */}
             <div className="flex-1 min-h-0 flex flex-col">
-              <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              {/* <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <h3 className="text-lg font-semibold text-white font-satoshi">
                   <Activity size={20} className="inline mr-2" />
                   {tokenInfo.symbol} Transactions
@@ -1458,7 +1458,7 @@ export default function TokenOverviewPage() {
                 <button className="text-gray-400 hover:text-white transition-colors">
                   <MoreHorizontal size={16} />
                 </button>
-              </div>
+              </div> */}
 
               <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
                 <TransactionHistory

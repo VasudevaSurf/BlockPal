@@ -1,4 +1,4 @@
-// src/components/auth/RegisterForm.tsx - UPDATED with email verification
+// src/components/auth/RegisterForm.tsx - UPDATED with email verification (No scroll indicators)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -261,7 +261,15 @@ export default function RegisterForm() {
   // Step 1: Registration Form
   if (step === "form") {
     return (
-      <div className="w-full">
+      <div
+        className="w-full overflow-hidden"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-white mb-2 font-mayeka-bold-demo">
             Create your Account
@@ -452,7 +460,15 @@ export default function RegisterForm() {
   // Step 2: Email Verification
   if (step === "verify") {
     return (
-      <div className="w-full">
+      <div
+        className="w-full overflow-hidden"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
         <div className="mb-6 text-center">
           <div className="w-16 h-16 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <Mail size={32} className="text-[#E2AF19]" />
@@ -545,7 +561,15 @@ export default function RegisterForm() {
   // Step 3: Success
   if (step === "success") {
     return (
-      <div className="w-full">
+      <div
+        className="w-full overflow-hidden"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
         <div className="text-center">
           <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={32} className="text-green-400" />
