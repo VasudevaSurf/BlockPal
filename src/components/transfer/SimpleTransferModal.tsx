@@ -1,17 +1,19 @@
-// src/components/transfer/SimpleTransferModal.tsx - UPDATED WITH USERNAME SEARCH
+// src/components/transfer/SimpleTransferModal.tsx - UPDATED WITH CUSTOM PROFILE ICON
 "use client";
 
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import {
   X,
-  ArrowDown,
+  ArrowLeft,
   Send,
   ExternalLink,
   CheckCircle,
   AlertTriangle,
   Copy,
   RefreshCw,
+  User,
+  Contact,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
@@ -66,6 +68,29 @@ interface TransactionResult {
   actualCostUSD?: string;
 }
 
+// Custom Profile Icon Component
+const ProfileIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="21"
+    viewBox="0 0 30 31"
+    fill="none"
+    className={className}
+  >
+    <path
+      d="M21 12.5C21 14.0913 20.3679 15.6174 19.2426 16.7426C18.1174 17.8679 16.5913 18.5 15 18.5C13.4087 18.5 11.8826 17.8679 10.7574 16.7426C9.63214 15.6174 9 14.0913 9 12.5C9 10.9087 9.63214 9.38258 10.7574 8.25736C11.8826 7.13214 13.4087 6.5 15 6.5C16.5913 6.5 18.1174 7.13214 19.2426 8.25736C20.3679 9.38258 21 10.9087 21 12.5Z"
+      fill="#6E6E6E"
+    />
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M14.388 30.488C6.38775 30.167 0 23.579 0 15.5C0 7.2155 6.7155 0.5 15 0.5C23.2845 0.5 30 7.2155 30 15.5C30 23.7845 23.2845 30.5 15 30.5H14.7945C14.6585 30.5 14.523 30.496 14.388 30.488ZM5.3745 24.965C5.26235 24.6429 5.22417 24.2997 5.26281 23.9609C5.30145 23.622 5.4159 23.2963 5.59768 23.0077C5.77946 22.7191 6.0239 22.4752 6.31284 22.2941C6.60179 22.1129 6.92782 21.9992 7.26675 21.9613C13.1138 21.314 16.9222 21.3725 22.7407 21.9748C23.0801 22.0101 23.407 22.1224 23.6964 22.3032C23.9858 22.4839 24.2301 22.7283 24.4108 23.0178C24.5915 23.3072 24.7037 23.6341 24.739 23.9735C24.7742 24.3129 24.7316 24.6558 24.6143 24.9762C27.1081 22.4533 28.5046 19.0475 28.5 15.5C28.5 8.04425 22.4557 2 15 2C7.54425 2 1.5 8.04425 1.5 15.5C1.5 19.187 2.97825 22.529 5.3745 24.965Z"
+      fill="#6E6E6E"
+    />
+  </svg>
+);
+
 export default function SimpleTransferModal({
   isOpen,
   onClose,
@@ -89,24 +114,118 @@ export default function SimpleTransferModal({
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState("");
 
-  // NEW: Selected user state for username input
+  // Selected user state for username input
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
+
+  // Percentage buttons state
+  const [selectedPercentage, setSelectedPercentage] = useState<number | null>(
+    null
+  );
+
+  // NEW: Gas estimation state
+  const [gasEstimation, setGasEstimation] = useState<{
+    gasCostUSD: string;
+    gasCostETH: string;
+    estimatedGas: string;
+  } | null>(null);
+  const [gasLoading, setGasLoading] = useState(false);
 
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       setStep("form");
       setFormData({ recipientAddress: "", amount: "" });
-      setSelectedUser(null); // NEW: Reset selected user
+      setSelectedUser(null);
       setPreview(null);
       setTransactionResult(null);
       setErrors({});
       setIsLoading(false);
       setCopied("");
+      setSelectedPercentage(null);
+      setGasEstimation(null); // NEW: Reset gas estimation
+      setGasLoading(false);
     }
   }, [isOpen]);
 
-  // NEW: Handle username/address input change
+  // NEW: Debounced gas estimation effect
+  useEffect(() => {
+    const fetchGasEstimation = async () => {
+      // Only fetch if we have valid form data
+      if (
+        !formData.amount ||
+        !formData.recipientAddress ||
+        !walletAddress ||
+        parseFloat(formData.amount) <= 0 ||
+        parseFloat(formData.amount) > parseFloat(tokenInfo.balance)
+      ) {
+        setGasEstimation(null);
+        return;
+      }
+
+      // Validate recipient address format
+      const recipientAddress = selectedUser
+        ? selectedUser.walletAddress
+        : formData.recipientAddress;
+
+      if (!/^0x[a-fA-F0-9]{40}$/.test(recipientAddress)) {
+        setGasEstimation(null);
+        return;
+      }
+
+      try {
+        setGasLoading(true);
+
+        const response = await fetch("/api/transfer/simple", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "preview",
+            tokenInfo: {
+              ...tokenInfo,
+              isETH:
+                tokenInfo.contractAddress === "native" ||
+                tokenInfo.symbol === "ETH",
+            },
+            recipientAddress: recipientAddress,
+            amount: formData.amount,
+            fromAddress: walletAddress,
+            tokenPrice: tokenInfo.priceData?.current_price,
+          }),
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.preview?.gasEstimation) {
+            setGasEstimation({
+              gasCostUSD: data.preview.gasEstimation.gasCostUSD,
+              gasCostETH: data.preview.gasEstimation.gasCostETH,
+              estimatedGas: data.preview.gasEstimation.estimatedGas,
+            });
+          }
+        }
+      } catch (error) {
+        console.log("Gas estimation failed:", error);
+        // Silently fail - not critical for form functionality
+      } finally {
+        setGasLoading(false);
+      }
+    };
+
+    // Debounce the gas estimation to avoid too many API calls
+    const timeoutId = setTimeout(fetchGasEstimation, 800);
+    return () => clearTimeout(timeoutId);
+  }, [
+    formData.amount,
+    formData.recipientAddress,
+    selectedUser,
+    walletAddress,
+    tokenInfo,
+  ]);
+
+  // Handle username/address input change
   const handleRecipientChange = (
     value: string,
     suggestion?: UserSuggestion
@@ -126,17 +245,37 @@ export default function SimpleTransferModal({
     }
   };
 
-  // NEW: Handle user selection from dropdown
+  // Handle user selection from dropdown
   const handleUserSelect = (user: UserSuggestion) => {
     setSelectedUser(user);
     setFormData({ ...formData, recipientAddress: user.walletAddress });
     console.log("✅ User selected from dropdown:", user);
   };
 
+  // Handle percentage selection
+  const handlePercentageSelect = (percentage: number) => {
+    const balance = parseFloat(tokenInfo.balance);
+    const amount = ((balance * percentage) / 100).toString();
+    setFormData({ ...formData, amount });
+    setSelectedPercentage(percentage);
+    if (errors.amount) {
+      setErrors({ ...errors, amount: "" });
+    }
+  };
+
+  // Handle amount change
+  const handleAmountChange = (value: string) => {
+    setFormData({ ...formData, amount: value });
+    setSelectedPercentage(null); // Reset percentage selection when manually typing
+    if (errors.amount) {
+      setErrors({ ...errors, amount: "" });
+    }
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // NEW: Enhanced validation for username/address
+    // Enhanced validation for username/address
     if (!formData.recipientAddress.trim()) {
       newErrors.recipientAddress = "Recipient address is required";
     } else if (selectedUser) {
@@ -203,7 +342,7 @@ export default function SimpleTransferModal({
     setErrors({}); // Clear previous errors
 
     try {
-      // NEW: Use selected user's wallet address if available, otherwise use direct input
+      // Use selected user's wallet address if available, otherwise use direct input
       const recipientAddress = selectedUser
         ? selectedUser.walletAddress
         : formData.recipientAddress;
@@ -287,7 +426,7 @@ export default function SimpleTransferModal({
     setErrors({}); // Clear previous errors
 
     try {
-      // NEW: Use selected user's wallet address if available
+      // Use selected user's wallet address if available
       const recipientAddress = selectedUser
         ? selectedUser.walletAddress
         : formData.recipientAddress;
@@ -382,8 +521,11 @@ export default function SimpleTransferModal({
       LINK: "bg-blue-700",
       DAI: "bg-yellow-500",
       UNI: "bg-pink-500",
+      BTC: "bg-orange-500",
+      USDT: "bg-green-500",
+      BNB: "bg-yellow-600",
     };
-    return colors[symbol] || "bg-gray-500";
+    return colors[symbol] || "bg-purple-500";
   };
 
   const getTokenLetter = (symbol: string) => {
@@ -397,7 +539,7 @@ export default function SimpleTransferModal({
     return letters[symbol] || symbol.charAt(0);
   };
 
-  // NEW: Helper function to get recipient display info
+  // Helper function to get recipient display info
   const getRecipientDisplayInfo = () => {
     if (selectedUser) {
       return {
@@ -424,424 +566,599 @@ export default function SimpleTransferModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
-          <div>
-            <h2 className="text-xl font-bold text-white font-mayeka">
-              {step === "form" && "Send Token"}
-              {step === "preview" && "Transfer Preview"}
-              {step === "processing" && "Processing Transfer"}
-              {step === "success" && "Transfer Successful"}
-              {step === "error" && "Transfer Failed"}
+    <>
+      {/* FIXED: Stronger fade effect to match other modals */}
+      <div className="fixed inset-0 z-40 bg-white/10" onClick={handleClose} />
+
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div className="bg-black border rounded-[20px] w-full max-w-lg overflow-hidden">
+          {/* NEW: Header matching the image design */}
+          <div className="flex items-center justify-between px-6 py-4">
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h2 className="text-lg font-semibold text-white font-mayeka-demi-bold-demo">
+              Send
             </h2>
-            <p className="text-gray-400 text-sm font-satoshi mt-1">
-              {step === "form" && `Send ${tokenInfo.symbol} to another wallet`}
-              {step === "preview" && "Review your transfer details"}
-              {step === "processing" &&
-                "Please wait while we process your transfer"}
-              {step === "success" && "Your transfer has been completed"}
-              {step === "error" && "Something went wrong"}
-            </p>
-          </div>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
-          {/* Form Step */}
-          {step === "form" && (
-            <div className="space-y-6">
-              {/* Token Info */}
-              <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                <div className="flex items-center mb-3">
-                  {tokenInfo.priceData?.image ? (
-                    <img
-                      src={tokenInfo.priceData.image}
-                      alt={tokenInfo.symbol}
-                      className="w-10 h-10 rounded-full mr-3"
-                    />
-                  ) : (
-                    <div
-                      className={`w-10 h-10 ${getTokenIcon(
-                        tokenInfo.symbol
-                      )} rounded-full mr-3 flex items-center justify-center`}
-                    >
-                      <span className="text-white text-lg font-bold">
-                        {getTokenLetter(tokenInfo.symbol)}
-                      </span>
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="text-white font-semibold font-satoshi">
-                      {tokenInfo.name}
-                    </h3>
-                    <p className="text-gray-400 text-sm font-satoshi">
-                      Balance: {parseFloat(tokenInfo.balance).toFixed(6)}{" "}
-                      {tokenInfo.symbol}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form Fields */}
-              <div className="space-y-4">
-                {/* NEW: Username/Address Input */}
-                <div>
-                  <UsernameInput
-                    value={formData.recipientAddress}
-                    onChange={handleRecipientChange}
-                    onUserSelect={handleUserSelect}
-                    placeholder="@username or 0x... address"
-                    error={errors.recipientAddress}
-                    className="font-satoshi"
-                  />
-                </div>
-
-                <Input
-                  type="text"
-                  placeholder={`Amount in ${tokenInfo.symbol}`}
-                  value={formData.amount}
-                  onChange={(e) => {
-                    setFormData({ ...formData, amount: e.target.value });
-                    if (errors.amount) {
-                      setErrors({ ...errors, amount: "" });
-                    }
-                  }}
-                  error={errors.amount}
-                  className="font-satoshi"
+            {/* Token icon in header */}
+            <div className="w-8 h-8 bg-[#E2AF19] rounded-lg flex items-center justify-center">
+              {tokenInfo.priceData?.image ? (
+                <img
+                  src={tokenInfo.priceData.image}
+                  alt={tokenInfo.symbol}
+                  className="w-6 h-6 rounded-md"
                 />
-
-                <button
-                  onClick={() =>
-                    setFormData({ ...formData, amount: tokenInfo.balance })
-                  }
-                  className="text-[#E2AF19] text-sm font-satoshi hover:opacity-80 transition-opacity"
-                >
-                  Use Max Balance
-                </button>
-              </div>
-
-              {errors.general && (
-                <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-                  <p className="text-red-400 text-sm font-satoshi">
-                    {errors.general}
-                  </p>
-                </div>
+              ) : (
+                <span className="text-black text-sm font-bold">
+                  {getTokenLetter(tokenInfo.symbol)}
+                </span>
               )}
-
-              {/* Info Note */}
-              <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
-                <div className="flex items-start">
-                  <AlertTriangle
-                    size={16}
-                    className="text-blue-400 mr-2 mt-0.5 flex-shrink-0"
-                  />
-                  <div>
-                    <p className="text-blue-400 text-sm font-satoshi font-medium mb-1">
-                      Mainnet Transfer
-                    </p>
-                    <p className="text-blue-400 text-xs font-satoshi">
-                      This is a real mainnet transaction. Please verify all
-                      details before proceeding. Current balance:{" "}
-                      {parseFloat(tokenInfo.balance).toFixed(6)}{" "}
-                      {tokenInfo.symbol}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleCreatePreview}
-                disabled={isLoading || !walletAddress}
-                className="w-full font-satoshi"
-              >
-                {isLoading ? (
-                  <>
-                    <RefreshCw size={16} className="mr-2 animate-spin" />
-                    Creating Preview...
-                  </>
-                ) : (
-                  "Review Transfer"
-                )}
-              </Button>
             </div>
-          )}
+          </div>
 
-          {/* Preview Step */}
-          {step === "preview" && preview && (
-            <div className="space-y-6">
-              <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                <h3 className="text-white font-semibold font-satoshi mb-4">
-                  Transfer Details
-                </h3>
+          {/* Content */}
+          <div className="p-6">
+            {/* Form Step - FIXED: Normal spacing & no dividers */}
+            {step === "form" && (
+              <div className="space-y-6">
+                {/* Recipient Box */}
+                <div className="bg-black border border-[#2C2C2C] rounded-lg p-4">
+                  {/* Recipient heading */}
+                  <div className="text-white text-sm font-satoshi mb-3">
+                    Recipient
+                  </div>
 
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Network:</span>
-                    <span className="text-white">{preview.network}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Token:</span>
-                    <span className="text-white">
-                      {preview.tokenName} ({preview.tokenSymbol})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">From:</span>
-                    <span className="text-white">
-                      {preview.fromAddress.slice(0, 8)}...
-                      {preview.fromAddress.slice(-6)}
-                    </span>
-                  </div>
-                  {/* NEW: Enhanced recipient display */}
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">To:</span>
-                    <div className="text-right">
+                  {/* Input row with user icon and placeholder */}
+                  <div className="flex items-center mb-3">
+                    {/* User icon (shows user avatar if selected, else default wallet icon) */}
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
                       {selectedUser ? (
-                        <div>
-                          <span className="text-green-400 font-medium">
-                            @{selectedUser.username}
-                          </span>
-                          {selectedUser.displayName && (
-                            <div className="text-gray-400 text-xs">
-                              {selectedUser.displayName}
-                            </div>
-                          )}
-                          <div className="text-white text-xs">
-                            {selectedUser.walletAddress.slice(0, 8)}...
-                            {selectedUser.walletAddress.slice(-6)}
+                        // Show user avatar if available
+                        selectedUser.avatar ? (
+                          <img
+                            src={selectedUser.avatar}
+                            alt={selectedUser.username}
+                            className="w-8 h-8 rounded-lg object-cover"
+                            onError={(e) => {
+                              // Fallback to initials if image fails
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = "none";
+                              const fallback =
+                                target.nextElementSibling as HTMLElement;
+                              if (fallback) {
+                                fallback.classList.remove("hidden");
+                              }
+                            }}
+                          />
+                        ) : (
+                          // Show user initials
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">
+                              {selectedUser.username?.[0]?.toUpperCase() ||
+                                selectedUser.displayName?.[0]?.toUpperCase() ||
+                                "U"}
+                            </span>
                           </div>
-                        </div>
+                        )
                       ) : (
-                        <span className="text-white">
-                          {preview.toAddress.slice(0, 8)}...
-                          {preview.toAddress.slice(-6)}
-                        </span>
+                        // Show default wallet icon
+                        <div className="w-8 h-8 bg-[#E2AF19] rounded-lg flex items-center justify-center">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            className="text-black"
+                          >
+                            <path
+                              d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <path
+                              d="M16 10h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <circle cx="16" cy="14" r="1" fill="currentColor" />
+                          </svg>
+                        </div>
+                      )}
+
+                      {/* Hidden fallback for user image error */}
+                      {selectedUser?.avatar && (
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg flex items-center justify-center hidden">
+                          <span className="text-white text-xs font-bold">
+                            {selectedUser.username?.[0]?.toUpperCase() ||
+                              selectedUser.displayName?.[0]?.toUpperCase() ||
+                              "U"}
+                          </span>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Amount:</span>
-                    <span className="text-white">
-                      {preview.amount} {preview.tokenSymbol}
-                    </span>
-                  </div>
-                  {preview.valueUSD && preview.valueUSD !== "Not available" && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Value:</span>
-                      <span className="text-white">{preview.valueUSD}</span>
+
+                    {/* Username input with big placeholder */}
+                    <div className="flex-1 relative">
+                      <UsernameInput
+                        value={formData.recipientAddress}
+                        onChange={handleRecipientChange}
+                        onUserSelect={handleUserSelect}
+                        placeholder="Paste address / username"
+                        error=""
+                        className="w-full bg-transparent border-none text-white placeholder-gray-400 font-satoshi text-lg focus:outline-none"
+                      />
                     </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Est. Gas:</span>
-                    <span className="text-white">
-                      {preview.gasEstimation.estimatedGas} gas
-                    </span>
+
+                    {/* UPDATED: Custom Profile icon */}
+                    <div className="flex-shrink-0">
+                      <ProfileIcon />
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Gas Cost:</span>
-                    <span className="text-white">
-                      {preview.gasEstimation.gasCostETH} ETH (≈
-                      {preview.gasEstimation.gasCostUSD})
-                    </span>
+
+                  {/* Address display below */}
+                  <div className="text-xs text-gray-400 font-satoshi">
+                    {selectedUser
+                      ? selectedUser.walletAddress
+                      : formData.recipientAddress ||
+                        "0x9e700000000000000000000000000000000000000"}
                   </div>
                 </div>
-              </div>
 
-              <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-4">
-                <div className="flex items-start">
-                  <AlertTriangle
-                    size={16}
-                    className="text-yellow-400 mr-2 mt-0.5 flex-shrink-0"
-                  />
-                  <p className="text-yellow-400 text-sm font-satoshi">
-                    This is a real mainnet transaction with actual value. Please
-                    verify all details before proceeding.
-                  </p>
-                </div>
-              </div>
+                {/* Error for recipient */}
+                {errors.recipientAddress && (
+                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                    <p className="text-red-400 text-sm font-satoshi">
+                      {errors.recipientAddress}
+                    </p>
+                  </div>
+                )}
 
-              <div className="flex space-x-3">
-                <Button
-                  variant="secondary"
-                  onClick={() => setStep("form")}
-                  className="flex-1 font-satoshi"
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={handleExecuteTransfer}
-                  disabled={isLoading}
-                  className="flex-1 font-satoshi"
-                >
-                  {isLoading ? (
-                    <>
-                      <RefreshCw size={16} className="mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    "Send Transfer"
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
+                {/* Asset Box */}
+                <div className="bg-black border border-[#2C2C2C] rounded-lg p-4">
+                  {/* Asset heading with percentage buttons */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-white text-sm font-satoshi">Asset</div>
 
-          {/* Processing Step */}
-          {step === "processing" && (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                <RefreshCw size={32} className="text-black animate-spin" />
-              </div>
-              <h3 className="text-white text-lg font-semibold font-satoshi mb-2">
-                Processing Transaction
-              </h3>
-              <p className="text-gray-400 font-satoshi">
-                Please wait while your transfer is being processed on the
-                blockchain...
-              </p>
-              <div className="mt-4 text-xs text-gray-500 font-satoshi">
-                This may take a few moments. Do not close this window.
-              </div>
-            </div>
-          )}
-
-          {/* Success Step */}
-          {step === "success" && transactionResult && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle size={32} className="text-white" />
-                </div>
-                <h3 className="text-white text-lg font-semibold font-satoshi mb-2">
-                  Transfer Successful!
-                </h3>
-                <p className="text-gray-400 font-satoshi">
-                  Your transfer has been completed successfully
-                </p>
-              </div>
-
-              <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                <h4 className="text-white font-semibold font-satoshi mb-3">
-                  Transaction Details
-                </h4>
-
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400">Transaction Hash:</span>
-                    <div className="flex items-center">
-                      <span className="text-white mr-2">
-                        {transactionResult.transactionHash?.slice(0, 8)}...
-                        {transactionResult.transactionHash?.slice(-6)}
-                      </span>
+                    {/* Percentage buttons */}
+                    <div className="flex gap-1">
                       <button
-                        onClick={() =>
-                          copyToClipboard(
-                            transactionResult.transactionHash!,
-                            "hash"
-                          )
-                        }
-                        className="text-gray-400 hover:text-white transition-colors"
+                        onClick={() => handlePercentageSelect(25)}
+                        className={`px-2 py-1 text-xs font-satoshi transition-colors ${
+                          selectedPercentage === 25
+                            ? "text-[#E2AF19] font-medium"
+                            : "text-[#E2AF19] hover:opacity-80"
+                        }`}
                       >
-                        <Copy size={14} />
+                        25%
+                      </button>
+                      <button
+                        onClick={() => handlePercentageSelect(50)}
+                        className={`px-2 py-1 text-xs font-satoshi transition-colors ${
+                          selectedPercentage === 50
+                            ? "text-[#E2AF19] font-medium"
+                            : "text-[#E2AF19] hover:opacity-80"
+                        }`}
+                      >
+                        50%
+                      </button>
+                      <button
+                        onClick={() => handlePercentageSelect(75)}
+                        className={`px-2 py-1 text-xs font-satoshi transition-colors ${
+                          selectedPercentage === 75
+                            ? "text-[#E2AF19] font-medium"
+                            : "text-[#E2AF19] hover:opacity-80"
+                        }`}
+                      >
+                        75%
+                      </button>
+                      <button
+                        onClick={() => handlePercentageSelect(100)}
+                        className={`px-2 py-1 text-xs font-satoshi transition-colors ${
+                          selectedPercentage === 100
+                            ? "text-[#E2AF19] font-medium"
+                            : "text-[#E2AF19] hover:opacity-80"
+                        }`}
+                      >
+                        MAX
                       </button>
                     </div>
                   </div>
-                  {transactionResult.gasUsed && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Gas Used:</span>
-                      <span className="text-white">
-                        {transactionResult.gasUsed?.toLocaleString()} gas
-                      </span>
+
+                  {/* Token row with amount input */}
+                  <div className="flex items-center justify-between mb-3">
+                    {/* Token info */}
+                    <div className="flex items-center">
+                      {tokenInfo.priceData?.image ? (
+                        <div
+                          className={`w-10 h-10 ${getTokenIcon(
+                            tokenInfo.symbol
+                          )} rounded-full mr-3 p-0.5 flex items-center justify-center`}
+                        >
+                          <img
+                            src={tokenInfo.priceData.image}
+                            alt={tokenInfo.symbol}
+                            className="w-full h-full rounded-full object-cover"
+                            onError={(e) => {
+                              // If image fails to load, show the fallback background with letter
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = "none";
+                              const fallback = target.parentElement
+                                ?.nextElementSibling as HTMLElement;
+                              if (fallback) {
+                                fallback.classList.remove("hidden");
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : null}
+
+                      {/* Fallback background with letter (shown when no image or image fails) */}
+                      <div
+                        className={`w-10 h-10 ${getTokenIcon(
+                          tokenInfo.symbol
+                        )} rounded-full mr-3 flex items-center justify-center ${
+                          tokenInfo.priceData?.image ? "hidden" : ""
+                        }`}
+                      >
+                        <span className="text-white text-base font-bold">
+                          {getTokenLetter(tokenInfo.symbol)}
+                        </span>
+                      </div>
+
+                      <div className="text-white font-satoshi">
+                        {tokenInfo.name}
+                      </div>
                     </div>
-                  )}
-                  {transactionResult.blockNumber && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Block Number:</span>
-                      <span className="text-white">
-                        {transactionResult.blockNumber?.toLocaleString()}
-                      </span>
+
+                    {/* Amount input with circle indicator */}
+                    <div className="flex items-center">
+                      <input
+                        type="text"
+                        placeholder="0"
+                        value={formData.amount}
+                        onChange={(e) => handleAmountChange(e.target.value)}
+                        className="bg-transparent text-white text-2xl font-bold font-satoshi placeholder-gray-500 focus:outline-none text-right mr-3 w-24"
+                      />
+                      <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                        <span className="text-white text-xs">○</span>
+                      </div>
                     </div>
-                  )}
-                  {transactionResult.actualCostETH && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Actual Cost:</span>
-                      <span className="text-white">
-                        {transactionResult.actualCostETH} ETH
-                        {transactionResult.actualCostUSD &&
-                          ` (${transactionResult.actualCostUSD})`}
-                      </span>
-                    </div>
-                  )}
+                  </div>
+
+                  {/* Balance row */}
+                  <div className="text-gray-400 text-sm font-satoshi">
+                    Balance: {parseFloat(tokenInfo.balance).toFixed(4)}
+                  </div>
                 </div>
 
-                {copied === "hash" && (
-                  <p className="text-green-400 text-xs font-satoshi mt-2">
-                    Hash copied!
-                  </p>
+                {/* Error for amount */}
+                {errors.amount && (
+                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                    <p className="text-red-400 text-sm font-satoshi">
+                      {errors.amount}
+                    </p>
+                  </div>
                 )}
-              </div>
 
-              <div className="flex space-x-3">
-                {transactionResult.explorerUrl && (
+                {/* Network Fee - NOW DYNAMIC */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white font-satoshi">Network Fee</span>
+                  <span className="text-[#E2AF19] font-satoshi">
+                    {gasLoading
+                      ? "Calculating..."
+                      : gasEstimation
+                      ? `Fast ~ ${gasEstimation.gasCostUSD}`
+                      : "Fast ~ <$0.03"}
+                  </span>
+                </div>
+
+                {/* Error display */}
+                {errors.general && (
+                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                    <p className="text-red-400 text-sm font-satoshi">
+                      {errors.general}
+                    </p>
+                  </div>
+                )}
+
+                {errors.recipientAddress && (
+                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                    <p className="text-red-400 text-sm font-satoshi">
+                      {errors.recipientAddress}
+                    </p>
+                  </div>
+                )}
+
+                {/* NEW: Confirm Button */}
+                <button
+                  onClick={handleCreatePreview}
+                  disabled={
+                    isLoading ||
+                    !walletAddress ||
+                    !formData.recipientAddress ||
+                    !formData.amount
+                  }
+                  className="w-full bg-[#E2AF19] text-black font-semibold py-4 rounded-lg hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-satoshi"
+                >
+                  {isLoading ? (
+                    <>
+                      <RefreshCw
+                        size={16}
+                        className="inline mr-2 animate-spin"
+                      />
+                      Creating Preview...
+                    </>
+                  ) : (
+                    "Confirm"
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Preview Step */}
+            {step === "preview" && preview && (
+              <div className="space-y-6">
+                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
+                  <h3 className="text-white font-semibold font-satoshi mb-4">
+                    Transfer Details
+                  </h3>
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Network:</span>
+                      <span className="text-white">{preview.network}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Token:</span>
+                      <span className="text-white">
+                        {preview.tokenName} ({preview.tokenSymbol})
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">From:</span>
+                      <span className="text-white">
+                        {preview.fromAddress.slice(0, 8)}...
+                        {preview.fromAddress.slice(-6)}
+                      </span>
+                    </div>
+                    {/* Enhanced recipient display */}
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">To:</span>
+                      <div className="text-right">
+                        {selectedUser ? (
+                          <div>
+                            <span className="text-green-400 font-medium">
+                              @{selectedUser.username}
+                            </span>
+                            {selectedUser.displayName && (
+                              <div className="text-gray-400 text-xs">
+                                {selectedUser.displayName}
+                              </div>
+                            )}
+                            <div className="text-white text-xs">
+                              {selectedUser.walletAddress.slice(0, 8)}...
+                              {selectedUser.walletAddress.slice(-6)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-white">
+                            {preview.toAddress.slice(0, 8)}...
+                            {preview.toAddress.slice(-6)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Amount:</span>
+                      <span className="text-white">
+                        {preview.amount} {preview.tokenSymbol}
+                      </span>
+                    </div>
+                    {preview.valueUSD &&
+                      preview.valueUSD !== "Not available" && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Value:</span>
+                          <span className="text-white">{preview.valueUSD}</span>
+                        </div>
+                      )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Est. Gas:</span>
+                      <span className="text-white">
+                        {preview.gasEstimation.estimatedGas} gas
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Gas Cost:</span>
+                      <span className="text-white">
+                        {preview.gasEstimation.gasCostETH} ETH (≈
+                        {preview.gasEstimation.gasCostUSD})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
                   <Button
                     variant="secondary"
-                    onClick={() =>
-                      window.open(transactionResult.explorerUrl, "_blank")
-                    }
+                    onClick={() => setStep("form")}
                     className="flex-1 font-satoshi"
                   >
-                    <ExternalLink size={16} className="mr-2" />
-                    View on Explorer
+                    Back
                   </Button>
-                )}
-                <Button onClick={handleClose} className="flex-1 font-satoshi">
-                  Done
-                </Button>
+                  <Button
+                    onClick={handleExecuteTransfer}
+                    disabled={isLoading}
+                    className="flex-1 font-satoshi"
+                  >
+                    {isLoading ? (
+                      <>
+                        <RefreshCw size={16} className="mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      "Send Transfer"
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Error Step */}
-          {step === "error" && transactionResult && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <X size={32} className="text-white" />
+            {/* Processing Step */}
+            {step === "processing" && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                  <RefreshCw size={32} className="text-black animate-spin" />
                 </div>
                 <h3 className="text-white text-lg font-semibold font-satoshi mb-2">
-                  Transfer Failed
+                  Processing Transaction
                 </h3>
-                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 text-left">
-                  <p className="text-red-400 text-sm font-satoshi">
-                    {transactionResult.error}
-                  </p>
+                <p className="text-gray-400 font-satoshi">
+                  Please wait while your transfer is being processed on the
+                  blockchain...
+                </p>
+                <div className="mt-4 text-xs text-gray-500 font-satoshi">
+                  This may take a few moments. Do not close this window.
                 </div>
               </div>
+            )}
 
-              <div className="flex space-x-3">
-                <Button
-                  variant="secondary"
-                  onClick={() => setStep("form")}
-                  className="flex-1 font-satoshi"
-                >
-                  Try Again
-                </Button>
-                <Button onClick={handleClose} className="flex-1 font-satoshi">
-                  Close
-                </Button>
+            {/* Success Step */}
+            {step === "success" && transactionResult && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle size={32} className="text-white" />
+                  </div>
+                  <h3 className="text-white text-lg font-semibold font-satoshi mb-2">
+                    Transfer Successful!
+                  </h3>
+                  <p className="text-gray-400 font-satoshi">
+                    Your transfer has been completed successfully
+                  </p>
+                </div>
+
+                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
+                  <h4 className="text-white font-semibold font-satoshi mb-3">
+                    Transaction Details
+                  </h4>
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Transaction Hash:</span>
+                      <div className="flex items-center">
+                        <span className="text-white mr-2">
+                          {transactionResult.transactionHash?.slice(0, 8)}...
+                          {transactionResult.transactionHash?.slice(-6)}
+                        </span>
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              transactionResult.transactionHash!,
+                              "hash"
+                            )
+                          }
+                          className="text-gray-400 hover:text-white transition-colors"
+                        >
+                          <Copy size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {transactionResult.gasUsed && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Gas Used:</span>
+                        <span className="text-white">
+                          {transactionResult.gasUsed?.toLocaleString()} gas
+                        </span>
+                      </div>
+                    )}
+                    {transactionResult.blockNumber && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Block Number:</span>
+                        <span className="text-white">
+                          {transactionResult.blockNumber?.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {transactionResult.actualCostETH && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Actual Cost:</span>
+                        <span className="text-white">
+                          {transactionResult.actualCostETH} ETH
+                          {transactionResult.actualCostUSD &&
+                            ` (${transactionResult.actualCostUSD})`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {copied === "hash" && (
+                    <p className="text-green-400 text-xs font-satoshi mt-2">
+                      Hash copied!
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex space-x-3">
+                  {transactionResult.explorerUrl && (
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        window.open(transactionResult.explorerUrl, "_blank")
+                      }
+                      className="flex-1 font-satoshi"
+                    >
+                      <ExternalLink size={16} className="mr-2" />
+                      View on Explorer
+                    </Button>
+                  )}
+                  <Button onClick={handleClose} className="flex-1 font-satoshi">
+                    Done
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Error Step */}
+            {step === "error" && transactionResult && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <X size={32} className="text-white" />
+                  </div>
+                  <h3 className="text-white text-lg font-semibold font-satoshi mb-2">
+                    Transfer Failed
+                  </h3>
+                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 text-left">
+                    <p className="text-red-400 text-sm font-satoshi">
+                      {transactionResult.error}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setStep("form")}
+                    className="flex-1 font-satoshi"
+                  >
+                    Try Again
+                  </Button>
+                  <Button onClick={handleClose} className="flex-1 font-satoshi">
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
