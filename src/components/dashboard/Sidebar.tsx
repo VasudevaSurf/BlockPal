@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx (MINIMAL UPDATE - Only logout clickable when no wallet)
+// src/components/dashboard/Sidebar.tsx (UPDATED - Increased sidebar width)
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -116,7 +116,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
   return (
     <div
-      className="relative w-full lg:w-64 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
+      className="relative w-full lg:w-80 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
       style={{ borderRadius: "20px" }}
     >
       {/* Top Gradient Blur */}
@@ -152,12 +152,12 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       />
 
       {/* Logo Section */}
-      <div className="p-4 lg:p-6 flex-shrink-0 relative z-20">
+      <div className="p-4 lg:p-8 flex-shrink-0 relative z-20">
         <div className="flex items-center mb-4 lg:mb-8">
           <img
             src="/blockName.png"
             alt="Blockpal"
-            className="brightness-110 h-6 lg:h-7"
+            className="brightness-110 h-6 lg:h-8"
             style={{
               width: "auto",
             }}
@@ -177,7 +177,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       </div>
 
       {/* Navigation Menu */}
-      <div className="flex-1 px-3 lg:px-4 overflow-y-auto relative z-20">
+      <div className="flex-1 px-3 lg:px-6 overflow-y-auto relative z-20">
         <nav className="space-y-2 lg:space-y-3 mb-6 lg:mb-8">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
@@ -188,7 +188,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 key={item.label}
                 onClick={(e) => handleNavigation(item.href, e)}
                 disabled={isLoading || isDisabled}
-                className={`w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
+                className={`w-full flex items-center px-4 lg:px-5 py-3 lg:py-4 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
                   isActive
                     ? "bg-[#E2AF19] text-black font-medium"
                     : isDisabled
@@ -198,13 +198,13 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
               >
                 {isLoading && pathname !== item.href ? (
                   <RefreshCw
-                    size={18}
-                    className="mr-3 flex-shrink-0 animate-spin"
+                    size={20}
+                    className="mr-4 flex-shrink-0 animate-spin"
                   />
                 ) : (
                   <item.icon
-                    size={18}
-                    className="mr-3 flex-shrink-0"
+                    size={20}
+                    className="mr-4 flex-shrink-0"
                     filled={isActive}
                   />
                 )}
@@ -218,7 +218,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       </div>
 
       {/* Others Section - Fixed at bottom */}
-      <div className="p-3 lg:p-4 flex-shrink-0 relative z-20">
+      <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
         {/* Others Section with Lines - Hidden on mobile */}
         <div className="mb-4 lg:mb-6 hidden lg:block">
           <div className="flex items-center mb-4">
@@ -244,7 +244,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                     !isProfileDisabled && handleNavigation(item.href, e)
                   }
                   disabled={isLoading || isProfileDisabled}
-                  className={`flex-1 flex items-center px-3 lg:px-4 py-3 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
+                  className={`flex-1 flex items-center px-4 lg:px-5 py-3 lg:py-4 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
                     isActive
                       ? "bg-[#E2AF19] text-black font-medium"
                       : isProfileDisabled
@@ -254,11 +254,11 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 >
                   {isLoading && pathname !== item.href ? (
                     <RefreshCw
-                      size={18}
-                      className="mr-3 flex-shrink-0 animate-spin"
+                      size={20}
+                      className="mr-4 flex-shrink-0 animate-spin"
                     />
                   ) : (
-                    <item.icon size={18} className="mr-3 flex-shrink-0" />
+                    <item.icon size={20} className="mr-4 flex-shrink-0" />
                   )}
                   <span className={isActive ? "font-medium" : ""}>
                     {item.label}
@@ -267,12 +267,12 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
                 {/* Logout Button - Always enabled and separate */}
                 <button
-                  className="ml-2 flex-shrink-0 p-2 rounded hover:bg-red-900/20 transition-colors"
+                  className="ml-2 flex-shrink-0 p-3 rounded hover:bg-red-900/20 transition-colors"
                   onClick={handleLogout}
                   title="Logout"
                 >
                   <LogoutIcon
-                    size={16}
+                    size={18}
                     className="hover:opacity-80 transition-opacity"
                     color="#E74C3C"
                   />
@@ -283,13 +283,13 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
           {/* Go to Website Button */}
           <button
-            className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
+            className="w-full flex items-center px-4 lg:px-5 py-3 lg:py-4 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
             disabled={isLoading}
           >
-            <WebsiteIcon size={18} className="mr-3 flex-shrink-0" />
+            <WebsiteIcon size={20} className="mr-4 flex-shrink-0" />
             <span className="truncate">Go to website</span>
             <div className="ml-auto flex-shrink-0">
-              <ExternalLink size={14} className="text-gray-400" />
+              <ExternalLink size={16} className="text-gray-400" />
             </div>
           </button>
 
@@ -297,13 +297,13 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
           <button
             onClick={() => dispatch(toggleTheme())}
             disabled={isLoading}
-            className="w-full flex items-center px-3 lg:px-4 py-3 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
+            className="w-full flex items-center px-4 lg:px-5 py-3 lg:py-4 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
           >
-            <DarkModeIcon size={18} className="mr-3 flex-shrink-0" />
+            <DarkModeIcon size={20} className="mr-4 flex-shrink-0" />
             <span className="truncate">Dark Mode</span>
             <div className="ml-auto flex-shrink-0">
-              <div className="w-8 lg:w-10 h-5 lg:h-6 rounded-full relative bg-[#E2AF19]">
-                <div className="w-3 lg:w-4 h-3 lg:h-4 bg-white rounded-full absolute top-1 right-1"></div>
+              <div className="w-10 lg:w-12 h-6 lg:h-7 rounded-full relative bg-[#E2AF19]">
+                <div className="w-4 lg:w-5 h-4 lg:h-5 bg-white rounded-full absolute top-1 right-1"></div>
               </div>
             </div>
           </button>
