@@ -1,4 +1,4 @@
-// src/components/profile/UserProfilePage.tsx - UPDATED with enhanced 2FA support
+// src/components/profile/UserProfilePage.tsx - COMPLETE UPDATED VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -28,6 +28,7 @@ import {
   Settings,
   Lock,
   ChevronDown,
+  QrCode, // Add QrCode import
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { logoutUser } from "@/store/slices/authSlice";
@@ -35,6 +36,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import TwoFactorSetupModal from "./TwoFactorSetupModal";
 import ProfilePictureUpload from "./ProfilePictureUpload";
+import UserQRCodeModal from "./UserQRCodeModal"; // Add QR Modal import
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 
 interface UserProfile {
@@ -196,6 +198,7 @@ export default function UserProfilePage() {
   const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false); // Add QR modal state
 
   // 2FA Modal State
   const [show2FAModal, setShow2FAModal] = useState(false);
@@ -219,7 +222,6 @@ export default function UserProfilePage() {
 
       const response = await fetch("/api/profile", {
         credentials: "include",
-        // Add cache busting to ensure fresh data
         headers: {
           "Cache-Control": "no-cache",
         },
@@ -243,7 +245,6 @@ export default function UserProfilePage() {
   const handleAvatarUpdate = async (newAvatarUrl: string) => {
     console.log("🖼️ Avatar update received:", newAvatarUrl);
 
-    // Update state immediately for instant UI feedback
     if (profile) {
       const updatedProfile = {
         ...profile,
@@ -253,14 +254,12 @@ export default function UserProfilePage() {
       setProfile(updatedProfile);
     }
 
-    // Also refresh the entire profile to ensure consistency
     try {
       console.log("🔄 Refreshing profile data to ensure consistency...");
       await fetchUserProfile();
       console.log("✅ Profile data refreshed successfully");
     } catch (error) {
       console.error("❌ Error refreshing profile:", error);
-      // If refresh fails, the immediate state update above will still show the new avatar
     }
   };
 
@@ -438,15 +437,15 @@ export default function UserProfilePage() {
     );
   }
 
-  // DEBUG: Log current profile avatar
   console.log("🖼️ Rendering profile with avatar:", profile.avatar);
 
   return (
     <>
       {/* Backdrop for all modals */}
-      {(showPasswordModal || showContactModal || show2FAModal) && (
-        <div className="fixed inset-0 z-40 bg-white/10" />
-      )}
+      {(showPasswordModal ||
+        showContactModal ||
+        show2FAModal ||
+        showQRModal) && <div className="fixed inset-0 z-40 bg-white/10" />}
 
       <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
         {/* Mobile Layout */}
@@ -457,23 +456,33 @@ export default function UserProfilePage() {
               <h2 className="text-lg font-semibold text-white font-satoshi">
                 Profile Information
               </h2>
-              <button
-                onClick={() =>
-                  editing ? handleSaveProfile() : setEditing(true)
-                }
-                className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
-              >
-                {editing ? (
-                  <Save size={14} className="mr-1" />
-                ) : (
-                  <Edit3 size={14} className="mr-1" />
-                )}
-                {editing ? "Save" : "Edit"}
-              </button>
+              <div className="flex items-center space-x-2">
+                {/* QR Code Button - Mobile */}
+                <button
+                  onClick={() => setShowQRModal(true)}
+                  className="bg-[#2C2C2C] text-white p-2 rounded-lg hover:bg-[#3C3C3C] transition-colors"
+                  title="View QR Code"
+                >
+                  <QrCode size={16} />
+                </button>
+
+                <button
+                  onClick={() =>
+                    editing ? handleSaveProfile() : setEditing(true)
+                  }
+                  className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
+                >
+                  {editing ? (
+                    <Save size={14} className="mr-1" />
+                  ) : (
+                    <Edit3 size={14} className="mr-1" />
+                  )}
+                  {editing ? "Save" : "Edit"}
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center mb-6">
-              {/* Profile Picture Upload - Mobile */}
               <ProfilePictureUpload
                 currentAvatarUrl={profile.avatar}
                 userName={profile.displayName || profile.username}
@@ -503,7 +512,6 @@ export default function UserProfilePage() {
                 <p className="text-gray-400 text-sm font-satoshi">
                   @{profile.username}
                 </p>
-                {/* Authentication method indicator */}
                 <div className="flex items-center mt-1">
                   {profile.authProvider === "google" ||
                   profile.hasGoogleAuth ? (
@@ -592,6 +600,36 @@ export default function UserProfilePage() {
                 <div className="text-white text-lg font-bold font-satoshi">
                   {wallets.length}
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* QR Code Section - Mobile */}
+          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white font-satoshi">
+                Your QR Code
+              </h3>
+              <button
+                onClick={() => setShowQRModal(true)}
+                className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
+              >
+                <QrCode size={14} className="mr-1" />
+                View
+              </button>
+            </div>
+
+            <div className="flex items-center">
+              <div className="w-16 h-16 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg mr-4 flex items-center justify-center">
+                <QrCode size={24} className="text-[#E2AF19]" />
+              </div>
+              <div>
+                <p className="text-white font-satoshi font-medium">
+                  Share your wallet address
+                </p>
+                <p className="text-gray-400 text-sm font-satoshi">
+                  Let others scan to send you crypto
+                </p>
               </div>
             </div>
           </div>
@@ -851,23 +889,33 @@ export default function UserProfilePage() {
                 <h2 className="text-xl font-semibold text-white font-satoshi">
                   Profile Information
                 </h2>
-                <button
-                  onClick={() =>
-                    editing ? handleSaveProfile() : setEditing(true)
-                  }
-                  className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
-                >
-                  {editing ? (
-                    <Save size={16} className="mr-2" />
-                  ) : (
-                    <Edit3 size={16} className="mr-2" />
-                  )}
-                  {editing ? "Save Changes" : "Edit Profile"}
-                </button>
+                <div className="flex items-center space-x-3">
+                  {/* QR Code Button - Desktop */}
+                  <button
+                    onClick={() => setShowQRModal(true)}
+                    className="bg-[#2C2C2C] text-white p-2 rounded-lg hover:bg-[#3C3C3C] transition-colors"
+                    title="View QR Code"
+                  >
+                    <QrCode size={18} />
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      editing ? handleSaveProfile() : setEditing(true)
+                    }
+                    className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
+                  >
+                    {editing ? (
+                      <Save size={16} className="mr-2" />
+                    ) : (
+                      <Edit3 size={16} className="mr-2" />
+                    )}
+                    {editing ? "Save Changes" : "Edit Profile"}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-start space-x-6">
-                {/* Profile Picture Upload - Desktop */}
                 <ProfilePictureUpload
                   currentAvatarUrl={profile.avatar}
                   userName={profile.displayName || profile.username}
@@ -901,7 +949,6 @@ export default function UserProfilePage() {
                         @{profile.username}
                       </p>
 
-                      {/* Authentication method indicator - Desktop */}
                       <div className="flex items-center mb-4">
                         {profile.authProvider === "google" ||
                         profile.hasGoogleAuth ? (
@@ -997,6 +1044,42 @@ export default function UserProfilePage() {
 
           {/* Right Column - Desktop */}
           <div className="w-[400px] space-y-6 overflow-y-auto scrollbar-hide">
+            {/* QR Code Section - Desktop */}
+            <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-white font-satoshi">
+                  Your QR Code
+                </h3>
+                <button
+                  onClick={() => setShowQRModal(true)}
+                  className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
+                >
+                  <QrCode size={16} className="mr-2" />
+                  View QR Code
+                </button>
+              </div>
+
+              <div className="text-center">
+                <div className="w-24 h-24 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg mx-auto mb-4 flex items-center justify-center">
+                  <QrCode size={32} className="text-[#E2AF19]" />
+                </div>
+                <p className="text-white font-satoshi font-medium mb-1">
+                  Share your wallet address
+                </p>
+                <p className="text-gray-400 text-sm font-satoshi">
+                  Let others scan to send you crypto easily
+                </p>
+              </div>
+
+              <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+                <p className="text-blue-400 text-xs font-satoshi">
+                  <strong>Pro tip:</strong> Your QR code automatically shows
+                  your currently active wallet address and updates when you
+                  switch wallets.
+                </p>
+              </div>
+            </div>
+
             {/* Account & Security - Desktop */}
             <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
               <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
@@ -1074,7 +1157,6 @@ export default function UserProfilePage() {
               </div>
             </div>
 
-            {/* Rest of the desktop layout sections... */}
             {/* Notifications - Desktop */}
             <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
               <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
@@ -1384,6 +1466,12 @@ export default function UserProfilePage() {
             }}
           />
         )}
+
+        {/* QR Code Modal */}
+        <UserQRCodeModal
+          isOpen={showQRModal}
+          onClose={() => setShowQRModal(false)}
+        />
 
         <style jsx global>{`
           .scrollbar-hide {
