@@ -1,4 +1,4 @@
-// src/components/ui/UsernameInput.tsx - UPDATED with better active wallet handling
+// src/components/ui/UsernameInput.tsx - UPDATED with backdrop for suggestions
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -47,13 +47,6 @@ export default function UsernameInput({
 
   // Handle suggestion selection
   const handleSuggestionSelect = (suggestion: UserSuggestion) => {
-    console.log("🎯 UsernameInput: User selected:", {
-      username: suggestion.username,
-      displayName: suggestion.displayName,
-      walletAddress: suggestion.walletAddress,
-      activeWalletId: suggestion.activeWalletId, // This should now be populated
-    });
-
     onChange(suggestion.walletAddress, suggestion);
     if (onUserSelect) {
       onUserSelect(suggestion);
@@ -114,6 +107,16 @@ export default function UsernameInput({
 
   return (
     <div className="relative">
+      {/* ADDED: Backdrop for suggestions dropdown */}
+      {showSuggestions &&
+        (suggestions.length > 0 ||
+          (!loading && value.length >= 2 && !isAddress)) && (
+          <div
+            className="fixed inset-0 z-30 bg-white/10"
+            onClick={() => setShowSuggestions(false)}
+          />
+        )}
+
       <div className="relative">
         <input
           ref={inputRef}
@@ -163,7 +166,7 @@ export default function UsernameInput({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto"
+          className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto"
         >
           {suggestions.map((suggestion, index) => (
             <button
@@ -224,7 +227,7 @@ export default function UsernameInput({
         suggestions.length === 0 &&
         value.length >= 2 &&
         !isAddress && (
-          <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg p-3">
+          <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg p-3">
             <div className="text-gray-400 text-sm font-satoshi text-center">
               No users found matching "{value}"
             </div>

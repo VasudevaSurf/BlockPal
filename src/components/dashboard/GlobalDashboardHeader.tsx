@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - Updated with trigger ref for dropdown
+// src/components/dashboard/GlobalDashboardHeader.tsx - Fixed wallet button toggle
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -270,6 +270,12 @@ export default function GlobalDashboardHeader({
     }
   };
 
+  // FIXED: Handle wallet button click with proper toggle
+  const handleWalletButtonClick = () => {
+    console.log("🎯 Wallet button clicked, current state:", walletSwitcherOpen);
+    setWalletSwitcherOpen(!walletSwitcherOpen);
+  };
+
   // Get wallet color based on activeWallet index in wallets array
   const getWalletColor = () => {
     const colors = [
@@ -346,7 +352,7 @@ export default function GlobalDashboardHeader({
           {wallets.length > 0 && (
             <button
               ref={walletButtonRef}
-              onClick={() => setWalletSwitcherOpen(true)}
+              onClick={handleWalletButtonClick}
               className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto hover:border-[#E2AF19] transition-colors group"
             >
               <div

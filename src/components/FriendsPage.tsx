@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - COMPLETE VERSION with ALL functionality
+// src/components/FriendsPage.tsx - COMPLETE VERSION with backdrop effects and optimized errors
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,6 +18,7 @@ import {
   ExternalLink,
   AlertTriangle,
   ChevronDown,
+  ArrowLeft,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
@@ -74,6 +75,31 @@ interface FundRequest {
   fulfilledBy?: string;
 }
 
+// Helper function to parse user-friendly error messages
+const parseErrorMessage = (error: string): string => {
+  if (error.includes("insufficient funds")) {
+    return "Insufficient funds for this request. Please check your wallet balance.";
+  }
+  if (error.includes("gas")) {
+    return "Not enough ETH to pay for transaction fees.";
+  }
+  if (error.includes("execution reverted")) {
+    return "Transaction failed. Please check token balances and try again.";
+  }
+  if (error.includes("nonce too low")) {
+    return "Network issue detected. Please try again.";
+  }
+  if (error.includes("network error") || error.includes("timeout")) {
+    return "Network connection error. Please check your internet and try again.";
+  }
+  if (error.includes("user denied") || error.includes("user rejected")) {
+    return "Transaction was cancelled.";
+  }
+
+  // For any other technical errors, return a generic user-friendly message
+  return "Request failed. Please try again or contact support if the issue persists.";
+};
+
 export default function FriendsPage() {
   const { activeWallet, tokens } = useSelector(
     (state: RootState) => state.wallet
@@ -96,6 +122,7 @@ export default function FriendsPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [initialLoading, setInitialLoading] = useState(true);
 
   // Fund request modal states
@@ -111,6 +138,10 @@ export default function FriendsPage() {
 
   // Token dropdown state for fund request modal
   const [showTokenDropdown, setShowTokenDropdown] = useState(false);
+
+  // Remove friend confirmation modal state
+  const [showRemoveConfirmation, setShowRemoveConfirmation] = useState(false);
+  const [friendToRemove, setFriendToRemove] = useState<Friend | null>(null);
 
   // Track copied state for clipboard actions
   const [copied, setCopied] = useState<string | null>(null);
@@ -202,44 +233,44 @@ export default function FriendsPage() {
     const imageUrl = token?.icon;
 
     return (
-      <div
-        className={`flex items-center ${isSelected ? "justify-between" : ""}`}
-      >
-        {isValidImageUrl(imageUrl) ? (
-          <img
-            src={imageUrl}
-            alt={symbol}
-            className="w-5 h-5 rounded-full mr-2 flex-shrink-0"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = "none";
-              const fallback = target.nextElementSibling as HTMLElement;
-              if (fallback) {
-                fallback.classList.remove("hidden");
-              }
-            }}
-          />
-        ) : null}
+      <div className="flex items-center justify-between w-full">
+        <div className="flex items-center">
+          {isValidImageUrl(imageUrl) ? (
+            <img
+              src={imageUrl}
+              alt={symbol}
+              className="w-5 h-5 rounded-full mr-2 flex-shrink-0"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = "none";
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) {
+                  fallback.classList.remove("hidden");
+                }
+              }}
+            />
+          ) : null}
 
-        <div
-          className={`w-5 h-5 ${getTokenIcon(
-            symbol,
-            contractAddress
-          )} rounded-full mr-2 flex items-center justify-center flex-shrink-0 ${
-            isValidImageUrl(imageUrl) ? "hidden" : ""
-          }`}
-        >
-          <span className="text-white text-xs font-medium">
-            {getTokenLetter(symbol, contractAddress)}
-          </span>
+          <div
+            className={`w-5 h-5 ${getTokenIcon(
+              symbol,
+              contractAddress
+            )} rounded-full mr-2 flex items-center justify-center flex-shrink-0 ${
+              isValidImageUrl(imageUrl) ? "hidden" : ""
+            }`}
+          >
+            <span className="text-white text-xs font-medium">
+              {getTokenLetter(symbol, contractAddress)}
+            </span>
+          </div>
+
+          <span className="text-white font-satoshi">{symbol}</span>
         </div>
-
-        <span className="text-white font-satoshi">{symbol}</span>
 
         {isSelected && (
           <ChevronDown
             size={16}
-            className="text-gray-400 pointer-events-none ml-auto"
+            className="text-gray-400 pointer-events-none"
           />
         )}
       </div>
@@ -272,9 +303,6 @@ export default function FriendsPage() {
       if (response.ok) {
         const userData = await response.json();
         setCurrentUser({ username: userData.username });
-        console.log("✅ Current user loaded:", userData.username);
-      } else {
-        console.error("Failed to load current user");
       }
     } catch (error) {
       console.error("Error loading current user:", error);
@@ -349,13 +377,10 @@ export default function FriendsPage() {
       if (response.ok) {
         const data = await response.json();
         setFriends(data.friends || []);
-        console.log("✅ Friends loaded:", data.friends?.length || 0);
       } else {
-        console.error("Load friends failed:", response.status);
         setError("Failed to load friends");
       }
     } catch (error) {
-      console.error("Error loading friends:", error);
       setError("Failed to load friends");
     } finally {
       setLoading(false);
@@ -372,13 +397,10 @@ export default function FriendsPage() {
       if (response.ok) {
         const data = await response.json();
         setFriendRequests(data.requests || []);
-        console.log("✅ Friend requests loaded:", data.requests?.length || 0);
       } else {
-        console.error("Load friend requests failed:", response.status);
         setError("Failed to load friend requests");
       }
     } catch (error) {
-      console.error("Error loading friend requests:", error);
       setError("Failed to load friend requests");
     } finally {
       setLoading(false);
@@ -395,13 +417,10 @@ export default function FriendsPage() {
       if (response.ok) {
         const data = await response.json();
         setSentRequests(data.sentRequests || []);
-        console.log("✅ Sent requests loaded:", data.sentRequests?.length || 0);
       } else {
-        console.error("Load sent requests failed:", response.status);
         setError("Failed to load sent requests");
       }
     } catch (error) {
-      console.error("Error loading sent requests:", error);
       setError("Failed to load sent requests");
     } finally {
       setLoading(false);
@@ -411,7 +430,6 @@ export default function FriendsPage() {
   const loadFundRequests = async () => {
     try {
       setLoading(true);
-      console.log("🔄 Loading fund requests with strict status checking...");
 
       const response = await fetch("/api/friends/fund-request?type=received", {
         credentials: "include",
@@ -430,23 +448,10 @@ export default function FriendsPage() {
         });
 
         setFundRequests(validatedRequests);
-        console.log("✅ Fund requests loaded with validation:", {
-          total: validatedRequests.length,
-          pending: validatedRequests.filter((r) => r.status === "pending")
-            .length,
-          fulfilled: validatedRequests.filter((r) => r.status === "fulfilled")
-            .length,
-          declined: validatedRequests.filter((r) => r.status === "declined")
-            .length,
-          expired: validatedRequests.filter((r) => r.status === "expired")
-            .length,
-        });
       } else {
-        console.error("Load fund requests failed:", response.status);
         setError("Failed to load fund requests");
       }
     } catch (error) {
-      console.error("Error loading fund requests:", error);
       setError("Failed to load fund requests");
     } finally {
       setLoading(false);
@@ -457,6 +462,7 @@ export default function FriendsPage() {
     try {
       setLoading(true);
       setError("");
+      setSuccessMessage("");
 
       const response = await fetch("/api/friends", {
         method: "POST",
@@ -473,9 +479,14 @@ export default function FriendsPage() {
       if (response.ok) {
         // Refresh sent requests to update search suggestions
         loadSentRequests();
-        console.log("✅ Friend request sent successfully");
+        // Show success message
+        setSuccessMessage(`Friend request sent to @${username}!`);
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => setSuccessMessage(""), 3000);
       } else {
-        setError(data.error || "Failed to send friend request");
+        setError(
+          parseErrorMessage(data.error || "Failed to send friend request")
+        );
       }
     } catch (error) {
       setError("Failed to send friend request");
@@ -490,6 +501,9 @@ export default function FriendsPage() {
   ) => {
     try {
       setLoading(true);
+      setError("");
+      setSuccessMessage("");
+
       const response = await fetch("/api/friends", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -505,10 +519,18 @@ export default function FriendsPage() {
         loadSentRequests();
         if (action === "accept") {
           loadFriends();
+          setSuccessMessage(`You are now friends with @${username}!`);
+        } else {
+          setSuccessMessage(`Friend request from @${username} declined.`);
         }
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => setSuccessMessage(""), 3000);
+      } else {
+        setError(`Failed to ${action} friend request`);
       }
     } catch (error) {
       console.error("Error handling friend request:", error);
+      setError(`Failed to ${action} friend request`);
     } finally {
       setLoading(false);
     }
@@ -517,6 +539,9 @@ export default function FriendsPage() {
   const removeFriend = async (username: string) => {
     try {
       setLoading(true);
+      setError("");
+      setSuccessMessage("");
+
       const response = await fetch("/api/friends", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -529,12 +554,26 @@ export default function FriendsPage() {
 
       if (response.ok) {
         loadFriends();
+        setShowRemoveConfirmation(false);
+        setFriendToRemove(null);
+        // Show success message
+        setSuccessMessage(`@${username} has been removed from your friends.`);
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => setSuccessMessage(""), 3000);
+      } else {
+        setError("Failed to remove friend");
       }
     } catch (error) {
       console.error("Error removing friend:", error);
+      setError("Failed to remove friend");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRemoveFriend = (friend: Friend) => {
+    setFriendToRemove(friend);
+    setShowRemoveConfirmation(true);
   };
 
   const openFundRequestModal = (friend: Friend) => {
@@ -566,14 +605,7 @@ export default function FriendsPage() {
     try {
       setLoading(true);
       setError("");
-
-      console.log("💰 Sending fund request:", {
-        from: currentUser.username,
-        to: selectedFriend.username,
-        amount: fundRequestData.amount,
-        token: fundRequestData.tokenSymbol,
-        requesterWallet: activeWallet.address,
-      });
+      setSuccessMessage("");
 
       const response = await fetch("/api/friends/fund-request", {
         method: "POST",
@@ -598,14 +630,21 @@ export default function FriendsPage() {
           amount: "",
           message: "",
         });
-
-        console.log("✅ Fund request sent successfully");
+        // Show success message
+        setSuccessMessage(
+          `Fund request for ${fundRequestData.amount} ${fundRequestData.tokenSymbol} sent to @${selectedFriend.username}!`
+        );
+        // Auto-hide success message after 4 seconds (longer for fund requests)
+        setTimeout(() => setSuccessMessage(""), 4000);
       } else {
-        setError(data.error || "Failed to send fund request");
+        setError(
+          parseErrorMessage(data.error || "Failed to send fund request")
+        );
       }
     } catch (error: any) {
-      console.error("❌ Error sending fund request:", error);
-      setError("Failed to send fund request");
+      setError(
+        parseErrorMessage(error.message || "Failed to send fund request")
+      );
     } finally {
       setLoading(false);
     }
@@ -679,13 +718,6 @@ export default function FriendsPage() {
   const handleFundRequestClick = (request: FundRequest) => {
     const statusInfo = getFundRequestStatusInfo(request);
 
-    console.log("🔔 Fund request clicked:", {
-      requestId: request.requestId,
-      status: request.status,
-      canAction: statusInfo.canAction,
-      hasTransactionHash: !!request.transactionHash,
-    });
-
     if (!statusInfo.canAction) {
       if (request.status === "fulfilled" && request.transactionHash) {
         window.open(
@@ -694,7 +726,6 @@ export default function FriendsPage() {
         );
         return;
       } else {
-        console.log(`ℹ️ Request is ${request.status} - no action available`);
         return;
       }
     }
@@ -708,341 +739,502 @@ export default function FriendsPage() {
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
-      {/* Header */}
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
-          <div className="flex items-start">
-            <AlertCircle
-              size={16}
-              className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
-            />
-            <p className="text-red-400 text-sm font-satoshi">{error}</p>
-            <button
-              onClick={() => setError("")}
-              className="ml-auto text-red-400 hover:text-red-300"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
+    <>
+      {/* ADDED: Backdrop for all modals and dropdowns */}
+      {(showFundRequestModal ||
+        selectedFundRequest ||
+        showNotifications ||
+        showTokenDropdown ||
+        showRemoveConfirmation) && (
+        <div className="fixed inset-0 z-30 bg-white/10" />
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="bg-black rounded-[16px] lg:rounded-[20px] border border-[#2C2C2C] p-4 lg:p-6 flex-1 flex flex-col min-h-0">
-          {/* Tab Navigation with Enhanced Search */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 lg:mb-6 gap-4">
-            {/* Tab Buttons */}
-            <div className="flex">
+      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
+        {/* Success Message Display */}
+        {successMessage && (
+          <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
+            <div className="flex items-start">
+              <CheckCircle
+                size={16}
+                className="text-green-400 mr-2 mt-0.5 flex-shrink-0"
+              />
+              <p className="text-green-400 text-sm font-satoshi">
+                {successMessage}
+              </p>
               <button
-                onClick={() => setActiveTab("Friends")}
-                className={`px-4 lg:px-6 py-2 rounded-lg font-satoshi transition-colors mr-2 text-sm lg:text-base ${
-                  activeTab === "Friends"
-                    ? "bg-[#E2AF19] text-black font-medium"
-                    : "text-gray-400 hover:text-white"
-                }`}
+                onClick={() => setSuccessMessage("")}
+                className="ml-auto text-green-400 hover:text-green-300"
               >
-                Friends ({friends.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("Requests")}
-                className={`px-4 lg:px-6 py-2 rounded-lg font-satoshi transition-colors border mr-2 text-sm lg:text-base ${
-                  activeTab === "Requests"
-                    ? "bg-[#E2AF19] text-black font-medium border-[#E2AF19]"
-                    : "text-gray-400 hover:text-white border-[#2C2C2C]"
-                }`}
-              >
-                Requests ({friendRequests.length})
-              </button>
-              <button
-                onClick={() => setActiveTab("FundRequests")}
-                className={`px-4 lg:px-6 py-2 rounded-lg font-satoshi transition-colors border text-sm lg:text-base ${
-                  activeTab === "FundRequests"
-                    ? "bg-[#E2AF19] text-black font-medium border-[#E2AF19]"
-                    : "text-gray-400 hover:text-white border-[#2C2C2C]"
-                }`}
-              >
-                Fund Requests ({fundRequests.length})
+                <X size={16} />
               </button>
             </div>
-
-            {/* Enhanced Search Component - Only show for Friends tab */}
-            {activeTab === "Friends" && (
-              <div className="w-full lg:w-96">
-                <EnhancedFriendsSearch
-                  friends={friends}
-                  friendRequests={friendRequests}
-                  sentRequests={sentRequests}
-                  onSendFriendRequest={sendFriendRequest}
-                  loading={loading}
-                  currentUsername={currentUser?.username}
-                />
-              </div>
-            )}
           </div>
+        )}
 
-          {/* Content based on active tab */}
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            {activeTab === "Friends" && (
-              <div className="space-y-0">
-                {loading && friends.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
-                    <p className="text-gray-400 font-satoshi">
-                      Loading friends...
-                    </p>
-                  </div>
-                ) : friends.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-                    <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-                      <DollarSign
-                        size={20}
-                        className="text-gray-400 lg:w-6 lg:h-6"
-                      />
-                    </div>
-                    <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
-                      No friends yet
-                    </h3>
-                    <p className="text-gray-400 font-satoshi text-sm lg:text-base mb-4">
-                      Search for friends using the search box above
-                    </p>
-                    <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 max-w-sm">
-                      <p className="text-blue-400 text-sm font-satoshi">
-                        💡 <strong>Tip:</strong> You can search by username or
-                        paste a wallet address to send a friend request!
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
+            <div className="flex items-start">
+              <AlertCircle
+                size={16}
+                className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+              />
+              <p className="text-red-400 text-sm font-satoshi">{error}</p>
+              <button
+                onClick={() => setError("")}
+                className="ml-auto text-red-400 hover:text-red-300"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="bg-black rounded-[16px] lg:rounded-[20px] border border-[#2C2C2C] p-4 lg:p-6 flex-1 flex flex-col min-h-0">
+            {/* Tab Navigation with Enhanced Search */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 lg:mb-6 gap-4">
+              {/* Tab Buttons */}
+              <div className="flex">
+                <button
+                  onClick={() => setActiveTab("Friends")}
+                  className={`px-4 lg:px-6 py-2 rounded-lg font-satoshi transition-colors mr-2 text-sm lg:text-base ${
+                    activeTab === "Friends"
+                      ? "bg-[#E2AF19] text-black font-medium"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Friends ({friends.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("Requests")}
+                  className={`px-4 lg:px-6 py-2 rounded-lg font-satoshi transition-colors border mr-2 text-sm lg:text-base ${
+                    activeTab === "Requests"
+                      ? "bg-[#E2AF19] text-black font-medium border-[#E2AF19]"
+                      : "text-gray-400 hover:text-white border-[#2C2C2C]"
+                  }`}
+                >
+                  Requests ({friendRequests.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("FundRequests")}
+                  className={`px-4 lg:px-6 py-2 rounded-lg font-satoshi transition-colors border text-sm lg:text-base ${
+                    activeTab === "FundRequests"
+                      ? "bg-[#E2AF19] text-black font-medium border-[#E2AF19]"
+                      : "text-gray-400 hover:text-white border-[#2C2C2C]"
+                  }`}
+                >
+                  Fund Requests ({fundRequests.length})
+                </button>
+              </div>
+
+              {/* Enhanced Search Component - Only show for Friends tab */}
+              {activeTab === "Friends" && (
+                <div className="w-full lg:w-96">
+                  <EnhancedFriendsSearch
+                    friends={friends}
+                    friendRequests={friendRequests}
+                    sentRequests={sentRequests}
+                    onSendFriendRequest={sendFriendRequest}
+                    loading={loading}
+                    currentUsername={currentUser?.username}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Content based on active tab */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {activeTab === "Friends" && (
+                <div className="space-y-0">
+                  {loading && friends.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
+                      <p className="text-gray-400 font-satoshi">
+                        Loading friends...
                       </p>
                     </div>
-                  </div>
-                ) : (
-                  friends.map((friend, index) => (
-                    <div key={friend._id}>
-                      {/* Mobile Card Layout */}
-                      <div className="block lg:hidden">
-                        <div className="bg-[#0F0F0F] rounded-lg p-4 mb-3 border border-[#2C2C2C]">
-                          <div className="flex items-center mb-3">
-                            <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
-                              <span className="text-white text-sm font-medium">
-                                {friend.displayName?.[0]?.toUpperCase() ||
-                                  friend.username[0]?.toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="flex-1">
-                              <div className="text-white font-satoshi">
-                                {friend.displayName || friend.username}
+                  ) : friends.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
+                      <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+                        <DollarSign
+                          size={20}
+                          className="text-gray-400 lg:w-6 lg:h-6"
+                        />
+                      </div>
+                      <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+                        No friends yet
+                      </h3>
+                      <p className="text-gray-400 font-satoshi text-sm lg:text-base mb-4">
+                        Search for friends using the search box above
+                      </p>
+                      <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 max-w-sm">
+                        <p className="text-blue-400 text-sm font-satoshi">
+                          💡 <strong>Tip:</strong> You can search by username or
+                          paste a wallet address to send a friend request!
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    friends.map((friend, index) => (
+                      <div key={friend._id}>
+                        {/* Mobile Card Layout */}
+                        <div className="block lg:hidden">
+                          <div className="bg-[#0F0F0F] rounded-lg p-4 mb-3 border border-[#2C2C2C]">
+                            <div className="flex items-center mb-3">
+                              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                                <span className="text-white text-sm font-medium">
+                                  {friend.displayName?.[0]?.toUpperCase() ||
+                                    friend.username[0]?.toUpperCase()}
+                                </span>
                               </div>
-                              <div className="text-gray-400 text-xs font-satoshi">
-                                @{friend.username}
+                              <div className="flex-1">
+                                <div className="text-white font-satoshi">
+                                  {friend.displayName || friend.username}
+                                </div>
+                                <div className="text-gray-400 text-xs font-satoshi">
+                                  @{friend.username}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <button
-                              onClick={() => openFundRequestModal(friend)}
-                              className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex-1 flex items-center justify-center"
-                            >
-                              Request Funds
-                            </button>
-                            <button
-                              onClick={() => removeFriend(friend.username)}
-                              className="bg-transparent border border-red-500 text-red-500 px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-red-500 hover:text-white transition-colors text-sm flex-1"
-                            >
-                              Remove
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <button
+                                onClick={() => openFundRequestModal(friend)}
+                                className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex-1 flex items-center justify-center"
+                              >
+                                Request Funds
+                              </button>
+                              <button
+                                onClick={() => handleRemoveFriend(friend)}
+                                className="bg-transparent border border-red-500 text-red-500 px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-red-500 hover:text-white transition-colors text-sm flex-1"
+                              >
+                                Remove
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Desktop Row Layout */}
-                      <div className="hidden lg:block">
-                        <div className="flex items-center justify-between py-3 px-4 hover:bg-[#1A1A1A] rounded-lg transition-colors">
+                        {/* Desktop Row Layout */}
+                        <div className="hidden lg:block">
+                          <div className="flex items-center justify-between py-3 px-4 hover:bg-[#1A1A1A] rounded-lg transition-colors">
+                            <div className="flex items-center">
+                              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                                <span className="text-white text-sm font-medium">
+                                  {friend.displayName?.[0]?.toUpperCase() ||
+                                    friend.username[0]?.toUpperCase()}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-white font-satoshi">
+                                  {friend.displayName || friend.username}
+                                </span>
+                                <div className="text-gray-400 text-sm font-satoshi">
+                                  @{friend.username}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-3">
+                              <button
+                                onClick={() => openFundRequestModal(friend)}
+                                className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex items-center"
+                              >
+                                Request Funds
+                              </button>
+                              <button
+                                onClick={() => handleRemoveFriend(friend)}
+                                className="bg-transparent border border-red-500 text-red-500 px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-red-500 hover:text-white transition-colors text-sm"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+
+                          {index < friends.length - 1 && (
+                            <div className="border-b border-[#2C2C2C] mx-4"></div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {activeTab === "Requests" && (
+                <div className="space-y-3">
+                  {loading && friendRequests.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
+                      <p className="text-gray-400 font-satoshi">
+                        Loading requests...
+                      </p>
+                    </div>
+                  ) : friendRequests.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
+                      <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+                        <Bell
+                          size={20}
+                          className="text-gray-400 lg:w-6 lg:h-6"
+                        />
+                      </div>
+                      <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+                        No friend requests
+                      </h3>
+                      <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+                        Friend requests will appear here
+                      </p>
+                    </div>
+                  ) : (
+                    friendRequests.map((request) => (
+                      <div
+                        key={request._id}
+                        className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]"
+                      >
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
                               <span className="text-white text-sm font-medium">
-                                {friend.displayName?.[0]?.toUpperCase() ||
-                                  friend.username[0]?.toUpperCase()}
+                                {request.requesterData?.displayName?.[0]?.toUpperCase() ||
+                                  request.requesterData?.username[0]?.toUpperCase() ||
+                                  "?"}
                               </span>
                             </div>
                             <div>
-                              <span className="text-white font-satoshi">
-                                {friend.displayName || friend.username}
-                              </span>
+                              <div className="text-white font-satoshi">
+                                {request.requesterData?.displayName ||
+                                  request.requesterData?.username}
+                              </div>
                               <div className="text-gray-400 text-sm font-satoshi">
-                                @{friend.username}
+                                @{request.requesterUsername}
+                              </div>
+                              <div className="text-gray-400 text-xs font-satoshi">
+                                {new Date(
+                                  request.requestedAt
+                                ).toLocaleDateString()}
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center space-x-3">
+                          <div className="flex space-x-2">
                             <button
-                              onClick={() => openFundRequestModal(friend)}
-                              className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex items-center"
+                              onClick={() =>
+                                handleFriendRequest(
+                                  request.requesterUsername,
+                                  "accept"
+                                )
+                              }
+                              disabled={loading}
+                              className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-green-700 transition-colors text-sm flex items-center"
                             >
-                              Request Funds
+                              <Check size={14} className="mr-1" />
+                              Accept
                             </button>
                             <button
-                              onClick={() => removeFriend(friend.username)}
-                              className="bg-transparent border border-red-500 text-red-500 px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-red-500 hover:text-white transition-colors text-sm"
+                              onClick={() =>
+                                handleFriendRequest(
+                                  request.requesterUsername,
+                                  "decline"
+                                )
+                              }
+                              disabled={loading}
+                              className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-red-700 transition-colors text-sm flex items-center"
                             >
-                              Remove
+                              <X size={14} className="mr-1" />
+                              Decline
                             </button>
                           </div>
                         </div>
-
-                        {index < friends.length - 1 && (
-                          <div className="border-b border-[#2C2C2C] mx-4"></div>
-                        )}
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
+                    ))
+                  )}
+                </div>
+              )}
 
-            {activeTab === "Requests" && (
-              <div className="space-y-3">
-                {loading && friendRequests.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
-                    <p className="text-gray-400 font-satoshi">
-                      Loading requests...
-                    </p>
-                  </div>
-                ) : friendRequests.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-                    <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-                      <Bell size={20} className="text-gray-400 lg:w-6 lg:h-6" />
+              {activeTab === "FundRequests" && (
+                <div className="space-y-0">
+                  {loading && fundRequests.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
+                      <p className="text-gray-400 font-satoshi">
+                        Loading fund requests...
+                      </p>
                     </div>
-                    <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
-                      No friend requests
-                    </h3>
-                    <p className="text-gray-400 font-satoshi text-sm lg:text-base">
-                      Friend requests will appear here
-                    </p>
-                  </div>
-                ) : (
-                  friendRequests.map((request) => (
-                    <div
-                      key={request._id}
-                      className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
-                            <span className="text-white text-sm font-medium">
-                              {request.requesterData?.displayName?.[0]?.toUpperCase() ||
-                                request.requesterData?.username[0]?.toUpperCase() ||
-                                "?"}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="text-white font-satoshi">
-                              {request.requesterData?.displayName ||
-                                request.requesterData?.username}
-                            </div>
-                            <div className="text-gray-400 text-sm font-satoshi">
-                              @{request.requesterUsername}
-                            </div>
-                            <div className="text-gray-400 text-xs font-satoshi">
-                              {new Date(
-                                request.requestedAt
-                              ).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() =>
-                              handleFriendRequest(
-                                request.requesterUsername,
-                                "accept"
-                              )
-                            }
-                            disabled={loading}
-                            className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-green-700 transition-colors text-sm flex items-center"
-                          >
-                            <Check size={14} className="mr-1" />
-                            Accept
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleFriendRequest(
-                                request.requesterUsername,
-                                "decline"
-                              )
-                            }
-                            disabled={loading}
-                            className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-red-700 transition-colors text-sm flex items-center"
-                          >
-                            <X size={14} className="mr-1" />
-                            Decline
-                          </button>
-                        </div>
+                  ) : fundRequests.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
+                      <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+                        <DollarSign
+                          size={20}
+                          className="text-gray-400 lg:w-6 lg:h-6"
+                        />
                       </div>
+                      <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+                        No fund requests
+                      </h3>
+                      <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+                        Fund requests from friends will appear here
+                      </p>
                     </div>
-                  ))
-                )}
-              </div>
-            )}
+                  ) : (
+                    fundRequests.map((request, index) => {
+                      const statusInfo = getFundRequestStatusInfo(request);
+                      return (
+                        <div key={request._id}>
+                          {/* Mobile Card Layout */}
+                          <div className="block lg:hidden">
+                            <div
+                              className={`bg-[#0F0F0F] rounded-lg p-4 mb-3 border border-[#2C2C2C] transition-all ${
+                                statusInfo.canAction
+                                  ? "cursor-pointer hover:bg-[#1A1A1A] hover:border-[#E2AF19]"
+                                  : "opacity-75"
+                              }`}
+                              onClick={() =>
+                                statusInfo.canAction &&
+                                handleFundRequestClick(request)
+                              }
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center">
+                                  <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                                    <span className="text-white text-sm font-medium">
+                                      {request.requesterUsername[0]?.toUpperCase() ||
+                                        "?"}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <div className="text-white font-satoshi">
+                                      @{request.requesterUsername}
+                                    </div>
+                                    <div className="text-gray-400 text-xs font-satoshi">
+                                      {new Date(
+                                        request.requestedAt
+                                      ).toLocaleDateString()}
+                                    </div>
+                                  </div>
+                                </div>
 
-            {activeTab === "FundRequests" && (
-              <div className="space-y-0">
-                {loading && fundRequests.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
-                    <p className="text-gray-400 font-satoshi">
-                      Loading fund requests...
-                    </p>
-                  </div>
-                ) : fundRequests.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-                    <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-                      <DollarSign
-                        size={20}
-                        className="text-gray-400 lg:w-6 lg:h-6"
-                      />
-                    </div>
-                    <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
-                      No fund requests
-                    </h3>
-                    <p className="text-gray-400 font-satoshi text-sm lg:text-base">
-                      Fund requests from friends will appear here
-                    </p>
-                  </div>
-                ) : (
-                  fundRequests.map((request, index) => {
-                    const statusInfo = getFundRequestStatusInfo(request);
-                    return (
-                      <div key={request._id}>
-                        {/* Mobile Card Layout */}
-                        <div className="block lg:hidden">
-                          <div
-                            className={`bg-[#0F0F0F] rounded-lg p-4 mb-3 border border-[#2C2C2C] transition-all ${
-                              statusInfo.canAction
-                                ? "cursor-pointer hover:bg-[#1A1A1A] hover:border-[#E2AF19]"
-                                : "opacity-75"
-                            }`}
-                            onClick={() =>
-                              statusInfo.canAction &&
-                              handleFundRequestClick(request)
-                            }
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center">
+                                <div
+                                  className={`px-2 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
+                                >
+                                  {statusInfo.icon}
+                                  <span
+                                    className={`ml-1 text-xs font-satoshi font-medium ${statusInfo.color}`}
+                                  >
+                                    {statusInfo.label}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="mb-3">
+                                <div className="text-[#E2AF19] font-bold text-lg">
+                                  {request.amount} {request.tokenSymbol}
+                                </div>
+                                {request.message && (
+                                  <div className="text-gray-400 text-sm font-satoshi mt-1">
+                                    "{request.message}"
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between pt-3 border-t border-[#2C2C2C]">
+                                <div className="flex items-center text-gray-400 text-xs font-satoshi">
+                                  <Clock size={12} className="mr-1" />
+                                  {statusInfo.canAction ? (
+                                    <>
+                                      Expires{" "}
+                                      {new Date(
+                                        request.expiresAt
+                                      ).toLocaleDateString()}
+                                    </>
+                                  ) : (
+                                    <>
+                                      {request.respondedAt
+                                        ? `Responded ${new Date(
+                                            request.respondedAt
+                                          ).toLocaleDateString()}`
+                                        : `${statusInfo.label} ${new Date(
+                                            request.requestedAt
+                                          ).toLocaleDateString()}`}
+                                    </>
+                                  )}
+                                </div>
+
+                                {statusInfo.canAction ? (
+                                  <div className="text-[#E2AF19] text-xs font-satoshi">
+                                    Tap to respond
+                                  </div>
+                                ) : request.status === "fulfilled" &&
+                                  request.transactionHash ? (
+                                  <div className="text-green-400 text-xs font-satoshi flex items-center">
+                                    <ExternalLink size={12} className="mr-1" />
+                                    View Transaction
+                                  </div>
+                                ) : (
+                                  <div
+                                    className={`text-xs font-satoshi ${statusInfo.color}`}
+                                  >
+                                    {statusInfo.label}
+                                  </div>
+                                )}
+                              </div>
+
+                              {request.status === "fulfilled" &&
+                                request.transactionHash && (
+                                  <div className="mt-2 p-2 bg-green-900/20 border border-green-500/50 rounded">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-green-400 text-xs font-satoshi">
+                                        Tx:{" "}
+                                        {request.transactionHash.slice(0, 10)}
+                                        ...{request.transactionHash.slice(-8)}
+                                      </span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          copyToClipboard(
+                                            request.transactionHash!,
+                                            `tx-${request._id}`
+                                          );
+                                        }}
+                                        className="text-green-400 hover:text-green-300 transition-colors"
+                                      >
+                                        <Copy size={12} />
+                                      </button>
+                                    </div>
+                                    {copied === `tx-${request._id}` && (
+                                      <p className="text-green-400 text-xs font-satoshi mt-1">
+                                        Transaction hash copied!
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                            </div>
+                          </div>
+
+                          {/* Desktop Row Layout */}
+                          <div className="hidden lg:block">
+                            <div
+                              className={`flex items-center justify-between py-3 px-4 rounded-lg transition-colors ${
+                                statusInfo.canAction
+                                  ? "cursor-pointer hover:bg-[#1A1A1A]"
+                                  : "opacity-75"
+                              }`}
+                              onClick={() =>
+                                statusInfo.canAction &&
+                                handleFundRequestClick(request)
+                              }
+                            >
+                              <div className="flex items-center flex-1">
                                 <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
                                   <span className="text-white text-sm font-medium">
                                     {request.requesterUsername[0]?.toUpperCase() ||
                                       "?"}
                                   </span>
                                 </div>
-                                <div>
-                                  <div className="text-white font-satoshi">
+                                <div className="flex-1">
+                                  <span className="text-white font-satoshi">
                                     @{request.requesterUsername}
-                                  </div>
-                                  <div className="text-gray-400 text-xs font-satoshi">
+                                  </span>
+                                  <div className="text-gray-400 text-sm font-satoshi">
                                     {new Date(
                                       request.requestedAt
                                     ).toLocaleDateString()}
@@ -1050,338 +1242,121 @@ export default function FriendsPage() {
                                 </div>
                               </div>
 
-                              <div
-                                className={`px-2 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
-                              >
-                                {statusInfo.icon}
-                                <span
-                                  className={`ml-1 text-xs font-satoshi font-medium ${statusInfo.color}`}
-                                >
-                                  {statusInfo.label}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="mb-3">
-                              <div className="text-[#E2AF19] font-bold text-lg">
-                                {request.amount} {request.tokenSymbol}
-                              </div>
-                              {request.message && (
-                                <div className="text-gray-400 text-sm font-satoshi mt-1">
-                                  "{request.message}"
+                              <div className="flex items-center space-x-4">
+                                <div className="text-[#E2AF19] font-bold font-satoshi">
+                                  {request.amount} {request.tokenSymbol}
                                 </div>
-                              )}
-                            </div>
 
-                            <div className="flex items-center justify-between pt-3 border-t border-[#2C2C2C]">
-                              <div className="flex items-center text-gray-400 text-xs font-satoshi">
-                                <Clock size={12} className="mr-1" />
+                                <div
+                                  className={`px-3 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
+                                >
+                                  {statusInfo.icon}
+                                  <span
+                                    className={`ml-2 text-sm font-satoshi font-medium ${statusInfo.color}`}
+                                  >
+                                    {statusInfo.label}
+                                  </span>
+                                </div>
+
                                 {statusInfo.canAction ? (
-                                  <>
-                                    Expires{" "}
-                                    {new Date(
-                                      request.expiresAt
-                                    ).toLocaleDateString()}
-                                  </>
+                                  <div className="text-[#E2AF19] text-sm font-satoshi">
+                                    Click to respond
+                                  </div>
+                                ) : request.status === "fulfilled" &&
+                                  request.transactionHash ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.open(
+                                        `https://etherscan.io/tx/${request.transactionHash}`,
+                                        "_blank"
+                                      );
+                                    }}
+                                    className="text-green-400 text-sm font-satoshi hover:opacity-80 transition-opacity flex items-center"
+                                  >
+                                    <ExternalLink size={14} className="mr-1" />
+                                    Explorer
+                                  </button>
                                 ) : (
-                                  <>
+                                  <div
+                                    className={`text-sm font-satoshi ${statusInfo.color}`}
+                                  >
                                     {request.respondedAt
-                                      ? `Responded ${new Date(
+                                      ? new Date(
                                           request.respondedAt
-                                        ).toLocaleDateString()}`
-                                      : `${statusInfo.label} ${new Date(
-                                          request.requestedAt
-                                        ).toLocaleDateString()}`}
-                                  </>
+                                        ).toLocaleDateString()
+                                      : "—"}
+                                  </div>
                                 )}
                               </div>
-
-                              {statusInfo.canAction ? (
-                                <div className="text-[#E2AF19] text-xs font-satoshi">
-                                  Tap to respond
-                                </div>
-                              ) : request.status === "fulfilled" &&
-                                request.transactionHash ? (
-                                <div className="text-green-400 text-xs font-satoshi flex items-center">
-                                  <ExternalLink size={12} className="mr-1" />
-                                  View Transaction
-                                </div>
-                              ) : (
-                                <div
-                                  className={`text-xs font-satoshi ${statusInfo.color}`}
-                                >
-                                  {statusInfo.label}
-                                </div>
-                              )}
                             </div>
 
-                            {request.status === "fulfilled" &&
-                              request.transactionHash && (
-                                <div className="mt-2 p-2 bg-green-900/20 border border-green-500/50 rounded">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-green-400 text-xs font-satoshi">
-                                      Tx: {request.transactionHash.slice(0, 10)}
-                                      ...{request.transactionHash.slice(-8)}
-                                    </span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        copyToClipboard(
-                                          request.transactionHash!,
-                                          `tx-${request._id}`
-                                        );
-                                      }}
-                                      className="text-green-400 hover:text-green-300 transition-colors"
-                                    >
-                                      <Copy size={12} />
-                                    </button>
-                                  </div>
-                                  {copied === `tx-${request._id}` && (
-                                    <p className="text-green-400 text-xs font-satoshi mt-1">
-                                      Transaction hash copied!
-                                    </p>
-                                  )}
-                                </div>
-                              )}
+                            {index < fundRequests.length - 1 && (
+                              <div className="border-b border-[#2C2C2C] mx-4"></div>
+                            )}
                           </div>
                         </div>
-
-                        {/* Desktop Row Layout */}
-                        <div className="hidden lg:block">
-                          <div
-                            className={`flex items-center justify-between py-3 px-4 rounded-lg transition-colors ${
-                              statusInfo.canAction
-                                ? "cursor-pointer hover:bg-[#1A1A1A]"
-                                : "opacity-75"
-                            }`}
-                            onClick={() =>
-                              statusInfo.canAction &&
-                              handleFundRequestClick(request)
-                            }
-                          >
-                            <div className="flex items-center flex-1">
-                              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
-                                <span className="text-white text-sm font-medium">
-                                  {request.requesterUsername[0]?.toUpperCase() ||
-                                    "?"}
-                                </span>
-                              </div>
-                              <div className="flex-1">
-                                <span className="text-white font-satoshi">
-                                  @{request.requesterUsername}
-                                </span>
-                                <div className="text-gray-400 text-sm font-satoshi">
-                                  {new Date(
-                                    request.requestedAt
-                                  ).toLocaleDateString()}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center space-x-4">
-                              <div className="text-[#E2AF19] font-bold font-satoshi">
-                                {request.amount} {request.tokenSymbol}
-                              </div>
-
-                              <div
-                                className={`px-3 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
-                              >
-                                {statusInfo.icon}
-                                <span
-                                  className={`ml-2 text-sm font-satoshi font-medium ${statusInfo.color}`}
-                                >
-                                  {statusInfo.label}
-                                </span>
-                              </div>
-
-                              {statusInfo.canAction ? (
-                                <div className="text-[#E2AF19] text-sm font-satoshi">
-                                  Click to respond
-                                </div>
-                              ) : request.status === "fulfilled" &&
-                                request.transactionHash ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(
-                                      `https://etherscan.io/tx/${request.transactionHash}`,
-                                      "_blank"
-                                    );
-                                  }}
-                                  className="text-green-400 text-sm font-satoshi hover:opacity-80 transition-opacity flex items-center"
-                                >
-                                  <ExternalLink size={14} className="mr-1" />
-                                  Explorer
-                                </button>
-                              ) : (
-                                <div
-                                  className={`text-sm font-satoshi ${statusInfo.color}`}
-                                >
-                                  {request.respondedAt
-                                    ? new Date(
-                                        request.respondedAt
-                                      ).toLocaleDateString()
-                                    : "—"}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {index < fundRequests.length - 1 && (
-                            <div className="border-b border-[#2C2C2C] mx-4"></div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ENHANCED: Fund Request Modal with Fixed Token Dropdown */}
-      {showFundRequestModal && selectedFriend && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white font-satoshi">
-                Request Funds
-              </h3>
-              <button
-                onClick={() => {
-                  setShowFundRequestModal(false);
-                  setSelectedFriend(null);
-                  setShowTokenDropdown(false);
-                }}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="mb-4">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-white text-sm font-medium">
-                    {selectedFriend.displayName?.[0]?.toUpperCase() ||
-                      selectedFriend.username[0]?.toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <div className="text-white font-satoshi">
-                    {selectedFriend.displayName || selectedFriend.username}
-                  </div>
-                  <div className="text-gray-400 text-sm font-satoshi">
-                    @{selectedFriend.username}
-                  </div>
-                </div>
-              </div>
-
-              {/* Fund request flow explanation */}
-              <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] mb-4">
-                <div className="text-sm font-satoshi mb-3">
-                  <span className="text-[#E2AF19] font-medium">
-                    💰 Fund Request Flow:
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 font-satoshi">
-                      You're asking:
-                    </span>
-                    <span className="text-white font-satoshi">
-                      @{selectedFriend.username}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400 font-satoshi">
-                      To send funds to:
-                    </span>
-                    <span className="text-white font-satoshi font-mono text-xs">
-                      {activeWallet?.address
-                        ? `${activeWallet.address.slice(
-                            0,
-                            8
-                          )}...${activeWallet.address.slice(-6)}`
-                        : "Your wallet"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/50 rounded">
-                  <p className="text-blue-400 text-xs font-satoshi">
-                    ℹ️ {selectedFriend.displayName || selectedFriend.username}{" "}
-                    will send {fundRequestData.tokenSymbol} from their wallet to
-                    your currently selected wallet.
-                  </p>
-                </div>
-              </div>
-
-              {/* Current Active Wallet Display */}
-              {activeWallet && (
-                <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3 mb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-green-400 text-sm font-satoshi font-medium">
-                        ✅ Active Wallet Selected
-                      </div>
-                      <div className="text-green-400 text-xs font-satoshi">
-                        Funds will be sent to: {activeWallet.name}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() =>
-                        copyToClipboard(activeWallet.address, "wallet")
-                      }
-                      className="text-green-400 hover:text-green-300 transition-colors"
-                    >
-                      <Copy size={14} />
-                    </button>
-                  </div>
-                  {copied === "wallet" && (
-                    <p className="text-green-400 text-xs font-satoshi mt-1">
-                      Wallet address copied!
-                    </p>
+                      );
+                    })
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
 
-              {/* Warning if no active wallet */}
-              {!activeWallet && (
-                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4">
-                  <div className="flex items-start">
-                    <AlertTriangle
-                      size={16}
-                      className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
-                    />
-                    <div>
-                      <p className="text-red-400 text-sm font-satoshi font-medium">
-                        No Active Wallet Selected
-                      </p>
-                      <p className="text-red-400 text-xs font-satoshi">
-                        Please select an active wallet to receive funds.
-                      </p>
+        {/* UPDATED: Fund Request Modal with improved UI */}
+        {showFundRequestModal && selectedFriend && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
+              {/* Header with back button and centered title */}
+              <div className="flex items-center mb-6">
+                <button
+                  onClick={() => {
+                    setShowFundRequestModal(false);
+                    setSelectedFriend(null);
+                    setShowTokenDropdown(false);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors mr-4"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <h3 className="flex-1 text-center text-lg font-semibold text-white font-satoshi">
+                  Request Funds
+                </h3>
+                {/* Invisible spacer to center the title */}
+                <div className="w-5"></div>
+              </div>
+
+              <div className="mb-4">
+                {/* Warning if no active wallet */}
+                {!activeWallet && (
+                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4">
+                    <div className="flex items-start">
+                      <AlertTriangle
+                        size={16}
+                        className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+                      />
+                      <div>
+                        <p className="text-red-400 text-sm font-satoshi font-medium">
+                          No Active Wallet Selected
+                        </p>
+                        <p className="text-red-400 text-xs font-satoshi">
+                          Please select an active wallet to receive funds.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="space-y-4">
-              {/* Token Dropdown */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Token
-                </label>
+              <div className="space-y-4">
+                {/* Token Dropdown - No label, improved spacing */}
                 <div className="relative" data-token-dropdown>
                   <button
                     type="button"
                     onClick={() => setShowTokenDropdown(!showTokenDropdown)}
-                    className="w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white font-satoshi text-left flex items-center justify-between hover:border-[#E2AF19] transition-colors focus:outline-none focus:border-[#E2AF19]"
+                    className="w-full bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg px-3 py-3 text-white font-satoshi text-left flex items-center justify-between hover:border-[#E2AF19] transition-colors focus:outline-none focus:border-[#E2AF19]"
                   >
                     {(() => {
                       const selectedToken = tokens.find(
@@ -1396,27 +1371,8 @@ export default function FriendsPage() {
                   </button>
 
                   {showTokenDropdown && (
-                    <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                      {/* ETH Option */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFundRequestData({
-                            ...fundRequestData,
-                            tokenSymbol: "ETH",
-                          });
-                          setShowTokenDropdown(false);
-                        }}
-                        className="w-full flex items-center px-3 py-3 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
-                      >
-                        {renderTokenOption({
-                          symbol: "ETH",
-                          icon: null,
-                          contractAddress: "native",
-                        })}
-                      </button>
-
-                      {/* Other Token Options */}
+                    <div className="absolute top-full left-0 right-0 z-[60] mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-2xl max-h-64 overflow-y-auto">
+                      {/* Token Options */}
                       {tokens.map((token) => (
                         <button
                           key={token.id}
@@ -1436,28 +1392,24 @@ export default function FriendsPage() {
                     </div>
                   )}
                 </div>
-              </div>
 
-              <Input
-                type="text"
-                label="Amount"
-                placeholder="0.0"
-                value={fundRequestData.amount}
-                onChange={(e) =>
-                  setFundRequestData({
-                    ...fundRequestData,
-                    amount: e.target.value,
-                  })
-                }
-                className="font-satoshi"
-              />
+                {/* Amount Input - No label */}
+                <input
+                  type="text"
+                  placeholder="Amount (e.g., 0.5)"
+                  value={fundRequestData.amount}
+                  onChange={(e) =>
+                    setFundRequestData({
+                      ...fundRequestData,
+                      amount: e.target.value,
+                    })
+                  }
+                  className="w-full p-3 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi transition-colors"
+                />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Message (optional)
-                </label>
+                {/* Message Input - No label */}
                 <textarea
-                  placeholder="What's this request for?"
+                  placeholder="Message (optional) - What's this request for?"
                   value={fundRequestData.message}
                   onChange={(e) =>
                     setFundRequestData({
@@ -1465,77 +1417,124 @@ export default function FriendsPage() {
                       message: e.target.value,
                     })
                   }
-                  className="w-full p-3 bg-black border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi resize-none"
+                  className="w-full p-3 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi resize-none transition-colors"
                   rows={3}
                 />
-              </div>
 
-              <div className="flex gap-3 pt-4">
+                {/* Single Send Button */}
+                <div className="pt-4">
+                  <button
+                    onClick={sendFundRequest}
+                    disabled={
+                      loading || !fundRequestData.amount || !activeWallet
+                    }
+                    className="w-full px-4 py-3 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? "Sending..." : "Send Request"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Fund Request Detail Modal - Only opens for pending requests */}
+        {selectedFundRequest && (
+          <FundRequestModal
+            isOpen={!!selectedFundRequest}
+            onClose={() => setSelectedFundRequest(null)}
+            fundRequest={selectedFundRequest}
+            onFulfilled={() => {
+              setSelectedFundRequest(null);
+              loadFundRequests();
+            }}
+            onDeclined={() => {
+              setSelectedFundRequest(null);
+              loadFundRequests();
+            }}
+          />
+        )}
+
+        {/* Remove Friend Confirmation Modal */}
+        {showRemoveConfirmation && friendToRemove && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-sm p-6">
+              {/* Header with back button */}
+              <div className="flex items-center mb-6">
                 <button
                   onClick={() => {
-                    setShowFundRequestModal(false);
-                    setSelectedFriend(null);
-                    setShowTokenDropdown(false);
+                    setShowRemoveConfirmation(false);
+                    setFriendToRemove(null);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors mr-4"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <h3 className="flex-1 text-center text-lg font-semibold text-white font-satoshi">
+                  Delete Confirmation
+                </h3>
+                <div className="w-5"></div>
+              </div>
+
+              {/* Content */}
+              <div className="text-center mb-6">
+                <p className="text-gray-300 font-satoshi text-base mb-1">
+                  Are you sure you want to delete
+                </p>
+                <p className="text-white font-satoshi text-base">
+                  @{friendToRemove.username}?
+                </p>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowRemoveConfirmation(false);
+                    setFriendToRemove(null);
                   }}
                   className="flex-1 px-4 py-2 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={sendFundRequest}
-                  disabled={loading || !fundRequestData.amount || !activeWallet}
-                  className="flex-1 px-4 py-2 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => removeFriend(friendToRemove.username)}
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-satoshi font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
-                  {loading ? "Sending..." : "Send Request"}
+                  {loading ? "Deleting..." : "Delete"}
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Fund Request Detail Modal - Only opens for pending requests */}
-      {selectedFundRequest && (
-        <FundRequestModal
-          isOpen={!!selectedFundRequest}
-          onClose={() => setSelectedFundRequest(null)}
-          fundRequest={selectedFundRequest}
-          onFulfilled={() => {
-            setSelectedFundRequest(null);
-            loadFundRequests();
-          }}
-          onDeclined={() => {
-            setSelectedFundRequest(null);
-            loadFundRequests();
-          }}
+        {/* Notification Center */}
+        <NotificationCenter
+          isOpen={showNotifications}
+          onClose={() => setShowNotifications(false)}
         />
-      )}
 
-      {/* Notification Center */}
-      <NotificationCenter
-        isOpen={showNotifications}
-        onClose={() => setShowNotifications(false)}
-      />
-
-      <style jsx global>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-
-        select {
-          background-image: none;
-        }
-
-        @media (max-width: 640px) {
-          input {
-            font-size: 16px;
+        <style jsx global>{`
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
           }
-        }
-      `}</style>
-    </div>
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+
+          select {
+            background-image: none;
+          }
+
+          @media (max-width: 640px) {
+            input {
+              font-size: 16px;
+            }
+          }
+        `}</style>
+      </div>
+    </>
   );
 }

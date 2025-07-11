@@ -1,4 +1,4 @@
-// src/components/wallet/RealtimeWalletSwitcher.tsx - Dropdown style below button
+// src/components/wallet/RealtimeWalletSwitcher.tsx - FIXED: Added backdrop like WelcomeModal
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -47,6 +47,14 @@ export default function RealtimeWalletSwitcher({
     width: 320,
   });
 
+  // FIXED: Close modal state when wallet modal is opened/closed
+  useEffect(() => {
+    if (walletModalOpen) {
+      // Don't close the switcher when wallet modal opens
+      console.log("🎭 Wallet modal opened, keeping switcher open");
+    }
+  }, [walletModalOpen]);
+
   // Calculate dropdown position to stretch from wallet button to end of header icons
   useEffect(() => {
     if (isOpen && triggerRef?.current) {
@@ -68,13 +76,13 @@ export default function RealtimeWalletSwitcher({
       const spaceBelow = viewportHeight - triggerRect.bottom;
       const spaceAbove = triggerRect.top;
 
-      let top = triggerRect.bottom + 8; // 8px gap below button
+      let top = triggerRect.bottom + 12; // 12px gap below button
       let left = triggerRect.left;
       let width = rightEdge - triggerRect.left; // Stretch to the end of header
 
       // If not enough space below, show above
       if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-        top = triggerRect.top - dropdownHeight - 8;
+        top = triggerRect.top - dropdownHeight - 12;
       }
 
       // Ensure minimum width
@@ -86,25 +94,46 @@ export default function RealtimeWalletSwitcher({
     }
   }, [isOpen, triggerRef]);
 
-  // Close dropdown when clicking outside
+  // FIXED: Better outside click handling that respects modal state
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      // Don't close if wallet modal is open
+      if (walletModalOpen) {
+        console.log("🎭 Wallet modal is open, ignoring outside click");
+        return;
+      }
+
+      // Check if click is on wallet modal content
+      const walletModalElement = document.querySelector("[data-wallet-modal]");
+      if (
+        walletModalElement &&
+        walletModalElement.contains(event.target as Node)
+      ) {
+        console.log("🎭 Click inside wallet modal, ignoring");
+        return;
+      }
+
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node) &&
         triggerRef?.current &&
         !triggerRef.current.contains(event.target as Node)
       ) {
+        console.log("🎭 Outside click detected, closing switcher");
         onClose();
       }
     }
 
     if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      // Small delay to prevent immediate closure
+      setTimeout(() => {
+        document.addEventListener("mousedown", handleClickOutside);
+      }, 100);
+
       return () =>
         document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [isOpen, onClose, triggerRef]);
+  }, [isOpen, onClose, triggerRef, walletModalOpen]);
 
   if (!isOpen) return null;
 
@@ -131,13 +160,30 @@ export default function RealtimeWalletSwitcher({
     }
   };
 
-  const handleAddWallet = () => {
+  // FIXED: Better add wallet handling
+  const handleAddWallet = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("🎭 Opening wallet modal from switcher");
     setWalletModalOpen(true);
   };
 
+  // FIXED: Handle wallet creation and properly close modals
   const handleWalletCreated = () => {
+    console.log("🎭 Wallet created, refreshing and closing modals");
     dispatch(fetchWallets());
     setWalletModalOpen(false);
+    // Close the main switcher as well since wallet was created
+    setTimeout(() => {
+      onClose();
+    }, 100);
+  };
+
+  // FIXED: Handle wallet modal close
+  const handleWalletModalClose = () => {
+    console.log("🎭 Wallet modal closed, keeping switcher open");
+    setWalletModalOpen(false);
+    // Don't close the main switcher
   };
 
   const getWalletColor = (index: number) => {
@@ -153,10 +199,13 @@ export default function RealtimeWalletSwitcher({
 
   return (
     <>
+      {/* ADDED: Backdrop similar to WelcomeModal */}
+      <div className="fixed inset-0 z-30 bg-white/10" onClick={onClose} />
+
       {/* Dropdown positioned below trigger button */}
       <div
         ref={dropdownRef}
-        className="fixed z-50 bg-black border border-[#2C2C2C] rounded-[16px] shadow-2xl overflow-hidden"
+        className="fixed z-40 bg-black border border-[#2C2C2C] rounded-[16px] shadow-2xl overflow-hidden"
         style={{
           top: `${dropdownPosition.top}px`,
           left: `${dropdownPosition.left}px`,
@@ -164,28 +213,8 @@ export default function RealtimeWalletSwitcher({
           maxHeight: "400px",
         }}
       >
-        {/* Header */}
-        <div className="p-4 flex items-center justify-between">
-          <h3 className="text-white font-semibold text-sm font-satoshi">
-            Select Wallet
-          </h3>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={refreshAllWallets}
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
-              title="Refresh balances"
-            >
-              <RefreshCw size={14} />
-            </button>
-            <span className="text-xs text-gray-400 font-satoshi">
-              {realtimeBalances.length} wallet
-              {realtimeBalances.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-        </div>
-
         {/* Wallets List */}
-        <div className="px-4 max-h-[280px] overflow-y-auto scrollbar-hide">
+        <div className="px-4 py-3 max-h-[280px] overflow-y-auto scrollbar-hide">
           <div className="space-y-2">
             {realtimeBalances.map((wallet, index) => {
               const isActive = activeWallet?.id === wallet.id;
@@ -194,7 +223,7 @@ export default function RealtimeWalletSwitcher({
               return (
                 <div
                   key={wallet.id}
-                  className="w-full border border-[#6E6E6E] rounded-lg overflow-hidden"
+                  className="w-full border border-[#6E6E6E] rounded-2xl overflow-hidden"
                 >
                   <button
                     onClick={() => handleSelectWallet(wallet.id)}
@@ -262,7 +291,7 @@ export default function RealtimeWalletSwitcher({
         </div>
 
         {/* Footer with Add Wallet */}
-        <div className="p-4">
+        <div className="px-4 py-4">
           <button
             onClick={handleAddWallet}
             className="w-full bg-[#E2AF19] text-black py-2.5 rounded-[12px] font-satoshi font-medium text-sm hover:bg-[#D4A853] transition-colors flex items-center justify-center"
@@ -273,13 +302,30 @@ export default function RealtimeWalletSwitcher({
         </div>
       </div>
 
-      {/* Wallet Welcome Modal */}
-      <WalletWelcomeModal
-        isOpen={walletModalOpen}
-        onClose={() => setWalletModalOpen(false)}
-        userName={user?.displayName || user?.name || "User"}
-        onWalletCreated={handleWalletCreated}
-      />
+      {/* Wallet Welcome Modal with higher z-index and data attribute */}
+      {walletModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Modal backdrop */}
+          <div
+            className="absolute inset-0 bg-white/10"
+            onClick={handleWalletModalClose}
+          />
+
+          {/* Modal wrapper with data attribute for click detection */}
+          <div
+            data-wallet-modal
+            className="relative z-51"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <WalletWelcomeModal
+              isOpen={true}
+              onClose={handleWalletModalClose}
+              userName={user?.displayName || user?.name || "User"}
+              onWalletCreated={handleWalletCreated}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }

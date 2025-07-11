@@ -1,4 +1,4 @@
-// src/components/friends/EnhancedFriendsSearch.tsx
+// src/components/friends/EnhancedFriendsSearch.tsx - UPDATED with backdrop effect
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -327,180 +327,204 @@ export default function EnhancedFriendsSearch({
     }
   };
 
-  return (
-    <div className="relative w-full" ref={searchRef}>
-      <div className="flex items-center gap-3">
-        {/* Enhanced Search Input */}
-        <div className="relative flex-1">
-          <Input
-            type="text"
-            placeholder={
-              isWalletAddress(searchQuery)
-                ? "Wallet address detected"
-                : "Search by @username or display name"
-            }
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-            }}
-            className="font-satoshi pr-10"
-            style={{ fontSize: "16px" }}
-            onFocus={() => {
-              if (suggestions.length > 0) {
-                setShowSuggestions(true);
-              }
-            }}
-          />
-          <Search
-            size={16}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          />
+  // Determine if dropdown is open (suggestions or no results message)
+  const isDropdownOpen =
+    showSuggestions ||
+    (showSuggestions &&
+      suggestions.length === 0 &&
+      searchQuery.length >= 2 &&
+      !searchLoading &&
+      !isWalletAddress(searchQuery));
 
-          {/* Loading indicator */}
-          {searchLoading && (
-            <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#E2AF19]"></div>
-            </div>
+  return (
+    <>
+      {/* ADDED: Backdrop for dropdown */}
+      {isDropdownOpen && <div className="fixed inset-0 z-10 bg-white/10" />}
+
+      <div className="relative w-full" ref={searchRef}>
+        <div className="flex items-center gap-3">
+          {/* Enhanced Search Input */}
+          <div className="relative flex-1">
+            <Input
+              type="text"
+              placeholder={
+                isWalletAddress(searchQuery)
+                  ? "Wallet address detected"
+                  : "Search by @username or display name"
+              }
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+              }}
+              className="font-satoshi pr-10"
+              style={{ fontSize: "16px" }}
+              onFocus={() => {
+                if (suggestions.length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
+            />
+            <Search
+              size={16}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            />
+
+            {/* Loading indicator */}
+            {searchLoading && (
+              <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#E2AF19]"></div>
+              </div>
+            )}
+          </div>
+
+          {/* Wallet Address Add Button */}
+          {searchQuery && isWalletAddress(searchQuery) && (
+            <Button
+              onClick={handleWalletAddressSubmit}
+              disabled={loading}
+              className="whitespace-nowrap text-sm lg:text-base"
+            >
+              {loading ? "Adding..." : "Add Friend"}
+            </Button>
           )}
         </div>
 
-        {/* Wallet Address Add Button */}
-        {searchQuery && isWalletAddress(searchQuery) && (
-          <Button
-            onClick={handleWalletAddressSubmit}
-            disabled={loading}
-            className="whitespace-nowrap text-sm lg:text-base"
-          >
-            {loading ? "Adding..." : "Add Friend"}
-          </Button>
-        )}
-      </div>
-
-      {/* Enhanced Suggestions Dropdown */}
-      {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-80 overflow-y-auto">
-          {/* Search Results Header */}
-          <div className="px-4 py-3 border-b border-[#2C2C2C] bg-[#0F0F0F]">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400 text-sm font-satoshi">
-                Search Results
-              </span>
-              <span className="text-gray-500 text-xs font-satoshi">
-                {suggestions.length} found
-              </span>
+        {/* Enhanced Suggestions Dropdown */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-80 overflow-y-auto scrollbar-hide">
+            {/* Search Results Header */}
+            <div className="px-4 py-3 border-b border-[#2C2C2C] bg-[#0F0F0F]">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm font-satoshi">
+                  Search Results
+                </span>
+                <span className="text-gray-500 text-xs font-satoshi">
+                  {suggestions.length} found
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* Suggestions List */}
-          <div className="py-2">
-            {suggestions.map((suggestion, index) => {
-              const relationshipDisplay = getRelationshipDisplay(suggestion);
-              const isSelected = index === selectedIndex;
+            {/* Suggestions List */}
+            <div className="py-2">
+              {suggestions.map((suggestion, index) => {
+                const relationshipDisplay = getRelationshipDisplay(suggestion);
+                const isSelected = index === selectedIndex;
 
-              return (
-                <div
-                  key={suggestion._id}
-                  className={`flex items-center justify-between px-4 py-3 transition-colors cursor-pointer ${
-                    isSelected ? "bg-[#2C2C2C]" : "hover:bg-[#1A1A1A]"
-                  }`}
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                >
-                  {/* User Info */}
-                  <div className="flex items-center flex-1 min-w-0">
-                    {/* Avatar */}
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-sm font-medium">
-                        {suggestion.displayName?.[0]?.toUpperCase() ||
-                          suggestion.username[0]?.toUpperCase()}
-                      </span>
+                return (
+                  <div
+                    key={suggestion._id}
+                    className={`flex items-center justify-between px-4 py-3 transition-colors cursor-pointer ${
+                      isSelected ? "bg-[#2C2C2C]" : "hover:bg-[#1A1A1A]"
+                    }`}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    onMouseEnter={() => setSelectedIndex(index)}
+                  >
+                    {/* User Info */}
+                    <div className="flex items-center flex-1 min-w-0">
+                      {/* Avatar */}
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-sm font-medium">
+                          {suggestion.displayName?.[0]?.toUpperCase() ||
+                            suggestion.username[0]?.toUpperCase()}
+                        </span>
+                      </div>
+
+                      {/* User Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-white font-satoshi text-sm truncate">
+                            {suggestion.displayName || suggestion.username}
+                          </span>
+                          {relationshipDisplay.icon}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 font-satoshi text-xs truncate">
+                            @{suggestion.username}
+                          </span>
+                          <span
+                            className={`text-xs font-satoshi ${relationshipDisplay.color}`}
+                          >
+                            {relationshipDisplay.label}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* User Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-white font-satoshi text-sm truncate">
-                          {suggestion.displayName || suggestion.username}
-                        </span>
-                        {relationshipDisplay.icon}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-400 font-satoshi text-xs truncate">
-                          @{suggestion.username}
-                        </span>
-                        <span
-                          className={`text-xs font-satoshi ${relationshipDisplay.color}`}
+                    {/* Action Button */}
+                    <div className="flex-shrink-0 ml-3">
+                      {!relationshipDisplay.actionDisabled ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSuggestionClick(suggestion);
+                          }}
+                          disabled={loading}
+                          className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-xs flex items-center gap-1 disabled:opacity-50"
                         >
+                          <UserPlus size={12} />
+                          Add
+                        </button>
+                      ) : (
+                        <div
+                          className={`px-3 py-1.5 rounded-lg text-xs font-satoshi ${relationshipDisplay.color} bg-opacity-10 flex items-center gap-1`}
+                          style={{
+                            backgroundColor: relationshipDisplay.color.includes(
+                              "green"
+                            )
+                              ? "rgba(34, 197, 94, 0.1)"
+                              : relationshipDisplay.color.includes("blue")
+                              ? "rgba(59, 130, 246, 0.1)"
+                              : "rgba(251, 146, 60, 0.1)",
+                          }}
+                        >
+                          {relationshipDisplay.icon}
                           {relationshipDisplay.label}
-                        </span>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {/* Action Button */}
-                  <div className="flex-shrink-0 ml-3">
-                    {!relationshipDisplay.actionDisabled ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSuggestionClick(suggestion);
-                        }}
-                        disabled={loading}
-                        className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-xs flex items-center gap-1 disabled:opacity-50"
-                      >
-                        <UserPlus size={12} />
-                        Add
-                      </button>
-                    ) : (
-                      <div
-                        className={`px-3 py-1.5 rounded-lg text-xs font-satoshi ${relationshipDisplay.color} bg-opacity-10 flex items-center gap-1`}
-                        style={{
-                          backgroundColor: relationshipDisplay.color.includes(
-                            "green"
-                          )
-                            ? "rgba(34, 197, 94, 0.1)"
-                            : relationshipDisplay.color.includes("blue")
-                            ? "rgba(59, 130, 246, 0.1)"
-                            : "rgba(251, 146, 60, 0.1)",
-                        }}
-                      >
-                        {relationshipDisplay.icon}
-                        {relationshipDisplay.label}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Footer with shortcut hints */}
-          <div className="px-4 py-2 border-t border-[#2C2C2C] bg-[#0F0F0F]">
-            <div className="flex items-center justify-between text-xs text-gray-500 font-satoshi">
-              <span>Use ↑↓ to navigate, Enter to select</span>
-              <span>ESC to close</span>
+                );
+              })}
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* No Results Message */}
-      {showSuggestions &&
-        suggestions.length === 0 &&
-        searchQuery.length >= 2 &&
-        !searchLoading &&
-        !isWalletAddress(searchQuery) && (
-          <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-4">
-            <div className="text-center">
-              <div className="text-gray-400 text-sm font-satoshi mb-2">
-                No users found for "{searchQuery}"
-              </div>
-              <div className="text-gray-500 text-xs font-satoshi">
-                Try searching by username or display name
+            {/* Footer with shortcut hints */}
+            <div className="px-4 py-2 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+              <div className="flex items-center justify-between text-xs text-gray-500 font-satoshi">
+                <span>Use ↑↓ to navigate, Enter to select</span>
+                <span>ESC to close</span>
               </div>
             </div>
           </div>
         )}
-    </div>
+
+        {/* No Results Message */}
+        {showSuggestions &&
+          suggestions.length === 0 &&
+          searchQuery.length >= 2 &&
+          !searchLoading &&
+          !isWalletAddress(searchQuery) && (
+            <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-4">
+              <div className="text-center">
+                <div className="text-gray-400 text-sm font-satoshi mb-2">
+                  No users found for "{searchQuery}"
+                </div>
+                <div className="text-gray-500 text-xs font-satoshi">
+                  Try searching by username or display name
+                </div>
+              </div>
+            </div>
+          )}
+
+        <style jsx global>{`
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+      </div>
+    </>
   );
 }

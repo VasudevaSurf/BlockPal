@@ -1,4 +1,4 @@
-// src/components/notifications/NotificationPanel.tsx - UNIFIED notification system
+// src/components/notifications/NotificationPanel.tsx - UNIFIED notification system with backdrop
 "use client";
 
 import { useState, useEffect } from "react";
@@ -315,270 +315,218 @@ export default function NotificationPanel({
   const unreadCount = unifiedNotifications.filter((n) => !n.isRead).length;
 
   return (
-    <div className="absolute top-16 right-0 z-50 w-80 bg-black/95 backdrop-blur-sm border border-[#2C2C2C] rounded-lg shadow-xl">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
-        <div className="flex items-center">
-          <Bell size={18} className="text-white mr-2" />
-          <h3 className="text-white font-semibold font-satoshi">
-            Notifications
-          </h3>
-          {unreadCount > 0 && (
-            <span className="ml-2 bg-[#E2AF19] text-black text-xs font-satoshi font-medium px-2 py-1 rounded-full">
-              {unreadCount}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center space-x-2">
-          {unreadCount > 0 && (
-            <button
-              onClick={clearAllNotifications}
-              className="text-[#E2AF19] hover:opacity-80 transition-opacity text-sm font-satoshi"
-            >
-              Read All
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      </div>
+    <>
+      {/* ADDED: Backdrop similar to WelcomeModal */}
+      <div className="fixed inset-0 z-30 bg-white/10" onClick={onClose} />
 
-      {/* <div className="p-4 border-b border-[#2C2C2C] bg-[#0F0F0F]/50">
-        <div className="flex items-center justify-between mb-3">
+      <div className="absolute top-16 right-0 z-50 w-80 bg-black/95 backdrop-blur-sm border border-[#2C2C2C] rounded-lg shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
           <div className="flex items-center">
-            {isMonitoring ? (
-              <Wifi size={16} className="text-green-400 animate-pulse mr-2" />
-            ) : (
-              <WifiOff size={16} className="text-gray-400 mr-2" />
-            )}
-            <span
-              className={`text-sm font-satoshi font-medium ${
-                isMonitoring ? "text-green-400" : "text-gray-400"
-              }`}
-            >
-              {isMonitoring ? "Live Updates Active" : "Disconnected"}
-            </span>
-          </div>
-
-          <button
-            onClick={refreshDashboard}
-            className="bg-[#E2AF19] text-black px-3 py-1 rounded-lg text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
-          >
-            <RefreshCw size={12} className="mr-1" />
-            Refresh
-          </button>
-        </div>
-
-        <div className="space-y-2 text-xs">
-          {lastUpdated && (
-            <div className="flex justify-between">
-              <span className="text-gray-400">Last Update:</span>
-              <span className="text-white">{formatTime(lastUpdated)}</span>
-            </div>
-          )}
-
-          {isMonitoring && nextUpdateCountdown > 0 && (
-            <div className="flex justify-between">
-              <span className="text-gray-400">Next Update:</span>
-              <span className="text-green-400 flex items-center">
-                <Clock size={10} className="mr-1" />
-                {nextUpdateCountdown}s
+            <Bell size={18} className="text-white mr-2" />
+            <h3 className="text-white font-semibold font-satoshi">
+              Notifications
+            </h3>
+            {unreadCount > 0 && (
+              <span className="ml-2 bg-[#E2AF19] text-black text-xs font-satoshi font-medium px-2 py-1 rounded-full">
+                {unreadCount}
               </span>
-            </div>
-          )}
-
-          {realtimeData && (
-            <>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Portfolio:</span>
-                <span className="text-white">
-                  ${realtimeData.totalValue.toFixed(2)}
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-gray-400">Tokens:</span>
-                <span className="text-white">{realtimeData.tokens.length}</span>
-              </div>
-            </>
-          )}
-        </div>
-      </div> */}
-
-      <div className="max-h-64 overflow-y-auto scrollbar-hide">
-        {loadingDb && databaseNotifications.length === 0 ? (
-          <div className="p-6 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
-            <p className="text-gray-400 font-satoshi">
-              Loading notifications...
-            </p>
+            )}
           </div>
-        ) : unifiedNotifications.length === 0 ? (
-          <div className="p-6 text-center">
-            <CheckCircle size={32} className="text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-400 text-sm font-satoshi">
-              No new notifications
-            </p>
-            <p className="text-gray-500 text-xs font-satoshi mt-1">
-              You'll be notified of portfolio changes and friend requests
-            </p>
-          </div>
-        ) : (
-          <div className="p-2">
-            {unifiedNotifications.slice(0, 20).map((notification) => (
-              <div
-                key={notification.id}
-                className={`p-3 rounded-lg border-l-4 mb-2 transition-colors ${getNotificationColor(
-                  notification.type,
-                  notification.source
-                )} ${!notification.isRead ? "bg-opacity-80" : "bg-opacity-40"}`}
+          <div className="flex items-center space-x-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={clearAllNotifications}
+                className="text-[#E2AF19] hover:opacity-80 transition-opacity text-sm font-satoshi"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0 mt-0.5">
-                      {getNotificationIcon(
-                        notification.type,
-                        notification.source
-                      )}
-                    </div>
+                Read All
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
 
-                    <div className="ml-3 flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-white text-sm font-satoshi font-medium">
-                          {notification.title}
-                        </p>
-                        {!notification.isRead && (
-                          <div className="w-2 h-2 bg-[#E2AF19] rounded-full flex-shrink-0 ml-2"></div>
+        <div className="max-h-64 overflow-y-auto scrollbar-hide">
+          {loadingDb && databaseNotifications.length === 0 ? (
+            <div className="p-6 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
+              <p className="text-gray-400 font-satoshi">
+                Loading notifications...
+              </p>
+            </div>
+          ) : unifiedNotifications.length === 0 ? (
+            <div className="p-6 text-center">
+              <CheckCircle size={32} className="text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-400 text-sm font-satoshi">
+                No new notifications
+              </p>
+              <p className="text-gray-500 text-xs font-satoshi mt-1">
+                You'll be notified of portfolio changes and friend requests
+              </p>
+            </div>
+          ) : (
+            <div className="p-2">
+              {unifiedNotifications.slice(0, 20).map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-3 rounded-lg border-l-4 mb-2 transition-colors ${getNotificationColor(
+                    notification.type,
+                    notification.source
+                  )} ${
+                    !notification.isRead ? "bg-opacity-80" : "bg-opacity-40"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getNotificationIcon(
+                          notification.type,
+                          notification.source
                         )}
                       </div>
 
-                      <p className="text-gray-400 text-sm font-satoshi mt-1">
-                        {notification.message}
-                      </p>
+                      <div className="ml-3 flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-white text-sm font-satoshi font-medium">
+                            {notification.title}
+                          </p>
+                          {!notification.isRead && (
+                            <div className="w-2 h-2 bg-[#E2AF19] rounded-full flex-shrink-0 ml-2"></div>
+                          )}
+                        </div>
 
-                      {/* Additional notification data */}
-                      {notification.source === "realtime" && (
-                        <>
-                          {notification.type === "portfolio_increased" &&
-                            notification.data && (
-                              <p className="text-green-400 text-xs font-satoshi mt-1">
-                                New total: $
-                                {notification.data.totalValue.toFixed(2)}
-                              </p>
-                            )}
+                        <p className="text-gray-400 text-sm font-satoshi mt-1">
+                          {notification.message}
+                        </p>
 
-                          {notification.type === "portfolio_decreased" &&
-                            notification.data && (
-                              <p className="text-red-400 text-xs font-satoshi mt-1">
-                                New total: $
-                                {notification.data.totalValue.toFixed(2)}
-                              </p>
-                            )}
+                        {/* Additional notification data */}
+                        {notification.source === "realtime" && (
+                          <>
+                            {notification.type === "portfolio_increased" &&
+                              notification.data && (
+                                <p className="text-green-400 text-xs font-satoshi mt-1">
+                                  New total: $
+                                  {notification.data.totalValue.toFixed(2)}
+                                </p>
+                              )}
 
-                          {notification.type === "token_count_changed" &&
-                            notification.data && (
-                              <p className="text-blue-400 text-xs font-satoshi mt-1">
-                                {notification.data.previousCount} →{" "}
-                                {notification.data.newCount} tokens
-                              </p>
-                            )}
-                        </>
-                      )}
+                            {notification.type === "portfolio_decreased" &&
+                              notification.data && (
+                                <p className="text-red-400 text-xs font-satoshi mt-1">
+                                  New total: $
+                                  {notification.data.totalValue.toFixed(2)}
+                                </p>
+                              )}
 
-                      {/* Database notification details */}
-                      {notification.source === "database" &&
-                        notification.type === "fund_request_response" &&
-                        notification.data && (
-                          <div className="bg-[#1A1A1A] rounded p-2 mt-2 border border-[#2C2C2C]">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-400 font-satoshi">
-                                Amount: {notification.data.amount}{" "}
-                                {notification.data.tokenSymbol}
-                              </span>
-                              <span
-                                className={`font-satoshi font-medium ${
-                                  notification.data.action === "fulfill"
-                                    ? "text-green-400"
-                                    : "text-red-400"
-                                }`}
-                              >
-                                {notification.data.action === "fulfill"
-                                  ? "✅ Fulfilled"
-                                  : "❌ Declined"}
-                              </span>
-                            </div>
-                            {notification.data.transactionHash && (
-                              <div className="text-xs text-gray-400 font-satoshi mt-1">
-                                Tx:{" "}
-                                {notification.data.transactionHash.slice(0, 10)}
-                                ...
-                                {notification.data.transactionHash.slice(-8)}
-                              </div>
-                            )}
-                          </div>
+                            {notification.type === "token_count_changed" &&
+                              notification.data && (
+                                <p className="text-blue-400 text-xs font-satoshi mt-1">
+                                  {notification.data.previousCount} →{" "}
+                                  {notification.data.newCount} tokens
+                                </p>
+                              )}
+                          </>
                         )}
 
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-gray-500 text-xs font-satoshi">
-                          {getTimeAgo(notification.timestamp)}
-                        </span>
-                        <span className="text-gray-600 text-xs font-satoshi capitalize">
-                          {notification.source === "realtime"
-                            ? "Live"
-                            : "System"}
-                        </span>
+                        {/* Database notification details */}
+                        {notification.source === "database" &&
+                          notification.type === "fund_request_response" &&
+                          notification.data && (
+                            <div className="bg-[#1A1A1A] rounded p-2 mt-2 border border-[#2C2C2C]">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-400 font-satoshi">
+                                  Amount: {notification.data.amount}{" "}
+                                  {notification.data.tokenSymbol}
+                                </span>
+                                <span
+                                  className={`font-satoshi font-medium ${
+                                    notification.data.action === "fulfill"
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }`}
+                                >
+                                  {notification.data.action === "fulfill"
+                                    ? "✅ Fulfilled"
+                                    : "❌ Declined"}
+                                </span>
+                              </div>
+                              {notification.data.transactionHash && (
+                                <div className="text-xs text-gray-400 font-satoshi mt-1">
+                                  Tx:{" "}
+                                  {notification.data.transactionHash.slice(
+                                    0,
+                                    10
+                                  )}
+                                  ...
+                                  {notification.data.transactionHash.slice(-8)}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-gray-500 text-xs font-satoshi">
+                            {getTimeAgo(notification.timestamp)}
+                          </span>
+                          <span className="text-gray-600 text-xs font-satoshi capitalize">
+                            {notification.source === "realtime"
+                              ? "Live"
+                              : "System"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <style jsx>{`
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+
+        {/* Footer */}
+        {unifiedNotifications.length > 0 && (
+          <div className="p-3 border-t border-[#2C2C2C] bg-[#0F0F0F]/50">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400 text-xs font-satoshi">
+                {unifiedNotifications.length} notification
+                {unifiedNotifications.length !== 1 ? "s" : ""}
+                {unreadCount > 0 && ` (${unreadCount} unread)`}
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={fetchDatabaseNotifications}
+                  className="text-gray-400 hover:text-white text-xs font-satoshi px-2 py-1 rounded transition-colors"
+                >
+                  Refresh
+                </button>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={clearAllNotifications}
+                    className="text-[#E2AF19] hover:text-white text-xs font-satoshi px-3 py-1 rounded-lg bg-[#2C2C2C] hover:bg-[#3C3C3C] transition-colors"
+                  >
+                    Read All ({unreadCount})
+                  </button>
+                )}
               </div>
-            ))}
+            </div>
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
-
-      {/* Footer */}
-      {unifiedNotifications.length > 0 && (
-        <div className="p-3 border-t border-[#2C2C2C] bg-[#0F0F0F]/50">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-400 text-xs font-satoshi">
-              {unifiedNotifications.length} notification
-              {unifiedNotifications.length !== 1 ? "s" : ""}
-              {unreadCount > 0 && ` (${unreadCount} unread)`}
-            </span>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={fetchDatabaseNotifications}
-                className="text-gray-400 hover:text-white text-xs font-satoshi px-2 py-1 rounded transition-colors"
-              >
-                Refresh
-              </button>
-              {unreadCount > 0 && (
-                <button
-                  onClick={clearAllNotifications}
-                  className="text-[#E2AF19] hover:text-white text-xs font-satoshi px-3 py-1 rounded-lg bg-[#2C2C2C] hover:bg-[#3C3C3C] transition-colors"
-                >
-                  Read All ({unreadCount})
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
