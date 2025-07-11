@@ -1,4 +1,4 @@
-// src/components/profile/UserProfilePage.tsx - FIXED to hide password change for Google users
+// src/components/profile/UserProfilePage.tsx - FIXED with proper avatar refresh
 "use client";
 
 import { useState, useEffect } from "react";
@@ -34,6 +34,7 @@ import { logoutUser } from "@/store/slices/authSlice";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import TwoFactorSetupModal from "./TwoFactorSetupModal";
+import ProfilePictureUpload from "./ProfilePictureUpload";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 
 interface UserProfile {
@@ -54,7 +55,6 @@ interface UserProfile {
     currency: "USD" | "INR" | "EUR";
   };
   twoFactorEnabled: boolean;
-  // NEW: Add authentication provider info
   authProvider?: "email" | "google";
   hasPassword?: boolean;
   hasGoogleAuth?: boolean;
@@ -219,12 +219,16 @@ export default function UserProfilePage() {
 
       const response = await fetch("/api/profile", {
         credentials: "include",
+        // Add cache busting to ensure fresh data
+        headers: {
+          "Cache-Control": "no-cache",
+        },
       });
 
       if (response.ok) {
         const data = await response.json();
+        console.log("✅ Profile loaded with avatar:", data.profile.avatar);
         setProfile(data.profile);
-        console.log("✅ Profile loaded:", data.profile);
       } else {
         console.error("❌ Failed to fetch profile:", response.status);
       }
@@ -232,6 +236,31 @@ export default function UserProfilePage() {
       console.error("💥 Error fetching profile:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // FIXED: Enhanced avatar update handler
+  const handleAvatarUpdate = async (newAvatarUrl: string) => {
+    console.log("🖼️ Avatar update received:", newAvatarUrl);
+
+    // Update state immediately for instant UI feedback
+    if (profile) {
+      const updatedProfile = {
+        ...profile,
+        avatar: newAvatarUrl,
+      };
+      console.log("🔄 Updating profile state with new avatar");
+      setProfile(updatedProfile);
+    }
+
+    // Also refresh the entire profile to ensure consistency
+    try {
+      console.log("🔄 Refreshing profile data to ensure consistency...");
+      await fetchUserProfile();
+      console.log("✅ Profile data refreshed successfully");
+    } catch (error) {
+      console.error("❌ Error refreshing profile:", error);
+      // If refresh fails, the immediate state update above will still show the new avatar
     }
   };
 
@@ -300,22 +329,13 @@ export default function UserProfilePage() {
       willEnable: !profile.twoFactorEnabled,
     });
 
-    // Set the action we want to perform
     setIs2FAEnabling(!profile.twoFactorEnabled);
-
-    // Show the modal
     setShow2FAModal(true);
-
-    console.log("✅ 2FA Modal should now be open:", {
-      show2FAModal: true,
-      is2FAEnabling: !profile.twoFactorEnabled,
-    });
   };
 
   // 2FA Complete Handler
   const handle2FAComplete = async () => {
     console.log("🎉 2FA Setup completed, refreshing profile...");
-    // Refresh profile to get updated 2FA status
     await fetchUserProfile();
   };
 
@@ -353,12 +373,12 @@ export default function UserProfilePage() {
     await dispatch(logoutUser());
   };
 
-  // NEW: Check if user can change password
+  // Check if user can change password
   const canChangePassword =
     profile &&
     (profile.authProvider === "email" ||
       profile.hasPassword === true ||
-      (!profile.authProvider && !profile.hasGoogleAuth)); // Fallback for existing users
+      (!profile.authProvider && !profile.hasGoogleAuth));
 
   // Show skeleton loading when loading
   if (loading) {
@@ -367,12 +387,10 @@ export default function UserProfilePage() {
         {/* Mobile Layout Skeleton */}
         <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
           <ProfileHeaderSkeleton />
-
           <SkeletonCard>
             <Skeleton className="h-5 w-32 mb-4" />
             <ProfileStatsSkeleton />
           </SkeletonCard>
-
           <SettingsSectionSkeleton />
           <SettingsSectionSkeleton />
           <SettingsSectionSkeleton />
@@ -380,17 +398,13 @@ export default function UserProfilePage() {
 
         {/* Desktop Layout Skeleton */}
         <div className="hidden xl:flex gap-6 flex-1 min-h-0">
-          {/* Left Column */}
           <div className="flex-1 space-y-6 overflow-y-auto scrollbar-hide">
             <ProfileHeaderSkeleton />
-
             <SkeletonCard>
               <Skeleton className="h-6 w-32 mb-6" />
               <ProfileStatsSkeleton />
             </SkeletonCard>
           </div>
-
-          {/* Right Column */}
           <div className="w-[400px] space-y-6 overflow-y-auto scrollbar-hide">
             <SettingsSectionSkeleton />
             <SettingsSectionSkeleton />
@@ -424,26 +438,12 @@ export default function UserProfilePage() {
     );
   }
 
-  // Get wallet color based on activeWallet index in wallets array
-  const getWalletColor = () => {
-    const colors = [
-      "bg-gradient-to-br from-blue-400 to-cyan-400",
-      "bg-gradient-to-br from-purple-400 to-pink-400",
-      "bg-gradient-to-br from-green-400 to-emerald-400",
-      "bg-gradient-to-br from-orange-400 to-red-400",
-      "bg-gradient-to-br from-indigo-400 to-purple-400",
-    ];
-
-    if (!activeWallet) return colors[0];
-
-    // Find the index of the active wallet in the wallets array
-    const activeIndex = wallets.findIndex((w) => w.id === activeWallet.id);
-    return colors[activeIndex >= 0 ? activeIndex % colors.length : 0];
-  };
+  // DEBUG: Log current profile avatar
+  console.log("🖼️ Rendering profile with avatar:", profile.avatar);
 
   return (
     <>
-      {/* ADDED: Backdrop for all modals */}
+      {/* Backdrop for all modals */}
       {(showPasswordModal || showContactModal || show2FAModal) && (
         <div className="fixed inset-0 z-40 bg-white/10" />
       )}
@@ -451,7 +451,7 @@ export default function UserProfilePage() {
       <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
         {/* Mobile Layout */}
         <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-          {/* Profile Header */}
+          {/* Profile Header - Mobile */}
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-white font-satoshi">
@@ -473,19 +473,14 @@ export default function UserProfilePage() {
             </div>
 
             <div className="flex items-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-4 flex items-center justify-center relative">
-                <div
-                  className="absolute inset-0 rounded-full opacity-30"
-                  style={{
-                    backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
-                                   linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
-                    backgroundSize: "8px 8px",
-                  }}
-                ></div>
-                <span className="text-white text-xl font-bold">
-                  {profile.displayName?.charAt(0)?.toUpperCase() || "U"}
-                </span>
-              </div>
+              {/* Profile Picture Upload - Mobile */}
+              <ProfilePictureUpload
+                currentAvatarUrl={profile.avatar}
+                userName={profile.displayName || profile.username}
+                onAvatarUpdate={handleAvatarUpdate}
+                className="w-16 h-16 mr-4"
+              />
+
               <div>
                 {editing ? (
                   <Input
@@ -508,7 +503,7 @@ export default function UserProfilePage() {
                 <p className="text-gray-400 text-sm font-satoshi">
                   @{profile.username}
                 </p>
-                {/* NEW: Show authentication method */}
+                {/* Authentication method indicator */}
                 <div className="flex items-center mt-1">
                   {profile.authProvider === "google" ||
                   profile.hasGoogleAuth ? (
@@ -544,7 +539,7 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* Account Statistics */}
+          {/* Account Statistics - Mobile */}
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
             <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
               Account Statistics
@@ -601,14 +596,13 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* Account & Security - UPDATED */}
+          {/* Account & Security - Mobile */}
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
             <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
               Account & Security
             </h3>
 
             <div className="space-y-4">
-              {/* CONDITIONAL: Only show password change for non-Google users */}
               {canChangePassword && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -626,7 +620,6 @@ export default function UserProfilePage() {
                 </div>
               )}
 
-              {/* NEW: Show info for Google users who can't change password */}
               {!canChangePassword && (
                 <div className="flex items-center justify-between p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
                   <div className="flex items-center">
@@ -646,7 +639,7 @@ export default function UserProfilePage() {
                 </div>
               )}
 
-              {/* 2FA Section */}
+              {/* 2FA Section - Mobile */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <Shield size={16} className="text-gray-400 mr-3" />
@@ -680,7 +673,7 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* Notifications */}
+          {/* Notifications - Mobile */}
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
             <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
               Notifications
@@ -800,7 +793,7 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* Support & Feedback */}
+          {/* Support & Feedback - Mobile */}
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
             <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
               Support & Feedback
@@ -830,7 +823,7 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* Account Actions */}
+          {/* Account Actions - Mobile */}
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
             <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
               Account Actions
@@ -848,7 +841,7 @@ export default function UserProfilePage() {
           </div>
         </div>
 
-        {/* Desktop Layout - Similar structure but need to update Account & Security section */}
+        {/* Desktop Layout */}
         <div className="hidden xl:flex gap-6 flex-1 min-h-0">
           {/* Left Column */}
           <div className="flex-1 space-y-6 overflow-y-auto scrollbar-hide">
@@ -874,19 +867,13 @@ export default function UserProfilePage() {
               </div>
 
               <div className="flex items-start space-x-6">
-                <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full flex items-center justify-center relative">
-                  <div
-                    className="absolute inset-0 rounded-full opacity-30"
-                    style={{
-                      backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
-                                     linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
-                      backgroundSize: "12px 12px",
-                    }}
-                  ></div>
-                  <span className="text-white text-2xl font-bold">
-                    {profile.displayName?.charAt(0)?.toUpperCase() || "U"}
-                  </span>
-                </div>
+                {/* Profile Picture Upload - Desktop */}
+                <ProfilePictureUpload
+                  currentAvatarUrl={profile.avatar}
+                  userName={profile.displayName || profile.username}
+                  onAvatarUpdate={handleAvatarUpdate}
+                  className="w-24 h-24"
+                />
 
                 <div className="flex-1">
                   {editing ? (
@@ -914,7 +901,7 @@ export default function UserProfilePage() {
                         @{profile.username}
                       </p>
 
-                      {/* NEW: Show authentication method - Desktop */}
+                      {/* Authentication method indicator - Desktop */}
                       <div className="flex items-center mb-4">
                         {profile.authProvider === "google" ||
                         profile.hasGoogleAuth ? (
@@ -1008,16 +995,15 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* Right Column */}
+          {/* Right Column - Desktop */}
           <div className="w-[400px] space-y-6 overflow-y-auto scrollbar-hide">
-            {/* Account & Security - Desktop - UPDATED */}
+            {/* Account & Security - Desktop */}
             <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
               <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
                 Account & Security
               </h3>
 
               <div className="space-y-6">
-                {/* CONDITIONAL: Only show password change for non-Google users */}
                 {canChangePassword && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
@@ -1035,7 +1021,6 @@ export default function UserProfilePage() {
                   </div>
                 )}
 
-                {/* NEW: Show info for Google users who can't change password - Desktop */}
                 {!canChangePassword && (
                   <div className="flex items-center justify-between p-4 bg-blue-900/20 border border-blue-500/50 rounded-lg">
                     <div className="flex items-center">
@@ -1089,7 +1074,7 @@ export default function UserProfilePage() {
               </div>
             </div>
 
-            {/* Notifications - Desktop (same as before) */}
+            {/* Notifications - Desktop */}
             <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
               <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
                 Notifications
@@ -1212,7 +1197,7 @@ export default function UserProfilePage() {
               </div>
             </div>
 
-            {/* Support & Account Actions - Desktop (same as before) */}
+            {/* Support & Account Actions - Desktop */}
             <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
               <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
                 Support & Actions
@@ -1256,6 +1241,7 @@ export default function UserProfilePage() {
           </div>
         </div>
 
+        {/* Modals remain the same... */}
         {/* Password Change Modal - Only show if user can change password */}
         {showPasswordModal && canChangePassword && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">

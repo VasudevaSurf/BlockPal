@@ -1,4 +1,4 @@
-// src/app/api/profile/route.ts - FIXED with auth provider info
+// src/app/api/profile/route.ts - UPDATED with better avatar handling
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -27,6 +27,10 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
+
+    // DEBUG: Log the avatar field
+    console.log("🖼️ User avatar from DB:", user.avatar);
+    console.log("🖼️ Avatar updated at:", user.avatarUpdatedAt);
 
     // Get actual transaction count
     const totalTransactions = await db
@@ -61,11 +65,22 @@ export async function GET(request: NextRequest) {
       friendsCount,
     });
 
+    // Ensure avatar URL is properly set
+    let avatarUrl = user.avatar;
+
+    // If no avatar or avatar is null/empty, generate default
+    if (!avatarUrl || avatarUrl === null || avatarUrl === "") {
+      avatarUrl = `https://avatars.dicebear.com/api/identicon/${user.username}.svg`;
+      console.log("🖼️ Using default avatar:", avatarUrl);
+    } else {
+      console.log("🖼️ Using stored avatar:", avatarUrl);
+    }
+
     const profile = {
       username: user.username,
       displayName: user.displayName || user.username,
       gmail: user.gmail || user.email,
-      avatar: user.avatar || null,
+      avatar: avatarUrl, // Ensure this is always a valid URL
       accountCreated: user.createdAt
         ? new Date(user.createdAt).toLocaleDateString()
         : new Date().toLocaleDateString(),
@@ -82,7 +97,7 @@ export async function GET(request: NextRequest) {
       },
       // Get actual 2FA status
       twoFactorEnabled: user.twoFactorEnabled || false,
-      // NEW: Add authentication provider information
+      // Authentication provider information
       authProvider: user.authProvider || (user.googleId ? "google" : "email"),
       hasPassword: !!user.passwordHash,
       hasGoogleAuth: !!user.googleId,
@@ -90,6 +105,7 @@ export async function GET(request: NextRequest) {
 
     console.log("✅ Profile data prepared:", {
       username: profile.username,
+      avatar: profile.avatar,
       totalTransactions: profile.totalTransactions,
       completedScheduledPayments: profile.scheduledPayments,
       friendsCount: profile.friendsCount,
@@ -153,6 +169,9 @@ export async function PUT(request: NextRequest) {
         { projection: { passwordHash: 0 } }
       );
 
+    // DEBUG: Log the avatar after update
+    console.log("🖼️ Updated user avatar from DB:", updatedUser?.avatar);
+
     // Get updated stats
     const totalTransactions = await db
       .collection("executed_transactions")
@@ -177,34 +196,42 @@ export async function PUT(request: NextRequest) {
       ],
     });
 
+    // Ensure avatar URL is properly set
+    let avatarUrl = updatedUser?.avatar;
+
+    if (!avatarUrl || avatarUrl === null || avatarUrl === "") {
+      avatarUrl = `https://avatars.dicebear.com/api/identicon/${updatedUser?.username}.svg`;
+    }
+
     const profile = {
-      username: updatedUser.username,
-      displayName: updatedUser.displayName || updatedUser.username,
-      gmail: updatedUser.gmail || updatedUser.email,
-      avatar: updatedUser.avatar || null,
-      accountCreated: updatedUser.createdAt
+      username: updatedUser?.username,
+      displayName: updatedUser?.displayName || updatedUser?.username,
+      gmail: updatedUser?.gmail || updatedUser?.email,
+      avatar: avatarUrl,
+      accountCreated: updatedUser?.createdAt
         ? new Date(updatedUser.createdAt).toLocaleDateString()
         : new Date().toLocaleDateString(),
       totalTransactions,
       scheduledPayments,
       friendsCount,
       preferences: {
-        notifications: updatedUser.preferences?.notifications !== false,
-        pushNotifications: updatedUser.preferences?.pushNotifications !== false,
+        notifications: updatedUser?.preferences?.notifications !== false,
+        pushNotifications:
+          updatedUser?.preferences?.pushNotifications !== false,
         emailNotifications:
-          updatedUser.preferences?.emailNotifications !== false,
-        friendRequests: updatedUser.preferences?.friendRequests || "everyone",
-        currency: updatedUser.preferences?.currency || "USD",
+          updatedUser?.preferences?.emailNotifications !== false,
+        friendRequests: updatedUser?.preferences?.friendRequests || "everyone",
+        currency: updatedUser?.preferences?.currency || "USD",
       },
-      twoFactorEnabled: updatedUser.twoFactorEnabled || false,
-      // NEW: Add authentication provider information
+      twoFactorEnabled: updatedUser?.twoFactorEnabled || false,
       authProvider:
-        updatedUser.authProvider || (updatedUser.googleId ? "google" : "email"),
-      hasPassword: !!updatedUser.passwordHash,
-      hasGoogleAuth: !!updatedUser.googleId,
+        updatedUser?.authProvider ||
+        (updatedUser?.googleId ? "google" : "email"),
+      hasPassword: !!updatedUser?.passwordHash,
+      hasGoogleAuth: !!updatedUser?.googleId,
     };
 
-    console.log("✅ Profile updated successfully");
+    console.log("✅ Profile updated successfully with avatar:", profile.avatar);
 
     return NextResponse.json({
       success: true,
