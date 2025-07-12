@@ -1,4 +1,4 @@
-// src/components/transfer/SimpleTransferModal.tsx - UPDATED WITH CUSTOM PROFILE ICON
+// src/components/transfer/SimpleTransferModal.tsx - FIXED MOBILE LAYOUT
 "use client";
 
 import { useState, useEffect } from "react";
@@ -142,15 +142,14 @@ export default function SimpleTransferModal({
       setIsLoading(false);
       setCopied("");
       setSelectedPercentage(null);
-      setGasEstimation(null); // NEW: Reset gas estimation
+      setGasEstimation(null);
       setGasLoading(false);
     }
   }, [isOpen]);
 
-  // NEW: Debounced gas estimation effect
+  // Debounced gas estimation effect
   useEffect(() => {
     const fetchGasEstimation = async () => {
-      // Only fetch if we have valid form data
       if (
         !formData.amount ||
         !formData.recipientAddress ||
@@ -162,7 +161,6 @@ export default function SimpleTransferModal({
         return;
       }
 
-      // Validate recipient address format
       const recipientAddress = selectedUser
         ? selectedUser.walletAddress
         : formData.recipientAddress;
@@ -208,13 +206,11 @@ export default function SimpleTransferModal({
         }
       } catch (error) {
         console.log("Gas estimation failed:", error);
-        // Silently fail - not critical for form functionality
       } finally {
         setGasLoading(false);
       }
     };
 
-    // Debounce the gas estimation to avoid too many API calls
     const timeoutId = setTimeout(fetchGasEstimation, 800);
     return () => clearTimeout(timeoutId);
   }, [
@@ -239,7 +235,6 @@ export default function SimpleTransferModal({
       setSelectedUser(null);
     }
 
-    // Clear error when user types
     if (errors.recipientAddress) {
       setErrors({ ...errors, recipientAddress: "" });
     }
@@ -266,7 +261,7 @@ export default function SimpleTransferModal({
   // Handle amount change
   const handleAmountChange = (value: string) => {
     setFormData({ ...formData, amount: value });
-    setSelectedPercentage(null); // Reset percentage selection when manually typing
+    setSelectedPercentage(null);
     if (errors.amount) {
       setErrors({ ...errors, amount: "" });
     }
@@ -275,11 +270,9 @@ export default function SimpleTransferModal({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // Enhanced validation for username/address
     if (!formData.recipientAddress.trim()) {
       newErrors.recipientAddress = "Recipient address is required";
     } else if (selectedUser) {
-      // User selected from dropdown - use their wallet address
       if (
         !selectedUser.walletAddress ||
         !/^0x[a-fA-F0-9]{40}$/.test(selectedUser.walletAddress)
@@ -292,7 +285,6 @@ export default function SimpleTransferModal({
         newErrors.recipientAddress = "Cannot send to yourself";
       }
     } else {
-      // Direct address input - validate format
       if (!/^0x[a-fA-F0-9]{40}$/.test(formData.recipientAddress)) {
         newErrors.recipientAddress =
           "Invalid recipient address format. Please enter a valid address or select a user";
@@ -303,7 +295,6 @@ export default function SimpleTransferModal({
       }
     }
 
-    // Validate amount
     if (!formData.amount.trim()) {
       newErrors.amount = "Amount is required";
     } else {
@@ -327,7 +318,6 @@ export default function SimpleTransferModal({
       return;
     }
 
-    // Validate required parameters
     if (!walletAddress) {
       setErrors({ general: "Wallet address not available" });
       return;
@@ -339,10 +329,9 @@ export default function SimpleTransferModal({
     }
 
     setIsLoading(true);
-    setErrors({}); // Clear previous errors
+    setErrors({});
 
     try {
-      // Use selected user's wallet address if available, otherwise use direct input
       const recipientAddress = selectedUser
         ? selectedUser.walletAddress
         : formData.recipientAddress;
@@ -415,7 +404,6 @@ export default function SimpleTransferModal({
       return;
     }
 
-    // Validate required parameters
     if (!walletAddress) {
       setErrors({ general: "Wallet address not available" });
       return;
@@ -423,10 +411,9 @@ export default function SimpleTransferModal({
 
     setStep("processing");
     setIsLoading(true);
-    setErrors({}); // Clear previous errors
+    setErrors({});
 
     try {
-      // Use selected user's wallet address if available
       const recipientAddress = selectedUser
         ? selectedUser.walletAddress
         : formData.recipientAddress;
@@ -459,7 +446,7 @@ export default function SimpleTransferModal({
           amount: formData.amount,
           fromAddress: walletAddress,
           tokenPrice: tokenInfo.priceData?.current_price,
-          useStoredKey: true, // Use stored private key
+          useStoredKey: true,
         }),
         credentials: "include",
       });
@@ -483,7 +470,6 @@ export default function SimpleTransferModal({
       setStep("success");
       console.log("✅ Transfer executed successfully");
 
-      // Call the completion callback if provided
       if (onTransactionComplete) {
         onTransactionComplete();
       }
@@ -539,30 +525,6 @@ export default function SimpleTransferModal({
     return letters[symbol] || symbol.charAt(0);
   };
 
-  // Helper function to get recipient display info
-  const getRecipientDisplayInfo = () => {
-    if (selectedUser) {
-      return {
-        name: `@${selectedUser.username}`,
-        displayName: selectedUser.displayName || selectedUser.username,
-        address: selectedUser.walletAddress,
-        isUser: true,
-      };
-    } else {
-      return {
-        name: formData.recipientAddress
-          ? `${formData.recipientAddress.slice(
-              0,
-              10
-            )}...${formData.recipientAddress.slice(-6)}`
-          : "",
-        displayName: null,
-        address: formData.recipientAddress,
-        isUser: false,
-      };
-    }
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -571,8 +533,8 @@ export default function SimpleTransferModal({
       <div className="fixed inset-0 z-40 bg-white/10" onClick={handleClose} />
 
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-black border rounded-[20px] w-full max-w-lg overflow-hidden">
-          {/* NEW: Header matching the image design */}
+        <div className="bg-black border rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden">
+          {/* Header matching the image design */}
           <div className="flex items-center justify-between px-6 py-4">
             <button
               onClick={handleClose}
@@ -598,10 +560,9 @@ export default function SimpleTransferModal({
               )}
             </div>
           </div>
-
           {/* Content */}
-          <div className="p-6">
-            {/* Form Step - FIXED: Normal spacing & no dividers */}
+          <div className="p-4 sm:p-6 max-h-[calc(90vh-80px)] overflow-y-auto">
+            {/* Form Step - FIXED: Responsive mobile layout */}
             {step === "form" && (
               <div className="space-y-6">
                 {/* Recipient Box */}
@@ -613,17 +574,15 @@ export default function SimpleTransferModal({
 
                   {/* Input row with user icon and placeholder */}
                   <div className="flex items-center mb-3">
-                    {/* User icon (shows user avatar if selected, else default wallet icon) */}
+                    {/* User icon */}
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
                       {selectedUser ? (
-                        // Show user avatar if available
                         selectedUser.avatar ? (
                           <img
                             src={selectedUser.avatar}
                             alt={selectedUser.username}
                             className="w-8 h-8 rounded-lg object-cover"
                             onError={(e) => {
-                              // Fallback to initials if image fails
                               const target = e.target as HTMLImageElement;
                               target.style.display = "none";
                               const fallback =
@@ -634,7 +593,6 @@ export default function SimpleTransferModal({
                             }}
                           />
                         ) : (
-                          // Show user initials
                           <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg flex items-center justify-center">
                             <span className="text-white text-xs font-bold">
                               {selectedUser.username?.[0]?.toUpperCase() ||
@@ -644,7 +602,6 @@ export default function SimpleTransferModal({
                           </div>
                         )
                       ) : (
-                        // Show default wallet icon
                         <div className="w-8 h-8 bg-[#E2AF19] rounded-lg flex items-center justify-center">
                           <svg
                             width="16"
@@ -672,7 +629,6 @@ export default function SimpleTransferModal({
                         </div>
                       )}
 
-                      {/* Hidden fallback for user image error */}
                       {selectedUser?.avatar && (
                         <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg flex items-center justify-center hidden">
                           <span className="text-white text-xs font-bold">
@@ -684,26 +640,26 @@ export default function SimpleTransferModal({
                       )}
                     </div>
 
-                    {/* Username input with big placeholder */}
-                    <div className="flex-1 relative">
+                    {/* Username input */}
+                    <div className="flex-1 relative min-w-0">
                       <UsernameInput
                         value={formData.recipientAddress}
                         onChange={handleRecipientChange}
                         onUserSelect={handleUserSelect}
                         placeholder="Paste address / username"
                         error=""
-                        className="w-full bg-transparent border-none text-white placeholder-gray-400 font-satoshi text-lg focus:outline-none"
+                        className="w-full bg-transparent border-none text-white placeholder-gray-400 font-satoshi text-base sm:text-lg focus:outline-none"
                       />
                     </div>
 
-                    {/* UPDATED: Custom Profile icon */}
+                    {/* Profile icon */}
                     <div className="flex-shrink-0">
                       <ProfileIcon />
                     </div>
                   </div>
 
-                  {/* Address display below */}
-                  <div className="text-xs text-gray-400 font-satoshi">
+                  {/* Address display below - FIXED: Mobile overflow */}
+                  <div className="text-xs text-gray-400 font-satoshi break-all">
                     {selectedUser
                       ? selectedUser.walletAddress
                       : formData.recipientAddress ||
@@ -720,13 +676,13 @@ export default function SimpleTransferModal({
                   </div>
                 )}
 
-                {/* Asset Box */}
+                {/* Asset Box - FIXED: Mobile responsive layout */}
                 <div className="bg-black border border-[#2C2C2C] rounded-lg p-4">
                   {/* Asset heading with percentage buttons */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="text-white text-sm font-satoshi">Asset</div>
 
-                    {/* Percentage buttons */}
+                    {/* Percentage buttons - FIXED: Better mobile spacing */}
                     <div className="flex gap-1">
                       <button
                         onClick={() => handlePercentageSelect(25)}
@@ -771,22 +727,21 @@ export default function SimpleTransferModal({
                     </div>
                   </div>
 
-                  {/* Token row with amount input */}
-                  <div className="flex items-center justify-between mb-3">
-                    {/* Token info */}
-                    <div className="flex items-center">
+                  {/* Token row with amount input - FIXED: Mobile responsive */}
+                  <div className="flex items-center justify-between mb-3 gap-3">
+                    {/* Token info - FIXED: Prevent overflow */}
+                    <div className="flex items-center min-w-0 flex-shrink">
                       {tokenInfo.priceData?.image ? (
                         <div
                           className={`w-10 h-10 ${getTokenIcon(
                             tokenInfo.symbol
-                          )} rounded-full mr-3 p-0.5 flex items-center justify-center`}
+                          )} rounded-full mr-3 p-0.5 flex items-center justify-center flex-shrink-0`}
                         >
                           <img
                             src={tokenInfo.priceData.image}
                             alt={tokenInfo.symbol}
                             className="w-full h-full rounded-full object-cover"
                             onError={(e) => {
-                              // If image fails to load, show the fallback background with letter
                               const target = e.target as HTMLImageElement;
                               target.style.display = "none";
                               const fallback = target.parentElement
@@ -799,11 +754,10 @@ export default function SimpleTransferModal({
                         </div>
                       ) : null}
 
-                      {/* Fallback background with letter (shown when no image or image fails) */}
                       <div
                         className={`w-10 h-10 ${getTokenIcon(
                           tokenInfo.symbol
-                        )} rounded-full mr-3 flex items-center justify-center ${
+                        )} rounded-full mr-3 flex items-center justify-center flex-shrink-0 ${
                           tokenInfo.priceData?.image ? "hidden" : ""
                         }`}
                       >
@@ -812,27 +766,28 @@ export default function SimpleTransferModal({
                         </span>
                       </div>
 
-                      <div className="text-white font-satoshi">
+                      {/* FIXED: Token name with proper truncation */}
+                      <div className="text-white font-satoshi text-sm sm:text-base truncate">
                         {tokenInfo.name}
                       </div>
                     </div>
 
-                    {/* Amount input with circle indicator */}
-                    <div className="flex items-center">
+                    {/* Amount input - FIXED: Better mobile sizing */}
+                    <div className="flex items-center flex-shrink-0">
                       <input
                         type="text"
                         placeholder="0"
                         value={formData.amount}
                         onChange={(e) => handleAmountChange(e.target.value)}
-                        className="bg-transparent text-white text-2xl font-bold font-satoshi placeholder-gray-500 focus:outline-none text-right mr-3 w-24"
+                        className="bg-transparent text-white text-lg sm:text-2xl font-bold font-satoshi placeholder-gray-500 focus:outline-none text-right mr-3 w-16 sm:w-24"
                       />
-                      <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-xs">○</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Balance row */}
+                  {/* Balance row - FIXED: Mobile text sizing */}
                   <div className="text-gray-400 text-sm font-satoshi">
                     Balance: {parseFloat(tokenInfo.balance).toFixed(4)}
                   </div>
@@ -847,7 +802,7 @@ export default function SimpleTransferModal({
                   </div>
                 )}
 
-                {/* Network Fee - NOW DYNAMIC */}
+                {/* Network Fee - Dynamic */}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-white font-satoshi">Network Fee</span>
                   <span className="text-[#E2AF19] font-satoshi">
@@ -868,15 +823,7 @@ export default function SimpleTransferModal({
                   </div>
                 )}
 
-                {errors.recipientAddress && (
-                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-                    <p className="text-red-400 text-sm font-satoshi">
-                      {errors.recipientAddress}
-                    </p>
-                  </div>
-                )}
-
-                {/* NEW: Confirm Button */}
+                {/* Confirm Button */}
                 <button
                   onClick={handleCreatePreview}
                   disabled={
@@ -928,7 +875,6 @@ export default function SimpleTransferModal({
                         {preview.fromAddress.slice(-6)}
                       </span>
                     </div>
-                    {/* Enhanced recipient display */}
                     <div className="flex justify-between">
                       <span className="text-gray-400">To:</span>
                       <div className="text-right">

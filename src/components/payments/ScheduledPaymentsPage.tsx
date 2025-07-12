@@ -1157,9 +1157,9 @@ export default function ScheduledPaymentsPage() {
               </div>
 
               {/* Token, Amount, and Timezone Row */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-3 sm:grid sm:grid-cols-2 sm:gap-3 md:grid-cols-3 md:space-y-0">
                 {/* Token Selector */}
-                <div className="relative token-dropdown">
+                <div className="relative token-dropdown w-full sm:col-span-1">
                   <button
                     onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
                     className="flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 w-full"
@@ -1224,20 +1224,20 @@ export default function ScheduledPaymentsPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Amount Input */}
-                <Input
-                  type="text"
-                  placeholder="Amount"
-                  value={formData.amount}
-                  onChange={(e) =>
-                    setFormData({ ...formData, amount: e.target.value })
-                  }
-                  className="font-satoshi"
-                />
-
+                <div className="w-full sm:col-span-1 md:col-span-1">
+                  {/* Amount Input */}
+                  <Input
+                    type="text"
+                    placeholder="Amount"
+                    value={formData.amount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, amount: e.target.value })
+                    }
+                    className="font-satoshi"
+                  />
+                </div>
                 {/* Timezone Selector */}
-                <div className="relative timezone-dropdown">
+                <div className="relative timezone-dropdown w-full sm:col-span-2 md:col-span-1">
                   <button
                     onClick={() =>
                       setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)

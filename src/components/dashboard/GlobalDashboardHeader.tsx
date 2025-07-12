@@ -347,7 +347,7 @@ export default function GlobalDashboardHeader({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
+        <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
           {/* Wallet Selector with Real-time Data */}
           {wallets.length > 0 && (
             <button
@@ -403,8 +403,9 @@ export default function GlobalDashboardHeader({
           )}
 
           {/* Action Icons Container */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3 relative">
+          {/* Action Icons Container */}
+          <div className="flex items-center space-x-3 relative">
+            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
               {/* Notification Bell with UNIFIED count */}
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
