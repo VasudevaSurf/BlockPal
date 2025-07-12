@@ -1349,7 +1349,7 @@ export default function TokenOverviewPage() {
           </div>
 
           {/* Right Column - Portfolio Section */}
-          <div className="w-[450px] flex-shrink-0 h-full">
+          <div className="w-[480px] flex-shrink-0 h-full">
             <div className="bg-black rounded-[20px] border border-[#2C2C2C] h-full flex flex-col p-6">
               {/* Portfolio Header */}
               <div className="flex items-center mb-6">
