@@ -438,7 +438,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="hidden xl:block w-[400px] flex-shrink-0 h-full">
+          <div className="hidden xl:block w-[400px] 2xl:w-[480px] flex-shrink-0 h-full">
             <SwapSection />
           </div>
         </div>

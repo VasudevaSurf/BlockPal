@@ -1,4 +1,4 @@
-// src/components/ui/Skeleton.tsx - UPDATED to remove header skeletons
+// src/components/ui/Skeleton.tsx - UPDATED to remove all scrolling indicators
 import React from "react";
 import { clsx } from "clsx";
 
@@ -49,9 +49,7 @@ export function SkeletonCard({ children }: { children: React.ReactNode }) {
   );
 }
 
-// REMOVED: SkeletonHeader - No longer needed since header is global
-
-// Token List Skeleton (NO HEADER)
+// Token List Skeleton (NO SCROLLING INDICATORS)
 export function SkeletonTokenList() {
   return (
     <SkeletonCard>
@@ -116,7 +114,7 @@ export function SkeletonTokenList() {
   );
 }
 
-// Wallet Balance Skeleton (NO HEADER)
+// Wallet Balance Skeleton (NO SCROLLING INDICATORS)
 export function SkeletonWalletBalance() {
   return (
     <SkeletonCard>
@@ -139,7 +137,7 @@ export function SkeletonWalletBalance() {
   );
 }
 
-// Swap Section Skeleton (NO HEADER)
+// Swap Section Skeleton (NO SCROLLING INDICATORS)
 export function SkeletonSwapSection() {
   return (
     <SkeletonCard>
@@ -222,15 +220,14 @@ export function SkeletonSwapSection() {
   );
 }
 
-// AI Chat Skeleton (NO HEADER)
-// Updated AI Chat Skeleton (NO HEADER) - WhatsApp-like normal layout
+// AI Chat Skeleton (NO SCROLLING INDICATORS)
 export function SkeletonAIChat() {
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] flex flex-col overflow-hidden">
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] flex flex-col">
       {/* Chat Container - Normal WhatsApp-like layout */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col">
         {/* Messages Area - Messages stick to bottom like WhatsApp */}
-        <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 flex flex-col justify-end scrollbar-hide">
+        <div className="flex-1 px-2 sm:px-4 lg:px-6 flex flex-col justify-end">
           <div className="space-y-4 lg:space-y-6 py-4">
             {/* Single Welcome Message */}
             <div className="flex flex-col items-start space-y-2">
@@ -271,12 +268,10 @@ export function SkeletonAIChat() {
   );
 }
 
-// Friends Page Skeleton (NO HEADER)
+// Friends Page Skeleton (NO SCROLLING INDICATORS)
 export function SkeletonFriendsPage() {
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      {/* Header removed - now using global header */}
-
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col">
       <div className="flex-1 flex flex-col min-h-0">
         <SkeletonCard>
           {/* Tab Navigation Skeleton */}
@@ -343,12 +338,10 @@ export function SkeletonFriendsPage() {
   );
 }
 
-// Scheduled Payments Skeleton (NO HEADER)
+// Scheduled Payments Skeleton (NO SCROLLING INDICATORS)
 export function SkeletonScheduledPayments() {
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      {/* Header removed - now using global header */}
-
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col">
       {/* Mobile Layout */}
       <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0">
         {/* Schedule Payment Form - Mobile */}
@@ -516,7 +509,7 @@ export function SkeletonScheduledPayments() {
   );
 }
 
-// Transaction History Skeleton (NO HEADER)
+// Transaction History Skeleton (NO SCROLLING INDICATORS)
 export function SkeletonTransactionHistory() {
   return (
     <div className="flex flex-col min-h-0">
@@ -566,14 +559,12 @@ export function SkeletonTransactionHistory() {
   );
 }
 
-// Token Overview Skeleton (NO HEADER)
+// Token Overview Skeleton (NO SCROLLING INDICATORS)
 export function SkeletonTokenOverview() {
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
-      {/* Header removed - now using global header */}
-
+    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col">
       {/* Mobile Layout */}
-      <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto">
+      <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0">
         {/* Token Header */}
         <SkeletonCard>
           <div className="flex items-center mb-4">
@@ -676,8 +667,8 @@ export function SkeletonTokenOverview() {
       {/* Desktop Layout */}
       <div className="hidden xl:flex gap-6 flex-1 min-h-0">
         {/* Left Column */}
-        <div className="flex-1 flex flex-col gap-6 min-w-0 max-h-full overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-6">
+        <div className="flex-1 flex flex-col gap-6 min-w-0 max-h-full">
+          <div className="flex-1 space-y-6">
             {/* Token Header and Chart - Desktop */}
             <SkeletonCard>
               <div className="flex items-start justify-between mb-6">
@@ -782,7 +773,7 @@ export function SkeletonTokenOverview() {
                 <Skeleton variant="circular" className="w-4 h-4" />
               </div>
 
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1">
                 <SkeletonTransactionHistory />
               </div>
             </div>
