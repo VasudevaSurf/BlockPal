@@ -605,7 +605,7 @@ export default function UserProfilePage() {
           </div>
 
           {/* QR Code Section - Mobile */}
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+          {/* <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white font-satoshi">
                 Your QR Code
@@ -632,7 +632,7 @@ export default function UserProfilePage() {
                 </p>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Account & Security - Mobile */}
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
@@ -1045,7 +1045,7 @@ export default function UserProfilePage() {
           {/* Right Column - Desktop */}
           <div className="w-[400px] space-y-6 overflow-y-auto scrollbar-hide">
             {/* QR Code Section - Desktop */}
-            <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
+            {/* <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-white font-satoshi">
                   Your QR Code
@@ -1078,7 +1078,7 @@ export default function UserProfilePage() {
                   switch wallets.
                 </p>
               </div>
-            </div>
+            </div> */}
 
             {/* Account & Security - Desktop */}
             <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
