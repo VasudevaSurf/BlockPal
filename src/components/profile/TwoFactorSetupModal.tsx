@@ -1,4 +1,4 @@
-// src/components/profile/TwoFactorSetupModal.tsx - COMPACT VERSION
+// src/components/profile/TwoFactorSetupModal.tsx - FIXED DISABLE FLOW
 "use client";
 
 import { useState, useEffect } from "react";
@@ -42,7 +42,7 @@ type Step =
   | "setup"
   | "verify"
   | "backup"
-  | "disable";
+  | "disable_confirm"; // NEW: Added disable confirmation step
 
 export default function TwoFactorSetupModal({
   isOpen,
@@ -72,8 +72,8 @@ export default function TwoFactorSetupModal({
         // For enabling: Google users skip password, go to email verification
         setStep(isGoogleOnlyUser ? "email_verify" : "password");
       } else {
-        // For disabling: Always go to verification step
-        setStep("verify");
+        // FIXED: For disabling, go directly to disable confirmation step
+        setStep("disable_confirm");
       }
       setPassword("");
       setEmailCode("");
@@ -264,6 +264,25 @@ If you lose access to your authenticator app, you can use these codes to regain 
     URL.revokeObjectURL(url);
   };
 
+  // FIXED: Handle back button logic
+  const handleBackButton = () => {
+    if (isEnabling) {
+      // For enabling flow
+      if (step === "verify") {
+        setStep("setup");
+      } else if (step === "setup") {
+        setStep(isGoogleOnlyUser ? "email_verify" : "password");
+      } else if (step === "email_verify") {
+        onClose(); // Go back to main form or close modal
+      } else {
+        onClose();
+      }
+    } else {
+      // FIXED: For disabling flow, back should close the modal
+      onClose();
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -445,10 +464,10 @@ If you lose access to your authenticator app, you can use these codes to regain 
                     <div className="flex gap-2">
                       <Button
                         variant="secondary"
-                        onClick={onClose}
+                        onClick={handleBackButton}
                         className="flex-1"
                       >
-                        Cancel
+                        Back
                       </Button>
                       <Button
                         onClick={handleEmailVerification}
@@ -541,6 +560,46 @@ If you lose access to your authenticator app, you can use these codes to regain 
               </div>
             )}
 
+            {/* NEW Step: Disable Confirmation */}
+            {step === "disable_confirm" && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <AlertTriangle size={24} className="text-red-400" />
+                  </div>
+                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
+                    Disable Two-Factor Authentication
+                  </h4>
+                  <p className="text-gray-400 text-sm font-satoshi">
+                    This will make your account less secure
+                  </p>
+                </div>
+
+                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3">
+                  <p className="text-red-400 text-sm font-satoshi">
+                    <strong>Warning:</strong> Disabling 2FA will reduce your
+                    account security.
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={onClose}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => setStep("verify")}
+                    className="flex-1 bg-red-600 hover:bg-red-700"
+                  >
+                    Continue to Disable
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Step 3: Verification */}
             {step === "verify" && (
               <div className="space-y-4">
@@ -581,7 +640,7 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 <div className="flex gap-2">
                   <Button
                     variant="secondary"
-                    onClick={() => setStep(isEnabling ? "setup" : "password")}
+                    onClick={handleBackButton}
                     className="flex-1"
                   >
                     Back
@@ -678,47 +737,6 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 <Button onClick={handleComplete} className="w-full">
                   I've Saved My Backup Codes
                 </Button>
-              </div>
-            )}
-
-            {/* Disable 2FA Confirmation */}
-            {step === "disable" && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <AlertTriangle size={24} className="text-red-400" />
-                  </div>
-                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
-                    Disable Two-Factor Authentication
-                  </h4>
-                  <p className="text-gray-400 text-sm font-satoshi">
-                    This will make your account less secure
-                  </p>
-                </div>
-
-                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3">
-                  <p className="text-red-400 text-sm font-satoshi">
-                    <strong>Warning:</strong> Disabling 2FA will reduce your
-                    account security. You'll only need your password (or Google
-                    sign-in) to access your account.
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={onClose}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => setStep("verify")}
-                    className="flex-1 bg-red-600 hover:bg-red-700"
-                  >
-                    Continue to Disable
-                  </Button>
-                </div>
               </div>
             )}
           </div>

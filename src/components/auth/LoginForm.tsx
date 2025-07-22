@@ -1,4 +1,4 @@
-// src/components/auth/LoginForm.tsx - WITH TOAST NOTIFICATIONS
+// src/components/auth/LoginForm.tsx - UPDATED with working forgot password and loading states
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,6 +18,7 @@ import { loginUser, clearError } from "@/store/slices/authSlice";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import ForgotPasswordModal from "./ForgotPasswordModal"; // Import the modal
 
 // Toast Component
 interface Toast {
@@ -131,6 +132,21 @@ const useToast = () => {
   };
 };
 
+// Loading Overlay Component
+const LoadingOverlay = ({ message }: { message: string }) => (
+  <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+    <div className="bg-black border border-[#2C2C2C] rounded-[16px] p-6 text-center max-w-sm mx-4">
+      <div className="w-12 h-12 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <Loader2 size={24} className="animate-spin text-[#E2AF19]" />
+      </div>
+      <h3 className="text-white font-semibold font-mayeka mb-2">
+        Redirecting to Dashboard
+      </h3>
+      <p className="text-gray-400 text-sm font-satoshi">{message}</p>
+    </div>
+  </div>
+);
+
 export default function LoginForm() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -139,8 +155,7 @@ export default function LoginForm() {
   );
 
   // Toast hook
-  const { toasts, removeToast, showError, showSuccess, showWarning } =
-    useToast();
+  const { toasts, removeToast, showError, showSuccess } = useToast();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -152,6 +167,12 @@ export default function LoginForm() {
     email?: string;
     password?: string;
   }>({});
+
+  // NEW: Forgot password modal state
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+
+  // NEW: Loading overlay state
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // 2FA state
   const [requires2FA, setRequires2FA] = useState(false);
@@ -230,13 +251,31 @@ export default function LoginForm() {
     }
   }, [googleError, showError]);
 
-  // Redirect on successful authentication (no toast needed - just redirect)
+  // NEW: Enhanced redirect with loading overlay on successful authentication
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log("✅ User authenticated, redirecting to dashboard");
-      router.push("/dashboard");
+    if (isAuthenticated && !isRedirecting) {
+      console.log("✅ User authenticated, starting redirect process");
+
+      setIsRedirecting(true);
+
+      // Show success message
+      showSuccess(
+        "Login Successful!",
+        "Welcome back! Redirecting to your dashboard..."
+      );
+
+      // Add a brief delay to show the success state, then redirect
+      setTimeout(() => {
+        console.log("🚀 Redirecting to dashboard");
+        router.push("/dashboard");
+
+        // Reset the redirecting state after a delay in case something goes wrong
+        setTimeout(() => {
+          setIsRedirecting(false);
+        }, 2000);
+      }, 1500); // 1.5 second delay to show success message
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, showSuccess, isRedirecting]);
 
   // Form validation (no toast for validation - inline errors are sufficient)
   const validateForm = () => {
@@ -417,6 +456,11 @@ export default function LoginForm() {
     dispatch(clearError());
   };
 
+  // NEW: Handle forgot password button click
+  const handleForgotPasswordClick = () => {
+    setShowForgotPassword(true);
+  };
+
   // Loading state
   const isLoading = loading || googleLoading;
 
@@ -506,7 +550,7 @@ export default function LoginForm() {
                 type="button"
                 className="text-[#E2AF19] hover:opacity-80 font-medium"
                 onClick={() => {
-                  showWarning(
+                  showError(
                     "Account Recovery",
                     "Please contact our support team for assistance with account recovery."
                   );
@@ -525,6 +569,12 @@ export default function LoginForm() {
   return (
     <>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+      {/* NEW: Loading Overlay */}
+      {isRedirecting && (
+        <LoadingOverlay message="Setting up your workspace..." />
+      )}
+
       <div className="space-y-4">
         <div className="text-center">
           <h2 className="text-lg font-bold text-white font-mayeka mb-1">
@@ -651,22 +701,24 @@ export default function LoginForm() {
           </Button>
         </form>
 
-        {/* Forgot Password Link */}
+        {/* NEW: Updated Forgot Password Link */}
         <div className="text-center">
           <button
             type="button"
             className="text-[#E2AF19] hover:opacity-80 text-xs font-satoshi font-medium"
-            onClick={() => {
-              showWarning(
-                "Feature Coming Soon",
-                "Password recovery functionality will be available soon. Please contact support if you need assistance."
-              );
-            }}
+            onClick={handleForgotPasswordClick}
+            disabled={isLoading}
           >
             Forgot your password?
           </button>
         </div>
       </div>
+
+      {/* NEW: Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </>
   );
 }
