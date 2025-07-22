@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - UPDATED WITH ITALIC ADDRESS
+// src/components/dashboard/WalletBalance.tsx - COMPACT VERSION
 "use client";
 
 import { useSelector, useDispatch } from "react-redux";
@@ -130,30 +130,30 @@ export default function WalletBalance() {
   const displayBalance = totalBalance || activeWallet?.balance || 0;
 
   return (
-    <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex-shrink-0 h-auto">
+    <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0 h-auto">
       {/* Header - Responsive layout */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3 sm:gap-0">
-        <h2 className="text-base lg:text-lg font-semibold text-white font-mayeka-demi-bold-demo">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
+        <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo">
           Wallet Balance
         </h2>
 
         {/* Address and Copy Button - Responsive */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
-          <span className="text-gray-400 text-xs sm:text-sm font-satoshi italic font-medium truncate max-w-[150px] sm:max-w-none tracking-wide">
+        <div className="flex items-center space-x-2">
+          <span className="text-gray-400 text-xs sm:text-xs font-satoshi italic font-medium truncate max-w-[120px] sm:max-w-none tracking-wide">
             {activeWallet?.address
               ? `${activeWallet.address.slice(
                   0,
-                  10
-                )}...${activeWallet.address.slice(-8)}`
+                  8
+                )}...${activeWallet.address.slice(-6)}`
               : "No wallet selected"}
           </span>
           {activeWallet?.address && (
             <button
               onClick={() => copyToClipboard(activeWallet.address)}
-              className="text-black hover:bg-[#D4A853] transition-colors bg-[#E2AF19] bg-opacity-100 px-2 sm:px-3 py-1 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0"
+              className="text-black hover:bg-[#D4A853] transition-colors bg-[#E2AF19] bg-opacity-100 px-2 py-0.5 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0"
             >
               Copy
-              <Copy size={10} className="text-black sm:w-3 sm:h-3" />
+              <Copy size={8} className="text-black sm:w-2.5 sm:h-2.5" />
             </button>
           )}
         </div>
@@ -163,20 +163,20 @@ export default function WalletBalance() {
       <div>
         {displayBalance > 0 ? (
           <>
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 font-satoshi">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
               {formatBalance(displayBalance)}
             </div>
-            <div className="flex items-center text-sm">
+            <div className="flex items-center text-xs">
               <span className="text-green-400 mr-1 font-satoshi">+$177.56</span>
               <span className="text-green-400 font-satoshi">(0.30%)</span>
             </div>
           </>
         ) : (
           <>
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 font-satoshi">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
               {formatBalance(0)}
             </div>
-            <div className="flex items-center text-sm">
+            <div className="flex items-center text-xs">
               <span className="text-gray-400 font-satoshi">
                 {balanceLoadingState.hasAttemptedLoad &&
                 balanceLoadingState.balanceLoaded

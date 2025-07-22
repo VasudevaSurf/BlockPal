@@ -1,4 +1,4 @@
-// src/components/ui/UsernameInput.tsx - UPDATED with backdrop for suggestions and NO SCROLL INDICATORS
+// src/components/ui/UsernameInput.tsx - Compact Version with backdrop for suggestions and NO SCROLL INDICATORS
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -135,86 +135,75 @@ export default function UsernameInput({
           }}
           placeholder={placeholder}
           disabled={disabled}
-          className={`w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] transition-colors pl-10 ${
+          className={`w-full bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] transition-colors pl-8 text-xs ${
             error ? "border-red-500" : ""
           } ${className}`}
         />
 
         {/* Icon */}
-        <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+        <div className="absolute left-2.5 top-1/2 transform -translate-y-1/2">
           {isAddress ? (
-            <Wallet size={16} className="text-gray-400" />
+            <Wallet size={14} className="text-gray-400" />
           ) : (
-            <Search size={16} className="text-gray-400" />
+            <Search size={14} className="text-gray-400" />
           )}
         </div>
 
         {/* Loading indicator */}
         {loading && (
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#E2AF19]"></div>
+          <div className="absolute right-2.5 top-1/2 transform -translate-y-1/2">
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#E2AF19]"></div>
           </div>
         )}
       </div>
 
       {/* Error message */}
       {error && (
-        <p className="text-red-400 text-sm mt-1 font-satoshi">{error}</p>
+        <p className="text-red-400 text-xs mt-1 font-satoshi">{error}</p>
       )}
 
       {/* Suggestions dropdown - REMOVED SCROLLBAR */}
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-48 overflow-y-auto scrollbar-hide"
+          className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg max-h-40 overflow-y-auto scrollbar-hide"
         >
           {suggestions.map((suggestion, index) => (
             <button
               key={suggestion.username}
               onClick={() => handleSuggestionSelect(suggestion)}
-              className={`w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left ${
+              className={`w-full flex items-center p-2.5 hover:bg-[#2C2C2C] transition-colors text-left ${
                 index === selectedIndex ? "bg-[#2C2C2C]" : ""
               }`}
             >
               {/* Avatar */}
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
+              <div className="w-6 h-6 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-2.5 flex items-center justify-center flex-shrink-0">
                 {suggestion.avatar ? (
                   <img
                     src={suggestion.avatar}
                     alt={suggestion.username}
-                    className="w-8 h-8 rounded-full"
+                    className="w-6 h-6 rounded-full"
                   />
                 ) : (
-                  <User size={16} className="text-white" />
+                  <User size={12} className="text-white" />
                 )}
               </div>
 
               {/* User info */}
               <div className="flex-1 min-w-0">
-                <div className="text-white font-medium font-satoshi truncate">
+                <div className="text-white font-medium font-satoshi truncate text-xs">
                   @{suggestion.username}
                 </div>
                 {suggestion.displayName && (
-                  <div className="text-gray-400 text-sm font-satoshi truncate">
+                  <div className="text-gray-400 text-xs font-satoshi truncate">
                     {suggestion.displayName}
                   </div>
                 )}
-                {/* UPDATED: Show active wallet address with indicator */}
-                {/* <div className="text-gray-500 text-xs font-satoshi truncate flex items-center">
-                  <Wallet size={10} className="mr-1 text-green-400" />
-                  <span className="text-green-400 mr-1">Active:</span>
-                  {suggestion.walletAddress
-                    ? `${suggestion.walletAddress.slice(
-                        0,
-                        8
-                      )}...${suggestion.walletAddress.slice(-4)}`
-                    : "No wallet"}
-                </div> */}
               </div>
 
               {/* Active wallet indicator */}
               <div className="flex items-center text-green-400">
-                <Wallet size={14} />
+                <Wallet size={12} />
               </div>
             </button>
           ))}
@@ -227,8 +216,8 @@ export default function UsernameInput({
         suggestions.length === 0 &&
         value.length >= 2 &&
         !isAddress && (
-          <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg p-3">
-            <div className="text-gray-400 text-sm font-satoshi text-center">
+          <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-lg p-2.5">
+            <div className="text-gray-400 text-xs font-satoshi text-center">
               No users found matching "{value}"
             </div>
           </div>

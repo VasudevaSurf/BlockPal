@@ -68,17 +68,17 @@ function ProfileStatsSkeleton() {
     <>
       {/* Mobile Stats */}
       <div className="block xl:hidden">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]"
+              className="bg-[#0F0F0F] rounded-lg p-2 border border-[#2C2C2C]"
             >
-              <div className="flex items-center mb-2">
-                <Skeleton variant="circular" className="w-4 h-4 mr-2" />
-                <Skeleton className="h-3 w-16" />
+              <div className="flex items-center mb-1">
+                <Skeleton variant="circular" className="w-3.5 h-3.5 mr-1.5" />
+                <Skeleton className="h-2.5 w-12" />
               </div>
-              <Skeleton className="h-6 w-8" />
+              <Skeleton className="h-4 w-6" />
             </div>
           ))}
         </div>
@@ -86,15 +86,15 @@ function ProfileStatsSkeleton() {
 
       {/* Desktop Stats */}
       <div className="hidden xl:block">
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] text-center"
+              className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] text-center"
             >
-              <Skeleton variant="circular" className="w-6 h-6 mx-auto mb-2" />
-              <Skeleton className="h-5 w-8 mx-auto mb-1" />
-              <Skeleton className="h-3 w-20 mx-auto" />
+              <Skeleton variant="circular" className="w-5 h-5 mx-auto mb-1.5" />
+              <Skeleton className="h-4 w-6 mx-auto mb-1" />
+              <Skeleton className="h-2.5 w-16 mx-auto" />
             </div>
           ))}
         </div>
@@ -107,48 +107,48 @@ function ProfileStatsSkeleton() {
 function ProfileHeaderSkeleton() {
   return (
     <SkeletonCard>
-      <div className="flex items-center justify-between mb-4 lg:mb-6">
-        <Skeleton className="h-5 lg:h-6 w-32" />
-        <Skeleton variant="rounded" className="h-8 lg:h-10 w-20 lg:w-32" />
+      <div className="flex items-center justify-between mb-3 lg:mb-4">
+        <Skeleton className="h-4 lg:h-5 w-24" />
+        <Skeleton variant="rounded" className="h-6 lg:h-8 w-16 lg:w-24" />
       </div>
 
       {/* Mobile Layout */}
       <div className="block xl:hidden">
-        <div className="flex items-center mb-6">
-          <Skeleton variant="circular" className="w-16 h-16 mr-4" />
+        <div className="flex items-center mb-4">
+          <Skeleton variant="circular" className="w-12 h-12 mr-3" />
           <div>
-            <Skeleton className="h-6 w-32 mb-1" />
-            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-5 w-24 mb-1" />
+            <Skeleton className="h-3 w-16" />
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Skeleton className="h-4 w-12" />
-            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-10" />
+            <Skeleton className="h-3 w-32" />
           </div>
           <div className="flex items-center justify-between">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-3 w-20" />
           </div>
         </div>
       </div>
 
       {/* Desktop Layout */}
       <div className="hidden xl:block">
-        <div className="flex items-start space-x-6">
-          <Skeleton variant="circular" className="w-24 h-24" />
+        <div className="flex items-start space-x-4">
+          <Skeleton variant="circular" className="w-20 h-20" />
           <div className="flex-1">
-            <Skeleton className="h-8 w-48 mb-2" />
-            <Skeleton className="h-4 w-24 mb-4" />
-            <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-6 w-40 mb-1.5" />
+            <Skeleton className="h-3 w-20 mb-3" />
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Skeleton className="h-3 w-12 mb-1" />
-                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-2.5 w-10 mb-1" />
+                <Skeleton className="h-3 w-24" />
               </div>
               <div>
-                <Skeleton className="h-3 w-20 mb-1" />
-                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-2.5 w-16 mb-1" />
+                <Skeleton className="h-3 w-20" />
               </div>
             </div>
           </div>
@@ -162,22 +162,22 @@ function ProfileHeaderSkeleton() {
 function SettingsSectionSkeleton() {
   return (
     <SkeletonCard>
-      <Skeleton className="h-5 lg:h-6 w-32 mb-4 lg:mb-6" />
+      <Skeleton className="h-4 lg:h-5 w-24 mb-3 lg:mb-4" />
 
-      <div className="space-y-4 lg:space-y-6">
+      <div className="space-y-3 lg:space-y-4">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex items-center justify-between">
             <div className="flex items-center">
               <Skeleton
                 variant="circular"
-                className="w-4 h-4 lg:w-5 lg:h-5 mr-3"
+                className="w-3.5 h-3.5 lg:w-4 lg:h-4 mr-2"
               />
               <div>
-                <Skeleton className="h-4 w-32 mb-1" />
-                {i === 2 && <Skeleton className="h-3 w-16" />}
+                <Skeleton className="h-3 w-24 mb-0.5" />
+                {i === 2 && <Skeleton className="h-2.5 w-12" />}
               </div>
             </div>
-            <Skeleton variant="rounded" className="h-6 lg:h-8 w-12 lg:w-16" />
+            <Skeleton variant="rounded" className="h-5 lg:h-6 w-10 lg:w-12" />
           </div>
         ))}
       </div>
@@ -382,12 +382,12 @@ export default function UserProfilePage() {
   // Show skeleton loading when loading
   if (loading) {
     return (
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
+      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-2.5 lg:p-3 flex flex-col overflow-hidden">
         {/* Mobile Layout Skeleton */}
-        <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
           <ProfileHeaderSkeleton />
           <SkeletonCard>
-            <Skeleton className="h-5 w-32 mb-4" />
+            <Skeleton className="h-4 w-24 mb-3" />
             <ProfileStatsSkeleton />
           </SkeletonCard>
           <SettingsSectionSkeleton />
@@ -396,15 +396,15 @@ export default function UserProfilePage() {
         </div>
 
         {/* Desktop Layout Skeleton */}
-        <div className="hidden xl:flex gap-6 flex-1 min-h-0">
-          <div className="flex-1 space-y-6 overflow-y-auto scrollbar-hide">
+        <div className="hidden xl:flex gap-4 flex-1 min-h-0">
+          <div className="flex-1 space-y-4 overflow-y-auto scrollbar-hide">
             <ProfileHeaderSkeleton />
             <SkeletonCard>
-              <Skeleton className="h-6 w-32 mb-6" />
+              <Skeleton className="h-5 w-24 mb-4" />
               <ProfileStatsSkeleton />
             </SkeletonCard>
           </div>
-          <div className="w-[400px] space-y-6 overflow-y-auto scrollbar-hide">
+          <div className="w-[320px] space-y-4 overflow-y-auto scrollbar-hide">
             <SettingsSectionSkeleton />
             <SettingsSectionSkeleton />
             <SettingsSectionSkeleton />
@@ -426,9 +426,9 @@ export default function UserProfilePage() {
 
   if (!profile) {
     return (
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-6 flex items-center justify-center">
+      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-4 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-bold text-white mb-2">
+          <h2 className="text-lg font-bold text-white mb-2">
             Profile not found
           </h2>
           <p className="text-gray-400">Please try refreshing the page</p>
@@ -447,47 +447,47 @@ export default function UserProfilePage() {
         show2FAModal ||
         showQRModal) && <div className="fixed inset-0 z-40 bg-white/10" />}
 
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
         {/* Mobile Layout */}
-        <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
           {/* Profile Header - Mobile */}
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white font-satoshi">
+          <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold text-white font-satoshi">
                 Profile Information
               </h2>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5">
                 {/* QR Code Button - Mobile */}
                 <button
                   onClick={() => setShowQRModal(true)}
-                  className="bg-[#2C2C2C] text-white p-2 rounded-lg hover:bg-[#3C3C3C] transition-colors"
+                  className="bg-[#2C2C2C] text-white p-1.5 rounded-lg hover:bg-[#3C3C3C] transition-colors"
                   title="View QR Code"
                 >
-                  <QrCode size={16} />
+                  <QrCode size={14} />
                 </button>
 
                 <button
                   onClick={() =>
                     editing ? handleSaveProfile() : setEditing(true)
                   }
-                  className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
+                  className="bg-[#E2AF19] text-black px-2.5 py-1 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
                 >
                   {editing ? (
-                    <Save size={14} className="mr-1" />
+                    <Save size={12} className="mr-1" />
                   ) : (
-                    <Edit3 size={14} className="mr-1" />
+                    <Edit3 size={12} className="mr-1" />
                   )}
                   {editing ? "Save" : "Edit"}
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center mb-6">
+            <div className="flex items-center mb-4">
               <ProfilePictureUpload
                 currentAvatarUrl={profile.avatar}
                 userName={profile.displayName || profile.username}
                 onAvatarUpdate={handleAvatarUpdate}
-                className="w-16 h-16 mr-4"
+                className="w-12 h-12 mr-3"
               />
 
               <div>
@@ -501,25 +501,25 @@ export default function UserProfilePage() {
                         displayName: e.target.value,
                       })
                     }
-                    className="mb-2 font-satoshi"
+                    className="mb-1.5 font-satoshi"
                     placeholder="Display Name"
                   />
                 ) : (
-                  <h3 className="text-xl font-bold text-white font-satoshi">
+                  <h3 className="text-lg font-bold text-white font-satoshi">
                     {profile.displayName}
                   </h3>
                 )}
                 <p className="text-gray-400 text-sm font-satoshi">
                   @{profile.username}
                 </p>
-                <div className="flex items-center mt-1">
+                <div className="flex items-center mt-0.5">
                   {profile.authProvider === "google" ||
                   profile.hasGoogleAuth ? (
-                    <span className="text-xs text-blue-400 font-satoshi bg-blue-900/20 px-2 py-1 rounded">
+                    <span className="text-xs text-blue-400 font-satoshi bg-blue-900/20 px-1.5 py-0.5 rounded">
                       🔗 Google Account
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-400 font-satoshi bg-gray-800/20 px-2 py-1 rounded">
+                    <span className="text-xs text-gray-400 font-satoshi bg-gray-800/20 px-1.5 py-0.5 rounded">
                       📧 Email Account
                     </span>
                   )}
@@ -527,7 +527,7 @@ export default function UserProfilePage() {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 text-sm font-satoshi">
                   Gmail:
@@ -548,110 +548,80 @@ export default function UserProfilePage() {
           </div>
 
           {/* Account Statistics - Mobile */}
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
+          <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
+            <h3 className="text-base font-semibold text-white mb-3 font-satoshi">
               Account Statistics
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-                <div className="flex items-center mb-2">
-                  <CreditCard size={16} className="text-[#E2AF19] mr-2" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#0F0F0F] rounded-lg p-2 border border-[#2C2C2C]">
+                <div className="flex items-center mb-1">
+                  <CreditCard size={14} className="text-[#E2AF19] mr-1.5" />
                   <span className="text-gray-400 text-xs font-satoshi">
                     Total Transactions
                   </span>
                 </div>
-                <div className="text-white text-lg font-bold font-satoshi">
+                <div className="text-white text-base font-bold font-satoshi">
                   {profile.totalTransactions}
                 </div>
               </div>
 
-              <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-                <div className="flex items-center mb-2">
-                  <Calendar size={16} className="text-[#E2AF19] mr-2" />
+              <div className="bg-[#0F0F0F] rounded-lg p-2 border border-[#2C2C2C]">
+                <div className="flex items-center mb-1">
+                  <Calendar size={14} className="text-[#E2AF19] mr-1.5" />
                   <span className="text-gray-400 text-xs font-satoshi">
                     Completed Schedules
                   </span>
                 </div>
-                <div className="text-white text-lg font-bold font-satoshi">
+                <div className="text-white text-base font-bold font-satoshi">
                   {profile.scheduledPayments}
                 </div>
               </div>
 
-              <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-                <div className="flex items-center mb-2">
-                  <Users size={16} className="text-[#E2AF19] mr-2" />
+              <div className="bg-[#0F0F0F] rounded-lg p-2 border border-[#2C2C2C]">
+                <div className="flex items-center mb-1">
+                  <Users size={14} className="text-[#E2AF19] mr-1.5" />
                   <span className="text-gray-400 text-xs font-satoshi">
                     Friends
                   </span>
                 </div>
-                <div className="text-white text-lg font-bold font-satoshi">
+                <div className="text-white text-base font-bold font-satoshi">
                   {profile.friendsCount}
                 </div>
               </div>
 
-              <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-                <div className="flex items-center mb-2">
-                  <WalletIcon size={16} className="text-[#E2AF19] mr-2" />
+              <div className="bg-[#0F0F0F] rounded-lg p-2 border border-[#2C2C2C]">
+                <div className="flex items-center mb-1">
+                  <WalletIcon size={14} className="text-[#E2AF19] mr-1.5" />
                   <span className="text-gray-400 text-xs font-satoshi">
                     Wallets
                   </span>
                 </div>
-                <div className="text-white text-lg font-bold font-satoshi">
+                <div className="text-white text-base font-bold font-satoshi">
                   {wallets.length}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* QR Code Section - Mobile */}
-          {/* <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white font-satoshi">
-                Your QR Code
-              </h3>
-              <button
-                onClick={() => setShowQRModal(true)}
-                className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
-              >
-                <QrCode size={14} className="mr-1" />
-                View
-              </button>
-            </div>
-
-            <div className="flex items-center">
-              <div className="w-16 h-16 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg mr-4 flex items-center justify-center">
-                <QrCode size={24} className="text-[#E2AF19]" />
-              </div>
-              <div>
-                <p className="text-white font-satoshi font-medium">
-                  Share your wallet address
-                </p>
-                <p className="text-gray-400 text-sm font-satoshi">
-                  Let others scan to send you crypto
-                </p>
-              </div>
-            </div>
-          </div> */}
-
           {/* Account & Security - Mobile */}
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
+          <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
+            <h3 className="text-base font-semibold text-white mb-3 font-satoshi">
               Account & Security
             </h3>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {canChangePassword && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <Lock size={16} className="text-gray-400 mr-3" />
-                    <span className="text-white font-satoshi">
+                    <Lock size={14} className="text-gray-400 mr-2" />
+                    <span className="text-white font-satoshi text-sm">
                       Change Password
                     </span>
                   </div>
                   <button
                     onClick={() => setShowPasswordModal(true)}
-                    className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                    className="bg-[#E2AF19] text-black px-2.5 py-1 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
                   >
                     Change
                   </button>
@@ -659,9 +629,9 @@ export default function UserProfilePage() {
               )}
 
               {!canChangePassword && (
-                <div className="flex items-center justify-between p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+                <div className="flex items-center justify-between p-2.5 bg-blue-900/20 border border-blue-500/50 rounded-lg">
                   <div className="flex items-center">
-                    <Lock size={16} className="text-blue-400 mr-3" />
+                    <Lock size={14} className="text-blue-400 mr-2" />
                     <div>
                       <span className="text-blue-400 font-satoshi text-sm">
                         Password Management
@@ -680,9 +650,9 @@ export default function UserProfilePage() {
               {/* 2FA Section - Mobile */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <Shield size={16} className="text-gray-400 mr-3" />
+                  <Shield size={14} className="text-gray-400 mr-2" />
                   <div>
-                    <span className="text-white font-satoshi">
+                    <span className="text-white font-satoshi text-sm">
                       Two-Factor Authentication
                     </span>
                     {profile.twoFactorEnabled && (
@@ -699,7 +669,7 @@ export default function UserProfilePage() {
                 </div>
                 <button
                   onClick={handleToggle2FA}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-satoshi font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg text-sm font-satoshi font-medium transition-colors ${
                     profile.twoFactorEnabled
                       ? "bg-red-600 hover:bg-red-700 text-white"
                       : "bg-[#E2AF19] hover:bg-[#D4A853] text-black"
@@ -712,16 +682,16 @@ export default function UserProfilePage() {
           </div>
 
           {/* Notifications - Mobile */}
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
+          <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
+            <h3 className="text-base font-semibold text-white mb-3 font-satoshi">
               Notifications
             </h3>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <Smartphone size={16} className="text-gray-400 mr-3" />
-                  <span className="text-white font-satoshi">
+                  <Smartphone size={14} className="text-gray-400 mr-2" />
+                  <span className="text-white font-satoshi text-sm">
                     Push Notifications
                   </span>
                 </div>
@@ -732,17 +702,17 @@ export default function UserProfilePage() {
                       !profile.preferences.pushNotifications
                     )
                   }
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                  className={`relative w-10 h-5 rounded-full transition-colors ${
                     profile.preferences.pushNotifications
                       ? "bg-[#E2AF19]"
                       : "bg-gray-600"
                   }`}
                 >
                   <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
                       profile.preferences.pushNotifications
-                        ? "translate-x-7"
-                        : "translate-x-1"
+                        ? "translate-x-5"
+                        : "translate-x-0.5"
                     }`}
                   />
                 </button>
@@ -750,8 +720,8 @@ export default function UserProfilePage() {
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <Mail size={16} className="text-gray-400 mr-3" />
-                  <span className="text-white font-satoshi">
+                  <Mail size={14} className="text-gray-400 mr-2" />
+                  <span className="text-white font-satoshi text-sm">
                     Email Notifications
                   </span>
                 </div>
@@ -762,17 +732,17 @@ export default function UserProfilePage() {
                       !profile.preferences.emailNotifications
                     )
                   }
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                  className={`relative w-10 h-5 rounded-full transition-colors ${
                     profile.preferences.emailNotifications
                       ? "bg-[#E2AF19]"
                       : "bg-gray-600"
                   }`}
                 >
                   <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
                       profile.preferences.emailNotifications
-                        ? "translate-x-7"
-                        : "translate-x-1"
+                        ? "translate-x-5"
+                        : "translate-x-0.5"
                     }`}
                   />
                 </button>
@@ -780,8 +750,8 @@ export default function UserProfilePage() {
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <UserPlus size={16} className="text-gray-400 mr-3" />
-                  <span className="text-white font-satoshi">
+                  <UserPlus size={14} className="text-gray-400 mr-2" />
+                  <span className="text-white font-satoshi text-sm">
                     Friend Requests
                   </span>
                 </div>
@@ -791,22 +761,22 @@ export default function UserProfilePage() {
                     onChange={(e) =>
                       handleNotificationToggle("friendRequests", e.target.value)
                     }
-                    className="appearance-none bg-[#1A1A1A] text-white px-3 py-1.5 pr-8 rounded-lg text-sm font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
+                    className="appearance-none bg-[#1A1A1A] text-white px-2.5 py-1 pr-6 rounded-lg text-sm font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
                   >
                     <option value="everyone">Everyone</option>
                     <option value="none">No One</option>
                   </select>
                   <ChevronDown
-                    size={14}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
+                    size={12}
+                    className="absolute right-1.5 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
                   />
                 </div>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <Globe size={16} className="text-gray-400 mr-3" />
-                  <span className="text-white font-satoshi">
+                  <Globe size={14} className="text-gray-400 mr-2" />
+                  <span className="text-white font-satoshi text-sm">
                     Currency Display
                   </span>
                 </div>
@@ -816,15 +786,15 @@ export default function UserProfilePage() {
                     onChange={(e) =>
                       handleNotificationToggle("currency", e.target.value)
                     }
-                    className="appearance-none bg-[#1A1A1A] text-white px-3 py-1.5 pr-8 rounded-lg text-sm font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
+                    className="appearance-none bg-[#1A1A1A] text-white px-2.5 py-1 pr-6 rounded-lg text-sm font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
                   >
                     <option value="USD">USD</option>
                     <option value="INR">INR</option>
                     <option value="EUR">EUR</option>
                   </select>
                   <ChevronDown
-                    size={14}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
+                    size={12}
+                    className="absolute right-1.5 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
                   />
                 </div>
               </div>
@@ -832,29 +802,31 @@ export default function UserProfilePage() {
           </div>
 
           {/* Support & Feedback - Mobile */}
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
+          <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
+            <h3 className="text-base font-semibold text-white mb-3 font-satoshi">
               Support & Feedback
             </h3>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <button
                 onClick={() => setShowContactModal(true)}
-                className="w-full flex items-center justify-between p-3 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors"
+                className="w-full flex items-center justify-between p-2.5 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors"
               >
                 <div className="flex items-center">
-                  <MessageSquare size={16} className="text-gray-400 mr-3" />
-                  <span className="text-white font-satoshi">
+                  <MessageSquare size={14} className="text-gray-400 mr-2" />
+                  <span className="text-white font-satoshi text-sm">
                     Contact Support
                   </span>
                 </div>
                 <span className="text-gray-400">→</span>
               </button>
 
-              <button className="w-full flex items-center justify-between p-3 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors">
+              <button className="w-full flex items-center justify-between p-2.5 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors">
                 <div className="flex items-center">
-                  <Settings size={16} className="text-gray-400 mr-3" />
-                  <span className="text-white font-satoshi">Report a Bug</span>
+                  <Settings size={14} className="text-gray-400 mr-2" />
+                  <span className="text-white font-satoshi text-sm">
+                    Report a Bug
+                  </span>
                 </div>
                 <span className="text-gray-400">→</span>
               </button>
@@ -862,17 +834,17 @@ export default function UserProfilePage() {
           </div>
 
           {/* Account Actions - Mobile */}
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
+          <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
+            <h3 className="text-base font-semibold text-white mb-3 font-satoshi">
               Account Actions
             </h3>
 
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center p-3 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center p-2.5 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
             >
-              <LogOut size={16} className="text-white mr-2" />
-              <span className="text-white font-satoshi font-medium">
+              <LogOut size={14} className="text-white mr-2" />
+              <span className="text-white font-satoshi font-medium text-sm">
                 Log Out of All Devices
               </span>
             </button>
@@ -880,52 +852,52 @@ export default function UserProfilePage() {
         </div>
 
         {/* Desktop Layout */}
-        <div className="hidden xl:flex gap-6 flex-1 min-h-0">
+        <div className="hidden xl:flex gap-4 flex-1 min-h-0">
           {/* Left Column */}
-          <div className="flex-1 space-y-6 overflow-y-auto scrollbar-hide">
+          <div className="flex-1 space-y-4 overflow-y-auto scrollbar-hide">
             {/* Profile Header - Desktop */}
-            <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-white font-satoshi">
+            <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white font-satoshi">
                   Profile Information
                 </h2>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
                   {/* QR Code Button - Desktop */}
                   <button
                     onClick={() => setShowQRModal(true)}
-                    className="bg-[#2C2C2C] text-white p-2 rounded-lg hover:bg-[#3C3C3C] transition-colors"
+                    className="bg-[#2C2C2C] text-white p-1.5 rounded-lg hover:bg-[#3C3C3C] transition-colors"
                     title="View QR Code"
                   >
-                    <QrCode size={18} />
+                    <QrCode size={16} />
                   </button>
 
                   <button
                     onClick={() =>
                       editing ? handleSaveProfile() : setEditing(true)
                     }
-                    className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
+                    className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
                   >
                     {editing ? (
-                      <Save size={16} className="mr-2" />
+                      <Save size={14} className="mr-1.5" />
                     ) : (
-                      <Edit3 size={16} className="mr-2" />
+                      <Edit3 size={14} className="mr-1.5" />
                     )}
                     {editing ? "Save Changes" : "Edit Profile"}
                   </button>
                 </div>
               </div>
 
-              <div className="flex items-start space-x-6">
+              <div className="flex items-start space-x-4">
                 <ProfilePictureUpload
                   currentAvatarUrl={profile.avatar}
                   userName={profile.displayName || profile.username}
                   onAvatarUpdate={handleAvatarUpdate}
-                  className="w-24 h-24"
+                  className="w-20 h-20"
                 />
 
                 <div className="flex-1">
                   {editing ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <Input
                         type="text"
                         value={editedProfile.displayName || profile.displayName}
@@ -942,32 +914,32 @@ export default function UserProfilePage() {
                     </div>
                   ) : (
                     <div>
-                      <h3 className="text-2xl font-bold text-white font-satoshi mb-2">
+                      <h3 className="text-xl font-bold text-white font-satoshi mb-1.5">
                         {profile.displayName}
                       </h3>
-                      <p className="text-gray-400 font-satoshi mb-2">
+                      <p className="text-gray-400 font-satoshi mb-1.5">
                         @{profile.username}
                       </p>
 
-                      <div className="flex items-center mb-4">
+                      <div className="flex items-center mb-3">
                         {profile.authProvider === "google" ||
                         profile.hasGoogleAuth ? (
-                          <span className="text-sm text-blue-400 font-satoshi bg-blue-900/20 px-3 py-1 rounded-full">
+                          <span className="text-sm text-blue-400 font-satoshi bg-blue-900/20 px-2.5 py-0.5 rounded-full">
                             🔗 Google Account
                           </span>
                         ) : (
-                          <span className="text-sm text-gray-400 font-satoshi bg-gray-800/20 px-3 py-1 rounded-full">
+                          <span className="text-sm text-gray-400 font-satoshi bg-gray-800/20 px-2.5 py-0.5 rounded-full">
                             📧 Email Account
                           </span>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
                           <span className="text-gray-400 text-sm font-satoshi">
                             Email:
                           </span>
-                          <p className="text-white font-satoshi">
+                          <p className="text-white font-satoshi text-sm">
                             {profile.gmail}
                           </p>
                         </div>
@@ -975,7 +947,7 @@ export default function UserProfilePage() {
                           <span className="text-gray-400 text-sm font-satoshi">
                             Member Since:
                           </span>
-                          <p className="text-white font-satoshi">
+                          <p className="text-white font-satoshi text-sm">
                             {profile.accountCreated}
                           </p>
                         </div>
@@ -987,18 +959,18 @@ export default function UserProfilePage() {
             </div>
 
             {/* Account Statistics - Desktop */}
-            <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
-              <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
+            <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
+              <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
                 Account Statistics
               </h3>
 
-              <div className="grid grid-cols-4 gap-4">
-                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] text-center">
+              <div className="grid grid-cols-4 gap-3">
+                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] text-center">
                   <CreditCard
-                    size={24}
-                    className="text-[#E2AF19] mx-auto mb-2"
+                    size={20}
+                    className="text-[#E2AF19] mx-auto mb-1.5"
                   />
-                  <div className="text-white text-xl font-bold font-satoshi mb-1">
+                  <div className="text-white text-lg font-bold font-satoshi mb-0.5">
                     {profile.totalTransactions}
                   </div>
                   <div className="text-gray-400 text-sm font-satoshi">
@@ -1006,9 +978,12 @@ export default function UserProfilePage() {
                   </div>
                 </div>
 
-                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] text-center">
-                  <Calendar size={24} className="text-[#E2AF19] mx-auto mb-2" />
-                  <div className="text-white text-xl font-bold font-satoshi mb-1">
+                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] text-center">
+                  <Calendar
+                    size={20}
+                    className="text-[#E2AF19] mx-auto mb-1.5"
+                  />
+                  <div className="text-white text-lg font-bold font-satoshi mb-0.5">
                     {profile.scheduledPayments}
                   </div>
                   <div className="text-gray-400 text-sm font-satoshi">
@@ -1016,9 +991,9 @@ export default function UserProfilePage() {
                   </div>
                 </div>
 
-                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] text-center">
-                  <Users size={24} className="text-[#E2AF19] mx-auto mb-2" />
-                  <div className="text-white text-xl font-bold font-satoshi mb-1">
+                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] text-center">
+                  <Users size={20} className="text-[#E2AF19] mx-auto mb-1.5" />
+                  <div className="text-white text-lg font-bold font-satoshi mb-0.5">
                     {profile.friendsCount}
                   </div>
                   <div className="text-gray-400 text-sm font-satoshi">
@@ -1026,12 +1001,12 @@ export default function UserProfilePage() {
                   </div>
                 </div>
 
-                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] text-center">
+                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] text-center">
                   <WalletIcon
-                    size={24}
-                    className="text-[#E2AF19] mx-auto mb-2"
+                    size={20}
+                    className="text-[#E2AF19] mx-auto mb-1.5"
                   />
-                  <div className="text-white text-xl font-bold font-satoshi mb-1">
+                  <div className="text-white text-lg font-bold font-satoshi mb-0.5">
                     {wallets.length}
                   </div>
                   <div className="text-gray-400 text-sm font-satoshi">
@@ -1043,61 +1018,25 @@ export default function UserProfilePage() {
           </div>
 
           {/* Right Column - Desktop */}
-          <div className="w-[400px] space-y-6 overflow-y-auto scrollbar-hide">
-            {/* QR Code Section - Desktop */}
-            {/* <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-white font-satoshi">
-                  Your QR Code
-                </h3>
-                <button
-                  onClick={() => setShowQRModal(true)}
-                  className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center"
-                >
-                  <QrCode size={16} className="mr-2" />
-                  View QR Code
-                </button>
-              </div>
-
-              <div className="text-center">
-                <div className="w-24 h-24 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg mx-auto mb-4 flex items-center justify-center">
-                  <QrCode size={32} className="text-[#E2AF19]" />
-                </div>
-                <p className="text-white font-satoshi font-medium mb-1">
-                  Share your wallet address
-                </p>
-                <p className="text-gray-400 text-sm font-satoshi">
-                  Let others scan to send you crypto easily
-                </p>
-              </div>
-
-              <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
-                <p className="text-blue-400 text-xs font-satoshi">
-                  <strong>Pro tip:</strong> Your QR code automatically shows
-                  your currently active wallet address and updates when you
-                  switch wallets.
-                </p>
-              </div>
-            </div> */}
-
+          <div className="w-[320px] space-y-4 overflow-y-auto scrollbar-hide">
             {/* Account & Security - Desktop */}
-            <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
-              <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
+            <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
+              <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
                 Account & Security
               </h3>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {canChangePassword && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <Lock size={20} className="text-gray-400 mr-3" />
+                      <Lock size={18} className="text-gray-400 mr-2" />
                       <span className="text-white font-satoshi">
                         Change Password
                       </span>
                     </div>
                     <button
                       onClick={() => setShowPasswordModal(true)}
-                      className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                      className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
                     >
                       Change
                     </button>
@@ -1105,9 +1044,9 @@ export default function UserProfilePage() {
                 )}
 
                 {!canChangePassword && (
-                  <div className="flex items-center justify-between p-4 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
                     <div className="flex items-center">
-                      <Lock size={20} className="text-blue-400 mr-3" />
+                      <Lock size={18} className="text-blue-400 mr-2" />
                       <div>
                         <span className="text-blue-400 font-satoshi">
                           Password Management
@@ -1126,7 +1065,7 @@ export default function UserProfilePage() {
                 {/* 2FA Section - Desktop */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <Shield size={20} className="text-gray-400 mr-3" />
+                    <Shield size={18} className="text-gray-400 mr-2" />
                     <div>
                       <span className="text-white font-satoshi">
                         Two-Factor Authentication
@@ -1145,7 +1084,7 @@ export default function UserProfilePage() {
                   </div>
                   <button
                     onClick={handleToggle2FA}
-                    className={`px-4 py-2 rounded-lg font-satoshi font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg font-satoshi font-medium transition-colors ${
                       profile.twoFactorEnabled
                         ? "bg-red-600 hover:bg-red-700 text-white"
                         : "bg-[#E2AF19] hover:bg-[#D4A853] text-black"
@@ -1158,15 +1097,15 @@ export default function UserProfilePage() {
             </div>
 
             {/* Notifications - Desktop */}
-            <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
-              <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
+            <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
+              <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
                 Notifications
               </h3>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <Smartphone size={20} className="text-gray-400 mr-3" />
+                    <Smartphone size={18} className="text-gray-400 mr-2" />
                     <span className="text-white font-satoshi">
                       Push Notifications
                     </span>
@@ -1178,17 +1117,17 @@ export default function UserProfilePage() {
                         !profile.preferences.pushNotifications
                       )
                     }
-                    className={`relative w-14 h-7 rounded-full transition-colors ${
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
                       profile.preferences.pushNotifications
                         ? "bg-[#E2AF19]"
                         : "bg-gray-600"
                     }`}
                   >
                     <div
-                      className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
                         profile.preferences.pushNotifications
-                          ? "translate-x-8"
-                          : "translate-x-1"
+                          ? "translate-x-6"
+                          : "translate-x-0.5"
                       }`}
                     />
                   </button>
@@ -1196,7 +1135,7 @@ export default function UserProfilePage() {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <Mail size={20} className="text-gray-400 mr-3" />
+                    <Mail size={18} className="text-gray-400 mr-2" />
                     <span className="text-white font-satoshi">
                       Email Notifications
                     </span>
@@ -1208,17 +1147,17 @@ export default function UserProfilePage() {
                         !profile.preferences.emailNotifications
                       )
                     }
-                    className={`relative w-14 h-7 rounded-full transition-colors ${
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
                       profile.preferences.emailNotifications
                         ? "bg-[#E2AF19]"
                         : "bg-gray-600"
                     }`}
                   >
                     <div
-                      className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
                         profile.preferences.emailNotifications
-                          ? "translate-x-8"
-                          : "translate-x-1"
+                          ? "translate-x-6"
+                          : "translate-x-0.5"
                       }`}
                     />
                   </button>
@@ -1226,7 +1165,7 @@ export default function UserProfilePage() {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <UserPlus size={20} className="text-gray-400 mr-3" />
+                    <UserPlus size={18} className="text-gray-400 mr-2" />
                     <span className="text-white font-satoshi">
                       Friend Requests
                     </span>
@@ -1240,21 +1179,21 @@ export default function UserProfilePage() {
                           e.target.value
                         )
                       }
-                      className="appearance-none bg-[#1A1A1A] text-white px-3 py-2 pr-8 rounded-lg font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
+                      className="appearance-none bg-[#1A1A1A] text-white px-2.5 py-1.5 pr-6 rounded-lg font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
                     >
                       <option value="everyone">Everyone</option>
                       <option value="none">No One</option>
                     </select>
                     <ChevronDown
-                      size={16}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
+                      size={14}
+                      className="absolute right-1.5 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
                     />
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <Globe size={20} className="text-gray-400 mr-3" />
+                    <Globe size={18} className="text-gray-400 mr-2" />
                     <span className="text-white font-satoshi">
                       Currency Display
                     </span>
@@ -1265,15 +1204,15 @@ export default function UserProfilePage() {
                       onChange={(e) =>
                         handleNotificationToggle("currency", e.target.value)
                       }
-                      className="appearance-none bg-[#1A1A1A] text-white px-3 py-2 pr-8 rounded-lg font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
+                      className="appearance-none bg-[#1A1A1A] text-white px-2.5 py-1.5 pr-6 rounded-lg font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
                     >
                       <option value="USD">USD</option>
                       <option value="INR">INR</option>
                       <option value="EUR">EUR</option>
                     </select>
                     <ChevronDown
-                      size={16}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
+                      size={14}
+                      className="absolute right-1.5 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
                     />
                   </div>
                 </div>
@@ -1281,18 +1220,18 @@ export default function UserProfilePage() {
             </div>
 
             {/* Support & Account Actions - Desktop */}
-            <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6">
-              <h3 className="text-xl font-semibold text-white mb-6 font-satoshi">
+            <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
+              <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
                 Support & Actions
               </h3>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <button
                   onClick={() => setShowContactModal(true)}
-                  className="w-full flex items-center justify-between p-3 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors"
+                  className="w-full flex items-center justify-between p-2.5 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors"
                 >
                   <div className="flex items-center">
-                    <MessageSquare size={18} className="text-gray-400 mr-3" />
+                    <MessageSquare size={16} className="text-gray-400 mr-2" />
                     <span className="text-white font-satoshi">
                       Contact Support
                     </span>
@@ -1300,9 +1239,9 @@ export default function UserProfilePage() {
                   <span className="text-gray-400">→</span>
                 </button>
 
-                <button className="w-full flex items-center justify-between p-3 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors">
+                <button className="w-full flex items-center justify-between p-2.5 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors">
                   <div className="flex items-center">
-                    <Settings size={18} className="text-gray-400 mr-3" />
+                    <Settings size={16} className="text-gray-400 mr-2" />
                     <span className="text-white font-satoshi">
                       Report a Bug
                     </span>
@@ -1312,9 +1251,9 @@ export default function UserProfilePage() {
 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-center p-3 bg-red-600 hover:bg-red-700 rounded-lg transition-colors mt-6"
+                  className="w-full flex items-center justify-center p-2.5 bg-red-600 hover:bg-red-700 rounded-lg transition-colors mt-4"
                 >
-                  <LogOut size={18} className="text-white mr-2" />
+                  <LogOut size={16} className="text-white mr-2" />
                   <span className="text-white font-satoshi font-medium">
                     Log Out of All Devices
                   </span>
@@ -1327,21 +1266,21 @@ export default function UserProfilePage() {
         {/* Modals */}
         {/* Password Change Modal - Only show if user can change password */}
         {showPasswordModal && canChangePassword && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-white font-satoshi">
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-white font-satoshi">
                   Change Password
                 </h3>
                 <button
                   onClick={() => setShowPasswordModal(false)}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <Input
                   type="password"
                   placeholder="Current Password"
@@ -1379,16 +1318,16 @@ export default function UserProfilePage() {
                   className="font-satoshi"
                 />
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-2 pt-3">
                   <button
                     onClick={() => setShowPasswordModal(false)}
-                    className="flex-1 px-4 py-2 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
+                    className="flex-1 px-3 py-1.5 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handlePasswordChange}
-                    className="flex-1 px-4 py-2 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                    className="flex-1 px-3 py-1.5 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
                   >
                     Update Password
                   </button>
@@ -1400,21 +1339,21 @@ export default function UserProfilePage() {
 
         {/* Contact Support Modal */}
         {showContactModal && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-white font-satoshi">
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-white font-satoshi">
                   Contact Support
                 </h3>
                 <button
                   onClick={() => setShowContactModal(false)}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <Input
                   type="text"
                   placeholder="Subject"
@@ -1422,14 +1361,14 @@ export default function UserProfilePage() {
                 />
                 <textarea
                   placeholder="Describe your issue..."
-                  className="w-full p-3 bg-black border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi resize-none"
-                  rows={4}
+                  className="w-full p-2.5 bg-black border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi resize-none"
+                  rows={3}
                 />
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-2 pt-3">
                   <button
                     onClick={() => setShowContactModal(false)}
-                    className="flex-1 px-4 py-2 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
+                    className="flex-1 px-3 py-1.5 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
                   >
                     Cancel
                   </button>
@@ -1438,7 +1377,7 @@ export default function UserProfilePage() {
                       setShowContactModal(false);
                       alert("Support request submitted successfully!");
                     }}
-                    className="flex-1 px-4 py-2 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                    className="flex-1 px-3 py-1.5 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
                   >
                     Send Message
                   </button>

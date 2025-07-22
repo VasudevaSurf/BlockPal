@@ -55,16 +55,15 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
+  const [dimensions, setDimensions] = useState({ width: 600, height: 300 });
 
-  // Dynamic responsive sizing
   const updateDimensions = useCallback(() => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      const width = Math.max(300, rect.width - 32); // Account for padding
+      const width = Math.max(250, rect.width - 24);
       const height = isFullscreen
-        ? 600
-        : Math.min(500, Math.max(250, width * 0.5));
+        ? 450
+        : Math.min(350, Math.max(200, width * 0.4));
       setDimensions({ width, height });
     }
   }, [isFullscreen]);
@@ -76,21 +75,19 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     return () => window.removeEventListener("resize", handleResize);
   }, [updateDimensions]);
 
-  // Responsive padding based on screen size
   const padding = useMemo(() => {
     const isMobile = dimensions.width < 500;
     return {
-      top: 30,
-      right: isMobile ? 60 : 80,
-      bottom: isMobile ? 50 : 60,
-      left: isMobile ? 60 : 80,
+      top: 20,
+      right: isMobile ? 50 : 60,
+      bottom: isMobile ? 35 : 45,
+      left: isMobile ? 50 : 60,
     };
   }, [dimensions.width]);
 
   const innerWidth = dimensions.width - padding.left - padding.right;
   const innerHeight = dimensions.height - padding.top - padding.bottom;
 
-  // Enhanced price calculation with better scaling
   const priceData = useMemo(() => {
     if (!chartData?.prices || chartData.prices.length === 0) {
       return {
@@ -108,13 +105,11 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     const rawMax = Math.max(...priceValues);
     const rawRange = rawMax - rawMin || 1;
 
-    // Add 8% padding for better visualization
     const paddingPercent = 0.08;
     const minPrice = rawMin - rawRange * paddingPercent;
     const maxPrice = rawMax + rawRange * paddingPercent;
     const priceRange = maxPrice - minPrice;
 
-    // Generate high-precision scaled points
     const scaledPoints = prices.map((point, index) => {
       const xProgress = prices.length > 1 ? index / (prices.length - 1) : 0;
       const x = xProgress * innerWidth;
@@ -122,7 +117,7 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
       const y = innerHeight - yProgress * innerHeight;
 
       return {
-        x: Math.round(x * 100) / 100, // Higher precision
+        x: Math.round(x * 100) / 100,
         y: Math.round(y * 100) / 100,
         ...point,
       };
@@ -137,7 +132,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     };
   }, [chartData, innerWidth, innerHeight]);
 
-  // Smooth curve generation using Catmull-Rom splines
   const pathData = useMemo(() => {
     if (priceData.scaledPoints.length === 0) return "";
 
@@ -153,7 +147,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
       } ${points[1].y + padding.top}`;
     }
 
-    // Create smooth curves using Catmull-Rom splines
     let path = `M ${points[0].x + padding.left} ${points[0].y + padding.top}`;
 
     for (let i = 1; i < points.length; i++) {
@@ -161,7 +154,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
       const previous = points[i - 1];
 
       if (i === 1) {
-        // First curve segment
         const next = points[i + 1];
         const cp1x = previous.x + (current.x - previous.x) * 0.3;
         const cp1y = previous.y + (current.y - previous.y) * 0.3;
@@ -182,7 +174,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
           current.y + padding.top
         }`;
       } else if (i === points.length - 1) {
-        // Last curve segment
         const cp1x = previous.x + (current.x - previous.x) * 0.3;
         const cp1y = previous.y + (current.y - previous.y) * 0.3;
         const cp2x = current.x - (current.x - previous.x) * 0.3;
@@ -194,7 +185,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
           current.y + padding.top
         }`;
       } else {
-        // Middle curve segments
         const next = points[i + 1];
         const prev2 = points[i - 2];
 
@@ -214,7 +204,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     return path;
   }, [priceData.scaledPoints, padding]);
 
-  // Enhanced area path with smooth curves
   const areaPath = useMemo(() => {
     if (priceData.scaledPoints.length === 0) return "";
 
@@ -226,7 +215,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     } L ${firstPoint.x + padding.left} ${innerHeight + padding.top} Z`;
   }, [pathData, priceData.scaledPoints, padding, innerHeight]);
 
-  // Enhanced mouse/touch tracking with interpolation
   const handlePointerMove = useCallback(
     (clientX: number, clientY: number) => {
       if (!svgRef.current || priceData.scaledPoints.length === 0) return;
@@ -240,7 +228,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
 
       setCursorPosition({ x: svgX, y: svgY });
 
-      // Accurate point detection with interpolation
       const adjustedX = svgX - padding.left;
 
       if (
@@ -262,7 +249,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
         ) {
           setHoveredPoint(priceData.scaledPoints[lowerIndex]);
         } else {
-          // Smooth interpolation between points
           const lowerPoint = priceData.scaledPoints[lowerIndex];
           const upperPoint = priceData.scaledPoints[upperIndex];
           const fraction = exactIndex - lowerIndex;
@@ -294,7 +280,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     [svgRef, priceData, dimensions, padding, innerWidth, innerHeight]
   );
 
-  // Mouse events
   const handleMouseMove = (event: React.MouseEvent<SVGSVGElement>) => {
     handlePointerMove(event.clientX, event.clientY);
 
@@ -302,14 +287,13 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
       const deltaX = event.clientX - dragStart.x;
       const deltaY = event.clientY - dragStart.y;
       setPanOffset((prev) => ({
-        x: Math.max(-150, Math.min(150, prev.x + deltaX * 0.5)),
-        y: Math.max(-150, Math.min(150, prev.y + deltaY * 0.5)),
+        x: Math.max(-100, Math.min(100, prev.x + deltaX * 0.5)),
+        y: Math.max(-100, Math.min(100, prev.y + deltaY * 0.5)),
       }));
       setDragStart({ x: event.clientX, y: event.clientY });
     }
   };
 
-  // Touch events for mobile
   const handleTouchMove = (event: React.TouchEvent<SVGSVGElement>) => {
     event.preventDefault();
     const touch = event.touches[0];
@@ -332,12 +316,11 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     setIsDragging(false);
   };
 
-  // Enhanced formatting functions
   const formatCurrency = (value: number) => {
-    if (value < 0.000001) return `$${value.toExponential(2)}`;
-    if (value < 0.01) return `$${value.toFixed(8)}`;
-    if (value < 1) return `$${value.toFixed(6)}`;
-    if (value < 100) return `$${value.toFixed(4)}`;
+    if (value < 0.000001) return `${value.toExponential(2)}`;
+    if (value < 0.01) return `${value.toFixed(8)}`;
+    if (value < 1) return `${value.toFixed(6)}`;
+    if (value < 100) return `${value.toFixed(4)}`;
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -368,14 +351,12 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     });
   };
 
-  // Enhanced grid generation
   const gridData = useMemo(() => {
     const isMobile = dimensions.width < 500;
     const horizontalLines = [];
     const verticalLines = [];
 
-    // Horizontal grid lines (price levels)
-    const priceSteps = isMobile ? 5 : 7;
+    const priceSteps = isMobile ? 4 : 5;
     for (let i = 0; i <= priceSteps; i++) {
       const y = padding.top + (i / priceSteps) * innerHeight;
       const price =
@@ -388,8 +369,7 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
       });
     }
 
-    // Vertical grid lines (time)
-    const timeSteps = isMobile ? 4 : 6;
+    const timeSteps = isMobile ? 3 : 4;
     const stepSize = Math.max(
       1,
       Math.floor(priceData.prices.length / timeSteps)
@@ -414,7 +394,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     return { horizontalLines, verticalLines };
   }, [priceData, dimensions, padding, innerWidth, innerHeight]);
 
-  // Control functions
   const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev * 1.2, 3));
   const handleZoomOut = () => setZoomLevel((prev) => Math.max(prev / 1.2, 0.5));
   const resetView = () => {
@@ -426,9 +405,9 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     return (
       <div
         ref={containerRef}
-        className={`relative h-[300px] flex items-center justify-center ${className}`}
+        className={`relative h-[250px] flex items-center justify-center ${className}`}
       >
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19]"></div>
       </div>
     );
   }
@@ -437,7 +416,7 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
     return (
       <div
         ref={containerRef}
-        className={`relative h-[300px] flex items-center justify-center ${className}`}
+        className={`relative h-[250px] flex items-center justify-center ${className}`}
       >
         <p className="text-gray-400 font-medium">No chart data available</p>
       </div>
@@ -450,10 +429,9 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
 
   return (
     <div className={`relative w-full ${className}`}>
-      {/* Chart Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <div className="text-3xl font-bold text-white">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <div className="text-2xl font-bold text-white">
             {hoveredPoint
               ? formatCurrency(hoveredPoint.price)
               : currentPrice
@@ -463,68 +441,66 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
                 )}
           </div>
           <div
-            className={`flex items-center text-lg font-medium ${
+            className={`flex items-center text-base font-medium ${
               isPositive ? "text-green-400" : "text-red-400"
             }`}
           >
             {isPositive ? (
-              <TrendingUp size={20} className="mr-2" />
+              <TrendingUp size={16} className="mr-1.5" />
             ) : (
-              <TrendingDown size={20} className="mr-2" />
+              <TrendingDown size={16} className="mr-1.5" />
             )}
             {priceChange24h >= 0 ? "+" : ""}
             {priceChange24h.toFixed(2)}%
           </div>
           {hoveredPoint && (
-            <div className="bg-black border border-[#2C2C2C] rounded-lg px-4 py-2 shadow-lg">
-              <div className="text-gray-300 text-sm">
+            <div className="bg-black border border-[#2C2C2C] rounded-lg px-3 py-1.5 shadow-lg">
+              <div className="text-gray-300 text-xs">
                 {formatDate(hoveredPoint.timestamp)}
               </div>
             </div>
           )}
         </div>
 
-        {/* Chart Controls */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5">
           <button
             onClick={handleZoomIn}
-            className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-all duration-200"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-all duration-200"
             title="Zoom In"
           >
-            <ZoomIn size={18} />
+            <ZoomIn size={14} />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-all duration-200"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-all duration-200"
             title="Zoom Out"
           >
-            <ZoomOut size={18} />
+            <ZoomOut size={14} />
           </button>
           <button
             onClick={resetView}
-            className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-all duration-200"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-all duration-200"
             title="Reset View"
           >
-            <Move size={18} />
+            <Move size={14} />
           </button>
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-all duration-200"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-all duration-200"
             title="Fullscreen"
           >
-            <Maximize2 size={18} />
+            <Maximize2 size={14} />
           </button>
         </div>
       </div>
 
-      {/* Interactive Chart Container */}
       <div
         ref={containerRef}
         className={`relative w-full ${
-          isFullscreen ? "fixed inset-0 z-50 bg-black p-8" : ""
+          isFullscreen ? "fixed inset-0 z-50 bg-black p-6" : ""
         }`}
       >
-        <div className="w-full bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] rounded-xl border border-[#2C2C2C] overflow-hidden shadow-2xl">
+        <div className="w-full bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] rounded-lg border border-[#2C2C2C] overflow-hidden shadow-xl">
           <svg
             ref={svgRef}
             width="100%"
@@ -547,17 +523,16 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
             }}
             preserveAspectRatio="xMidYMid meet"
           >
-            {/* Enhanced Gradient Definitions */}
             <defs>
               <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor={lineColor} stopOpacity="0.4" />
-                <stop offset="30%" stopColor={lineColor} stopOpacity="0.2" />
+                <stop offset="0%" stopColor={lineColor} stopOpacity="0.3" />
+                <stop offset="30%" stopColor={lineColor} stopOpacity="0.15" />
                 <stop offset="70%" stopColor={lineColor} stopOpacity="0.05" />
                 <stop offset="100%" stopColor={lineColor} stopOpacity="0.0" />
               </linearGradient>
 
               <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
                 <feMerge>
                   <feMergeNode in="coloredBlur" />
                   <feMergeNode in="SourceGraphic" />
@@ -567,8 +542,8 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
                 <feDropShadow
                   dx="0"
-                  dy="2"
-                  stdDeviation="4"
+                  dy="1"
+                  stdDeviation="3"
                   floodColor="#000"
                   floodOpacity="0.3"
                 />
@@ -576,12 +551,12 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
 
               <pattern
                 id={`enhanced-grid-${tokenSymbol}`}
-                width="50"
-                height="50"
+                width="40"
+                height="40"
                 patternUnits="userSpaceOnUse"
               >
                 <path
-                  d="M 50 0 L 0 0 0 50"
+                  d="M 40 0 L 0 0 0 40"
                   fill="none"
                   stroke="#1A1A1A"
                   strokeWidth="1"
@@ -601,7 +576,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               </linearGradient>
             </defs>
 
-            {/* Background with gradient */}
             <rect
               x="0"
               y="0"
@@ -610,7 +584,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               fill="url(#background-gradient)"
             />
 
-            {/* Grid Background */}
             <rect
               x={padding.left}
               y={padding.top}
@@ -619,7 +592,6 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               fill={`url(#enhanced-grid-${tokenSymbol})`}
             />
 
-            {/* Enhanced Grid Lines */}
             {gridData.horizontalLines.map((line, index) => (
               <g key={`h-${index}`}>
                 <line
@@ -629,13 +601,13 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
                   y2={line.y}
                   stroke="#2C2C2C"
                   strokeWidth="1"
-                  opacity="0.6"
+                  opacity="0.5"
                 />
                 <text
-                  x={padding.left - 12}
-                  y={line.y + 4}
+                  x={padding.left - 8}
+                  y={line.y + 3}
                   fill="#888"
-                  fontSize={dimensions.width < 500 ? "11" : "13"}
+                  fontSize={dimensions.width < 500 ? "10" : "11"}
                   textAnchor="end"
                   className="font-medium"
                 >
@@ -653,13 +625,13 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
                   y2={padding.top + innerHeight}
                   stroke="#2C2C2C"
                   strokeWidth="1"
-                  opacity="0.6"
+                  opacity="0.5"
                 />
                 <text
                   x={line.x}
-                  y={dimensions.height - 12}
+                  y={dimensions.height - 8}
                   fill="#888"
-                  fontSize={dimensions.width < 500 ? "10" : "12"}
+                  fontSize={dimensions.width < 500 ? "9" : "10"}
                   textAnchor="middle"
                   className="font-medium"
                 >
@@ -668,19 +640,17 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               </g>
             ))}
 
-            {/* Enhanced Price Area Fill */}
             <path
               d={areaPath}
               fill={`url(#${gradientId})`}
               filter="url(#shadow)"
             />
 
-            {/* Main Price Line with Glow */}
             <path
               d={pathData}
               fill="none"
               stroke={lineColor}
-              strokeWidth={dimensions.width < 500 ? "3" : "4"}
+              strokeWidth={dimensions.width < 500 ? "2.5" : "3"}
               strokeLinecap="round"
               strokeLinejoin="round"
               filter="url(#glow)"
@@ -689,13 +659,12 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               }}
             />
 
-            {/* Enhanced Data Points */}
             {priceData.scaledPoints.map((point, index) => {
               const shouldShow =
                 dimensions.width < 500
-                  ? index % Math.ceil(priceData.scaledPoints.length / 12) ===
+                  ? index % Math.ceil(priceData.scaledPoints.length / 8) ===
                       0 || hoveredPoint === point
-                  : index % Math.ceil(priceData.scaledPoints.length / 20) ===
+                  : index % Math.ceil(priceData.scaledPoints.length / 12) ===
                       0 || hoveredPoint === point;
 
               if (!shouldShow) return null;
@@ -707,11 +676,11 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
                   <circle
                     cx={point.x + padding.left}
                     cy={point.y + padding.top}
-                    r={isHovered ? 8 : 4}
+                    r={isHovered ? 6 : 3}
                     fill={lineColor}
                     stroke="#000"
-                    strokeWidth="2"
-                    opacity={isHovered ? 1 : 0.8}
+                    strokeWidth="1.5"
+                    opacity={isHovered ? 1 : 0.7}
                     className="transition-all duration-200"
                     filter={isHovered ? "url(#glow)" : undefined}
                   />
@@ -719,11 +688,11 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
                     <circle
                       cx={point.x + padding.left}
                       cy={point.y + padding.top}
-                      r="12"
+                      r="9"
                       fill="none"
                       stroke={lineColor}
-                      strokeWidth="2"
-                      opacity="0.5"
+                      strokeWidth="1.5"
+                      opacity="0.4"
                       className="animate-pulse"
                     />
                   )}
@@ -731,45 +700,40 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               );
             })}
 
-            {/* Enhanced Crosshair */}
             {isVisible && hoveredPoint && (
-              <g opacity="0.9">
-                {/* Horizontal line */}
+              <g opacity="0.8">
                 <line
                   x1={padding.left}
                   y1={hoveredPoint.y + padding.top}
                   x2={padding.left + innerWidth}
                   y2={hoveredPoint.y + padding.top}
                   stroke="#E2AF19"
-                  strokeWidth="1.5"
-                  strokeDasharray="6,4"
-                  opacity="0.8"
+                  strokeWidth="1"
+                  strokeDasharray="5,3"
+                  opacity="0.7"
                 />
-                {/* Vertical line */}
                 <line
                   x1={hoveredPoint.x + padding.left}
                   y1={padding.top}
                   x2={hoveredPoint.x + padding.left}
                   y2={padding.top + innerHeight}
                   stroke="#E2AF19"
-                  strokeWidth="1.5"
-                  strokeDasharray="6,4"
-                  opacity="0.8"
+                  strokeWidth="1"
+                  strokeDasharray="5,3"
+                  opacity="0.7"
                 />
-                {/* Intersection point */}
                 <circle
                   cx={hoveredPoint.x + padding.left}
                   cy={hoveredPoint.y + padding.top}
-                  r="6"
+                  r="5"
                   fill="#E2AF19"
                   stroke="#000"
-                  strokeWidth="2"
+                  strokeWidth="1.5"
                   filter="url(#glow)"
                 />
               </g>
             )}
 
-            {/* Chart Border */}
             <rect
               x={padding.left}
               y={padding.top}
@@ -777,9 +741,9 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               height={innerHeight}
               fill="none"
               stroke="#444"
-              strokeWidth="2"
-              rx="8"
-              opacity="0.8"
+              strokeWidth="1.5"
+              rx="6"
+              opacity="0.7"
             />
           </svg>
         </div>
@@ -787,40 +751,39 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
         {isFullscreen && (
           <button
             onClick={() => setIsFullscreen(false)}
-            className="absolute top-4 right-4 bg-black border border-[#2C2C2C] p-3 rounded-lg text-white hover:bg-[#2C2C2C] transition-colors z-10"
+            className="absolute top-3 right-3 bg-black border border-[#2C2C2C] p-2 rounded-lg text-white hover:bg-[#2C2C2C] transition-colors z-10"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         )}
       </div>
 
-      {/* Enhanced Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#2C2C2C] rounded-xl p-4 text-center">
-          <div className="text-green-400 text-xs font-medium mb-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#2C2C2C] rounded-lg p-3 text-center">
+          <div className="text-green-400 text-xs font-medium mb-1">
             24H HIGH
           </div>
-          <div className="text-white font-bold text-lg">
+          <div className="text-white font-bold text-sm">
             {formatCurrency(priceData.maxPrice)}
           </div>
         </div>
-        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#2C2C2C] rounded-xl p-4 text-center">
-          <div className="text-red-400 text-xs font-medium mb-2">24H LOW</div>
-          <div className="text-white font-bold text-lg">
+        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#2C2C2C] rounded-lg p-3 text-center">
+          <div className="text-red-400 text-xs font-medium mb-1">24H LOW</div>
+          <div className="text-white font-bold text-sm">
             {formatCurrency(priceData.minPrice)}
           </div>
         </div>
-        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#2C2C2C] rounded-xl p-4 text-center">
-          <div className="text-blue-400 text-xs font-medium mb-2">RANGE</div>
-          <div className="text-white font-bold text-lg">
+        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#2C2C2C] rounded-lg p-3 text-center">
+          <div className="text-blue-400 text-xs font-medium mb-1">RANGE</div>
+          <div className="text-white font-bold text-sm">
             {formatCurrency(priceData.maxPrice - priceData.minPrice)}
           </div>
         </div>
-        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#2C2C2C] rounded-xl p-4 text-center">
-          <div className="text-yellow-400 text-xs font-medium mb-2">
+        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#2C2C2C] rounded-lg p-3 text-center">
+          <div className="text-yellow-400 text-xs font-medium mb-1">
             DATA POINTS
           </div>
-          <div className="text-white font-bold text-lg">
+          <div className="text-white font-bold text-sm">
             {priceData.prices.length.toLocaleString()}
           </div>
         </div>
@@ -829,23 +792,21 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
   );
 };
 
-// Demo Component
 const ChartDemo = () => {
   const [selectedTimeframe, setSelectedTimeframe] = useState(7);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Generate realistic sample data
   const generateSampleData = (days: number) => {
     const now = Date.now();
-    const interval = (days * 24 * 60 * 60 * 1000) / 100; // 100 data points
+    const interval = (days * 24 * 60 * 60 * 1000) / 80;
     const basePrice = 45000 + Math.random() * 10000;
 
     const prices = [];
 
-    for (let i = 0; i < 100; i++) {
-      const timestamp = now - (99 - i) * interval;
-      const volatility = 0.02; // 2% volatility
-      const trend = Math.sin(i * 0.1) * 0.001; // Small trend component
+    for (let i = 0; i < 80; i++) {
+      const timestamp = now - (79 - i) * interval;
+      const volatility = 0.02;
+      const trend = Math.sin(i * 0.1) * 0.001;
       const randomWalk = (Math.random() - 0.5) * volatility;
 
       const priceChange = i === 0 ? 0 : trend + randomWalk;
@@ -870,11 +831,10 @@ const ChartDemo = () => {
     setIsLoading(true);
     setSelectedTimeframe(days);
 
-    // Simulate API call delay
     setTimeout(() => {
       setChartData(generateSampleData(days));
       setIsLoading(false);
-    }, 500);
+    }, 300);
   };
 
   const currentPrice =
@@ -884,28 +844,26 @@ const ChartDemo = () => {
   const priceChange24h = ((currentPrice - previousPrice) / previousPrice) * 100;
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="bg-[#0F0F0F] rounded-2xl border border-[#2C2C2C] p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xl font-bold">₿</span>
+    <div className="min-h-screen bg-[#0A0A0A] p-3">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-[#0F0F0F] rounded-xl border border-[#2C2C2C] p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-lg font-bold">₿</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Bitcoin</h1>
+                <h1 className="text-xl font-bold text-white">Bitcoin</h1>
                 <p className="text-gray-400">BTC</p>
               </div>
             </div>
 
-            {/* Timeframe Selector */}
-            <div className="flex space-x-2">
+            <div className="flex space-x-1.5">
               {[1, 7, 30, 90].map((days) => (
                 <button
                   key={days}
                   onClick={() => handleTimeframeChange(days)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                     selectedTimeframe === days
                       ? "bg-[#E2AF19] text-black"
                       : "bg-[#2C2C2C] text-gray-400 hover:text-white hover:bg-[#3C3C3C]"
@@ -916,18 +874,17 @@ const ChartDemo = () => {
               ))}
               <button
                 onClick={() => handleTimeframeChange(selectedTimeframe)}
-                className="p-2 text-gray-400 hover:text-white transition-colors"
+                className="p-1.5 text-gray-400 hover:text-white transition-colors"
                 disabled={isLoading}
               >
                 <RefreshCw
-                  size={16}
+                  size={14}
                   className={isLoading ? "animate-spin" : ""}
                 />
               </button>
             </div>
           </div>
 
-          {/* Enhanced Chart */}
           <EnhancedInteractiveChart
             chartData={chartData}
             tokenSymbol="BTC"

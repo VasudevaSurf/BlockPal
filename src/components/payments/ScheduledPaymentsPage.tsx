@@ -184,7 +184,7 @@ const isValidImageUrl = (url: string | null | undefined): boolean => {
 
 const TokenIcon = ({
   token,
-  size = "w-5 h-5",
+  size = "w-4 h-4",
   showBg = false,
 }: {
   token: any;
@@ -926,9 +926,9 @@ export default function ScheduledPaymentsPage() {
         return (
           <button
             onClick={() => handleEditPayment(payment)}
-            className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+            className="bg-[#E2AF19] text-black px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
           >
-            <Edit3 size={12} className="mr-1" />
+            <Edit3 size={10} className="mr-1" />
             Edit
           </button>
         );
@@ -938,17 +938,17 @@ export default function ScheduledPaymentsPage() {
           <>
             <button
               onClick={() => handleCancelEdit(payment)}
-              className="bg-gray-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+              className="bg-gray-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
             >
-              <X size={12} className="mr-1" />
+              <X size={10} className="mr-1" />
               Cancel
             </button>
             <button
               onClick={() => handleDeletePayment(payment.scheduleId)}
               disabled={loading}
-              className="bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
+              className="bg-red-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
             >
-              <Trash2 size={12} className="mr-1" />
+              <Trash2 size={10} className="mr-1" />
               {loading ? "..." : "Delete"}
             </button>
           </>
@@ -961,14 +961,14 @@ export default function ScheduledPaymentsPage() {
             onClick={() => openExplorer(payment)}
             className="text-[#E2AF19] text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
           >
-            <ExternalLink size={12} className="mr-1" />
+            <ExternalLink size={10} className="mr-1" />
             Explorer
           </button>
           <button
             onClick={() => copyTransactionHash(payment)}
             className="text-[#E2AF19] text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
           >
-            <Hash size={12} className="mr-1" />
+            <Hash size={10} className="mr-1" />
             {copied === `hash-${payment.id}` ||
             copied === `schedule-${payment.id}`
               ? "Copied!"
@@ -989,11 +989,11 @@ export default function ScheduledPaymentsPage() {
           <div className="flex items-center justify-center space-x-1">
             <button
               onClick={() => handleEditPayment(payment)}
-              className="bg-[#E2AF19] text-black px-2 gap-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+              className="bg-[#E2AF19] text-black px-2 gap-1 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
               title="Edit"
             >
               Edit
-              <Edit3 size={10} />
+              <Edit3 size={8} />
             </button>
           </div>
         );
@@ -1003,45 +1003,45 @@ export default function ScheduledPaymentsPage() {
           <div className="flex items-center justify-center space-x-1">
             <button
               onClick={() => handleCancelEdit(payment)}
-              className="bg-gray-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+              className="bg-gray-600 text-white px-1.5 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
               title="Cancel Edit"
             >
-              <X size={10} />
+              <X size={8} />
             </button>
             <button
               onClick={() => handleDeletePayment(payment.scheduleId)}
               disabled={loading}
-              className="bg-red-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
+              className="bg-red-600 text-white px-1.5 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
               title="Delete"
             >
-              <Trash2 size={10} />
+              <Trash2 size={8} />
             </button>
           </div>
         );
       }
     } else {
       return (
-        <div className="flex items-center justify-center space-x-2">
+        <div className="flex items-center justify-center space-x-1">
           <button
             onClick={() => openExplorer(payment)}
-            className="text-[#E2AF19] px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+            className="text-[#E2AF19] px-1.5 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
             title={
               payment.lastTransactionHash ? "View Transaction" : "View Address"
             }
           >
-            <ExternalLink size={10} className="mr-1" />
+            <ExternalLink size={8} className="mr-1" />
             Explorer
           </button>
           <button
             onClick={() => copyTransactionHash(payment)}
-            className="text-[#E2AF19] px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+            className="text-[#E2AF19] px-1.5 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
             title={
               payment.lastTransactionHash
                 ? "Copy Transaction Hash"
                 : "Copy Schedule ID"
             }
           >
-            <Hash size={10} className="mr-1" />
+            <Hash size={8} className="mr-1" />
             {copied === `hash-${payment.id}` ||
             copied === `schedule-${payment.id}`
               ? "Copied!"
@@ -1116,36 +1116,30 @@ export default function ScheduledPaymentsPage() {
         showEditModal ||
         showResult) && <div className="fixed inset-0 bg-white/10 z-30" />}
 
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
+      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1.5 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
         {/* Error Display */}
         {error && (
-          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
+          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-3 flex-shrink-0">
             <div className="flex items-start">
               <AlertTriangle
-                size={16}
+                size={14}
                 className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
               />
-              <p className="text-red-400 text-sm font-satoshi">{error}</p>
+              <p className="text-red-400 text-xs font-satoshi">{error}</p>
             </div>
           </div>
         )}
 
         {/* Mobile Layout */}
-        <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
           {/* Schedule Payment Form - Mobile */}
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <h2 className="text-lg font-semibold text-white mb-4 font-mayeka-demi-bold-demo">
+          <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
+            <h2 className="text-sm font-semibold text-white mb-3 font-mayeka-demi-bold-demo">
               Schedule Payment
             </h2>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Username/Address Input - Full width (larger) */}
-              {/* NOTE: UsernameInput component needs to be updated to:
-                  1. Accept onDropdownToggle prop: onDropdownToggle={setIsUsernameDropdownOpen}
-                  2. Call onDropdownToggle(true) when dropdown opens
-                  3. Call onDropdownToggle(false) when dropdown closes
-                  4. Add scrollbar-hide class to dropdown container
-                  5. Update dropdown z-index to z-40 */}
               <div>
                 <UsernameInput
                   value={formData.recipient}
@@ -1157,33 +1151,33 @@ export default function ScheduledPaymentsPage() {
               </div>
 
               {/* Token, Amount, and Timezone Row */}
-              <div className="space-y-3 sm:grid sm:grid-cols-2 sm:gap-3 md:grid-cols-3 md:space-y-0">
+              <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 md:grid-cols-3 md:space-y-0">
                 {/* Token Selector */}
                 <div className="relative token-dropdown w-full sm:col-span-1">
                   <button
                     onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
-                    className="flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 w-full"
+                    className="flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 w-full"
                   >
                     <div className="flex items-center">
                       {selectedToken && (
                         <>
-                          <TokenIcon token={selectedToken} size="w-5 h-5" />
-                          <span className="text-white font-satoshi text-sm ml-2">
+                          <TokenIcon token={selectedToken} size="w-4 h-4" />
+                          <span className="text-white font-satoshi text-xs ml-2">
                             {selectedToken.symbol}
                           </span>
                         </>
                       )}
                     </div>
-                    <ChevronDown size={16} className="text-gray-400" />
+                    <ChevronDown size={14} className="text-gray-400" />
                   </button>
 
                   {/* Token Dropdown */}
                   {isTokenDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-2xl shadow-lg max-h-48 overflow-y-auto scrollbar-hide">
+                    <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-lg max-h-40 overflow-y-auto scrollbar-hide">
                       {tokens.map((token) => (
                         <div
                           key={token.id}
-                          className="border border-[#2C2C2C] rounded-2xl m-2 overflow-hidden"
+                          className="border border-[#2C2C2C] rounded-xl m-1.5 overflow-hidden"
                         >
                           <button
                             onClick={() => {
@@ -1200,12 +1194,12 @@ export default function ScheduledPaymentsPage() {
                               });
                               setIsTokenDropdownOpen(false);
                             }}
-                            className="w-full flex items-center p-3 hover:bg-[#1A1A1A] transition-colors text-left"
+                            className="w-full flex items-center p-2.5 hover:bg-[#1A1A1A] transition-colors text-left"
                           >
                             <div className="flex items-center flex-1">
-                              <TokenIcon token={token} size="w-5 h-5" />
+                              <TokenIcon token={token} size="w-4 h-4" />
                               <div className="flex-1 ml-2">
-                                <div className="text-white font-satoshi text-sm">
+                                <div className="text-white font-satoshi text-xs">
                                   {token.symbol}
                                 </div>
                                 <div className="text-gray-400 font-satoshi text-xs">
@@ -1213,9 +1207,9 @@ export default function ScheduledPaymentsPage() {
                                 </div>
                               </div>
                             </div>
-                            <div className="w-4 h-4 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-3">
+                            <div className="w-3 h-3 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-2">
                               {selectedToken?.symbol === token.symbol && (
-                                <div className="w-2 h-2 bg-[#E2AF19] rounded-full" />
+                                <div className="w-1.5 h-1.5 bg-[#E2AF19] rounded-full" />
                               )}
                             </div>
                           </button>
@@ -1224,6 +1218,7 @@ export default function ScheduledPaymentsPage() {
                     </div>
                   )}
                 </div>
+                
                 <div className="w-full sm:col-span-1 md:col-span-1">
                   {/* Amount Input */}
                   <Input
@@ -1236,25 +1231,26 @@ export default function ScheduledPaymentsPage() {
                     className="font-satoshi"
                   />
                 </div>
+                
                 {/* Timezone Selector */}
                 <div className="relative timezone-dropdown w-full sm:col-span-2 md:col-span-1">
                   <button
                     onClick={() =>
                       setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)
                     }
-                    className="flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 w-full"
+                    className="flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 w-full"
                   >
-                    <span className="text-white font-satoshi text-sm truncate">
+                    <span className="text-white font-satoshi text-xs truncate">
                       {selectedTimezone.tz}
                     </span>
                     <ChevronDown
-                      size={16}
+                      size={14}
                       className="text-gray-400 flex-shrink-0"
                     />
                   </button>
 
                   {isTimezoneDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-40 overflow-y-auto scrollbar-hide">
                       {timezones.map((timezone) => (
                         <button
                           key={timezone.idx}
@@ -1262,9 +1258,9 @@ export default function ScheduledPaymentsPage() {
                             setSelectedTimezone(timezone);
                             setIsTimezoneDropdownOpen(false);
                           }}
-                          className="w-full flex items-center p-3 hover:bg-[#2C2C2C] transition-colors text-left"
+                          className="w-full flex items-center p-2.5 hover:bg-[#2C2C2C] transition-colors text-left"
                         >
-                          <span className="text-white font-satoshi text-sm">
+                          <span className="text-white font-satoshi text-xs">
                             {timezone.name}
                           </span>
                         </button>
@@ -1275,7 +1271,7 @@ export default function ScheduledPaymentsPage() {
               </div>
 
               {/* Mobile Layout - Date and Time Row */}
-              <div className="xl:hidden space-y-4">
+              <div className="xl:hidden space-y-3">
                 {/* Date Time Picker - Full width on mobile */}
                 <div>
                   <DateTimePicker
@@ -1295,21 +1291,21 @@ export default function ScheduledPaymentsPage() {
                 {/* Recurring Toggle - Next line on mobile */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <Repeat size={16} className="text-gray-400 mr-2" />
-                    <span className="text-white font-satoshi text-sm mr-3">
+                    <Repeat size={14} className="text-gray-400 mr-2" />
+                    <span className="text-white font-satoshi text-xs mr-2">
                       Enable recurring payments
                     </span>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
                     <button
                       onClick={() => setRecurringEnabled(!recurringEnabled)}
-                      className={`relative w-10 h-6 rounded-full transition-colors ${
+                      className={`relative w-8 h-5 rounded-full transition-colors ${
                         recurringEnabled ? "bg-[#E2AF19]" : "bg-gray-600"
                       }`}
                     >
                       <div
-                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                          recurringEnabled ? "translate-x-5" : "translate-x-1"
+                        className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-transform ${
+                          recurringEnabled ? "translate-x-4" : "translate-x-0.5"
                         }`}
                       />
                     </button>
@@ -1322,7 +1318,7 @@ export default function ScheduledPaymentsPage() {
                           }
                           onFocus={() => setIsRecurringDropdownOpen(true)}
                           onBlur={() => setIsRecurringDropdownOpen(false)}
-                          className="bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-white font-satoshi text-sm min-w-[100px] scrollbar-hide"
+                          className="bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-xs min-w-[80px] scrollbar-hide"
                         >
                           <option value="daily">Daily</option>
                           <option value="weekly">Weekly</option>
@@ -1335,11 +1331,8 @@ export default function ScheduledPaymentsPage() {
                 </div>
               </div>
 
-              {/* Frequency Selector */}
-              {/* Frequency selector now appears inline with toggle */}
-
               {/* Action Buttons */}
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <button
                   onClick={() => {
                     setFormData({
@@ -1353,14 +1346,14 @@ export default function ScheduledPaymentsPage() {
                     setRecurringEnabled(false);
                     setError("");
                   }}
-                  className="flex-1 px-4 py-3 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity"
+                  className="flex-1 px-3 py-2.5 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-xs"
                 >
                   Reset
                 </button>
                 <Button
                   onClick={handleCreatePreview}
                   disabled={loading}
-                  className="flex-1 font-satoshi"
+                  className="flex-1 font-satoshi text-xs"
                 >
                   {loading ? "Loading..." : "Create Schedule"}
                 </Button>
@@ -1369,53 +1362,51 @@ export default function ScheduledPaymentsPage() {
           </div>
 
           {/* Tab Navigation - Mobile */}
-          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-white font-mayeka-demi-bold-demo">
+          <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
                 Transaction History
               </h3>
 
               {/* Tab Buttons */}
-              <div className="flex bg-[#0F0F0F] rounded-lg p-1 border border-[#2C2C2C]">
+              <div className="flex bg-[#0F0F0F] rounded-lg p-0.5 border border-[#2C2C2C]">
                 <button
                   onClick={() => setActiveTab("active")}
-                  className={`px-3 py-1.5 rounded-md font-satoshi text-sm transition-colors ${
+                  className={`px-2.5 py-1 rounded-md font-satoshi text-xs transition-colors ${
                     activeTab === "active"
                       ? "bg-[#E2AF19] text-black font-medium"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
                   Active
-                  {/* ({activeCount}) */}
                 </button>
                 <button
                   onClick={() => setActiveTab("completed")}
-                  className={`px-3 py-1.5 rounded-md font-satoshi text-sm transition-colors ${
+                  className={`px-2.5 py-1 rounded-md font-satoshi text-xs transition-colors ${
                     activeTab === "completed"
                       ? "bg-[#E2AF19] text-black font-medium"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
                   Completed
-                  {/* ({completedCount}) */}
                 </button>
               </div>
             </div>
 
             {/* Mobile Transaction Cards */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               {loading ? (
-                <div className="text-center py-8">
+                <div className="text-center py-6">
                   <RefreshCw
-                    size={20}
+                    size={16}
                     className="animate-spin text-gray-400 mx-auto mb-2"
                   />
-                  <p className="text-gray-400 font-satoshi">Loading...</p>
+                  <p className="text-gray-400 font-satoshi text-xs">Loading...</p>
                 </div>
               ) : filteredPayments.length === 0 ? (
-                <div className="text-center py-8">
-                  <Clock size={24} className="text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-400 font-satoshi">
+                <div className="text-center py-6">
+                  <Clock size={20} className="text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-400 font-satoshi text-xs">
                     No {activeTab} scheduled payments found
                   </p>
                 </div>
@@ -1434,26 +1425,26 @@ export default function ScheduledPaymentsPage() {
                   return (
                     <div
                       key={payment.id}
-                      className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]"
+                      className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]"
                     >
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center">
-                          <div className="w-8 h-8 bg-gray-600 rounded-full mr-3 flex items-center justify-center">
-                            <span className="text-white text-sm">
+                          <div className="w-6 h-6 bg-gray-600 rounded-full mr-2 flex items-center justify-center">
+                            <span className="text-white text-xs">
                               {payment.recipient.startsWith("0x")
                                 ? "0"
                                 : payment.recipient[1]?.toUpperCase() || "?"}
                             </span>
                           </div>
                           <div>
-                            <div className="text-white font-medium text-sm font-satoshi">
+                            <div className="text-white font-medium text-xs font-satoshi">
                               {payment.recipient.slice(0, 10)}...
                               {payment.recipient.slice(-6)}
                             </div>
-                            <div className="flex items-center mt-1">
+                            <div className="flex items-center mt-0.5">
                               <TokenIcon
                                 token={paymentToken}
-                                size="w-4 h-4"
+                                size="w-3 h-3"
                                 showBg={true}
                               />
                               <span className="text-gray-400 text-xs font-satoshi ml-1">
@@ -1464,7 +1455,7 @@ export default function ScheduledPaymentsPage() {
                         </div>
 
                         <div className="text-right">
-                          <div className="text-white font-bold font-satoshi">
+                          <div className="text-white font-bold font-satoshi text-xs">
                             {payment.amount} {payment.tokenSymbol}
                           </div>
                           <div className="text-gray-400 text-xs font-satoshi">
@@ -1474,21 +1465,21 @@ export default function ScheduledPaymentsPage() {
                       </div>
 
                       {/* Status and Next Execution */}
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-1">
                           {payment.status === "active" && (
-                            <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-satoshi font-medium">
+                            <span className="bg-green-500 text-white px-1.5 py-0.5 rounded-full text-xs font-satoshi font-medium">
                               Active
                             </span>
                           )}
                           {payment.status === "completed" && (
-                            <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-satoshi font-medium">
+                            <span className="bg-blue-500 text-white px-1.5 py-0.5 rounded-full text-xs font-satoshi font-medium">
                               Completed
                             </span>
                           )}
                           {payment.frequency === "once" && (
-                            <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-satoshi flex items-center">
-                              <Clock size={10} className="mr-1" />
+                            <span className="bg-blue-500 text-white px-1.5 py-0.5 rounded-full text-xs font-satoshi flex items-center">
+                              <Clock size={8} className="mr-0.5" />
                               One-time
                             </span>
                           )}
@@ -1506,7 +1497,7 @@ export default function ScheduledPaymentsPage() {
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex justify-center space-x-3 pt-3 border-t border-[#2C2C2C]">
+                      <div className="flex justify-center space-x-2 pt-2 border-t border-[#2C2C2C]">
                         {renderMobileActionButtons(payment)}
                       </div>
                     </div>
@@ -1518,29 +1509,23 @@ export default function ScheduledPaymentsPage() {
         </div>
 
         {/* Desktop Layout */}
-        <div className="hidden xl:flex flex-col gap-6 flex-1 min-h-0">
+        <div className="hidden xl:flex flex-col gap-4 flex-1 min-h-0">
           {/* Schedule Payment Form */}
-          <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-shrink-0">
-            <h2 className="text-lg font-semibold text-white mb-6 font-mayeka-demi-bold-demo">
+          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
+            <h2 className="text-sm font-semibold text-white mb-4 font-mayeka-demi-bold-demo">
               Schedule Payment
             </h2>
 
             {/* Form Row 1 - Username/Address (spans 6 columns) */}
-            <div className="grid grid-cols-12 gap-4 mb-4">
+            <div className="grid grid-cols-12 gap-3 mb-3 items-center">
               {/* Username/Address Input - Takes up 6 columns (double width) */}
-              {/* NOTE: UsernameInput component needs to be updated to:
-                  1. Accept onDropdownToggle prop: onDropdownToggle={setIsUsernameDropdownOpen}
-                  2. Call onDropdownToggle(true) when dropdown opens
-                  3. Call onDropdownToggle(false) when dropdown closes
-                  4. Add scrollbar-hide class to dropdown container
-                  5. Update dropdown z-index to z-40 */}
               <div className="col-span-6">
                 <UsernameInput
                   value={formData.recipient}
                   onChange={handleRecipientChange}
                   onUserSelect={handleUserSelect}
                   placeholder="@username or address"
-                  className="font-satoshi text-gray-400"
+                  className="font-satoshi text-gray-400 h-[44px]"
                 />
               </div>
 
@@ -1548,37 +1533,37 @@ export default function ScheduledPaymentsPage() {
               <div className="col-span-2 relative token-dropdown">
                 <button
                   onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
-                  className="w-full h-full flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-left hover:border-[#E2AF19] transition-colors"
+                  className="w-full h-[44px] flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-2.5 text-left hover:border-[#E2AF19] transition-colors"
                 >
                   <div className="flex items-center">
                     {selectedToken && (
                       <>
                         <div
-                          className={`w-6 h-6 ${getTokenBackgroundColor(
+                          className={`w-5 h-5 ${getTokenBackgroundColor(
                             selectedToken.symbol,
                             selectedToken.contractAddress
                           )} rounded-full flex items-center justify-center`}
                         >
-                          <div className="w-4 h-4 flex items-center justify-center">
-                            <TokenIcon token={selectedToken} size="w-4 h-4" />
+                          <div className="w-3.5 h-3.5 flex items-center justify-center">
+                            <TokenIcon token={selectedToken} size="w-3.5 h-3.5" />
                           </div>
                         </div>
-                        <span className="text-white font-satoshi text-sm ml-2">
+                        <span className="text-white font-satoshi text-xs ml-2">
                           {selectedToken.symbol}
                         </span>
                       </>
                     )}
                   </div>
-                  <ChevronDown size={14} className="text-gray-400" />
+                  <ChevronDown size={12} className="text-gray-400" />
                 </button>
 
                 {/* Token dropdown */}
                 {isTokenDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-2xl shadow-xl max-h-48 overflow-y-auto scrollbar-hide">
+                  <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-xl max-h-40 overflow-y-auto scrollbar-hide">
                     {tokens.map((token) => (
                       <div
                         key={token.id}
-                        className="border border-[#2C2C2C] rounded-2xl m-2 overflow-hidden"
+                        className="border border-[#2C2C2C] rounded-xl m-1.5 overflow-hidden"
                       >
                         <button
                           onClick={() => {
@@ -1595,18 +1580,18 @@ export default function ScheduledPaymentsPage() {
                             });
                             setIsTokenDropdownOpen(false);
                           }}
-                          className="w-full flex items-center p-3 hover:bg-[#1A1A1A] transition-colors text-left"
+                          className="w-full flex items-center p-2.5 hover:bg-[#1A1A1A] transition-colors text-left"
                         >
                           <div className="flex items-center flex-1">
                             <div
-                              className={`w-6 h-6 ${getRandomTokenBgColor(
+                              className={`w-5 h-5 ${getRandomTokenBgColor(
                                 token.symbol
                               )} rounded-full flex items-center justify-center`}
                             >
-                              <TokenIcon token={token} size="w-4 h-4" />
+                              <TokenIcon token={token} size="w-3.5 h-3.5" />
                             </div>
                             <div className="flex-1 ml-2">
-                              <div className="text-white font-satoshi text-sm">
+                              <div className="text-white font-satoshi text-xs">
                                 {token.symbol}
                               </div>
                               <div className="text-gray-400 font-satoshi text-xs">
@@ -1614,9 +1599,9 @@ export default function ScheduledPaymentsPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="w-4 h-4 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-3">
+                          <div className="w-3 h-3 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-2">
                             {selectedToken?.symbol === token.symbol && (
-                              <div className="w-2 h-2 bg-[#E2AF19] rounded-full" />
+                              <div className="w-1.5 h-1.5 bg-[#E2AF19] rounded-full" />
                             )}
                           </div>
                         </button>
@@ -1635,7 +1620,7 @@ export default function ScheduledPaymentsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, amount: e.target.value })
                   }
-                  className="font-satoshi"
+                  className="font-satoshi h-[44px]"
                 />
               </div>
 
@@ -1645,19 +1630,19 @@ export default function ScheduledPaymentsPage() {
                   onClick={() =>
                     setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)
                   }
-                  className="w-full h-full flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-left hover:border-[#E2AF19] transition-colors"
+                  className="w-full h-[44px] flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-2.5 text-left hover:border-[#E2AF19] transition-colors"
                 >
-                  <span className="text-white font-satoshi text-sm truncate">
+                  <span className="text-white font-satoshi text-xs truncate">
                     {selectedTimezone.tz}
                   </span>
                   <ChevronDown
-                    size={14}
+                    size={12}
                     className="text-gray-400 ml-2 flex-shrink-0"
                   />
                 </button>
 
                 {isTimezoneDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-2xl shadow-xl max-h-48 overflow-y-auto scrollbar-hide">
+                  <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-xl max-h-40 overflow-y-auto scrollbar-hide">
                     {timezones.map((timezone) => (
                       <button
                         key={timezone.idx}
@@ -1678,8 +1663,8 @@ export default function ScheduledPaymentsPage() {
             </div>
 
             {/* Desktop Layout - Form Row 2 - Date with Time and Recurring Toggle */}
-            <div className="hidden xl:grid xl:grid-cols-12 xl:gap-4 xl:mb-4">
-              {/* Date with Time Input - Takes up 3 columns (reduced from 4) */}
+            <div className="grid grid-cols-12 gap-3 mb-3 items-center">
+              {/* Date with Time Input - Takes up 3 columns */}
               <div className="col-span-3">
                 <DateTimePicker
                   dateValue={formData.date}
@@ -1691,29 +1676,29 @@ export default function ScheduledPaymentsPage() {
                     setFormData({ ...formData, time: value })
                   }
                   placeholder="Select date & time"
-                  className="font-satoshi"
+                  className="font-satoshi h-[44px]"
                 />
               </div>
 
-              {/* Spacer - Takes up 4 columns (increased from 3) */}
+              {/* Spacer - Takes up 4 columns */}
               <div className="col-span-4"></div>
 
               {/* Recurring Toggle - Takes up 5 columns at the end */}
-              <div className="col-span-5 flex items-center justify-end">
-                <div className="flex items-center space-x-3">
-                  <Repeat size={16} className="text-gray-400 mr-2" />
-                  <span className="text-white font-satoshi text-sm mr-3">
+              <div className="col-span-5 flex items-center justify-end h-[44px]">
+                <div className="flex items-center space-x-2">
+                  <Repeat size={14} className="text-gray-400 mr-1.5" />
+                  <span className="text-white font-satoshi text-xs mr-2">
                     Enable recurring payments
                   </span>
                   <button
                     onClick={() => setRecurringEnabled(!recurringEnabled)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                    className={`relative w-10 h-5 rounded-full transition-colors ${
                       recurringEnabled ? "bg-[#E2AF19]" : "bg-gray-600"
                     }`}
                   >
                     <div
-                      className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                        recurringEnabled ? "translate-x-7" : "translate-x-1"
+                      className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-transform ${
+                        recurringEnabled ? "translate-x-6" : "translate-x-0.5"
                       }`}
                     />
                   </button>
@@ -1724,7 +1709,7 @@ export default function ScheduledPaymentsPage() {
                         onChange={(e) => setRecurringFrequency(e.target.value)}
                         onFocus={() => setIsRecurringDropdownOpen(true)}
                         onBlur={() => setIsRecurringDropdownOpen(false)}
-                        className="bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-white font-satoshi text-sm min-w-[100px] scrollbar-hide"
+                        className="bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-xs min-w-[80px] h-[32px] scrollbar-hide"
                       >
                         <option value="daily">Daily</option>
                         <option value="weekly">Weekly</option>
@@ -1737,11 +1722,8 @@ export default function ScheduledPaymentsPage() {
               </div>
             </div>
 
-            {/* Frequency Selector (only shows when recurring is enabled) */}
-            {/* Frequency selector now appears inline with toggle */}
-
             {/* Buttons */}
-            <div className="flex justify-end space-x-3">
+            <div className="flex justify-end space-x-2">
               <button
                 onClick={() => {
                   setFormData({
@@ -1755,87 +1737,88 @@ export default function ScheduledPaymentsPage() {
                   setRecurringEnabled(false);
                   setError("");
                 }}
-                className="px-4 py-2 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity"
+                className="px-3 py-1.5 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-xs"
               >
                 Reset
               </button>
               <Button
                 onClick={handleCreatePreview}
                 disabled={loading}
-                className="font-satoshi"
+                className="font-satoshi text-xs"
               >
-                {loading ? "Loading..." : "Transfer"}
+                {loading ? "Loading..." : "Create Schedule"}
               </Button>
             </div>
           </div>
 
-          {/* Transaction History */}
-          <div className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex-1 flex flex-col min-h-0">
+          {/* Transaction History - Desktop */}
+          <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-1 flex flex-col min-h-0">
             {/* Header with Radio Options */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white font-mayeka-demi-bold-demo">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
                 Transaction History
               </h2>
 
               {/* Radio Options */}
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center bg-black border border-[#2C2C2C] rounded-lg px-4 py-3">
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center bg-black border border-[#2C2C2C] rounded-lg px-3 py-2">
                   <input
                     type="radio"
-                    id="active-radio"
-                    name="payment-status"
+                    id="active-radio-desktop"
+                    name="payment-status-desktop"
                     checked={activeTab === "active"}
                     onChange={() => setActiveTab("active")}
-                    className="h-4 w-4 mr-2"
+                    className="h-3 w-3 mr-1.5"
                     style={{ accentColor: "#E2AF19" }}
                   />
                   <label
-                    htmlFor="active-radio"
-                    className="text-white font-satoshi text-sm"
+                    htmlFor="active-radio-desktop"
+                    className="text-white font-satoshi text-xs"
                   >
-                    Active
-                    {/* ({activeCount}) */}
+                    Active ({activeCount})
                   </label>
                 </div>
 
-                <div className="flex items-center bg-black border border-[#2C2C2C] rounded-lg px-4 py-3">
+                <div className="flex items-center bg-black border border-[#2C2C2C] rounded-lg px-3 py-2">
                   <input
                     type="radio"
-                    id="completed-radio"
-                    name="payment-status"
+                    id="completed-radio-desktop"
+                    name="payment-status-desktop"
                     checked={activeTab === "completed"}
                     onChange={() => setActiveTab("completed")}
-                    className="h-4 w-4 mr-2"
+                    className="h-3 w-3 mr-1.5"
                     style={{ accentColor: "#E2AF19" }}
                   />
                   <label
-                    htmlFor="completed-radio"
-                    className="text-white font-satoshi text-sm"
+                    htmlFor="completed-radio-desktop"
+                    className="text-white font-satoshi text-xs"
                   >
-                    Completed
-                    {/* ({completedCount}) */}
+                    Completed ({completedCount})
                   </label>
                 </div>
               </div>
             </div>
 
-            {/* Table Header - Updated to remove Frequency column */}
-            <div className="bg-[#0F0F0F] rounded-lg mb-2">
-              <div className="grid grid-cols-5 gap-2 px-3 py-3">
-                <div className="text-gray-400 text-sm font-satoshi text-left">
+            {/* Table Header */}
+            <div className="bg-[#0F0F0F] rounded-lg mb-1.5">
+              <div className="grid grid-cols-6 gap-2 px-2.5 py-2">
+                <div className="text-gray-400 text-xs font-satoshi text-left">
                   Username/Address
                 </div>
-                <div className="text-gray-400 text-sm font-satoshi text-left">
-                  Token Name
+                <div className="text-gray-400 text-xs font-satoshi text-left">
+                  Token
                 </div>
-                <div className="text-gray-400 text-sm font-satoshi text-left">
+                <div className="text-gray-400 text-xs font-satoshi text-left">
                   Amount
                 </div>
-                <div className="text-gray-400 text-sm font-satoshi text-left">
-                  Date
+                <div className="text-gray-400 text-xs font-satoshi text-left">
+                  Next Execution
                 </div>
-                <div className="text-gray-400 text-sm font-satoshi text-center">
-                  Edit
+                <div className="text-gray-400 text-xs font-satoshi text-left">
+                  Status
+                </div>
+                <div className="text-gray-400 text-xs font-satoshi text-center">
+                  Actions
                 </div>
               </div>
             </div>
@@ -1843,12 +1826,12 @@ export default function ScheduledPaymentsPage() {
             {/* Transaction List */}
             <div className="flex-1 overflow-y-auto scrollbar-hide">
               {loading ? (
-                <div className="flex items-center justify-center py-8">
+                <div className="flex items-center justify-center py-6">
                   <RefreshCw
-                    size={20}
+                    size={16}
                     className="animate-spin text-gray-400 mr-2"
                   />
-                  <span className="text-gray-400 font-satoshi">Loading...</span>
+                  <span className="text-gray-400 font-satoshi text-xs">Loading...</span>
                 </div>
               ) : filteredPayments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8">
@@ -1856,7 +1839,7 @@ export default function ScheduledPaymentsPage() {
                   <h3 className="text-white text-lg font-satoshi mb-2">
                     No {activeTab} scheduled payments
                   </h3>
-                  <p className="text-gray-400 font-satoshi text-center">
+                  <p className="text-gray-400 font-satoshi text-center text-sm max-w-md">
                     {activeTab === "active"
                       ? "Create your first scheduled payment to automate your crypto transfers"
                       : "Completed payments will appear here"}
@@ -1876,7 +1859,7 @@ export default function ScheduledPaymentsPage() {
 
                   return (
                     <div key={payment.id}>
-                      <div className="grid grid-cols-5 gap-2 items-center py-2 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors">
+                      <div className="grid grid-cols-6 gap-2 items-center py-2 px-2.5 hover:bg-[#1A1A1A] rounded-lg transition-colors">
                         <div className="flex items-center min-w-0">
                           <div className="w-6 h-6 bg-gray-600 rounded-full mr-2 flex items-center justify-center flex-shrink-0">
                             <span className="text-white text-xs">
@@ -1885,8 +1868,8 @@ export default function ScheduledPaymentsPage() {
                                 : payment.recipient[1]?.toUpperCase() || "?"}
                             </span>
                           </div>
-                          <span className="text-white font-satoshi text-sm truncate">
-                            {payment.recipient.slice(0, 8)}...
+                          <span className="text-white font-satoshi text-xs truncate">
+                            {payment.recipient.slice(0, 10)}...
                             {payment.recipient.slice(-6)}
                           </span>
                         </div>
@@ -1897,28 +1880,50 @@ export default function ScheduledPaymentsPage() {
                             size="w-5 h-5"
                             showBg={true}
                           />
-                          <span className="text-white font-satoshi text-sm truncate ml-2">
+                          <span className="text-white font-satoshi text-xs truncate ml-2">
                             {payment.tokenSymbol}
                           </span>
                         </div>
 
-                        <div className="text-white font-satoshi text-sm">
+                        <div className="text-white font-satoshi text-xs">
                           {payment.amount} {payment.tokenSymbol}
                         </div>
 
-                        <div className="text-white font-satoshi text-sm">
+                        <div className="text-white font-satoshi text-xs">
                           {payment.status === "active" &&
                           payment.nextExecution ? (
                             <div>
-                              <div className="text-sm">
+                              <div className="text-xs">
                                 {formatDateTime(payment.nextExecution)}
                               </div>
                               <div className="text-yellow-400 text-xs">
                                 {getTimeUntilExecution(payment.nextExecution)}
                               </div>
                             </div>
+                          ) : payment.status === "completed" ? (
+                            <div className="text-gray-400 text-xs">
+                              {formatDateTime(payment.lastExecutionAt || payment.scheduledFor)}
+                            </div>
                           ) : (
                             <span className="text-gray-400">—</span>
+                          )}
+                        </div>
+
+                        <div>
+                          {payment.status === "active" && (
+                            <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-satoshi font-medium">
+                              Active
+                            </span>
+                          )}
+                          {payment.status === "completed" && (
+                            <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-satoshi font-medium">
+                              Completed
+                            </span>
+                          )}
+                          {payment.status === "cancelled" && (
+                            <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-satoshi font-medium">
+                              Cancelled
+                            </span>
                           )}
                         </div>
 
@@ -1928,7 +1933,7 @@ export default function ScheduledPaymentsPage() {
                       </div>
 
                       {index < filteredPayments.length - 1 && (
-                        <div className="border-b border-[#2C2C2C] mx-3 my-1"></div>
+                        <div className="border-b border-[#2C2C2C] mx-2.5 my-1"></div>
                       )}
                     </div>
                   );
@@ -1941,21 +1946,21 @@ export default function ScheduledPaymentsPage() {
         {/* Edit Payment Modal */}
         {showEditModal && editingPayment && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-lg max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h2 className="text-xl font-bold text-white font-mayeka">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <h2 className="text-lg font-bold text-white font-mayeka">
                       Edit Scheduled Payment
                     </h2>
-                    <div className="flex items-center bg-[#E2AF19] px-2 py-1 rounded-full">
-                      <Edit3 size={12} className="text-black mr-1" />
+                    <div className="flex items-center bg-[#E2AF19] px-1.5 py-0.5 rounded-full">
+                      <Edit3 size={10} className="text-black mr-0.5" />
                       <span className="text-black text-xs font-semibold">
                         Edit
                       </span>
                     </div>
                   </div>
-                  <p className="text-gray-400 text-sm font-satoshi">
+                  <p className="text-gray-400 text-xs font-satoshi">
                     Modify your scheduled payment details
                   </p>
                 </div>
@@ -1963,18 +1968,19 @@ export default function ScheduledPaymentsPage() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingPayment(null);
+                    setIsEditing(false);
                   }}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+                  className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
                 >
-                  <X size={20} />
+                  <X size={16} />
                 </button>
               </div>
 
-              <div className="p-6 max-h-[60vh] overflow-y-auto scrollbar-hide">
-                <div className="space-y-4">
+              <div className="p-4 max-h-[60vh] overflow-y-auto scrollbar-hide">
+                <div className="space-y-3">
                   {/* Current Payment Info */}
-                  <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+                    <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
                         <span className="text-gray-400">Token:</span>
                         <span className="text-white ml-2">
@@ -1991,7 +1997,7 @@ export default function ScheduledPaymentsPage() {
                   </div>
 
                   {/* Edit Form */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div>
                       <Input
                         type="text"
@@ -2040,27 +2046,27 @@ export default function ScheduledPaymentsPage() {
                     {/* Recurring Toggle */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <Repeat size={16} className="text-gray-400 mr-2" />
-                        <span className="text-white font-satoshi text-sm">
+                        <Repeat size={14} className="text-gray-400 mr-1.5" />
+                        <span className="text-white font-satoshi text-xs">
                           Enable recurring payments
                         </span>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2">
                         <button
                           onClick={() =>
                             setEditRecurringEnabled(!editRecurringEnabled)
                           }
-                          className={`relative w-12 h-6 rounded-full transition-colors ${
+                          className={`relative w-10 h-5 rounded-full transition-colors ${
                             editRecurringEnabled
                               ? "bg-[#E2AF19]"
                               : "bg-gray-600"
                           }`}
                         >
                           <div
-                            className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                            className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-transform ${
                               editRecurringEnabled
-                                ? "translate-x-7"
-                                : "translate-x-1"
+                                ? "translate-x-6"
+                                : "translate-x-0.5"
                             }`}
                           />
                         </button>
@@ -2073,7 +2079,7 @@ export default function ScheduledPaymentsPage() {
                                 frequency: e.target.value,
                               })
                             }
-                            className="bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-white font-satoshi text-sm min-w-[100px]"
+                            className="bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-xs min-w-[80px] scrollbar-hide"
                           >
                             <option value="daily">Daily</option>
                             <option value="weekly">Weekly</option>
@@ -2091,16 +2097,16 @@ export default function ScheduledPaymentsPage() {
                           onClick={() =>
                             setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)
                           }
-                          className="w-full flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-left hover:border-[#E2AF19] transition-colors"
+                          className="w-full flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 text-left hover:border-[#E2AF19] transition-colors"
                         >
-                          <span className="text-white font-satoshi text-sm">
+                          <span className="text-white font-satoshi text-xs">
                             {editSelectedTimezone.name}
                           </span>
-                          <ChevronDown size={14} className="text-gray-400" />
+                          <ChevronDown size={12} className="text-gray-400" />
                         </button>
 
                         {isTimezoneDropdownOpen && (
-                          <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-2xl shadow-xl max-h-48 overflow-y-auto scrollbar-hide">
+                          <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-xl max-h-40 overflow-y-auto scrollbar-hide">
                             {timezones.map((timezone) => (
                               <button
                                 key={timezone.idx}
@@ -2108,9 +2114,9 @@ export default function ScheduledPaymentsPage() {
                                   setEditSelectedTimezone(timezone);
                                   setIsTimezoneDropdownOpen(false);
                                 }}
-                                className="w-full flex items-center p-3 hover:bg-[#1A1A1A] transition-colors text-left"
+                                className="w-full flex items-center p-2.5 hover:bg-[#1A1A1A] transition-colors text-left"
                               >
-                                <span className="text-white font-satoshi text-sm">
+                                <span className="text-white font-satoshi text-xs">
                                   {timezone.name}
                                 </span>
                               </button>
@@ -2123,31 +2129,32 @@ export default function ScheduledPaymentsPage() {
                 </div>
               </div>
 
-              <div className="p-6 border-t border-[#2C2C2C] bg-[#0F0F0F]">
-                <div className="flex space-x-3">
+              <div className="p-4 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+                <div className="flex space-x-2">
                   <Button
                     variant="secondary"
                     onClick={() => {
                       setShowEditModal(false);
                       setEditingPayment(null);
+                      setIsEditing(false);
                     }}
-                    className="flex-1 font-satoshi"
+                    className="flex-1 font-satoshi text-xs"
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={handleUpdatePayment}
                     disabled={updating}
-                    className="flex-1 font-satoshi bg-[#E2AF19] hover:bg-[#E2AF19]/90 text-black"
+                    className="flex-1 font-satoshi bg-[#E2AF19] hover:bg-[#E2AF19]/90 text-black text-xs"
                   >
                     {updating ? (
                       <>
-                        <RefreshCw size={16} className="mr-2 animate-spin" />
+                        <RefreshCw size={12} className="mr-1.5 animate-spin" />
                         Updating...
                       </>
                     ) : (
                       <>
-                        <Save size={16} className="mr-2" />
+                        <Save size={12} className="mr-1.5" />
                         Save Changes
                       </>
                     )}
@@ -2158,38 +2165,24 @@ export default function ScheduledPaymentsPage() {
           </div>
         )}
 
-        {/* Updated Preview Modal with Description Input */}
+        {/* Preview Modal */}
         {showPreview && preview && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-2xl max-h-[90vh] overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
-                {/* <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h2 className="text-xl font-bold text-white font-mayeka">
-                      Smart Contract Payment Preview
-                    </h2>
-                    <div className="flex items-center bg-gradient-to-r from-blue-500 to-purple-600 px-2 py-1 rounded-full">
-                      <Zap size={12} className="text-white mr-1" />
-                      <span className="text-white text-xs">Enhanced</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-400 text-sm font-satoshi">
-                    Review your smart contract scheduled payment details
-                  </p>
-                </div> */}
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-2xl max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
                 <button
                   onClick={() => setShowPreview(false)}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+                  className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
                 >
-                  <X size={20} />
+                  <X size={16} />
                 </button>
               </div>
 
-              <div className="p-6 max-h-[60vh] overflow-y-auto scrollbar-hide">
-                <div className="space-y-6">
+              <div className="p-4 max-h-[60vh] overflow-y-auto scrollbar-hide">
+                <div className="space-y-4">
                   {/* Description Input Field */}
-                  <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                    <h3 className="text-white font-semibold font-satoshi mb-3">
+                  <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+                    <h3 className="text-white font-semibold font-satoshi mb-2 text-xs">
                       Payment Description
                     </h3>
                     <Input
@@ -2204,55 +2197,39 @@ export default function ScheduledPaymentsPage() {
                       }
                       className="font-satoshi w-full"
                     />
-                    <p className="text-gray-400 text-xs font-satoshi mt-2">
+                    <p className="text-gray-400 text-xs font-satoshi mt-1.5">
                       This description will help you identify this payment in
                       your transaction history.
                     </p>
                   </div>
 
-                  {/* Smart Contract Features */}
-                  {/* <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/50 rounded-lg p-4">
-                    <div className="flex items-center mb-3">
-                      <Shield size={16} className="text-blue-400 mr-2" />
-                      <h3 className="text-blue-400 font-semibold font-satoshi">
-                        Smart Contract Benefits
-                      </h3>
-                    </div>
-                    <ul className="text-blue-400 text-sm font-satoshi space-y-1">
-                      <li>• Automatic tax calculation and deduction (0.5%)</li>
-                      <li>• Gas optimized execution</li>
-                      <li>• Enhanced security with smart contract</li>
-                      <li>• Transparent and auditable transactions</li>
-                    </ul>
-                  </div> */}
-
                   {/* Payment Summary */}
-                  <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                    <h3 className="text-white font-semibold font-satoshi mb-4">
+                  <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+                    <h3 className="text-white font-semibold font-satoshi mb-3 text-xs">
                       Payment Summary
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Token
                         </div>
-                        <div className="text-white font-bold font-satoshi">
+                        <div className="text-white font-bold font-satoshi text-xs">
                           {preview.tokenInfo.name} ({preview.tokenInfo.symbol})
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Amount
                         </div>
-                        <div className="text-white font-bold font-satoshi">
+                        <div className="text-white font-bold font-satoshi text-xs">
                           {preview.amount} {preview.tokenInfo.symbol}
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Recipient
                         </div>
-                        <div className="text-white font-bold font-satoshi">
+                        <div className="text-white font-bold font-satoshi text-xs">
                           {selectedUser
                             ? `@${selectedUser.username}`
                             : `${preview.recipient.slice(
@@ -2262,121 +2239,101 @@ export default function ScheduledPaymentsPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Frequency
                         </div>
-                        <div className="text-white font-bold font-satoshi">
+                        <div className="text-white font-bold font-satoshi text-xs">
                           {preview.frequency === "once"
                             ? "One-time"
                             : preview.frequency}
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Timezone
                         </div>
-                        <div className="text-white font-bold font-satoshi">
+                        <div className="text-white font-bold font-satoshi text-xs">
                           {selectedTimezone.tz}
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Scheduled For
                         </div>
-                        <div className="text-white font-bold font-satoshi">
+                        <div className="text-white font-bold font-satoshi text-xs">
                           {formatDateTime(preview.scheduledFor)}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Cost Breakdown with Tax */}
-                  <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                    <h3 className="text-white font-semibold font-satoshi mb-4">
+                  {/* Cost Breakdown */}
+                  <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+                    <h3 className="text-white font-semibold font-satoshi mb-3 text-xs">
                       Cost Breakdown
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Estimated Gas:
                         </span>
-                        <span className="text-white font-satoshi">
+                        <span className="text-white font-satoshi text-xs">
                           {parseInt(preview.estimatedGas).toLocaleString()} gas
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Gas Cost:
                         </span>
-                        <span className="text-white font-satoshi">
+                        <span className="text-white font-satoshi text-xs">
                           {preview.gasCostETH} ETH (${preview.gasCostUSD})
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Smart Contract Tax (0.5%):
                         </span>
-                        <span className="text-yellow-400 font-satoshi">
+                        <span className="text-yellow-400 font-satoshi text-xs">
                           {preview.taxETH} ETH (${preview.taxUSD})
                         </span>
                       </div>
-                      <div className="border-t border-[#2C2C2C] pt-2">
+                      <div className="border-t border-[#2C2C2C] pt-1.5">
                         <div className="flex justify-between">
-                          <span className="text-white font-semibold font-satoshi">
+                          <span className="text-white font-semibold font-satoshi text-xs">
                             Total Cost:
                           </span>
-                          <span className="text-white font-bold font-satoshi">
+                          <span className="text-white font-bold font-satoshi text-xs">
                             {preview.totalCostETH} ETH (${preview.totalCostUSD})
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
-
-                  {/* Enhanced Info */}
-                  {/* <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4">
-                    <div className="flex items-start">
-                      <CheckCircle
-                        size={16}
-                        className="text-green-400 mr-2 mt-0.5 flex-shrink-0"
-                      />
-                      <div>
-                        <p className="text-green-400 text-sm font-satoshi font-medium mb-1">
-                          Smart Contract Powered
-                        </p>
-                        <p className="text-green-400 text-xs font-satoshi">
-                          This payment will be executed through our audited
-                          smart contract with automatic tax handling and
-                          optimized gas usage.
-                        </p>
-                      </div>
-                    </div>
-                  </div> */}
                 </div>
               </div>
 
-              <div className="p-6 border-t border-[#2C2C2C] bg-[#0F0F0F]">
-                <div className="flex space-x-3">
+              <div className="p-4 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+                <div className="flex space-x-2">
                   <Button
                     variant="secondary"
                     onClick={() => setShowPreview(false)}
-                    className="flex-1 font-satoshi"
+                    className="flex-1 font-satoshi text-xs"
                   >
                     Back
                   </Button>
                   <Button
                     onClick={handleCreateScheduledPayment}
                     disabled={creating}
-                    className="flex-1 font-satoshi"
+                    className="flex-1 font-satoshi text-xs"
                   >
                     {creating ? (
                       <>
-                        <RefreshCw size={16} className="mr-2 animate-spin" />
+                        <RefreshCw size={12} className="mr-1.5 animate-spin" />
                         Creating...
                       </>
                     ) : (
                       <>
-                        <Zap size={16} className="mr-2" />
+                        <Zap size={12} className="mr-1.5" />
                         Create Smart Contract Schedule
                       </>
                     )}
@@ -2389,64 +2346,51 @@ export default function ScheduledPaymentsPage() {
 
         {/* Success Result Modal */}
         {showResult && result && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-lg">
-              <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold text-white font-mayeka">
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-lg">
+              <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-lg font-bold text-white font-mayeka">
                     Payment Scheduled!
                   </h2>
-                  <div className="flex items-center bg-gradient-to-r from-green-500 to-emerald-600 px-2 py-1 rounded-full">
-                    <CheckCircle size={12} className="text-white mr-1" />
+                  <div className="flex items-center bg-gradient-to-r from-green-500 to-emerald-600 px-1.5 py-0.5 rounded-full">
+                    <CheckCircle size={10} className="text-white mr-0.5" />
                     <span className="text-white text-xs">Success</span>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowResult(false)}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+                  className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
                 >
-                  <X size={20} />
+                  <X size={16} />
                 </button>
               </div>
 
-              <div className="p-6">
-                <div className="space-y-4">
-                  {/* <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4">
-                    <div className="flex items-center mb-2">
-                      <CheckCircle size={16} className="text-green-400 mr-2" />
-                      <span className="text-green-400 font-semibold font-satoshi">
-                        Smart Contract Scheduled Payment Created
-                      </span>
-                    </div>
-                    <p className="text-green-400 text-sm font-satoshi">
-                      Your payment has been successfully scheduled with our
-                      smart contract system.
-                    </p>
-                  </div> */}
-
-                  <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                    <h3 className="text-white font-semibold font-satoshi mb-3">
+              <div className="p-4">
+                <div className="space-y-3">
+                  <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+                    <h3 className="text-white font-semibold font-satoshi mb-2 text-xs">
                       Schedule Details
                     </h3>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Schedule ID:
                         </span>
                         <div className="flex items-center">
-                          <span className="text-white font-mono text-sm">
+                          <span className="text-white font-mono text-xs">
                             {result.scheduleId?.slice(0, 12)}...
                           </span>
                           <button
                             onClick={() =>
                               copyToClipboard(result.scheduleId, "scheduleId")
                             }
-                            className="ml-2 text-gray-400 hover:text-white transition-colors"
+                            className="ml-1.5 text-gray-400 hover:text-white transition-colors"
                           >
-                            <Copy size={12} />
+                            <Copy size={10} />
                           </button>
                           {copied === "scheduleId" && (
-                            <span className="ml-2 text-green-400 text-xs">
+                            <span className="ml-1.5 text-green-400 text-xs">
                               Copied!
                             </span>
                           )}
@@ -2454,46 +2398,31 @@ export default function ScheduledPaymentsPage() {
                       </div>
 
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Next Execution:
                         </span>
-                        <span className="text-white text-sm">
+                        <span className="text-white text-xs">
                           {formatDateTime(result.nextExecution)}
                         </span>
                       </div>
 
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Smart Contract:
                         </span>
-                        <span className="text-blue-400 text-sm">
+                        <span className="text-blue-400 text-xs">
                           {result.contractAddress?.slice(0, 12)}...
                         </span>
                       </div>
                     </div>
                   </div>
-
-                  {/* <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
-                    <div className="flex items-center mb-2">
-                      <Zap size={16} className="text-blue-400 mr-2" />
-                      <span className="text-blue-400 font-semibold font-satoshi">
-                        Enhanced Features Enabled
-                      </span>
-                    </div>
-                    <ul className="text-blue-400 text-sm font-satoshi space-y-1">
-                      <li>• Gas optimization for lower fees</li>
-                      <li>• Automatic tax calculation</li>
-                      <li>• Smart contract security</li>
-                      <li>• Real-time execution monitoring</li>
-                    </ul>
-                  </div> */}
                 </div>
               </div>
 
-              <div className="p-6 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+              <div className="p-4 border-t border-[#2C2C2C] bg-[#0F0F0F]">
                 <Button
                   onClick={() => setShowResult(false)}
-                  className="w-full font-satoshi"
+                  className="w-full font-satoshi text-xs"
                 >
                   Continue
                 </Button>

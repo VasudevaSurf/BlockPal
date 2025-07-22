@@ -1,4 +1,4 @@
-// src/components/auth/LoginForm.tsx - FIXED VERSION
+// src/components/auth/LoginForm.tsx - COMPACT VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -225,37 +225,37 @@ export default function LoginForm() {
   // 2FA Form
   if (requires2FA) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-white font-mayeka mb-2">
+          <h2 className="text-lg font-bold text-white font-mayeka mb-1">
             Two-Factor Authentication
           </h2>
-          <p className="text-gray-400 font-satoshi">
+          <p className="text-gray-400 font-satoshi text-sm">
             {isGoogle2FA
               ? "Enter the 6-digit code from your authenticator app for your Google account"
               : "Enter the 6-digit code from your authenticator app"}
           </p>
-          <div className="mt-2 text-sm text-gray-500 font-satoshi">
+          <div className="mt-1 text-xs text-gray-500 font-satoshi">
             Signing in as: <span className="text-white">{formData.email}</span>
           </div>
         </div>
 
         {/* 2FA Error */}
         {twoFactorError && (
-          <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+          <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
             <div className="flex items-start">
               <AlertCircle
-                size={16}
+                size={14}
                 className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
               />
-              <p className="text-red-400 text-sm font-satoshi">
+              <p className="text-red-400 text-xs font-satoshi">
                 {twoFactorError}
               </p>
             </div>
           </div>
         )}
 
-        <form onSubmit={handle2FASubmit} className="space-y-4">
+        <form onSubmit={handle2FASubmit} className="space-y-3">
           <Input
             type="text"
             placeholder="000000"
@@ -265,13 +265,13 @@ export default function LoginForm() {
               setTwoFactorCode(value);
               setTwoFactorError("");
             }}
-            className="font-satoshi text-center text-2xl tracking-widest"
+            className="font-satoshi text-center text-lg tracking-widest"
             maxLength={6}
             autoFocus
             autoComplete="one-time-code"
           />
 
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <Button
               type="button"
               variant="secondary"
@@ -288,7 +288,7 @@ export default function LoginForm() {
             >
               {isLoading ? (
                 <div className="flex items-center justify-center">
-                  <Loader2 size={16} className="animate-spin mr-2" />
+                  <Loader2 size={14} className="animate-spin mr-1" />
                   Verifying...
                 </div>
               ) : (
@@ -299,7 +299,7 @@ export default function LoginForm() {
         </form>
 
         <div className="text-center">
-          <p className="text-gray-400 text-sm font-satoshi">
+          <p className="text-gray-400 text-xs font-satoshi">
             Don't have access to your authenticator app?{" "}
             <button
               type="button"
@@ -319,25 +319,25 @@ export default function LoginForm() {
 
   // Main Login Form
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-white font-mayeka mb-2">
+        <h2 className="text-lg font-bold text-white font-mayeka mb-1">
           Welcome back
         </h2>
-        <p className="text-gray-400 font-satoshi">
+        <p className="text-gray-400 font-satoshi text-sm">
           Sign in to your Blockpal account
         </p>
       </div>
 
       {/* General Error Display */}
       {(error || googleError) && (
-        <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+        <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
           <div className="flex items-start">
             <AlertCircle
-              size={16}
+              size={14}
               className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
             />
-            <p className="text-red-400 text-sm font-satoshi">
+            <p className="text-red-400 text-xs font-satoshi">
               {error || googleError}
             </p>
           </div>
@@ -351,16 +351,16 @@ export default function LoginForm() {
         disabled={isLoading}
         variant="secondary"
         className="w-full text-black hover:bg-gray-100 border-white font-satoshi"
-        size="lg"
+        size="md"
       >
         {googleLoading ? (
           <div className="flex items-center justify-center">
-            <Loader2 size={16} className="animate-spin mr-2" />
+            <Loader2 size={14} className="animate-spin mr-2" />
             Signing in with Google...
           </div>
         ) : (
           <div className="flex items-center justify-center">
-            <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -389,14 +389,14 @@ export default function LoginForm() {
           <span className="w-full border-t border-[#2C2C2C]" />
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="bg-black px-2 text-gray-400 font-satoshi">
+          <span className="bg-black px-2 text-gray-400 font-satoshi text-xs">
             Or continue with email
           </span>
         </div>
       </div>
 
       {/* Email/Password Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <Input
             type="email"
@@ -409,7 +409,7 @@ export default function LoginForm() {
             disabled={isLoading}
           />
           {formErrors.email && (
-            <p className="text-red-400 text-sm mt-1 font-satoshi">
+            <p className="text-red-400 text-xs mt-1 font-satoshi">
               {formErrors.email}
             </p>
           )}
@@ -423,21 +423,21 @@ export default function LoginForm() {
               placeholder="Enter your password"
               value={formData.password}
               onChange={handleInputChange}
-              className="font-satoshi pr-10"
+              className="font-satoshi pr-8"
               autoComplete="current-password"
               disabled={isLoading}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
               disabled={isLoading}
             >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
           {formErrors.password && (
-            <p className="text-red-400 text-sm mt-1 font-satoshi">
+            <p className="text-red-400 text-xs mt-1 font-satoshi">
               {formErrors.password}
             </p>
           )}
@@ -447,11 +447,11 @@ export default function LoginForm() {
           type="submit"
           disabled={isLoading}
           className="w-full font-satoshi"
-          size="lg"
+          size="md"
         >
           {loading ? (
             <div className="flex items-center justify-center">
-              <Loader2 size={16} className="animate-spin mr-2" />
+              <Loader2 size={14} className="animate-spin mr-2" />
               Signing in...
             </div>
           ) : (
@@ -464,7 +464,7 @@ export default function LoginForm() {
       <div className="text-center">
         <button
           type="button"
-          className="text-[#E2AF19] hover:opacity-80 text-sm font-satoshi font-medium"
+          className="text-[#E2AF19] hover:opacity-80 text-xs font-satoshi font-medium"
           onClick={() => {
             // Handle forgot password
             alert("Forgot password functionality coming soon!");

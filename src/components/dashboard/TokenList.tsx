@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - UPDATED WITH COLORED BACKGROUNDS
+// src/components/dashboard/TokenList.tsx - COMPACT VERSION
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -318,21 +318,21 @@ export default function TokenList() {
 
   if (!activeWallet) {
     return (
-      <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-        <div className="flex items-center justify-between mb-4 lg:mb-6">
-          <h2 className="text-base lg:text-lg font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
+      <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+        <div className="flex items-center justify-between mb-3 lg:mb-4">
+          <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
             Token Holdings (0)
           </h2>
           <WalletRefreshButton />
         </div>
-        <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-          <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-            <span className="text-gray-400 text-lg lg:text-xl">₿</span>
+        <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
+          <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+            <span className="text-gray-400 text-base lg:text-lg">₿</span>
           </div>
-          <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+          <h3 className="text-white text-sm lg:text-base font-satoshi mb-1">
             No wallet selected
           </h3>
-          <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+          <p className="text-gray-400 font-satoshi text-xs lg:text-sm">
             Please select a wallet to view your tokens
           </p>
         </div>
@@ -348,28 +348,28 @@ export default function TokenList() {
     !loading
   ) {
     return (
-      <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-        <div className="flex items-center justify-between mb-4 lg:mb-6">
-          <h2 className="text-base lg:text-lg font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
+      <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+        <div className="flex items-center justify-between mb-3 lg:mb-4">
+          <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
             Token Holdings (0)
           </h2>
           <WalletRefreshButton />
         </div>
-        <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-          <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-            <span className="text-gray-400 text-lg lg:text-xl">🪙</span>
+        <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
+          <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+            <span className="text-gray-400 text-base lg:text-lg">🪙</span>
           </div>
-          <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+          <h3 className="text-white text-sm lg:text-base font-satoshi mb-1">
             No tokens found
           </h3>
-          <p className="text-gray-400 font-satoshi text-sm lg:text-base mb-4">
+          <p className="text-gray-400 font-satoshi text-xs lg:text-sm mb-3">
             This wallet doesn't have any tokens yet
           </p>
-          <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 max-w-sm">
-            <p className="text-blue-400 text-sm font-satoshi">
+          <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3 max-w-xs">
+            <p className="text-blue-400 text-xs font-satoshi">
               💡 <strong>Tip:</strong> Send some tokens to your wallet address:{" "}
-              {activeWallet.address.slice(0, 8)}...
-              {activeWallet.address.slice(-6)}
+              {activeWallet.address.slice(0, 6)}...
+              {activeWallet.address.slice(-4)}
             </p>
           </div>
         </div>
@@ -378,46 +378,45 @@ export default function TokenList() {
   }
 
   return (
-    <div className="bg-black rounded-[16px] lg:rounded-[20px] p-4 lg:p-6 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between mb-4 lg:mb-6 px-3">
-        <h2 className="text-base lg:text-lg font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
+    <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+      <div className="flex items-center justify-between mb-3 px-2">
+        <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
           Token Holdings
-          {/* ({displayTokens.length}) */}
         </h2>
         <WalletRefreshButton />
       </div>
 
       {/* Mobile Grid Layout */}
       <div className="block sm:hidden flex-1 overflow-y-auto scrollbar-hide">
-        <div className="grid grid-cols-1 gap-3 pr-2">
+        <div className="grid grid-cols-1 gap-2 pr-1">
           {displayTokens.map((token) => (
             <div
               key={token.id}
               onClick={() => handleTokenClick(token)}
-              className={`bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] cursor-pointer transition-colors ${
+              className={`bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C] cursor-pointer transition-colors ${
                 isNavigating
                   ? "opacity-50 cursor-not-allowed"
                   : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
               }`}
             >
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center">
                   {/* Show loading spinner if navigating */}
                   {isNavigating ? (
-                    <RefreshCw className="w-8 h-8 text-[#E2AF19] animate-spin mr-3 flex-shrink-0" />
+                    <RefreshCw className="w-7 h-7 text-[#E2AF19] animate-spin mr-2.5 flex-shrink-0" />
                   ) : (
                     <div
-                      className={`w-10 h-10 ${getTokenBackgroundColor(
+                      className={`w-8 h-8 ${getTokenBackgroundColor(
                         token.symbol,
                         token.contractAddress
-                      )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 p-1`}
+                      )} rounded-full flex items-center justify-center mr-2.5 flex-shrink-0 p-0.5`}
                     >
                       {/* UPDATED: Better icon handling with background */}
                       {isValidImageUrl(token.icon) ? (
                         <img
                           src={token.icon}
                           alt={token.symbol}
-                          className="w-8 h-8 rounded-full"
+                          className="w-7 h-7 rounded-full"
                           onError={(e) => {
                             console.log(
                               `❌ Image load failed for ${token.symbol}: ${token.icon}`
@@ -435,14 +434,14 @@ export default function TokenList() {
                       ) : null}
 
                       <div
-                        className={`w-8 h-8 ${getTokenIcon(
+                        className={`w-7 h-7 ${getTokenIcon(
                           token.symbol,
                           token.contractAddress
                         )} rounded-full flex items-center justify-center ${
                           isValidImageUrl(token.icon) ? "hidden" : ""
                         }`}
                       >
-                        <span className="text-white text-sm font-medium">
+                        <span className="text-white text-xs font-medium">
                           {getTokenLetter(token.symbol, token.contractAddress)}
                         </span>
                       </div>
@@ -450,20 +449,20 @@ export default function TokenList() {
                   )}
 
                   <div className="min-w-0">
-                    <div className="text-white font-medium font-satoshi">
+                    <div className="text-white font-medium font-satoshi text-sm">
                       {token.name}
                     </div>
-                    <div className="text-gray-400 text-sm font-satoshi">
+                    <div className="text-gray-400 text-xs font-satoshi">
                       {token.balance.toFixed(4)} {token.symbol}
                     </div>
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div className="text-white font-medium font-satoshi">
+                  <div className="text-white font-medium font-satoshi text-sm">
                     {formatCurrency(token.value)}
                   </div>
                   <div
-                    className={`text-sm font-satoshi ${
+                    className={`text-xs font-satoshi ${
                       token.change24h >= 0 ? "text-green-400" : "text-red-400"
                     }`}
                   >
@@ -478,12 +477,12 @@ export default function TokenList() {
 
       {/* Tablet/Desktop List Layout */}
       <div className="hidden sm:block flex-1 overflow-y-auto scrollbar-hide">
-        <div className="space-y-3 pr-2">
+        <div className="space-y-2 pr-1">
           {displayTokens.map((token) => (
             <div
               key={token.id}
               onClick={() => handleTokenClick(token)}
-              className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+              className={`flex items-center justify-between p-2.5 rounded-lg transition-colors ${
                 isNavigating
                   ? "opacity-50 cursor-not-allowed"
                   : "hover:bg-[#1A1A1A] cursor-pointer active:bg-[#2A2A2A]"
@@ -492,20 +491,20 @@ export default function TokenList() {
               <div className="flex items-center min-w-0 flex-1">
                 {/* Show loading spinner if navigating */}
                 {isNavigating ? (
-                  <RefreshCw className="w-10 h-10 text-[#E2AF19] animate-spin mr-3 flex-shrink-0" />
+                  <RefreshCw className="w-9 h-9 text-[#E2AF19] animate-spin mr-2.5 flex-shrink-0" />
                 ) : (
                   <div
-                    className={`w-12 h-12 ${getTokenBackgroundColor(
+                    className={`w-10 h-10 ${getTokenBackgroundColor(
                       token.symbol,
                       token.contractAddress
-                    )} rounded-full flex items-center justify-center mr-3 flex-shrink-0 p-1`}
+                    )} rounded-full flex items-center justify-center mr-2.5 flex-shrink-0 p-0.5`}
                   >
                     {/* UPDATED: Better icon handling with background */}
                     {isValidImageUrl(token.icon) ? (
                       <img
                         src={token.icon}
                         alt={token.symbol}
-                        className="w-10 h-10 rounded-full"
+                        className="w-9 h-9 rounded-full"
                         onError={(e) => {
                           console.log(
                             `❌ Image load failed for ${token.symbol}: ${token.icon}`
@@ -523,7 +522,7 @@ export default function TokenList() {
                     ) : null}
 
                     <div
-                      className={`w-10 h-10 ${getTokenIcon(
+                      className={`w-9 h-9 ${getTokenIcon(
                         token.symbol,
                         token.contractAddress
                       )} rounded-full flex items-center justify-center ${
@@ -538,21 +537,21 @@ export default function TokenList() {
                 )}
 
                 <div className="min-w-0 flex-1">
-                  <div className="text-white font-medium font-satoshi text-sm sm:text-base flex items-center">
+                  <div className="text-white font-medium font-satoshi text-sm sm:text-sm flex items-center">
                     {token.name}
                   </div>
-                  <div className="text-gray-400 text-xs sm:text-sm font-satoshi">
+                  <div className="text-gray-400 text-xs font-satoshi">
                     {token.balance.toFixed(4)} {token.symbol}
                   </div>
                 </div>
               </div>
 
               <div className="text-right flex-shrink-0">
-                <div className="text-white font-medium font-satoshi text-sm sm:text-base">
+                <div className="text-white font-medium font-satoshi text-sm">
                   {formatCurrency(token.value)}
                 </div>
                 <div
-                  className={`text-xs sm:text-sm font-satoshi ${
+                  className={`text-xs font-satoshi ${
                     token.change24h >= 0 ? "text-green-400" : "text-red-400"
                   }`}
                 >

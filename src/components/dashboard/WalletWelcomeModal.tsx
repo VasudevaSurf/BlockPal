@@ -39,17 +39,14 @@ export default function WalletWelcomeModal({
   const [error, setError] = useState("");
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Recovery phrase states
   const [phraseWords, setPhraseWords] = useState<string[]>(
     new Array(12).fill("")
   );
   const [phraseLength, setPhraseLength] = useState(12);
 
-  // Private key states
   const [privateKey, setPrivateKey] = useState("");
   const [walletName, setWalletName] = useState("");
 
-  // New wallet creation states
   const [newWalletName, setNewWalletName] = useState("");
   const [generatedWallet, setGeneratedWallet] = useState<{
     address: string;
@@ -57,7 +54,6 @@ export default function WalletWelcomeModal({
     mnemonic: string;
   } | null>(null);
 
-  // Handle outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -131,7 +127,6 @@ export default function WalletWelcomeModal({
     }
   };
 
-  // Generate a new wallet using ethers.js (client-side)
   const generateNewWallet = async () => {
     if (!newWalletName.trim()) {
       setError("Please enter a wallet name");
@@ -142,10 +137,8 @@ export default function WalletWelcomeModal({
     setError("");
 
     try {
-      // Import ethers dynamically
       const { ethers } = await import("ethers");
 
-      // Generate a random wallet
       const wallet = ethers.Wallet.createRandom();
 
       setGeneratedWallet({
@@ -154,7 +147,6 @@ export default function WalletWelcomeModal({
         mnemonic: wallet.mnemonic?.phrase || "",
       });
 
-      // Continue to wallet creation step for confirmation
       setCurrentStep("wallet-created");
     } catch (err: any) {
       console.error("Wallet generation error:", err);
@@ -164,7 +156,6 @@ export default function WalletWelcomeModal({
     }
   };
 
-  // Import wallet using recovery phrase
   const handleImportWithRecovery = async () => {
     const filledWords = phraseWords.filter((word) => word.trim() !== "");
 
@@ -179,13 +170,10 @@ export default function WalletWelcomeModal({
     setError("");
 
     try {
-      // Import ethers dynamically
       const { ethers } = await import("ethers");
 
-      // Create wallet from mnemonic
       const wallet = ethers.Wallet.fromPhrase(recoveryPhrase);
 
-      // Use the existing /api/wallets endpoint
       const response = await fetch("/api/wallets", {
         method: "POST",
         headers: {
@@ -219,7 +207,6 @@ export default function WalletWelcomeModal({
     }
   };
 
-  // Import wallet using private key
   const handleImportWithPrivateKey = async () => {
     if (!privateKey.trim() || !walletName.trim()) {
       setError("Please fill in all fields");
@@ -230,13 +217,10 @@ export default function WalletWelcomeModal({
     setError("");
 
     try {
-      // Import ethers dynamically
       const { ethers } = await import("ethers");
 
-      // Create wallet from private key
       const wallet = new ethers.Wallet(privateKey.trim());
 
-      // Use the existing /api/wallets endpoint
       const response = await fetch("/api/wallets", {
         method: "POST",
         headers: {
@@ -268,7 +252,6 @@ export default function WalletWelcomeModal({
     }
   };
 
-  // Save the generated wallet to database
   const handleSaveGeneratedWallet = async () => {
     if (!generatedWallet) return;
 
@@ -276,7 +259,6 @@ export default function WalletWelcomeModal({
     setError("");
 
     try {
-      // Use the existing /api/wallets endpoint
       const response = await fetch("/api/wallets", {
         method: "POST",
         headers: {
@@ -309,8 +291,8 @@ export default function WalletWelcomeModal({
 
   const renderWelcomeStep = () => (
     <div className="text-center">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white font-mayeka mb-2">
+      <div className="mb-4">
+        <h2 className="text-xl font-bold text-white font-mayeka mb-1.5">
           Welcome {userName}
         </h2>
         <p className="text-gray-400 font-satoshi">
@@ -318,15 +300,15 @@ export default function WalletWelcomeModal({
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Button
           onClick={() => setCurrentStep("create-wallet")}
           variant="secondary"
           className="w-full flex items-center justify-center"
           size="lg"
         >
-          <div className="w-6 h-6 border border-white rounded-full flex items-center justify-center mr-2">
-            <Plus size={14} className="text-white" />
+          <div className="w-5 h-5 border border-white rounded-full flex items-center justify-center mr-1.5">
+            <Plus size={12} className="text-white" />
           </div>
           Create a new wallet
         </Button>
@@ -335,7 +317,7 @@ export default function WalletWelcomeModal({
           className="w-full flex items-center justify-center"
           size="lg"
         >
-          <Download size={20} className="mr-2" />
+          <Download size={16} className="mr-1.5" />
           Import existing wallet
         </Button>
       </div>
@@ -344,20 +326,20 @@ export default function WalletWelcomeModal({
 
   const renderCreateWallet = () => (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => setCurrentStep("welcome")}
-          className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+          className="mr-2 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
         >
-          <ArrowLeft size={20} className="text-white" />
+          <ArrowLeft size={18} className="text-white" />
         </button>
-        <h2 className="text-xl font-bold text-white font-mayeka">
+        <h2 className="text-lg font-bold text-white font-mayeka">
           Create new wallet
         </h2>
-        <div className="w-8"></div>
+        <div className="w-6"></div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Input
           label="Wallet name"
           placeholder="Enter wallet name"
@@ -376,8 +358,8 @@ export default function WalletWelcomeModal({
       </div>
 
       {error && (
-        <div className="mt-4 bg-red-900/20 border border-red-500/50 rounded-lg p-3">
-          <p className="text-red-400 text-sm font-satoshi">{error}</p>
+        <div className="mt-3 bg-red-900/20 border border-red-500/50 rounded-lg p-2.5">
+          <p className="text-red-400 text-xs font-satoshi">{error}</p>
         </div>
       )}
     </div>
@@ -385,29 +367,29 @@ export default function WalletWelcomeModal({
 
   const renderImportOptions = () => (
     <div>
-      <div className="flex items-center justify-between mb-8 px-4 py-0">
+      <div className="flex items-center justify-between mb-6 px-3 py-0">
         <button
           onClick={() => setCurrentStep("welcome")}
-          className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+          className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
         >
-          <ArrowLeft size={20} className="text-white" />
+          <ArrowLeft size={18} className="text-white" />
         </button>
-        <h2 className="text-xl font-bold text-white font-satoshi">
+        <h2 className="text-lg font-bold text-white font-satoshi">
           Import existing wallet
         </h2>
-        <div className="w-8"></div>
+        <div className="w-6"></div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 px-0">
+      <div className="grid grid-cols-2 gap-4 px-0">
         <button
           onClick={() => setCurrentStep("import-recovery-phrase")}
-          className="flex flex-col items-center p-6 bg-[#0F0F0F] rounded-xl hover:bg-[#1A1A1A] transition-all duration-200 group"
+          className="flex flex-col items-center p-4 bg-[#0F0F0F] rounded-lg hover:bg-[#1A1A1A] transition-all duration-200 group"
         >
-          <div className="w-12 h-12 bg-[#4B3A08] rounded-full flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+          <div className="w-10 h-10 bg-[#4B3A08] rounded-full flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
+              width="14"
+              height="14"
               viewBox="0 0 25 24"
               fill="none"
             >
@@ -434,19 +416,19 @@ export default function WalletWelcomeModal({
               />
             </svg>
           </div>
-          <div className="text-white font-medium font-satoshi text-center">
+          <div className="text-white font-medium font-satoshi text-center text-sm">
             Recovery Phrase
           </div>
         </button>
 
         <button
           onClick={() => setCurrentStep("import-private-key")}
-          className="flex flex-col items-center p-6 bg-[#0F0F0F] rounded-xl hover:bg-[#1A1A1A] transition-all duration-200 group"
+          className="flex flex-col items-center p-4 bg-[#0F0F0F] rounded-lg hover:bg-[#1A1A1A] transition-all duration-200 group"
         >
-          <div className="w-12 h-12 bg-[#4B3A08] rounded-full flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-            <Download size={16} className="text-[#E2AF19]" />
+          <div className="w-10 h-10 bg-[#4B3A08] rounded-full flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Download size={14} className="text-[#E2AF19]" />
           </div>
-          <div className="text-white font-medium font-satoshi text-center">
+          <div className="text-white font-medium font-satoshi text-center text-sm">
             Private Key
           </div>
         </button>
@@ -456,38 +438,36 @@ export default function WalletWelcomeModal({
 
   const renderImportRecoveryPhrase = () => (
     <div>
-      <div className="flex items-center mb-6">
+      <div className="flex items-center mb-4">
         <button
           onClick={() => setCurrentStep("import-options")}
-          className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+          className="mr-2 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
         >
-          <ArrowLeft size={20} className="text-white" />
+          <ArrowLeft size={18} className="text-white" />
         </button>
-        <h2 className="text-xl font-bold text-white font-satoshi text-center flex-1">
+        <h2 className="text-lg font-bold text-white font-satoshi text-center flex-1">
           Import with recovery phrase
         </h2>
-        <div className="w-10"></div>
+        <div className="w-8"></div>
       </div>
 
-      <div className="text-center mb-6">
-        <h3 className="text-xl font-bold text-white mb-2 font-mayeka">
+      <div className="text-center mb-4">
+        <h3 className="text-lg font-bold text-white mb-1.5 font-mayeka">
           Enter Your Recovery Phrase
         </h3>
-        <p className="text-gray-400 text-sm font-satoshi">
+        <p className="text-gray-400 text-xs font-satoshi">
           Typically 12 (sometimes 18, 24) words.
         </p>
       </div>
 
-      {/* Unified container with background for controls and input grid */}
-      <div className="bg-[#0F0F0F] rounded-lg p-4 mb-6">
-        {/* Controls section */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex bg-[#2C2C2C] rounded-lg p-1 space-x-1">
+      <div className="bg-[#0F0F0F] rounded-lg p-3 mb-4">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex bg-[#2C2C2C] rounded-lg p-0.5 space-x-0.5">
             {[12, 18, 24].map((length) => (
               <button
                 key={length}
                 onClick={() => handlePhraseLength(length)}
-                className={`px-3 py-1.5 rounded-md font-satoshi text-sm transition-colors ${
+                className={`px-2.5 py-1 rounded-md font-satoshi text-xs transition-colors ${
                   phraseLength === length
                     ? "bg-[#494949] text-white"
                     : "text-gray-400 hover:text-white"
@@ -499,14 +479,13 @@ export default function WalletWelcomeModal({
           </div>
           <button
             onClick={handlePastePhrase}
-            className="bg-[#2C2C2C] text-white px-4 py-2 rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
+            className="bg-[#2C2C2C] text-white px-3 py-1.5 rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors text-xs"
           >
             Paste
           </button>
         </div>
 
-        {/* Input grid */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {Array.from({ length: phraseLength }).map((_, index) => (
             <div key={index} className="relative">
               <input
@@ -514,9 +493,9 @@ export default function WalletWelcomeModal({
                 placeholder=""
                 value={phraseWords[index] || ""}
                 onChange={(e) => handlePhraseWordChange(index, e.target.value)}
-                className="w-full px-3 py-3 pl-8 bg-black border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-[#E2AF19] font-satoshi"
+                className="w-full px-2.5 py-2.5 pl-6 bg-black border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:border-[#E2AF19] font-satoshi text-xs"
               />
-              <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 font-satoshi">
+              <span className="absolute left-1.5 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 font-satoshi">
                 {index + 1}.
               </span>
             </div>
@@ -536,8 +515,8 @@ export default function WalletWelcomeModal({
       </Button>
 
       {error && (
-        <div className="mt-4 bg-red-900/20 border border-red-500/50 rounded-lg p-3">
-          <p className="text-red-400 text-sm font-satoshi">{error}</p>
+        <div className="mt-3 bg-red-900/20 border border-red-500/50 rounded-lg p-2.5">
+          <p className="text-red-400 text-xs font-satoshi">{error}</p>
         </div>
       )}
     </div>
@@ -545,20 +524,20 @@ export default function WalletWelcomeModal({
 
   const renderImportPrivateKey = () => (
     <div>
-      <div className="flex items-center mb-6">
+      <div className="flex items-center mb-4">
         <button
           onClick={() => setCurrentStep("import-options")}
-          className="mr-3 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+          className="mr-2 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
         >
-          <ArrowLeft size={20} className="text-white" />
+          <ArrowLeft size={18} className="text-white" />
         </button>
-        <h2 className="text-xl font-bold text-white font-satoshi text-center flex-1">
+        <h2 className="text-lg font-bold text-white font-satoshi text-center flex-1">
           Import with private key
         </h2>
-        <div className="w-10"></div>
+        <div className="w-8"></div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Input
           placeholder="Enter wallet name"
           value={walletName}
@@ -570,10 +549,10 @@ export default function WalletWelcomeModal({
             value={privateKey}
             onChange={(e) => setPrivateKey(e.target.value)}
             placeholder="Enter your private key"
-            className="w-full h-32 px-3 py-3 border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-400 focus:outline-none focus:border-[#E2AF19] resize-none font-satoshi"
-            style={{ fontSize: "16px" }}
+            className="w-full h-24 px-2.5 py-2.5 border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-400 focus:outline-none focus:border-[#E2AF19] resize-none font-satoshi text-xs"
+            style={{ fontSize: "14px" }}
           />
-          <div className="flex justify-end mt-2">
+          <div className="flex justify-end mt-1.5">
             <button
               onClick={async () => {
                 try {
@@ -583,7 +562,7 @@ export default function WalletWelcomeModal({
                   setError("Failed to paste from clipboard");
                 }
               }}
-              className="bg-[#2C2C2C] text-white px-3 py-1.5 rounded-lg text-sm font-satoshi hover:bg-[#3C3C3C] transition-colors"
+              className="bg-[#2C2C2C] text-white px-2.5 py-1 rounded-lg text-xs font-satoshi hover:bg-[#3C3C3C] transition-colors"
             >
               Paste
             </button>
@@ -601,8 +580,8 @@ export default function WalletWelcomeModal({
       </div>
 
       {error && (
-        <div className="mt-4 bg-red-900/20 border border-red-500/50 rounded-lg p-3">
-          <p className="text-red-400 text-sm font-satoshi">{error}</p>
+        <div className="mt-3 bg-red-900/20 border border-red-500/50 rounded-lg p-2.5">
+          <p className="text-red-400 text-xs font-satoshi">{error}</p>
         </div>
       )}
     </div>
@@ -610,32 +589,31 @@ export default function WalletWelcomeModal({
 
   const renderWalletCreated = () => (
     <div className="text-center">
-      <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-        <span className="text-white text-2xl">✓</span>
+      <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
+        <span className="text-white text-xl">✓</span>
       </div>
-      <h2 className="text-2xl font-bold text-white font-mayeka mb-2">
+      <h2 className="text-xl font-bold text-white font-mayeka mb-1.5">
         Wallet Setup Complete! 🎉
       </h2>
-      <p className="text-gray-400 font-satoshi mb-6">
+      <p className="text-gray-400 font-satoshi mb-4">
         Your wallet has been successfully set up and is ready to use.
       </p>
 
-      {/* Show generated wallet details if this was a new wallet */}
       {generatedWallet && (
-        <div className="bg-[#0F0F0F] rounded-lg p-4 mb-6 text-left">
-          <h3 className="text-white font-semibold mb-3 font-satoshi">
+        <div className="bg-[#0F0F0F] rounded-lg p-3 mb-4 text-left">
+          <h3 className="text-white font-semibold mb-2 font-satoshi">
             ⚠️ Save Your Wallet Details
           </h3>
-          <div className="space-y-3 text-sm">
+          <div className="space-y-2 text-xs">
             <div>
               <label className="text-gray-400 font-satoshi">Address:</label>
-              <div className="text-white font-mono text-xs mt-1 break-all">
+              <div className="text-white font-mono text-xs mt-0.5 break-all">
                 {generatedWallet.address}
               </div>
             </div>
             <div>
               <label className="text-gray-400 font-satoshi">Private Key:</label>
-              <div className="text-white font-mono text-xs mt-1 break-all">
+              <div className="text-white font-mono text-xs mt-0.5 break-all">
                 {generatedWallet.privateKey}
               </div>
             </div>
@@ -644,13 +622,13 @@ export default function WalletWelcomeModal({
                 <label className="text-gray-400 font-satoshi">
                   Recovery Phrase:
                 </label>
-                <div className="text-white font-mono text-xs mt-1 break-all">
+                <div className="text-white font-mono text-xs mt-0.5 break-all">
                   {generatedWallet.mnemonic}
                 </div>
               </div>
             )}
           </div>
-          <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-500/50 rounded-lg">
+          <div className="mt-3 p-2.5 bg-yellow-900/20 border border-yellow-500/50 rounded-lg">
             <p className="text-yellow-400 text-xs font-satoshi">
               ⚠️ Save these details in a secure place. You'll need them to
               recover your wallet.
@@ -660,7 +638,7 @@ export default function WalletWelcomeModal({
       )}
 
       {generatedWallet ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           <Button
             onClick={handleSaveGeneratedWallet}
             className="w-full"
@@ -696,16 +674,14 @@ export default function WalletWelcomeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Modal backdrop - clicking here will close the modal */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
       <div className="absolute inset-0 bg-white/10" />
 
-      {/* Modal content */}
       <div
         ref={modalRef}
-        className="relative bg-black/95 border border-[#2C2C2C] rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl"
+        className="relative bg-black/95 border border-[#2C2C2C] rounded-[16px] w-full max-w-md max-h-[90vh] overflow-hidden shadow-xl"
       >
-        <div className="p-6 max-h-[80vh] overflow-y-auto">
+        <div className="p-4 max-h-[80vh] overflow-y-auto scrollbar-hide">
           {stepComponents[currentStep]()}
         </div>
       </div>

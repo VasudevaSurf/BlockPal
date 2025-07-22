@@ -1,4 +1,4 @@
-// src/app/dashboard/batch-payments/page.tsx - UPDATED WITH BACKDROP EFFECTS
+// src/app/dashboard/batch-payments/page.tsx - COMPACT VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -41,7 +41,6 @@ interface BatchPayment {
   selectedUser?: UserSuggestion | null;
 }
 
-// Helper function to check if icon URL is valid (same as TokenList)
 const isValidImageUrl = (url: string | null | undefined): boolean => {
   if (!url || url === "null" || url === "undefined" || url === "") {
     return false;
@@ -54,7 +53,6 @@ const isValidImageUrl = (url: string | null | undefined): boolean => {
   );
 };
 
-// Get fallback token icon colors (same as TokenList)
 const getTokenIcon = (symbol: string, contractAddress?: string) => {
   const colors: Record<string, string> = {
     ETH: "bg-blue-500",
@@ -84,7 +82,6 @@ const getTokenIcon = (symbol: string, contractAddress?: string) => {
   return colors[symbol] || "bg-gray-500";
 };
 
-// Generate random background color for tokens (like in scheduled payments)
 const getRandomTokenBgColor = (symbol: string) => {
   const colors = [
     "bg-red-500",
@@ -106,7 +103,6 @@ const getRandomTokenBgColor = (symbol: string) => {
     "bg-sky-500",
   ];
 
-  // Use symbol to generate consistent color for same token
   let hash = 0;
   for (let i = 0; i < symbol.length; i++) {
     hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
@@ -115,7 +111,6 @@ const getRandomTokenBgColor = (symbol: string) => {
   return colors[index];
 };
 
-// Get fallback token letters (same as TokenList)
 const getTokenLetter = (symbol: string, contractAddress?: string) => {
   const letters: Record<string, string> = {
     ETH: "Ξ",
@@ -145,10 +140,9 @@ const getTokenLetter = (symbol: string, contractAddress?: string) => {
   return letters[symbol] || symbol.charAt(0);
 };
 
-// Token icon component with enhanced styling for dropdown
 const TokenIconWithBg = ({
   token,
-  size = "w-5 h-5",
+  size = "w-3 h-3",
 }: {
   token: any;
   size?: string;
@@ -161,7 +155,7 @@ const TokenIconWithBg = ({
     <div
       className={`${size} ${getRandomTokenBgColor(
         token.symbol
-      )} rounded-full mr-2 flex-shrink-0 relative overflow-hidden shadow-sm border border-white/10 flex items-center justify-center`}
+      )} rounded-full mr-1.5 flex-shrink-0 relative overflow-hidden shadow-sm border border-white/10 flex items-center justify-center`}
     >
       {hasValidImage ? (
         <img
@@ -181,10 +175,9 @@ const TokenIconWithBg = ({
   );
 };
 
-// Regular token icon component for other uses
 const TokenIcon = ({
   token,
-  size = "w-5 h-5",
+  size = "w-3 h-3",
 }: {
   token: any;
   size?: string;
@@ -199,7 +192,7 @@ const TokenIcon = ({
         <img
           src={token.icon || token.logoUrl}
           alt={token.symbol}
-          className={`${size} rounded-full mr-2 flex-shrink-0`}
+          className={`${size} rounded-full mr-1.5 flex-shrink-0`}
           onError={() => {
             setImageError(true);
           }}
@@ -210,7 +203,7 @@ const TokenIcon = ({
         className={`${size} ${getTokenIcon(
           token.symbol,
           token.contractAddress
-        )} rounded-full flex items-center justify-center mr-2 flex-shrink-0 shadow-sm border border-white/10 ${
+        )} rounded-full flex items-center justify-center mr-1.5 flex-shrink-0 shadow-sm border border-white/10 ${
           hasValidImage ? "hidden" : ""
         }`}
       >
@@ -244,13 +237,11 @@ export default function BatchPaymentsPage() {
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
 
-  // NEW: Resizable panel state
-  const [batchPanelHeight, setBatchPanelHeight] = useState(50); // Percentage
+  const [batchPanelHeight, setBatchPanelHeight] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
 
-  // Initialize with first available token
   useEffect(() => {
     if (tokens.length > 0 && !selectedToken) {
       const firstToken = tokens[0];
@@ -267,7 +258,6 @@ export default function BatchPaymentsPage() {
     }
   }, [tokens, selectedToken]);
 
-  // NEW: Handle resize drag
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -282,7 +272,6 @@ export default function BatchPaymentsPage() {
     const newHeight =
       ((e.clientY - containerRect.top) / containerRect.height) * 100;
 
-    // Constrain between 20% and 80%
     const constrainedHeight = Math.max(20, Math.min(80, newHeight));
     setBatchPanelHeight(constrainedHeight);
   };
@@ -293,7 +282,6 @@ export default function BatchPaymentsPage() {
     document.body.style.userSelect = "";
   };
 
-  // Add/remove event listeners based on dragging state
   useEffect(() => {
     if (isDragging) {
       document.addEventListener("mousemove", handleMouseMove);
@@ -303,7 +291,6 @@ export default function BatchPaymentsPage() {
       document.removeEventListener("mouseup", handleMouseUp);
     }
 
-    // Cleanup on unmount
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
@@ -460,9 +447,7 @@ export default function BatchPaymentsPage() {
     }
   };
 
-  // Helper function to parse user-friendly error messages
   const parseErrorMessage = (error: string): string => {
-    // Check for common error patterns and return user-friendly messages
     if (error.includes("insufficient funds")) {
       return "Insufficient funds for this transaction. Please check your wallet balance and try again.";
     }
@@ -485,7 +470,6 @@ export default function BatchPaymentsPage() {
       return "Transaction was cancelled by user.";
     }
 
-    // For any other technical errors, return a generic user-friendly message
     return "Transaction failed. Please try again or contact support if the issue persists.";
   };
 
@@ -513,7 +497,6 @@ export default function BatchPaymentsPage() {
         );
 
         if (!privateKey) {
-          // Close preview modal and show error in result modal
           setShowPreview(false);
           setResult({
             success: false,
@@ -535,7 +518,6 @@ export default function BatchPaymentsPage() {
         }
       }
     } catch (err: any) {
-      // Close preview modal and show user-friendly error in result modal
       setShowPreview(false);
       setResult({
         success: false,
@@ -573,7 +555,6 @@ export default function BatchPaymentsPage() {
       setBatchPayments([]);
       setShowPreview(false);
     } catch (err: any) {
-      // Close preview modal and show user-friendly error in result modal
       setShowPreview(false);
       setResult({
         success: false,
@@ -632,8 +613,7 @@ export default function BatchPaymentsPage() {
   };
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
-      {/* ADDED: Token dropdown backdrop */}
+    <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden">
       {isTokenDropdownOpen && (
         <div
           className="fixed inset-0 z-30 bg-white/10"
@@ -641,63 +621,63 @@ export default function BatchPaymentsPage() {
         />
       )}
 
-      {/* Error Display */}
       {error && (
-        <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
+        <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-1.5 mb-2 flex-shrink-0">
           <div className="flex items-start">
             <AlertTriangle
-              size={16}
-              className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+              size={12}
+              className="text-red-400 mr-1.5 mt-0.5 flex-shrink-0"
             />
-            <p className="text-red-400 text-sm font-satoshi">{error}</p>
+            <p className="text-red-400 text-xs font-satoshi">{error}</p>
           </div>
         </div>
       )}
 
-      {/* Mobile Layout */}
-      <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-        {/* Mobile content remains the same... */}
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-white mb-4 font-satoshi">
+      <div className="flex flex-col xl:hidden gap-2 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
+          <h2 className="text-sm font-semibold text-white mb-2 font-satoshi">
             Add Payment
           </h2>
 
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             <div>
               <UsernameInput
                 value={formData.recipient}
                 onChange={handleRecipientChange}
                 onUserSelect={handleUserSelect}
                 placeholder="@username or 0x... address"
-                className="font-satoshi text-gray-400"
+                className="font-satoshi text-gray-400 text-xs h-[36px] px-2"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-1.5">
               <div className="relative">
                 <button
                   onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
-                  className="flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 w-full"
+                  className="flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-1.5 py-1.5 w-full h-[36px]"
                 >
                   <div className="flex items-center">
                     {selectedToken && (
                       <>
-                        <TokenIconWithBg token={selectedToken} size="w-5 h-5" />
-                        <span className="text-white font-satoshi text-sm">
+                        <TokenIconWithBg
+                          token={selectedToken}
+                          size="w-2.5 h-2.5"
+                        />
+                        <span className="text-white font-satoshi text-xs">
                           {selectedToken.symbol}
                         </span>
                       </>
                     )}
                   </div>
-                  <ChevronDown size={16} className="text-gray-400" />
+                  <ChevronDown size={10} className="text-gray-400" />
                 </button>
 
                 {isTokenDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-2xl shadow-lg max-h-48 overflow-y-auto scrollbar-hide">
+                  <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-lg max-h-32 overflow-y-auto scrollbar-hide">
                     {tokens.map((token) => (
                       <div
                         key={token.id}
-                        className="border border-[#2C2C2C] rounded-2xl m-2 overflow-hidden"
+                        className="border border-[#2C2C2C] rounded-xl m-1 overflow-hidden"
                       >
                         <button
                           onClick={() => {
@@ -714,12 +694,12 @@ export default function BatchPaymentsPage() {
                             });
                             setIsTokenDropdownOpen(false);
                           }}
-                          className="w-full flex items-center p-3 hover:bg-[#1A1A1A] transition-colors text-left"
+                          className="w-full flex items-center p-2 hover:bg-[#1A1A1A] transition-colors text-left"
                         >
                           <div className="flex items-center flex-1">
-                            <TokenIconWithBg token={token} size="w-5 h-5" />
-                            <div className="flex-1 ml-2">
-                              <div className="text-white font-satoshi text-sm">
+                            <TokenIconWithBg token={token} size="w-3 h-3" />
+                            <div className="flex-1 ml-1">
+                              <div className="text-white font-satoshi text-xs">
                                 {token.symbol}
                               </div>
                               <div className="text-gray-400 font-satoshi text-xs">
@@ -727,9 +707,9 @@ export default function BatchPaymentsPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="w-4 h-4 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-3">
+                          <div className="w-2.5 h-2.5 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-1.5">
                             {selectedToken?.symbol === token.symbol && (
-                              <div className="w-2 h-2 bg-[#E2AF19] rounded-full" />
+                              <div className="w-1 h-1 bg-[#E2AF19] rounded-full" />
                             )}
                           </div>
                         </button>
@@ -746,40 +726,39 @@ export default function BatchPaymentsPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, amount: e.target.value })
                 }
-                className="font-satoshi"
+                className="font-satoshi text-xs h-[36px]"
               />
             </div>
 
             <button
               onClick={addToBatch}
               disabled={loading}
-              className="w-full bg-[#E2AF19] text-black px-4 py-3 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center justify-center disabled:opacity-50"
+              className="w-full bg-[#E2AF19] text-black px-1.5 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center justify-center disabled:opacity-50 text-xs h-[36px]"
             >
-              <Plus size={16} className="mr-2" />
+              <Plus size={10} className="mr-1" />
               Add to Batch
             </button>
           </div>
         </div>
 
-        {/* Mobile batch summary and list */}
         {batchPayments.length > 0 && (
           <>
-            <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-white font-satoshi">
+            <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
+              <div className="flex justify-between items-center mb-1.5">
+                <h3 className="text-sm font-semibold text-white font-satoshi">
                   Batch Summary
                 </h3>
-                <div className="text-sm text-gray-400 font-satoshi">
+                <div className="text-xs text-gray-400 font-satoshi">
                   {batchPayments.length} payments
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-                  <div className="text-gray-400 text-xs font-satoshi mb-1">
+              <div className="grid grid-cols-2 gap-1.5 mb-1.5">
+                <div className="bg-[#0F0F0F] rounded-lg p-1.5 border border-[#2C2C2C]">
+                  <div className="text-gray-400 text-xs font-satoshi mb-0.5">
                     Total Amount
                   </div>
-                  <div className="text-white text-lg font-bold font-satoshi">
+                  <div className="text-white text-sm font-bold font-satoshi">
                     $
                     {batchPayments
                       .reduce((sum, p) => sum + p.usdValue, 0)
@@ -788,10 +767,10 @@ export default function BatchPaymentsPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-1">
                 <button
                   onClick={resetBatch}
-                  className="flex-1 px-4 py-2 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity"
+                  className="flex-1 px-1.5 py-1 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-xs"
                 >
                   Reset
                 </button>
@@ -805,35 +784,35 @@ export default function BatchPaymentsPage() {
               </div>
             </div>
 
-            <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-shrink-0">
-              <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
+            <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
+              <h3 className="text-sm font-semibold text-white mb-1.5 font-satoshi">
                 Payments Queue ({batchPayments.length})
               </h3>
 
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {batchPayments.map((payment) => {
                   const recipientInfo = getRecipientDisplay(payment);
 
                   return (
                     <div
                       key={payment.id}
-                      className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C] relative"
+                      className="bg-[#0F0F0F] rounded-lg p-1.5 border border-[#2C2C2C] relative"
                     >
                       <button
                         onClick={() => removeFromBatch(payment.id)}
-                        className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-400 transition-colors"
+                        className="absolute top-0.5 right-0.5 p-0.5 text-gray-400 hover:text-red-400 transition-colors"
                       >
-                        <X size={14} />
+                        <X size={8} />
                       </button>
 
-                      <div className="flex items-center mb-3 pr-6">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center shadow-sm border border-white/10">
-                          <span className="text-white text-sm font-medium">
+                      <div className="flex items-center mb-1 pr-3">
+                        <div className="w-4 h-4 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-1.5 flex items-center justify-center shadow-sm border border-white/10">
+                          <span className="text-white text-xs font-medium">
                             {recipientInfo.isUser ? "@" : "0"}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-white font-medium font-satoshi truncate">
+                          <div className="text-white font-medium font-satoshi truncate text-xs">
                             {recipientInfo.name}
                           </div>
                           {recipientInfo.isUser &&
@@ -842,12 +821,12 @@ export default function BatchPaymentsPage() {
                                 {recipientInfo.displayName}
                               </div>
                             )}
-                          <div className="flex items-center mt-1">
+                          <div className="flex items-center mt-0.5">
                             <div
-                              className={`w-4 h-4 ${getTokenIcon(
+                              className={`w-2.5 h-2.5 ${getTokenIcon(
                                 payment.tokenInfo.symbol,
                                 payment.tokenInfo.contractAddress
-                              )} rounded-full flex items-center justify-center mr-2 flex-shrink-0 shadow-sm border border-white/10`}
+                              )} rounded-full flex items-center justify-center mr-1 flex-shrink-0 shadow-sm border border-white/10`}
                             >
                               <span className="text-white text-xs font-medium">
                                 {getTokenLetter(
@@ -856,7 +835,7 @@ export default function BatchPaymentsPage() {
                                 )}
                               </span>
                             </div>
-                            <span className="text-gray-400 text-sm font-satoshi">
+                            <span className="text-gray-400 text-xs font-satoshi">
                               {payment.tokenInfo.symbol}
                             </span>
                           </div>
@@ -865,7 +844,7 @@ export default function BatchPaymentsPage() {
 
                       <div className="flex justify-between items-center">
                         <div>
-                          <div className="text-white font-bold font-satoshi">
+                          <div className="text-white font-bold font-satoshi text-xs">
                             {payment.amount} {payment.tokenInfo.symbol}
                           </div>
                         </div>
@@ -878,8 +857,8 @@ export default function BatchPaymentsPage() {
           </>
         )}
 
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] flex-shrink-0 overflow-hidden">
-          <div className="p-4 h-full max-h-[400px] flex flex-col">
+        <div className="bg-black rounded-[12px] border border-[#2C2C2C] flex-shrink-0 overflow-hidden">
+          <div className="p-1.5 h-full max-h-[250px] flex flex-col">
             <div className="h-full overflow-hidden">
               <TransactionHistory
                 walletAddress={activeWallet?.address}
@@ -894,55 +873,52 @@ export default function BatchPaymentsPage() {
         </div>
       </div>
 
-      {/* Desktop Layout with RESIZABLE PANELS */}
       <div
         className="hidden xl:flex flex-col gap-0 flex-1 min-h-0 relative"
         ref={containerRef}
       >
-        {/* Batch Payments Section */}
         <div
-          className="bg-black rounded-[20px] border border-[#2C2C2C] p-6 flex flex-col min-h-0 overflow-hidden"
+          className="bg-black rounded-[16px] border border-[#2C2C2C] p-2.5 flex flex-col min-h-0 overflow-hidden"
           style={{ height: `${batchPanelHeight}%` }}
         >
-          {/* Input Row - Desktop Grid */}
-          <div className="grid grid-cols-11 gap-3 mb-4 flex-shrink-0">
+          <div className="grid grid-cols-11 gap-1 mb-1.5 flex-shrink-0">
             <div className="col-span-6">
               <UsernameInput
                 value={formData.recipient}
                 onChange={handleRecipientChange}
                 onUserSelect={handleUserSelect}
                 placeholder="@username or address"
-                className="font-satoshi text-gray-400 py-3 text-sm h-full"
+                className="font-satoshi text-gray-400 text-xs h-[36px] px-1.5"
               />
             </div>
 
             <div className="col-span-2 relative">
               <button
                 onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
-                className="w-full h-full flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-2 py-3 text-left hover:border-[#E2AF19] transition-colors"
+                className="w-full h-[36px] flex items-center justify-between bg-black border border-[#2C2C2C] rounded-lg px-1 py-2 text-left hover:border-[#E2AF19] transition-colors"
               >
                 <div className="flex items-center min-w-0">
                   {selectedToken && (
                     <>
-                      <TokenIconWithBg token={selectedToken} size="w-4 h-4" />
+                      <TokenIconWithBg
+                        token={selectedToken}
+                        size="w-2.5 h-2.5"
+                      />
                       <span className="text-white font-satoshi text-xs truncate">
                         {selectedToken.symbol}
                       </span>
                     </>
                   )}
                 </div>
-                <ChevronDown
-                  size={12}
-                  className="text-gray-400 flex-shrink-0"
-                />
+                <ChevronDown size={6} className="text-gray-400 flex-shrink-0" />
               </button>
 
               {isTokenDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-2xl shadow-lg max-h-48 overflow-y-auto scrollbar-hide">
+                <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-lg max-h-32 overflow-y-auto scrollbar-hide">
                   {tokens.map((token) => (
                     <div
                       key={token.id}
-                      className="border border-[#2C2C2C] rounded-2xl m-2 overflow-hidden"
+                      className="border border-[#2C2C2C] rounded-xl m-1 overflow-hidden"
                     >
                       <button
                         onClick={() => {
@@ -958,12 +934,12 @@ export default function BatchPaymentsPage() {
                           });
                           setIsTokenDropdownOpen(false);
                         }}
-                        className="w-full flex items-center p-3 hover:bg-[#1A1A1A] transition-colors text-left"
+                        className="w-full flex items-center p-2 hover:bg-[#1A1A1A] transition-colors text-left"
                       >
                         <div className="flex items-center flex-1">
-                          <TokenIconWithBg token={token} size="w-5 h-5" />
-                          <div className="flex-1 min-w-0 ml-2">
-                            <div className="text-white font-satoshi text-sm truncate">
+                          <TokenIconWithBg token={token} size="w-3 h-3" />
+                          <div className="flex-1 min-w-0 ml-1">
+                            <div className="text-white font-satoshi text-xs truncate">
                               {token.symbol}
                             </div>
                             <div className="text-gray-400 font-satoshi text-xs truncate">
@@ -971,9 +947,9 @@ export default function BatchPaymentsPage() {
                             </div>
                           </div>
                         </div>
-                        <div className="w-4 h-4 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-3">
+                        <div className="w-2.5 h-2.5 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-1.5">
                           {selectedToken?.symbol === token.symbol && (
-                            <div className="w-2 h-2 bg-[#E2AF19] rounded-full" />
+                            <div className="w-1 h-1 bg-[#E2AF19] rounded-full" />
                           )}
                         </div>
                       </button>
@@ -991,7 +967,7 @@ export default function BatchPaymentsPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, amount: e.target.value })
                 }
-                className="font-satoshi py-3 text-sm h-full"
+                className="font-satoshi text-xs h-[36px] px-1.5"
               />
             </div>
 
@@ -999,45 +975,42 @@ export default function BatchPaymentsPage() {
               <button
                 onClick={addToBatch}
                 disabled={loading}
-                className="bg-[#E2AF19] text-black px-1 py-3 rounded-lg font-satoshi font-semibold hover:bg-[#D4A853] transition-colors flex items-center justify-center w-full h-full text-sm disabled:opacity-50"
+                className="bg-[#E2AF19] text-black px-0.5 py-2 rounded-lg font-satoshi font-semibold hover:bg-[#D4A853] transition-colors flex items-center justify-center w-full h-[36px] text-xs disabled:opacity-50"
               >
                 Add
               </button>
             </div>
           </div>
 
-          {/* Divider - Full width */}
-          <div className="border-t border-[#2C2C2C] mb-4 flex-shrink-0 -mx-6"></div>
+          <div className="border-t border-[#2C2C2C] mb-1.5 flex-shrink-0 -mx-2.5"></div>
 
-          {/* Table Header */}
-          <div className="bg-[#0F0F0F] rounded-lg mb-2 flex-shrink-0">
-            <div className="grid grid-cols-4 gap-2 px-3 py-3">
-              <div className="text-gray-400 text-sm font-satoshi text-left">
+          <div className="bg-[#0F0F0F] rounded-lg mb-1 flex-shrink-0">
+            <div className="grid grid-cols-4 gap-1 px-1.5 py-1.5">
+              <div className="text-gray-400 text-xs font-satoshi text-left">
                 Username/Address
               </div>
-              <div className="text-gray-400 text-sm font-satoshi text-left">
+              <div className="text-gray-400 text-xs font-satoshi text-left">
                 Token Name
               </div>
-              <div className="text-gray-400 text-sm font-satoshi text-left">
+              <div className="text-gray-400 text-xs font-satoshi text-left">
                 Amount
               </div>
-              <div className="text-gray-400 text-sm font-satoshi text-left">
+              <div className="text-gray-400 text-xs font-satoshi text-left">
                 Est. Gas
               </div>
             </div>
           </div>
 
-          {/* Batch Payments List */}
-          <div className="overflow-y-auto scrollbar-hide mb-6 flex-1 min-h-0">
+          <div className="overflow-y-auto scrollbar-hide mb-2 flex-1 min-h-0">
             {batchPayments.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <div className="w-16 h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
-                  <Plus size={24} className="text-gray-400" />
+              <div className="flex flex-col items-center justify-center py-3">
+                <div className="w-8 h-8 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-1.5">
+                  <Plus size={14} className="text-gray-400" />
                 </div>
-                <h3 className="text-white text-lg font-satoshi mb-2">
+                <h3 className="text-white text-sm font-satoshi mb-0.5">
                   No payments in batch
                 </h3>
-                <p className="text-gray-400 font-satoshi text-center">
+                <p className="text-gray-400 font-satoshi text-center text-xs">
                   Add recipients above to start building your batch payment
                 </p>
               </div>
@@ -1048,15 +1021,15 @@ export default function BatchPaymentsPage() {
 
                   return (
                     <div key={payment.id}>
-                      <div className="grid grid-cols-4 gap-2 items-center py-3 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors">
+                      <div className="grid grid-cols-4 gap-1 items-center py-1.5 px-1.5 hover:bg-[#1A1A1A] rounded-lg transition-colors">
                         <div className="flex items-center min-w-0">
-                          <div className="w-6 h-6 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-2 flex items-center justify-center flex-shrink-0 shadow-sm border border-white/10">
+                          <div className="w-3 h-3 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-1 flex items-center justify-center flex-shrink-0 shadow-sm border border-white/10">
                             <span className="text-white text-xs font-medium">
                               {recipientInfo.isUser ? "@" : "0"}
                             </span>
                           </div>
                           <div className="min-w-0">
-                            <span className="text-white font-satoshi text-sm truncate block">
+                            <span className="text-white font-satoshi text-xs truncate block">
                               {recipientInfo.name}
                             </span>
                             {recipientInfo.isUser &&
@@ -1070,10 +1043,10 @@ export default function BatchPaymentsPage() {
 
                         <div className="flex items-center min-w-0">
                           <div
-                            className={`w-5 h-5 ${getTokenIcon(
+                            className={`w-2.5 h-2.5 ${getTokenIcon(
                               payment.tokenInfo.symbol,
                               payment.tokenInfo.contractAddress
-                            )} rounded-full flex items-center justify-center mr-2 flex-shrink-0 shadow-sm border border-white/10`}
+                            )} rounded-full flex items-center justify-center mr-1 flex-shrink-0 shadow-sm border border-white/10`}
                           >
                             <span className="text-white text-xs font-medium">
                               {getTokenLetter(
@@ -1082,22 +1055,22 @@ export default function BatchPaymentsPage() {
                               )}
                             </span>
                           </div>
-                          <span className="text-white font-satoshi text-sm truncate">
+                          <span className="text-white font-satoshi text-xs truncate">
                             {payment.tokenInfo.symbol}
                           </span>
                         </div>
 
-                        <div className="text-white font-satoshi text-sm">
+                        <div className="text-white font-satoshi text-xs">
                           {payment.amount} {payment.tokenInfo.symbol}
                         </div>
 
-                        <div className="text-white font-satoshi text-sm">
+                        <div className="text-white font-satoshi text-xs">
                           ~ 65,000 gas
                         </div>
                       </div>
 
                       {index < batchPayments.length - 1 && (
-                        <div className="border-b border-[#2C2C2C] mx-3 my-1"></div>
+                        <div className="border-b border-[#2C2C2C] mx-1.5 my-0.5"></div>
                       )}
                     </div>
                   );
@@ -1106,19 +1079,18 @@ export default function BatchPaymentsPage() {
             )}
           </div>
 
-          {/* Reset and Transfer Buttons at Bottom */}
           {batchPayments.length > 0 && (
-            <div className="flex justify-end space-x-3 mt-6 flex-shrink-0">
+            <div className="flex justify-end space-x-1 mt-2 flex-shrink-0">
               <button
                 onClick={resetBatch}
-                className="px-4 py-2 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity"
+                className="px-1.5 py-1 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-xs"
               >
                 Reset
               </button>
               <Button
                 onClick={createPreview}
                 disabled={loading || batchPayments.length < 2}
-                className="font-satoshi"
+                className="font-satoshi text-xs"
               >
                 {loading ? "Loading..." : "Transfer"}
               </Button>
@@ -1126,19 +1098,18 @@ export default function BatchPaymentsPage() {
           )}
         </div>
 
-        {/* NEW: Resize Handle */}
         <div
           ref={dragRef}
           onMouseDown={handleMouseDown}
           className={`
-            relative z-10 h-2 flex items-center justify-center cursor-ns-resize
+            relative z-10 h-1.5 flex items-center justify-center cursor-ns-resize
             transition-colors duration-200 group
             ${isDragging ? "bg-[#E2AF19]/30" : "hover:bg-[#2C2C2C]"}
           `}
         >
           <div
             className={`
-            flex items-center justify-center w-16 h-6 rounded-full
+            flex items-center justify-center w-10 h-4 rounded-full
             transition-all duration-200
             ${
               isDragging
@@ -1147,16 +1118,15 @@ export default function BatchPaymentsPage() {
             }
           `}
           >
-            <GripHorizontal size={16} />
+            <GripHorizontal size={12} />
           </div>
         </div>
 
-        {/* Transaction History Section */}
         <div
-          className="bg-black rounded-[20px] border border-[#2C2C2C] flex flex-col min-h-0 overflow-hidden"
+          className="bg-black rounded-[16px] border border-[#2C2C2C] flex flex-col min-h-0 overflow-hidden"
           style={{ height: `${100 - batchPanelHeight}%` }}
         >
-          <div className="p-6 h-full flex flex-col overflow-hidden">
+          <div className="p-2.5 h-full flex flex-col overflow-hidden">
             <div className="h-full overflow-hidden">
               <TransactionHistory
                 walletAddress={activeWallet?.address}
@@ -1171,43 +1141,41 @@ export default function BatchPaymentsPage() {
         </div>
       </div>
 
-      {/* UPDATED: Preview Modal with backdrop */}
       {showPreview && preview && (
         <>
-          {/* Modal backdrop */}
           <div
             className="fixed inset-0 z-40 bg-white/10"
             onClick={() => setShowPreview(false)}
           />
 
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-2xl max-h-[90vh] overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-2.5">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-lg max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between p-3 border-b border-[#2C2C2C]">
                 <div>
-                  <h2 className="text-xl font-bold text-white font-mayeka">
+                  <h2 className="text-lg font-bold text-white font-mayeka">
                     Batch Transfer Preview
                   </h2>
-                  <p className="text-gray-400 text-sm font-satoshi mt-1">
+                  <p className="text-gray-400 text-xs font-satoshi mt-0.5">
                     Review your batch transfer details
                   </p>
                 </div>
                 <button
                   onClick={() => setShowPreview(false)}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+                  className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded-lg"
                 >
-                  <X size={20} />
+                  <X size={16} />
                 </button>
               </div>
 
-              <div className="p-6 max-h-[60vh] overflow-y-auto">
-                <div className="space-y-6">
-                  <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                    <h3 className="text-white font-semibold font-satoshi mb-4">
+              <div className="p-3 max-h-[60vh] overflow-y-auto scrollbar-hide">
+                <div className="space-y-3">
+                  <div className="bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C]">
+                    <h3 className="text-white font-semibold font-satoshi mb-2">
                       Transfer Summary
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Transfer Mode
                         </div>
                         <div className="text-white font-bold font-satoshi">
@@ -1215,7 +1183,7 @@ export default function BatchPaymentsPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Total Transfers
                         </div>
                         <div className="text-white font-bold font-satoshi">
@@ -1223,7 +1191,7 @@ export default function BatchPaymentsPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Total Value
                         </div>
                         <div className="text-white font-bold font-satoshi">
@@ -1231,7 +1199,7 @@ export default function BatchPaymentsPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           Network
                         </div>
                         <div className="text-white font-bold font-satoshi">
@@ -1241,13 +1209,13 @@ export default function BatchPaymentsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                    <h3 className="text-white font-semibold font-satoshi mb-4">
+                  <div className="bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C]">
+                    <h3 className="text-white font-semibold font-satoshi mb-2">
                       Gas Estimation
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-1.5">
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Batch Gas:
                         </span>
                         <span className="text-white font-satoshi">
@@ -1258,7 +1226,7 @@ export default function BatchPaymentsPage() {
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Individual Gas:
                         </span>
                         <span className="text-white font-satoshi">
@@ -1269,7 +1237,7 @@ export default function BatchPaymentsPage() {
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Gas Savings:
                         </span>
                         <span className="text-green-400 font-satoshi">
@@ -1280,7 +1248,7 @@ export default function BatchPaymentsPage() {
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400 text-sm font-satoshi">
+                        <span className="text-gray-400 text-xs font-satoshi">
                           Estimated Cost:
                         </span>
                         <span className="text-white font-satoshi">
@@ -1291,14 +1259,14 @@ export default function BatchPaymentsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-4">
+                  <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-2.5">
                     <div className="flex items-start">
                       <AlertTriangle
-                        size={16}
-                        className="text-yellow-400 mr-2 mt-0.5 flex-shrink-0"
+                        size={12}
+                        className="text-yellow-400 mr-1.5 mt-0.5 flex-shrink-0"
                       />
                       <div>
-                        <p className="text-yellow-400 text-sm font-satoshi font-medium mb-1">
+                        <p className="text-yellow-400 text-xs font-satoshi font-medium mb-0.5">
                           Transaction Confirmation Required
                         </p>
                         <p className="text-yellow-400 text-xs font-satoshi">
@@ -1312,8 +1280,8 @@ export default function BatchPaymentsPage() {
                 </div>
               </div>
 
-              <div className="p-6 border-t border-[#2C2C2C] bg-[#0F0F0F]">
-                <div className="flex space-x-3">
+              <div className="p-3 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+                <div className="flex space-x-1.5">
                   <Button
                     variant="secondary"
                     onClick={() => setShowPreview(false)}
@@ -1328,7 +1296,7 @@ export default function BatchPaymentsPage() {
                   >
                     {executing ? (
                       <>
-                        <RefreshCw size={16} className="mr-2 animate-spin" />
+                        <RefreshCw size={12} className="mr-1 animate-spin" />
                         Executing...
                       </>
                     ) : (
@@ -1342,25 +1310,23 @@ export default function BatchPaymentsPage() {
         </>
       )}
 
-      {/* UPDATED: Result Modal with backdrop */}
       {showResult && result && (
         <>
-          {/* Modal backdrop */}
           <div
             className="fixed inset-0 z-40 bg-white/10"
             onClick={() => setShowResult(false)}
           />
 
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-2.5">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between p-3 border-b border-[#2C2C2C]">
                 <div>
-                  <h2 className="text-xl font-bold text-white font-mayeka">
+                  <h2 className="text-lg font-bold text-white font-mayeka">
                     {result.success
                       ? "Batch Transfer Successful!"
                       : "Batch Transfer Failed"}
                   </h2>
-                  <p className="text-gray-400 text-sm font-satoshi mt-1">
+                  <p className="text-gray-400 text-xs font-satoshi mt-0.5">
                     {result.success
                       ? "Your batch transfer has been completed"
                       : "Something went wrong"}
@@ -1368,32 +1334,32 @@ export default function BatchPaymentsPage() {
                 </div>
                 <button
                   onClick={() => setShowResult(false)}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+                  className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded-lg"
                 >
-                  <X size={20} />
+                  <X size={16} />
                 </button>
               </div>
 
-              <div className="p-6 max-h-[60vh] overflow-y-auto">
+              <div className="p-3 max-h-[60vh] overflow-y-auto scrollbar-hide">
                 {result.success ? (
-                  <div className="space-y-6">
+                  <div className="space-y-3">
                     <div className="text-center">
-                      <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <CheckCircle size={32} className="text-white" />
+                      <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                        <CheckCircle size={20} className="text-white" />
                       </div>
                     </div>
 
-                    <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                      <h4 className="text-white font-semibold font-satoshi mb-3">
+                    <div className="bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C]">
+                      <h4 className="text-white font-semibold font-satoshi mb-1.5">
                         Transaction Details
                       </h4>
-                      <div className="space-y-3 text-sm">
+                      <div className="space-y-1.5 text-xs">
                         <div className="flex items-center justify-between">
                           <span className="text-gray-400">
                             Transaction Hash:
                           </span>
                           <div className="flex items-center">
-                            <span className="text-white mr-2 font-mono text-xs">
+                            <span className="text-white mr-1 font-mono text-xs">
                               {result.transactionHash?.slice(0, 10)}...
                               {result.transactionHash?.slice(-8)}
                             </span>
@@ -1403,7 +1369,7 @@ export default function BatchPaymentsPage() {
                               }
                               className="text-gray-400 hover:text-white transition-colors"
                             >
-                              <Copy size={14} />
+                              <Copy size={10} />
                             </button>
                           </div>
                         </div>
@@ -1430,22 +1396,22 @@ export default function BatchPaymentsPage() {
                       </div>
 
                       {copied === "hash" && (
-                        <p className="text-green-400 text-xs font-satoshi mt-2">
+                        <p className="text-green-400 text-xs font-satoshi mt-1">
                           Hash copied!
                         </p>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-6">
+                  <div className="space-y-3">
                     <div className="text-center">
-                      <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <X size={32} className="text-white" />
+                      <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                        <X size={20} className="text-white" />
                       </div>
                     </div>
 
-                    <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
-                      <p className="text-red-400 text-sm font-satoshi">
+                    <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2.5">
+                      <p className="text-red-400 text-xs font-satoshi">
                         {result.error}
                       </p>
                     </div>
@@ -1453,15 +1419,15 @@ export default function BatchPaymentsPage() {
                 )}
               </div>
 
-              <div className="p-6 border-t border-[#2C2C2C] bg-[#0F0F0F]">
-                <div className="flex space-x-3">
+              <div className="p-3 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+                <div className="flex space-x-1.5">
                   {result.success && result.explorerUrl && (
                     <Button
                       variant="secondary"
                       onClick={() => window.open(result.explorerUrl, "_blank")}
                       className="flex-1 font-satoshi"
                     >
-                      <ExternalLink size={16} className="mr-2" />
+                      <ExternalLink size={12} className="mr-1" />
                       View on Explorer
                     </Button>
                   )}

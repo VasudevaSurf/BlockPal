@@ -1,4 +1,4 @@
-// src/components/profile/TwoFactorSetupModal.tsx - UPDATED with Google account support
+// src/components/profile/TwoFactorSetupModal.tsx - COMPACT VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -271,14 +271,14 @@ If you lose access to your authenticator app, you can use these codes to regain 
       {/* Backdrop */}
       <div className="fixed inset-0 z-40 bg-white/10" />
 
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+        <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-hide">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
+          <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
             <div className="flex items-center">
-              <Shield size={24} className="text-[#E2AF19] mr-3" />
+              <Shield size={20} className="text-[#E2AF19] mr-2" />
               <div>
-                <h3 className="text-lg font-semibold text-white font-satoshi">
+                <h3 className="text-base font-semibold text-white font-satoshi">
                   {isEnabling ? "Enable" : "Disable"} Two-Factor Authentication
                 </h3>
                 <p className="text-gray-400 text-sm font-satoshi">
@@ -290,22 +290,22 @@ If you lose access to your authenticator app, you can use these codes to regain 
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+              className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-6">
+          <div className="p-4">
             {/* Step 1: Password Verification (for email/password users) */}
             {step === "password" && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Shield size={32} className="text-[#E2AF19]" />
+                  <div className="w-12 h-12 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Shield size={24} className="text-[#E2AF19]" />
                   </div>
-                  <h4 className="text-white font-semibold font-satoshi mb-2">
+                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
                     Verify Your Password
                   </h4>
                   <p className="text-gray-400 text-sm font-satoshi">
@@ -314,7 +314,7 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 </div>
 
                 {error && (
-                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                  <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                     <p className="text-red-400 text-sm font-satoshi">{error}</p>
                   </div>
                 )}
@@ -331,7 +331,7 @@ If you lose access to your authenticator app, you can use these codes to regain 
                   autoFocus
                 />
 
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <Button
                     variant="secondary"
                     onClick={onClose}
@@ -352,12 +352,12 @@ If you lose access to your authenticator app, you can use these codes to regain 
 
             {/* NEW Step: Email Verification (for Google users) */}
             {step === "email_verify" && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Mail size={32} className="text-[#E2AF19]" />
+                  <div className="w-12 h-12 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Mail size={24} className="text-[#E2AF19]" />
                   </div>
-                  <h4 className="text-white font-semibold font-satoshi mb-2">
+                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
                     Verify Your Email
                   </h4>
                   <p className="text-gray-400 text-sm font-satoshi">
@@ -367,9 +367,9 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 </div>
 
                 {/* Google Account Info */}
-                <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
+                <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3">
                   <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24">
                       <path
                         fill="#4285F4"
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -399,7 +399,7 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 </div>
 
                 {error && (
-                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                  <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                     <p className="text-red-400 text-sm font-satoshi">{error}</p>
                   </div>
                 )}
@@ -415,7 +415,7 @@ If you lose access to your authenticator app, you can use these codes to regain 
                       : "Send Verification Code"}
                   </Button>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div className="text-center">
                       <p className="text-gray-400 text-sm font-satoshi">
                         We sent a 6-digit code to{" "}
@@ -437,12 +437,12 @@ If you lose access to your authenticator app, you can use these codes to regain 
                         setEmailCode(value);
                         setError("");
                       }}
-                      className="font-satoshi text-center text-2xl tracking-widest"
+                      className="font-satoshi text-center text-xl tracking-widest"
                       maxLength={6}
                       autoFocus
                     />
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                       <Button
                         variant="secondary"
                         onClick={onClose}
@@ -477,12 +477,12 @@ If you lose access to your authenticator app, you can use these codes to regain 
 
             {/* Step 2: Setup Instructions (Enable only) */}
             {step === "setup" && setupData && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Smartphone size={32} className="text-[#E2AF19]" />
+                  <div className="w-12 h-12 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Smartphone size={24} className="text-[#E2AF19]" />
                   </div>
-                  <h4 className="text-white font-semibold font-satoshi mb-2">
+                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
                     Set Up Your Authenticator App
                   </h4>
                   <p className="text-gray-400 text-sm font-satoshi">
@@ -491,17 +491,17 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 </div>
 
                 {/* QR Code */}
-                <div className="bg-white p-4 rounded-lg text-center">
+                <div className="bg-white p-3 rounded-lg text-center">
                   <img
                     src={setupData.qrCodeUrl}
                     alt="2FA QR Code"
-                    className="mx-auto w-48 h-48"
+                    className="mx-auto w-40 h-40"
                   />
                 </div>
 
                 {/* Manual Entry */}
-                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+                  <div className="flex items-center justify-between mb-1.5">
                     <span className="text-gray-400 text-sm font-satoshi">
                       Setup Key:
                     </span>
@@ -509,9 +509,9 @@ If you lose access to your authenticator app, you can use these codes to regain 
                       onClick={() =>
                         copyToClipboard(setupData.manualEntryKey, "setup-key")
                       }
-                      className="text-[#E2AF19] hover:opacity-80 transition-opacity flex items-center"
+                      className="text-[#E2AF19] hover:opacity-80 transition-opacity flex items-center text-sm"
                     >
-                      <Copy size={14} className="mr-1" />
+                      <Copy size={12} className="mr-1" />
                       {copied === "setup-key" ? "Copied!" : "Copy"}
                     </button>
                   </div>
@@ -521,11 +521,11 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 </div>
 
                 {/* Instructions */}
-                <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
-                  <h5 className="text-blue-400 font-semibold font-satoshi mb-2">
+                <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3">
+                  <h5 className="text-blue-400 font-semibold font-satoshi mb-1.5 text-sm">
                     Instructions:
                   </h5>
-                  <ol className="text-blue-400 text-sm font-satoshi space-y-1">
+                  <ol className="text-blue-400 text-sm font-satoshi space-y-0.5">
                     <li>
                       1. Install an authenticator app (Google Authenticator,
                       Authy, etc.)
@@ -543,12 +543,12 @@ If you lose access to your authenticator app, you can use these codes to regain 
 
             {/* Step 3: Verification */}
             {step === "verify" && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Shield size={32} className="text-[#E2AF19]" />
+                  <div className="w-12 h-12 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Shield size={24} className="text-[#E2AF19]" />
                   </div>
-                  <h4 className="text-white font-semibold font-satoshi mb-2">
+                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
                     Enter Verification Code
                   </h4>
                   <p className="text-gray-400 text-sm font-satoshi">
@@ -559,7 +559,7 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 </div>
 
                 {error && (
-                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                  <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                     <p className="text-red-400 text-sm font-satoshi">{error}</p>
                   </div>
                 )}
@@ -573,12 +573,12 @@ If you lose access to your authenticator app, you can use these codes to regain 
                     setVerificationCode(value);
                     setError("");
                   }}
-                  className="font-satoshi text-center text-2xl tracking-widest"
+                  className="font-satoshi text-center text-xl tracking-widest"
                   maxLength={6}
                   autoFocus
                 />
 
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <Button
                     variant="secondary"
                     onClick={() => setStep(isEnabling ? "setup" : "password")}
@@ -599,12 +599,12 @@ If you lose access to your authenticator app, you can use these codes to regain 
 
             {/* Step 4: Backup Codes (Enable only) */}
             {step === "backup" && setupData && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle size={32} className="text-green-400" />
+                  <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle size={24} className="text-green-400" />
                   </div>
-                  <h4 className="text-white font-semibold font-satoshi mb-2">
+                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
                     Save Your Backup Codes
                   </h4>
                   <p className="text-gray-400 text-sm font-satoshi">
@@ -613,12 +613,12 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 </div>
 
                 {/* Backup Codes */}
-                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                  <div className="flex items-center justify-between mb-3">
+                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+                  <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-400 text-sm font-satoshi">
                       Backup Codes:
                     </span>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                       <button
                         onClick={() =>
                           copyToClipboard(
@@ -628,23 +628,23 @@ If you lose access to your authenticator app, you can use these codes to regain 
                         }
                         className="text-[#E2AF19] hover:opacity-80 transition-opacity flex items-center text-sm"
                       >
-                        <Copy size={14} className="mr-1" />
+                        <Copy size={12} className="mr-1" />
                         {copied === "backup-codes" ? "Copied!" : "Copy"}
                       </button>
                       <button
                         onClick={downloadBackupCodes}
                         className="text-[#E2AF19] hover:opacity-80 transition-opacity flex items-center text-sm"
                       >
-                        <Download size={14} className="mr-1" />
+                        <Download size={12} className="mr-1" />
                         Download
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-1.5">
                     {setupData.backupCodes.map((code, index) => (
                       <div
                         key={index}
-                        className="bg-black p-2 rounded border border-[#2C2C2C]"
+                        className="bg-black p-1.5 rounded border border-[#2C2C2C]"
                       >
                         <span className="text-white font-mono text-sm">
                           {code}
@@ -655,14 +655,14 @@ If you lose access to your authenticator app, you can use these codes to regain 
                 </div>
 
                 {/* Warning */}
-                <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-4">
+                <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-3">
                   <div className="flex items-start">
                     <AlertTriangle
-                      size={16}
-                      className="text-yellow-400 mr-2 mt-0.5 flex-shrink-0"
+                      size={14}
+                      className="text-yellow-400 mr-1.5 mt-0.5 flex-shrink-0"
                     />
                     <div>
-                      <p className="text-yellow-400 text-sm font-satoshi font-medium mb-1">
+                      <p className="text-yellow-400 text-sm font-satoshi font-medium mb-0.5">
                         Important Security Notice
                       </p>
                       <p className="text-yellow-400 text-xs font-satoshi">
@@ -683,12 +683,12 @@ If you lose access to your authenticator app, you can use these codes to regain 
 
             {/* Disable 2FA Confirmation */}
             {step === "disable" && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <AlertTriangle size={32} className="text-red-400" />
+                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <AlertTriangle size={24} className="text-red-400" />
                   </div>
-                  <h4 className="text-white font-semibold font-satoshi mb-2">
+                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
                     Disable Two-Factor Authentication
                   </h4>
                   <p className="text-gray-400 text-sm font-satoshi">
@@ -696,7 +696,7 @@ If you lose access to your authenticator app, you can use these codes to regain 
                   </p>
                 </div>
 
-                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
+                <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3">
                   <p className="text-red-400 text-sm font-satoshi">
                     <strong>Warning:</strong> Disabling 2FA will reduce your
                     account security. You'll only need your password (or Google
@@ -704,7 +704,7 @@ If you lose access to your authenticator app, you can use these codes to regain 
                   </p>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <Button
                     variant="secondary"
                     onClick={onClose}
@@ -724,6 +724,16 @@ If you lose access to your authenticator app, you can use these codes to regain 
           </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </>
   );
 }

@@ -160,3 +160,88 @@
   font-family: "Mayeka Regular Demo", "Inter", Arial, sans-serif !important;
   font-weight: 400 !important;
 }
+
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+/* Remove the global zoom/transform - this was causing the half-screen issue */
+/* Instead, we'll use smaller component sizes directly */
+
+/* Hide all scrollbars globally */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
+
+/* Ensure smooth scrolling without scrollbar visibility */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Override any existing scrollbar styles */
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar {
+  display: none;
+}
+
+/* Compact spacing utilities */
+.compact-spacing {
+  gap: 0.75rem;
+}
+
+.compact-padding {
+  padding: 0.75rem;
+}
+
+.compact-margin {
+  margin: 0.5rem;
+}
+
+/* Compact component styles */
+.compact-button {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.compact-input {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.compact-text {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.compact-heading {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+/* Ensure proper viewport handling */
+@media screen and (max-width: 100vw) {
+  body {
+    max-width: 100vw;
+  }
+}

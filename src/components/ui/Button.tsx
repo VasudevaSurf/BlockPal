@@ -27,9 +27,9 @@ export default function Button({
   };
 
   const sizeStyles = {
-    sm: "px-3 py-1.5 text-xs sm:text-sm",
-    md: "px-3 sm:px-4 py-2 text-sm sm:text-base",
-    lg: "px-4 sm:px-6 py-2.5 sm:py-3 text-base sm:text-lg",
+    sm: "px-2 py-1 text-xs",
+    md: "px-2.5 py-1.5 text-xs sm:text-sm",
+    lg: "px-3 py-2 text-sm sm:text-base",
   };
 
   const widthStyles = fullWidth ? "w-full" : "";

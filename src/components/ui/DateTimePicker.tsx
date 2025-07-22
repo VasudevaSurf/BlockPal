@@ -1,4 +1,4 @@
-// src/components/ui/DateTimePicker.tsx - Complete Updated Component
+// src/components/ui/DateTimePicker.tsx - Compact Version
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -215,12 +215,16 @@ export function DateTimePicker({
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] transition-colors text-left flex items-center justify-between"
+        className="w-full bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] transition-colors text-left flex items-center justify-between"
       >
         <div className="flex items-center min-w-0">
-          <Calendar size={16} className="text-gray-400 mr-2 flex-shrink-0" />
+          <Calendar size={14} className="text-gray-400 mr-1.5 flex-shrink-0" />
           <span
-            className={dateValue || timeValue ? "text-white" : "text-gray-400"}
+            className={
+              dateValue || timeValue
+                ? "text-white text-xs"
+                : "text-gray-400 text-xs"
+            }
           >
             {formatDisplayDateTime()}
           </span>
@@ -229,13 +233,13 @@ export function DateTimePicker({
           {(dateValue || timeValue) && (
             <button
               onClick={clearDateTime}
-              className="text-gray-400 hover:text-white mr-2 p-1"
+              className="text-gray-400 hover:text-white mr-1.5 p-0.5"
             >
-              <X size={14} />
+              <X size={12} />
             </button>
           )}
           <ChevronRight
-            size={16}
+            size={14}
             className={`text-gray-400 transform transition-transform ${
               isOpen ? "rotate-90" : ""
             }`}
@@ -244,38 +248,38 @@ export function DateTimePicker({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-4">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-3">
           {!showTimeAfterDate ? (
             // Date Selection
             <>
               {/* Month Navigation */}
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={() => navigateMonth("prev")}
-                  className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
                 >
-                  <ChevronLeft size={16} className="text-gray-400" />
+                  <ChevronLeft size={14} className="text-gray-400" />
                 </button>
 
-                <h3 className="text-white font-semibold font-satoshi">
+                <h3 className="text-white font-semibold font-satoshi text-xs">
                   {monthNames[currentMonth.getMonth()]}{" "}
                   {currentMonth.getFullYear()}
                 </h3>
 
                 <button
                   onClick={() => navigateMonth("next")}
-                  className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
                 >
-                  <ChevronRight size={16} className="text-gray-400" />
+                  <ChevronRight size={14} className="text-gray-400" />
                 </button>
               </div>
 
               {/* Days of Week */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
+              <div className="grid grid-cols-7 gap-0.5 mb-1.5">
                 {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
                   <div
                     key={day}
-                    className="text-center text-gray-400 text-xs font-satoshi py-2"
+                    className="text-center text-gray-400 text-xs font-satoshi py-1.5"
                   >
                     {day}
                   </div>
@@ -283,9 +287,9 @@ export function DateTimePicker({
               </div>
 
               {/* Calendar Grid */}
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-0.5">
                 {Array.from({ length: firstDayOfMonth }, (_, i) => (
-                  <div key={`empty-${i}`} className="h-8"></div>
+                  <div key={`empty-${i}`} className="h-6"></div>
                 ))}
 
                 {Array.from({ length: daysInMonth }, (_, i) => {
@@ -296,7 +300,7 @@ export function DateTimePicker({
                       onClick={() => handleDateSelect(day)}
                       disabled={isPastDate(day)}
                       className={`
-                        h-8 w-8 rounded-lg text-sm font-satoshi transition-colors
+                        h-6 w-6 rounded-lg text-xs font-satoshi transition-colors
                         ${
                           isPastDate(day)
                             ? "text-gray-600 cursor-not-allowed"
@@ -321,13 +325,13 @@ export function DateTimePicker({
               </div>
 
               {/* Quick Actions */}
-              <div className="flex gap-2 mt-4 pt-3 border-t border-[#2C2C2C]">
+              <div className="flex gap-1.5 mt-3 pt-2 border-t border-[#2C2C2C]">
                 <button
                   onClick={() => {
                     onDateChange(getQuickDate(0));
                     setShowTimeAfterDate(true);
                   }}
-                  className="flex-1 bg-[#2C2C2C] text-white px-3 py-2 rounded-lg text-sm font-satoshi hover:bg-[#3C3C3C] transition-colors"
+                  className="flex-1 bg-[#2C2C2C] text-white px-2.5 py-1.5 rounded-lg text-xs font-satoshi hover:bg-[#3C3C3C] transition-colors"
                 >
                   Today
                 </button>
@@ -336,7 +340,7 @@ export function DateTimePicker({
                     onDateChange(getQuickDate(1));
                     setShowTimeAfterDate(true);
                   }}
-                  className="flex-1 bg-[#2C2C2C] text-white px-3 py-2 rounded-lg text-sm font-satoshi hover:bg-[#3C3C3C] transition-colors"
+                  className="flex-1 bg-[#2C2C2C] text-white px-2.5 py-1.5 rounded-lg text-xs font-satoshi hover:bg-[#3C3C3C] transition-colors"
                 >
                   Tomorrow
                 </button>
@@ -345,19 +349,19 @@ export function DateTimePicker({
           ) : (
             // Time Selection
             <>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={() => setShowTimeAfterDate(false)}
-                  className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
                 >
-                  <ChevronLeft size={16} className="text-gray-400" />
+                  <ChevronLeft size={14} className="text-gray-400" />
                 </button>
                 <div className="text-center">
-                  <h3 className="text-white font-semibold font-satoshi flex items-center justify-center">
-                    <Clock size={16} className="mr-2" />
+                  <h3 className="text-white font-semibold font-satoshi flex items-center justify-center text-xs">
+                    <Clock size={14} className="mr-1.5" />
                     Select Time
                   </h3>
-                  <p className="text-gray-400 text-sm font-satoshi">
+                  <p className="text-gray-400 text-xs font-satoshi">
                     {selectedDate?.toLocaleDateString("en-US", {
                       weekday: "long",
                       month: "long",
@@ -365,26 +369,26 @@ export function DateTimePicker({
                     })}
                   </p>
                 </div>
-                <div className="w-10"></div> {/* Spacer for alignment */}
+                <div className="w-8"></div> {/* Spacer for alignment */}
               </div>
 
               {/* Time Input */}
-              <div className="mb-4">
+              <div className="mb-3">
                 <input
                   type="time"
                   value={timeValue}
                   onChange={(e) => onTimeChange(e.target.value)}
-                  className="w-full bg-[#2C2C2C] border border-[#4C4C4C] rounded-lg px-3 py-2 text-white font-satoshi text-center focus:outline-none focus:border-[#E2AF19] text-lg"
+                  className="w-full bg-[#2C2C2C] border border-[#4C4C4C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-center focus:outline-none focus:border-[#E2AF19] text-sm"
                 />
               </div>
 
               {/* Quick Time Buttons */}
-              <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="grid grid-cols-2 gap-1.5 mb-3">
                 {quickTimes.map((time) => (
                   <button
                     key={time.label}
                     onClick={() => handleTimeSelect(time.value())}
-                    className="bg-[#2C2C2C] text-white px-3 py-2 rounded-lg text-sm font-satoshi hover:bg-[#3C3C3C] transition-colors"
+                    className="bg-[#2C2C2C] text-white px-2.5 py-1.5 rounded-lg text-xs font-satoshi hover:bg-[#3C3C3C] transition-colors"
                   >
                     {time.label}
                   </button>
@@ -392,13 +396,13 @@ export function DateTimePicker({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2 pt-3 border-t border-[#2C2C2C]">
+              <div className="flex gap-1.5 pt-2 border-t border-[#2C2C2C]">
                 <button
                   onClick={() => {
                     setIsOpen(false);
                     setShowTimeAfterDate(false);
                   }}
-                  className="flex-1 bg-[#4B3A08] text-[#E2AF19] px-3 py-2 rounded-lg text-sm font-satoshi hover:opacity-90 transition-opacity"
+                  className="flex-1 bg-[#4B3A08] text-[#E2AF19] px-2.5 py-1.5 rounded-lg text-xs font-satoshi hover:opacity-90 transition-opacity"
                 >
                   Cancel
                 </button>
@@ -407,7 +411,7 @@ export function DateTimePicker({
                     setIsOpen(false);
                     setShowTimeAfterDate(false);
                   }}
-                  className="flex-1 bg-[#E2AF19] text-black px-3 py-2 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                  className="flex-1 bg-[#E2AF19] text-black px-2.5 py-1.5 rounded-lg text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
                 >
                   Done
                 </button>
@@ -563,11 +567,13 @@ export function DatePicker({
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] transition-colors text-left flex items-center justify-between"
+        className="w-full bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] transition-colors text-left flex items-center justify-between"
       >
         <div className="flex items-center">
-          <Calendar size={16} className="text-gray-400 mr-2" />
-          <span className={value ? "text-white" : "text-gray-400"}>
+          <Calendar size={14} className="text-gray-400 mr-1.5" />
+          <span
+            className={value ? "text-white text-xs" : "text-gray-400 text-xs"}
+          >
             {formatDisplayDate(value)}
           </span>
         </div>
@@ -575,13 +581,13 @@ export function DatePicker({
           {value && (
             <button
               onClick={clearDate}
-              className="text-gray-400 hover:text-white mr-2 p-1"
+              className="text-gray-400 hover:text-white mr-1.5 p-0.5"
             >
-              <X size={14} />
+              <X size={12} />
             </button>
           )}
           <ChevronRight
-            size={16}
+            size={14}
             className={`text-gray-400 transform transition-transform ${
               isOpen ? "rotate-90" : ""
             }`}
@@ -590,34 +596,34 @@ export function DatePicker({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-4">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-3">
           {/* Month Navigation */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <button
               onClick={() => navigateMonth("prev")}
-              className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+              className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
             >
-              <ChevronLeft size={16} className="text-gray-400" />
+              <ChevronLeft size={14} className="text-gray-400" />
             </button>
 
-            <h3 className="text-white font-semibold font-satoshi">
+            <h3 className="text-white font-semibold font-satoshi text-xs">
               {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
             </h3>
 
             <button
               onClick={() => navigateMonth("next")}
-              className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+              className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
             >
-              <ChevronRight size={16} className="text-gray-400" />
+              <ChevronRight size={14} className="text-gray-400" />
             </button>
           </div>
 
           {/* Days of Week */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
+          <div className="grid grid-cols-7 gap-0.5 mb-1.5">
             {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
               <div
                 key={day}
-                className="text-center text-gray-400 text-xs font-satoshi py-2"
+                className="text-center text-gray-400 text-xs font-satoshi py-1.5"
               >
                 {day}
               </div>
@@ -625,9 +631,9 @@ export function DatePicker({
           </div>
 
           {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5">
             {Array.from({ length: firstDayOfMonth }, (_, i) => (
-              <div key={`empty-${i}`} className="h-8"></div>
+              <div key={`empty-${i}`} className="h-6"></div>
             ))}
 
             {Array.from({ length: daysInMonth }, (_, i) => {
@@ -638,7 +644,7 @@ export function DatePicker({
                   onClick={() => handleDateSelect(day)}
                   disabled={isPastDate(day)}
                   className={`
-                    h-8 w-8 rounded-lg text-sm font-satoshi transition-colors
+                    h-6 w-6 rounded-lg text-xs font-satoshi transition-colors
                     ${
                       isPastDate(day)
                         ? "text-gray-600 cursor-not-allowed"
@@ -661,13 +667,13 @@ export function DatePicker({
           </div>
 
           {/* Quick Actions */}
-          <div className="flex gap-2 mt-4 pt-3 border-t border-[#2C2C2C]">
+          <div className="flex gap-1.5 mt-3 pt-2 border-t border-[#2C2C2C]">
             <button
               onClick={() => {
                 onChange(getQuickDate(0));
                 setIsOpen(false);
               }}
-              className="flex-1 bg-[#2C2C2C] text-white px-3 py-2 rounded-lg text-sm font-satoshi hover:bg-[#3C3C3C] transition-colors"
+              className="flex-1 bg-[#2C2C2C] text-white px-2.5 py-1.5 rounded-lg text-xs font-satoshi hover:bg-[#3C3C3C] transition-colors"
             >
               Today
             </button>
@@ -676,7 +682,7 @@ export function DatePicker({
                 onChange(getQuickDate(1));
                 setIsOpen(false);
               }}
-              className="flex-1 bg-[#2C2C2C] text-white px-3 py-2 rounded-lg text-sm font-satoshi hover:bg-[#3C3C3C] transition-colors"
+              className="flex-1 bg-[#2C2C2C] text-white px-2.5 py-1.5 rounded-lg text-xs font-satoshi hover:bg-[#3C3C3C] transition-colors"
             >
               Tomorrow
             </button>
@@ -751,11 +757,13 @@ export function TimePicker({
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-black border border-[#2C2C2C] rounded-lg px-3 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] transition-colors text-left flex items-center justify-between"
+        className="w-full bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] transition-colors text-left flex items-center justify-between"
       >
         <div className="flex items-center">
-          <Clock size={16} className="text-gray-400 mr-2" />
-          <span className={value ? "text-white" : "text-gray-400"}>
+          <Clock size={14} className="text-gray-400 mr-1.5" />
+          <span
+            className={value ? "text-white text-xs" : "text-gray-400 text-xs"}
+          >
             {displayTime}
           </span>
         </div>
@@ -763,13 +771,13 @@ export function TimePicker({
           {value && (
             <button
               onClick={clearTime}
-              className="text-gray-400 hover:text-white mr-2 p-1"
+              className="text-gray-400 hover:text-white mr-1.5 p-0.5"
             >
-              <X size={14} />
+              <X size={12} />
             </button>
           )}
           <ChevronRight
-            size={16}
+            size={14}
             className={`text-gray-400 transform transition-transform ${
               isOpen ? "rotate-90" : ""
             }`}
@@ -778,21 +786,21 @@ export function TimePicker({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-4">
-          <h3 className="text-white font-semibold font-satoshi mb-3 text-center">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-3">
+          <h3 className="text-white font-semibold font-satoshi mb-2 text-center text-xs">
             Select Time
           </h3>
 
-          <div className="mb-4">
+          <div className="mb-3">
             <input
               type="time"
               value={value}
               onChange={(e) => onChange(e.target.value)}
-              className="w-full bg-[#2C2C2C] border border-[#4C4C4C] rounded-lg px-3 py-2 text-white font-satoshi text-center focus:outline-none focus:border-[#E2AF19] text-lg"
+              className="w-full bg-[#2C2C2C] border border-[#4C4C4C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-center focus:outline-none focus:border-[#E2AF19] text-sm"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="grid grid-cols-2 gap-1.5 mb-3">
             {quickTimes.map((time) => (
               <button
                 key={time.label}
@@ -800,23 +808,23 @@ export function TimePicker({
                   onChange(time.value());
                   setIsOpen(false);
                 }}
-                className="bg-[#2C2C2C] text-white px-3 py-2 rounded-lg text-sm font-satoshi hover:bg-[#3C3C3C] transition-colors"
+                className="bg-[#2C2C2C] text-white px-2.5 py-1.5 rounded-lg text-xs font-satoshi hover:bg-[#3C3C3C] transition-colors"
               >
                 {time.label}
               </button>
             ))}
           </div>
 
-          <div className="flex gap-2 pt-3 border-t border-[#2C2C2C]">
+          <div className="flex gap-1.5 pt-2 border-t border-[#2C2C2C]">
             <button
               onClick={() => setIsOpen(false)}
-              className="flex-1 bg-[#4B3A08] text-[#E2AF19] px-3 py-2 rounded-lg text-sm font-satoshi hover:opacity-90 transition-opacity"
+              className="flex-1 bg-[#4B3A08] text-[#E2AF19] px-2.5 py-1.5 rounded-lg text-xs font-satoshi hover:opacity-90 transition-opacity"
             >
               Cancel
             </button>
             <button
               onClick={() => setIsOpen(false)}
-              className="flex-1 bg-[#E2AF19] text-black px-3 py-2 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+              className="flex-1 bg-[#E2AF19] text-black px-2.5 py-1.5 rounded-lg text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
             >
               Done
             </button>

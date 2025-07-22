@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - FIXED LOGOUT FUNCTION
+// src/components/dashboard/Sidebar.tsx - COMPACT VERSION
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -169,48 +169,48 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
   return (
     <div
-      className="relative w-full lg:w-80 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
-      style={{ borderRadius: "20px" }}
+      className="relative w-full lg:w-64 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
+      style={{ borderRadius: "16px" }}
     >
       {/* Top Gradient Blur */}
       <div
-        className="absolute -top-2 lg:-top-5 -left-2 lg:-left-5 -right-2 lg:-right-5 h-40 lg:h-80 pointer-events-none z-10"
+        className="absolute -top-1 lg:-top-3 -left-1 lg:-left-3 -right-1 lg:-right-3 h-24 lg:h-48 pointer-events-none z-10"
         style={{
-          borderRadius: "400px lg:898px",
+          borderRadius: "300px lg:600px",
           background:
             "linear-gradient(180deg, rgba(226, 175, 25, 0.40) 0%, rgba(226, 175, 25, 0.25) 25%, rgba(226, 175, 25, 0.10) 50%, rgba(226, 175, 25, 0.00) 75%)",
-          filter: "blur(30px lg:blur(70px))",
+          filter: "blur(20px lg:blur(50px)",
         }}
       />
 
       {/* Bottom Gradient Blur */}
       <div
-        className="absolute -bottom-2 lg:-bottom-5 -left-2 lg:-left-5 -right-2 lg:-right-5 h-40 lg:h-80 pointer-events-none z-10"
+        className="absolute -bottom-1 lg:-bottom-3 -left-1 lg:-left-3 -right-1 lg:-right-3 h-24 lg:h-48 pointer-events-none z-10"
         style={{
-          borderRadius: "400px lg:898px",
+          borderRadius: "300px lg:600px",
           background:
             "linear-gradient(0deg, rgba(226, 175, 25, 0.40) 0%, rgba(226, 175, 25, 0.25) 25%, rgba(226, 175, 25, 0.10) 50%, rgba(226, 175, 25, 0.00) 75%)",
-          filter: "blur(30px lg:blur(70px))",
+          filter: "blur(20px lg:blur(50px)",
         }}
       />
 
       {/* Additional Middle Fade Gradient */}
       <div
-        className="absolute top-1/3 bottom-1/3 -left-2 lg:-left-5 -right-2 lg:-right-5 pointer-events-none z-15"
+        className="absolute top-1/3 bottom-1/3 -left-1 lg:-left-3 -right-1 lg:-right-3 pointer-events-none z-15"
         style={{
           background:
             "linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.9) 50%, rgba(0, 0, 0, 0.3) 100%)",
-          filter: "blur(20px lg:blur(40px))",
+          filter: "blur(15px lg:blur(30px)",
         }}
       />
 
       {/* Logo Section */}
-      <div className="p-4 lg:p-8 flex-shrink-0 relative z-20">
-        <div className="flex items-center mb-4 lg:mb-8">
+      <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
+        <div className="flex items-center mb-3 lg:mb-6">
           <img
             src="/blockName.png"
             alt="Blockpal"
-            className="brightness-110 h-6 lg:h-8"
+            className="brightness-110 h-5 lg:h-6"
             style={{
               width: "auto",
             }}
@@ -218,10 +218,10 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         </div>
 
         {/* Navigations Section with Lines - Hidden on mobile, shown on lg+ */}
-        <div className="mb-4 lg:mb-6 hidden lg:block">
-          <div className="flex items-center mb-4">
+        <div className="mb-3 lg:mb-4 hidden lg:block">
+          <div className="flex items-center mb-3">
             <div className="flex-1 h-px bg-[#DCDCDC]"></div>
-            <span className="px-4 text-sm font-medium text-gray-300 font-satoshi">
+            <span className="px-3 text-xs font-medium text-gray-300 font-satoshi">
               Navigations
             </span>
             <div className="flex-1 h-px bg-[#DCDCDC]"></div>
@@ -230,8 +230,8 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       </div>
 
       {/* Navigation Menu */}
-      <div className="flex-1 px-3 lg:px-6 overflow-y-auto relative z-20">
-        <nav className="space-y-2 lg:space-y-3 mb-6 lg:mb-8">
+      <div className="flex-1 px-2 lg:px-4 overflow-y-auto relative z-20 scrollbar-hide">
+        <nav className="space-y-1 lg:space-y-2 mb-4 lg:mb-6">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             const isDisabled = !hasWallets && item.href !== "/dashboard";
@@ -241,7 +241,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 key={item.label}
                 onClick={(e) => handleNavigation(item.href, e)}
                 disabled={isLoading || isDisabled}
-                className={`w-full flex items-center px-4 lg:px-5 py-3 lg:py-4 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
+                className={`w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
                   isActive
                     ? "bg-[#E2AF19] text-black font-medium"
                     : isDisabled
@@ -251,13 +251,13 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
               >
                 {isLoading && pathname !== item.href ? (
                   <RefreshCw
-                    size={20}
-                    className="mr-4 flex-shrink-0 animate-spin"
+                    size={16}
+                    className="mr-3 flex-shrink-0 animate-spin"
                   />
                 ) : (
                   <item.icon
-                    size={20}
-                    className="mr-4 flex-shrink-0"
+                    size={16}
+                    className="mr-3 flex-shrink-0"
                     filled={isActive}
                   />
                 )}
@@ -271,19 +271,19 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       </div>
 
       {/* Others Section - Fixed at bottom */}
-      <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
+      <div className="p-2 lg:p-4 flex-shrink-0 relative z-20">
         {/* Others Section with Lines - Hidden on mobile */}
-        <div className="mb-4 lg:mb-6 hidden lg:block">
-          <div className="flex items-center mb-4">
+        <div className="mb-3 lg:mb-4 hidden lg:block">
+          <div className="flex items-center mb-3">
             <div className="flex-1 h-px bg-[#DCDCDC]"></div>
-            <span className="px-4 text-sm font-medium text-gray-300 font-satoshi">
+            <span className="px-3 text-xs font-medium text-gray-300 font-satoshi">
               Others
             </span>
             <div className="flex-1 h-px bg-[#DCDCDC]"></div>
           </div>
         </div>
 
-        <div className="space-y-2 lg:space-y-3">
+        <div className="space-y-1 lg:space-y-2">
           {/* User Profile Link with Logout */}
           {otherItems.map((item) => {
             const isActive = pathname === item.href;
@@ -297,7 +297,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                     !isProfileDisabled && handleNavigation(item.href, e)
                   }
                   disabled={isLoading || isProfileDisabled}
-                  className={`flex-1 flex items-center px-4 lg:px-5 py-3 lg:py-4 rounded-xl text-left transition-all duration-200 font-satoshi text-sm lg:text-base ${
+                  className={`flex-1 flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
                     isActive
                       ? "bg-[#E2AF19] text-black font-medium"
                       : isProfileDisabled
@@ -307,11 +307,11 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 >
                   {isLoading && pathname !== item.href ? (
                     <RefreshCw
-                      size={20}
-                      className="mr-4 flex-shrink-0 animate-spin"
+                      size={16}
+                      className="mr-3 flex-shrink-0 animate-spin"
                     />
                   ) : (
-                    <item.icon size={20} className="mr-4 flex-shrink-0" />
+                    <item.icon size={16} className="mr-3 flex-shrink-0" />
                   )}
                   <span className={isActive ? "font-medium" : ""}>
                     {item.label}
@@ -320,20 +320,20 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
                 {/* Logout Button - Always enabled and separate */}
                 <button
-                  className="ml-2 flex-shrink-0 p-3 rounded hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                  className="ml-1 flex-shrink-0 p-2 rounded hover:bg-red-900/20 transition-colors disabled:opacity-50"
                   onClick={handleLogout}
                   disabled={isLoading}
                   title="Logout"
                 >
                   {isLoading ? (
                     <RefreshCw
-                      size={18}
+                      size={14}
                       className="animate-spin"
                       color="#E74C3C"
                     />
                   ) : (
                     <LogoutIcon
-                      size={18}
+                      size={14}
                       className="hover:opacity-80 transition-opacity"
                       color="#E74C3C"
                     />
@@ -345,13 +345,13 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
           {/* Go to Website Button */}
           <button
-            className="w-full flex items-center px-4 lg:px-5 py-3 lg:py-4 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
+            className="w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-xs lg:text-sm"
             disabled={isLoading}
           >
-            <WebsiteIcon size={20} className="mr-4 flex-shrink-0" />
+            <WebsiteIcon size={16} className="mr-3 flex-shrink-0" />
             <span className="truncate">Go to website</span>
             <div className="ml-auto flex-shrink-0">
-              <ExternalLink size={16} className="text-gray-400" />
+              <ExternalLink size={12} className="text-gray-400" />
             </div>
           </button>
 
@@ -359,13 +359,13 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
           <button
             onClick={() => dispatch(toggleTheme())}
             disabled={isLoading}
-            className="w-full flex items-center px-4 lg:px-5 py-3 lg:py-4 rounded-xl text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-sm lg:text-base"
+            className="w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-xs lg:text-sm"
           >
-            <DarkModeIcon size={20} className="mr-4 flex-shrink-0" />
+            <DarkModeIcon size={16} className="mr-3 flex-shrink-0" />
             <span className="truncate">Dark Mode</span>
             <div className="ml-auto flex-shrink-0">
-              <div className="w-10 lg:w-12 h-6 lg:h-7 rounded-full relative bg-[#E2AF19]">
-                <div className="w-4 lg:w-5 h-4 lg:h-5 bg-white rounded-full absolute top-1 right-1"></div>
+              <div className="w-8 lg:w-10 h-5 lg:h-6 rounded-full relative bg-[#E2AF19]">
+                <div className="w-3 lg:w-4 h-3 lg:h-4 bg-white rounded-full absolute top-1 right-1"></div>
               </div>
             </div>
           </button>

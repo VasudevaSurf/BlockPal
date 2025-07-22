@@ -241,7 +241,7 @@ export default function FriendsPage() {
             <img
               src={imageUrl}
               alt={symbol}
-              className="w-5 h-5 rounded-full mr-2 flex-shrink-0"
+              className="w-4 h-4 rounded-full mr-2 flex-shrink-0"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
@@ -254,7 +254,7 @@ export default function FriendsPage() {
           ) : null}
 
           <div
-            className={`w-5 h-5 ${getTokenIcon(
+            className={`w-4 h-4 ${getTokenIcon(
               symbol,
               contractAddress
             )} rounded-full mr-2 flex items-center justify-center flex-shrink-0 ${
@@ -271,7 +271,7 @@ export default function FriendsPage() {
 
         {isSelected && (
           <ChevronDown
-            size={16}
+            size={14}
             className="text-gray-400 pointer-events-none"
           />
         )}
@@ -664,7 +664,7 @@ export default function FriendsPage() {
       case "pending":
         if (isExpired) {
           return {
-            icon: <Clock size={16} className="text-yellow-400" />,
+            icon: <Clock size={14} className="text-yellow-400" />,
             label: "Expired",
             color: "text-yellow-400",
             bgColor: "bg-yellow-500/20",
@@ -672,7 +672,7 @@ export default function FriendsPage() {
           };
         }
         return {
-          icon: <Clock size={16} className="text-blue-400" />,
+          icon: <Clock size={14} className="text-blue-400" />,
           label: "Pending",
           color: "text-blue-400",
           bgColor: "bg-blue-500/20",
@@ -680,7 +680,7 @@ export default function FriendsPage() {
         };
       case "fulfilled":
         return {
-          icon: <CheckCircle size={16} className="text-green-400" />,
+          icon: <CheckCircle size={14} className="text-green-400" />,
           label: "Fulfilled",
           color: "text-green-400",
           bgColor: "bg-green-500/20",
@@ -688,7 +688,7 @@ export default function FriendsPage() {
         };
       case "declined":
         return {
-          icon: <XCircle size={16} className="text-red-400" />,
+          icon: <XCircle size={14} className="text-red-400" />,
           label: "Declined",
           color: "text-red-400",
           bgColor: "bg-red-500/20",
@@ -696,7 +696,7 @@ export default function FriendsPage() {
         };
       case "expired":
         return {
-          icon: <Clock size={16} className="text-yellow-400" />,
+          icon: <Clock size={14} className="text-yellow-400" />,
           label: "Expired",
           color: "text-yellow-400",
           bgColor: "bg-yellow-500/20",
@@ -704,7 +704,7 @@ export default function FriendsPage() {
         };
       case "cancelled":
         return {
-          icon: <Ban size={16} className="text-gray-400" />,
+          icon: <Ban size={14} className="text-gray-400" />,
           label: "Cancelled",
           color: "text-gray-400",
           bgColor: "bg-gray-500/20",
@@ -712,7 +712,7 @@ export default function FriendsPage() {
         };
       default:
         return {
-          icon: <AlertCircle size={16} className="text-gray-400" />,
+          icon: <AlertCircle size={14} className="text-gray-400" />,
           label: "Unknown",
           color: "text-gray-400",
           bgColor: "bg-gray-500/20",
@@ -755,13 +755,13 @@ export default function FriendsPage() {
         <div className="fixed inset-0 z-30 bg-white/10" />
       )}
 
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
+      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-2.5 lg:p-3 flex flex-col overflow-hidden">
         {/* Success Message Display */}
         {successMessage && (
-          <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
+          <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-2 mb-3 flex-shrink-0">
             <div className="flex items-start">
               <CheckCircle
-                size={16}
+                size={14}
                 className="text-green-400 mr-2 mt-0.5 flex-shrink-0"
               />
               <p className="text-green-400 text-sm font-satoshi">
@@ -771,7 +771,7 @@ export default function FriendsPage() {
                 onClick={() => setSuccessMessage("")}
                 className="ml-auto text-green-400 hover:text-green-300"
               >
-                <X size={16} />
+                <X size={14} />
               </button>
             </div>
           </div>
@@ -779,10 +779,10 @@ export default function FriendsPage() {
 
         {/* Error Display */}
         {error && (
-          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4 flex-shrink-0">
+          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-3 flex-shrink-0">
             <div className="flex items-start">
               <AlertCircle
-                size={16}
+                size={14}
                 className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
               />
               <p className="text-red-400 text-sm font-satoshi">{error}</p>
@@ -790,7 +790,7 @@ export default function FriendsPage() {
                 onClick={() => setError("")}
                 className="ml-auto text-red-400 hover:text-red-300"
               >
-                <X size={16} />
+                <X size={14} />
               </button>
             </div>
           </div>
@@ -798,14 +798,14 @@ export default function FriendsPage() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="bg-black rounded-[16px] lg:rounded-[20px] border border-[#2C2C2C] p-4 lg:p-6 flex-1 flex flex-col min-h-0">
+          <div className="bg-black rounded-[12px] lg:rounded-[16px] border border-[#2C2C2C] p-3 lg:p-4 flex-1 flex flex-col min-h-0">
             {/* Tab Navigation with Enhanced Search */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 lg:mb-6 gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-3 lg:mb-4 gap-3">
               {/* Tab Buttons */}
               <div className="flex">
                 <button
                   onClick={() => setActiveTab("Friends")}
-                  className={`px-4 lg:px-6 py-2 rounded-lg font-satoshi transition-colors mr-2 text-sm lg:text-base ${
+                  className={`px-3 lg:px-4 py-1.5 rounded-lg font-satoshi transition-colors mr-2 text-sm ${
                     activeTab === "Friends"
                       ? "bg-[#E2AF19] text-black font-medium"
                       : "text-gray-400 hover:text-white"
@@ -815,7 +815,7 @@ export default function FriendsPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab("Requests")}
-                  className={`px-4 lg:px-6 py-2 rounded-lg font-satoshi transition-colors border mr-2 text-sm lg:text-base ${
+                  className={`px-3 lg:px-4 py-1.5 rounded-lg font-satoshi transition-colors border mr-2 text-sm ${
                     activeTab === "Requests"
                       ? "bg-[#E2AF19] text-black font-medium border-[#E2AF19]"
                       : "text-gray-400 hover:text-white border-[#2C2C2C]"
@@ -825,7 +825,7 @@ export default function FriendsPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab("FundRequests")}
-                  className={`px-4 lg:px-6 py-2 rounded-lg font-satoshi transition-colors border text-sm lg:text-base ${
+                  className={`px-3 lg:px-4 py-1.5 rounded-lg font-satoshi transition-colors border text-sm ${
                     activeTab === "FundRequests"
                       ? "bg-[#E2AF19] text-black font-medium border-[#E2AF19]"
                       : "text-gray-400 hover:text-white border-[#2C2C2C]"
@@ -837,7 +837,7 @@ export default function FriendsPage() {
 
               {/* Enhanced Search Component - Only show for Friends tab */}
               {activeTab === "Friends" && (
-                <div className="w-full lg:w-96">
+                <div className="w-full lg:w-80">
                   <EnhancedFriendsSearch
                     friends={friends}
                     friendRequests={friendRequests}
@@ -851,31 +851,31 @@ export default function FriendsPage() {
             </div>
 
             {/* Content based on active tab */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
               {activeTab === "Friends" && (
                 <div className="space-y-0">
                   {loading && friends.length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
+                    <div className="text-center py-6">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
                       <p className="text-gray-400 font-satoshi">
                         Loading friends...
                       </p>
                     </div>
                   ) : friends.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-                      <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+                    <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
+                      <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
                         <DollarSign
-                          size={20}
-                          className="text-gray-400 lg:w-6 lg:h-6"
+                          size={18}
+                          className="text-gray-400 lg:w-5 lg:h-5"
                         />
                       </div>
-                      <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+                      <h3 className="text-white text-sm lg:text-base font-satoshi mb-2">
                         No friends yet
                       </h3>
-                      <p className="text-gray-400 font-satoshi text-sm lg:text-base mb-4">
+                      <p className="text-gray-400 font-satoshi text-sm mb-3">
                         Search for friends using the search box above
                       </p>
-                      <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 max-w-sm">
+                      <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3 max-w-sm">
                         <p className="text-blue-400 text-sm font-satoshi">
                           💡 <strong>Tip:</strong> You can search by username or
                           paste a wallet address to send a friend request!
@@ -887,16 +887,16 @@ export default function FriendsPage() {
                       <div key={friend._id}>
                         {/* Mobile Card Layout */}
                         <div className="block lg:hidden">
-                          <div className="bg-[#0F0F0F] rounded-lg p-4 mb-3 border border-[#2C2C2C]">
-                            <div className="flex items-center mb-3">
-                              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
-                                <span className="text-white text-sm font-medium">
+                          <div className="bg-[#0F0F0F] rounded-lg p-3 mb-2 border border-[#2C2C2C]">
+                            <div className="flex items-center mb-2">
+                              <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center mr-2">
+                                <span className="text-white text-xs font-medium">
                                   {friend.displayName?.[0]?.toUpperCase() ||
                                     friend.username[0]?.toUpperCase()}
                                 </span>
                               </div>
                               <div className="flex-1">
-                                <div className="text-white font-satoshi">
+                                <div className="text-white font-satoshi text-sm">
                                   {friend.displayName || friend.username}
                                 </div>
                                 <div className="text-gray-400 text-xs font-satoshi">
@@ -904,16 +904,16 @@ export default function FriendsPage() {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex flex-col sm:flex-row gap-2">
+                            <div className="flex flex-col sm:flex-row gap-1.5">
                               <button
                                 onClick={() => openFundRequestModal(friend)}
-                                className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex-1 flex items-center justify-center"
+                                className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex-1 flex items-center justify-center"
                               >
                                 Request Funds
                               </button>
                               <button
                                 onClick={() => handleRemoveFriend(friend)}
-                                className="bg-transparent border border-red-500 text-red-500 px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-red-500 hover:text-white transition-colors text-sm flex-1"
+                                className="bg-transparent border border-red-500 text-red-500 px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-red-500 hover:text-white transition-colors text-sm flex-1"
                               >
                                 Remove
                               </button>
@@ -923,34 +923,34 @@ export default function FriendsPage() {
 
                         {/* Desktop Row Layout */}
                         <div className="hidden lg:block">
-                          <div className="flex items-center justify-between py-3 px-4 hover:bg-[#1A1A1A] rounded-lg transition-colors">
+                          <div className="flex items-center justify-between py-2 px-3 hover:bg-[#1A1A1A] rounded-lg transition-colors">
                             <div className="flex items-center">
-                              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                              <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center mr-2">
                                 <span className="text-white text-sm font-medium">
                                   {friend.displayName?.[0]?.toUpperCase() ||
                                     friend.username[0]?.toUpperCase()}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-white font-satoshi">
+                                <span className="text-white font-satoshi text-sm">
                                   {friend.displayName || friend.username}
                                 </span>
-                                <div className="text-gray-400 text-sm font-satoshi">
+                                <div className="text-gray-400 text-xs font-satoshi">
                                   @{friend.username}
                                 </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2">
                               <button
                                 onClick={() => openFundRequestModal(friend)}
-                                className="bg-[#E2AF19] text-black px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex items-center"
+                                className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex items-center"
                               >
                                 Request Funds
                               </button>
                               <button
                                 onClick={() => handleRemoveFriend(friend)}
-                                className="bg-transparent border border-red-500 text-red-500 px-4 py-2 rounded-lg font-satoshi font-medium hover:bg-red-500 hover:text-white transition-colors text-sm"
+                                className="bg-transparent border border-red-500 text-red-500 px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-red-500 hover:text-white transition-colors text-sm"
                               >
                                 Remove
                               </button>
@@ -958,7 +958,7 @@ export default function FriendsPage() {
                           </div>
 
                           {index < friends.length - 1 && (
-                            <div className="border-b border-[#2C2C2C] mx-4"></div>
+                            <div className="border-b border-[#2C2C2C] mx-3"></div>
                           )}
                         </div>
                       </div>
@@ -968,26 +968,26 @@ export default function FriendsPage() {
               )}
 
               {activeTab === "Requests" && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {loading && friendRequests.length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
+                    <div className="text-center py-6">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
                       <p className="text-gray-400 font-satoshi">
                         Loading requests...
                       </p>
                     </div>
                   ) : friendRequests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-                      <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+                    <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
+                      <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
                         <Bell
-                          size={20}
-                          className="text-gray-400 lg:w-6 lg:h-6"
+                          size={18}
+                          className="text-gray-400 lg:w-5 lg:h-5"
                         />
                       </div>
-                      <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+                      <h3 className="text-white text-sm lg:text-base font-satoshi mb-2">
                         No friend requests
                       </h3>
-                      <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+                      <p className="text-gray-400 font-satoshi text-sm">
                         Friend requests will appear here
                       </p>
                     </div>
@@ -995,11 +995,11 @@ export default function FriendsPage() {
                     friendRequests.map((request) => (
                       <div
                         key={request._id}
-                        className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]"
+                        className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
-                            <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                            <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center mr-2">
                               <span className="text-white text-sm font-medium">
                                 {request.requesterData?.displayName?.[0]?.toUpperCase() ||
                                   request.requesterData?.username[0]?.toUpperCase() ||
@@ -1007,11 +1007,11 @@ export default function FriendsPage() {
                               </span>
                             </div>
                             <div>
-                              <div className="text-white font-satoshi">
+                              <div className="text-white font-satoshi text-sm">
                                 {request.requesterData?.displayName ||
                                   request.requesterData?.username}
                               </div>
-                              <div className="text-gray-400 text-sm font-satoshi">
+                              <div className="text-gray-400 text-xs font-satoshi">
                                 @{request.requesterUsername}
                               </div>
                               <div className="text-gray-400 text-xs font-satoshi">
@@ -1022,7 +1022,7 @@ export default function FriendsPage() {
                             </div>
                           </div>
 
-                          <div className="flex space-x-2">
+                          <div className="flex space-x-1.5">
                             <button
                               onClick={() =>
                                 handleFriendRequest(
@@ -1031,9 +1031,9 @@ export default function FriendsPage() {
                                 )
                               }
                               disabled={loading}
-                              className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-green-700 transition-colors text-sm flex items-center"
+                              className="bg-green-600 text-white px-2.5 py-1 rounded-lg font-satoshi font-medium hover:bg-green-700 transition-colors text-sm flex items-center"
                             >
-                              <Check size={14} className="mr-1" />
+                              <Check size={12} className="mr-1" />
                               Accept
                             </button>
                             <button
@@ -1044,9 +1044,9 @@ export default function FriendsPage() {
                                 )
                               }
                               disabled={loading}
-                              className="bg-red-600 text-white px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-red-700 transition-colors text-sm flex items-center"
+                              className="bg-red-600 text-white px-2.5 py-1 rounded-lg font-satoshi font-medium hover:bg-red-700 transition-colors text-sm flex items-center"
                             >
-                              <X size={14} className="mr-1" />
+                              <X size={12} className="mr-1" />
                               Decline
                             </button>
                           </div>
@@ -1060,24 +1060,24 @@ export default function FriendsPage() {
               {activeTab === "FundRequests" && (
                 <div className="space-y-0">
                   {loading && fundRequests.length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
+                    <div className="text-center py-6">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
                       <p className="text-gray-400 font-satoshi">
                         Loading fund requests...
                       </p>
                     </div>
                   ) : fundRequests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-8 lg:py-12">
-                      <div className="w-12 h-12 lg:w-16 lg:h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-4">
+                    <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
+                      <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
                         <DollarSign
-                          size={20}
-                          className="text-gray-400 lg:w-6 lg:h-6"
+                          size={18}
+                          className="text-gray-400 lg:w-5 lg:h-5"
                         />
                       </div>
-                      <h3 className="text-white text-base lg:text-lg font-satoshi mb-2">
+                      <h3 className="text-white text-sm lg:text-base font-satoshi mb-2">
                         No fund requests
                       </h3>
-                      <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+                      <p className="text-gray-400 font-satoshi text-sm">
                         Fund requests from friends will appear here
                       </p>
                     </div>
@@ -1089,7 +1089,7 @@ export default function FriendsPage() {
                           {/* Mobile Card Layout */}
                           <div className="block lg:hidden">
                             <div
-                              className={`bg-[#0F0F0F] rounded-lg p-4 mb-3 border border-[#2C2C2C] transition-all ${
+                              className={`bg-[#0F0F0F] rounded-lg p-3 mb-2 border border-[#2C2C2C] transition-all ${
                                 statusInfo.canAction
                                   ? "cursor-pointer hover:bg-[#1A1A1A] hover:border-[#E2AF19]"
                                   : "opacity-75"
@@ -1099,16 +1099,16 @@ export default function FriendsPage() {
                                 handleFundRequestClick(request)
                               }
                             >
-                              <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center">
-                                  <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                                  <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center mr-2">
                                     <span className="text-white text-sm font-medium">
                                       {request.requesterUsername[0]?.toUpperCase() ||
                                         "?"}
                                     </span>
                                   </div>
                                   <div>
-                                    <div className="text-white font-satoshi">
+                                    <div className="text-white font-satoshi text-sm">
                                       @{request.requesterUsername}
                                     </div>
                                     <div className="text-gray-400 text-xs font-satoshi">
@@ -1120,7 +1120,7 @@ export default function FriendsPage() {
                                 </div>
 
                                 <div
-                                  className={`px-2 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
+                                  className={`px-2 py-0.5 rounded-full ${statusInfo.bgColor} flex items-center`}
                                 >
                                   {statusInfo.icon}
                                   <span
@@ -1131,8 +1131,8 @@ export default function FriendsPage() {
                                 </div>
                               </div>
 
-                              <div className="mb-3">
-                                <div className="text-[#E2AF19] font-bold text-lg">
+                              <div className="mb-2">
+                                <div className="text-[#E2AF19] font-bold text-base">
                                   {request.amount} {request.tokenSymbol}
                                 </div>
                                 {request.message && (
@@ -1142,9 +1142,9 @@ export default function FriendsPage() {
                                 )}
                               </div>
 
-                              <div className="flex items-center justify-between pt-3 border-t border-[#2C2C2C]">
+                              <div className="flex items-center justify-between pt-2 border-t border-[#2C2C2C]">
                                 <div className="flex items-center text-gray-400 text-xs font-satoshi">
-                                  <Clock size={12} className="mr-1" />
+                                  <Clock size={10} className="mr-1" />
                                   {statusInfo.canAction ? (
                                     <>
                                       Expires{" "}
@@ -1172,7 +1172,7 @@ export default function FriendsPage() {
                                 ) : request.status === "fulfilled" &&
                                   request.transactionHash ? (
                                   <div className="text-green-400 text-xs font-satoshi flex items-center">
-                                    <ExternalLink size={12} className="mr-1" />
+                                    <ExternalLink size={10} className="mr-1" />
                                     View Transaction
                                   </div>
                                 ) : (
@@ -1203,7 +1203,7 @@ export default function FriendsPage() {
                                         }}
                                         className="text-green-400 hover:text-green-300 transition-colors"
                                       >
-                                        <Copy size={12} />
+                                        <Copy size={10} />
                                       </button>
                                     </div>
                                     {copied === `tx-${request._id}` && (
@@ -1219,7 +1219,7 @@ export default function FriendsPage() {
                           {/* Desktop Row Layout */}
                           <div className="hidden lg:block">
                             <div
-                              className={`flex items-center justify-between py-3 px-4 rounded-lg transition-colors ${
+                              className={`flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
                                 statusInfo.canAction
                                   ? "cursor-pointer hover:bg-[#1A1A1A]"
                                   : "opacity-75"
@@ -1230,17 +1230,17 @@ export default function FriendsPage() {
                               }
                             >
                               <div className="flex items-center flex-1">
-                                <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+                                <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center mr-2">
                                   <span className="text-white text-sm font-medium">
                                     {request.requesterUsername[0]?.toUpperCase() ||
                                       "?"}
                                   </span>
                                 </div>
                                 <div className="flex-1">
-                                  <span className="text-white font-satoshi">
+                                  <span className="text-white font-satoshi text-sm">
                                     @{request.requesterUsername}
                                   </span>
-                                  <div className="text-gray-400 text-sm font-satoshi">
+                                  <div className="text-gray-400 text-xs font-satoshi">
                                     {new Date(
                                       request.requestedAt
                                     ).toLocaleDateString()}
@@ -1248,17 +1248,17 @@ export default function FriendsPage() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center space-x-4">
-                                <div className="text-[#E2AF19] font-bold font-satoshi">
+                              <div className="flex items-center space-x-3">
+                                <div className="text-[#E2AF19] font-bold font-satoshi text-sm">
                                   {request.amount} {request.tokenSymbol}
                                 </div>
 
                                 <div
-                                  className={`px-3 py-1 rounded-full ${statusInfo.bgColor} flex items-center`}
+                                  className={`px-2 py-0.5 rounded-full ${statusInfo.bgColor} flex items-center`}
                                 >
                                   {statusInfo.icon}
                                   <span
-                                    className={`ml-2 text-sm font-satoshi font-medium ${statusInfo.color}`}
+                                    className={`ml-1.5 text-sm font-satoshi font-medium ${statusInfo.color}`}
                                   >
                                     {statusInfo.label}
                                   </span>
@@ -1280,7 +1280,7 @@ export default function FriendsPage() {
                                     }}
                                     className="text-green-400 text-sm font-satoshi hover:opacity-80 transition-opacity flex items-center"
                                   >
-                                    <ExternalLink size={14} className="mr-1" />
+                                    <ExternalLink size={12} className="mr-1" />
                                     Explorer
                                   </button>
                                 ) : (
@@ -1298,7 +1298,7 @@ export default function FriendsPage() {
                             </div>
 
                             {index < fundRequests.length - 1 && (
-                              <div className="border-b border-[#2C2C2C] mx-4"></div>
+                              <div className="border-b border-[#2C2C2C] mx-3"></div>
                             )}
                           </div>
                         </div>
@@ -1313,34 +1313,34 @@ export default function FriendsPage() {
 
         {/* Fund Request Modal */}
         {showFundRequestModal && selectedFriend && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
               {/* Header with back button and centered title */}
-              <div className="flex items-center mb-6">
+              <div className="flex items-center mb-4">
                 <button
                   onClick={() => {
                     setShowFundRequestModal(false);
                     setSelectedFriend(null);
                     setShowTokenDropdown(false);
                   }}
-                  className="text-gray-400 hover:text-white transition-colors mr-4"
+                  className="text-gray-400 hover:text-white transition-colors mr-3"
                 >
-                  <ArrowLeft size={20} />
+                  <ArrowLeft size={18} />
                 </button>
-                <h3 className="flex-1 text-center text-lg font-semibold text-white font-satoshi">
+                <h3 className="flex-1 text-center text-base font-semibold text-white font-satoshi">
                   Request Funds
                 </h3>
                 {/* Invisible spacer to center the title */}
-                <div className="w-5"></div>
+                <div className="w-4"></div>
               </div>
 
-              <div className="mb-4">
+              <div className="mb-3">
                 {/* Warning if no active wallet */}
                 {!activeWallet && (
-                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-4">
+                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-3">
                     <div className="flex items-start">
                       <AlertTriangle
-                        size={16}
+                        size={14}
                         className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
                       />
                       <div>
@@ -1356,13 +1356,13 @@ export default function FriendsPage() {
                 )}
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Token Dropdown */}
                 <div className="relative" data-token-dropdown>
                   <button
                     type="button"
                     onClick={() => setShowTokenDropdown(!showTokenDropdown)}
-                    className="w-full bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg px-3 py-3 text-white font-satoshi text-left flex items-center justify-between hover:border-[#E2AF19] transition-colors focus:outline-none focus:border-[#E2AF19]"
+                    className="w-full bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 text-white font-satoshi text-left flex items-center justify-between hover:border-[#E2AF19] transition-colors focus:outline-none focus:border-[#E2AF19]"
                   >
                     {(() => {
                       const selectedToken = tokens.find(
@@ -1377,7 +1377,7 @@ export default function FriendsPage() {
                   </button>
 
                   {showTokenDropdown && (
-                    <div className="absolute top-full left-0 right-0 z-[60] mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-2xl max-h-64 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 z-[60] mt-1.5 bg-black border border-[#2C2C2C] rounded-lg shadow-2xl max-h-48 overflow-y-auto scrollbar-hide">
                       {/* Token Options */}
                       {tokens.map((token) => (
                         <button
@@ -1390,7 +1390,7 @@ export default function FriendsPage() {
                             });
                             setShowTokenDropdown(false);
                           }}
-                          className="w-full flex items-center px-3 py-3 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
+                          className="w-full flex items-center px-2.5 py-2.5 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
                         >
                           {renderTokenOption(token)}
                         </button>
@@ -1410,7 +1410,7 @@ export default function FriendsPage() {
                       amount: e.target.value,
                     })
                   }
-                  className="w-full p-3 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi transition-colors"
+                  className="w-full p-2.5 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi transition-colors"
                 />
 
                 {/* Message Input */}
@@ -1423,18 +1423,18 @@ export default function FriendsPage() {
                       message: e.target.value,
                     })
                   }
-                  className="w-full p-3 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi resize-none transition-colors"
-                  rows={3}
+                  className="w-full p-2.5 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi resize-none transition-colors"
+                  rows={2}
                 />
 
                 {/* Send Button */}
-                <div className="pt-4">
+                <div className="pt-3">
                   <button
                     onClick={sendFundRequest}
                     disabled={
                       loading || !fundRequestData.amount || !activeWallet
                     }
-                    className="w-full px-4 py-3 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2.5 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? "Sending..." : "Send Request"}
                   </button>
@@ -1463,50 +1463,50 @@ export default function FriendsPage() {
 
         {/* Remove Friend Confirmation Modal */}
         {showRemoveConfirmation && friendToRemove && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-sm p-6">
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-sm p-4">
               {/* Header with back button */}
-              <div className="flex items-center mb-6">
+              <div className="flex items-center mb-4">
                 <button
                   onClick={() => {
                     setShowRemoveConfirmation(false);
                     setFriendToRemove(null);
                   }}
-                  className="text-gray-400 hover:text-white transition-colors mr-4"
+                  className="text-gray-400 hover:text-white transition-colors mr-3"
                 >
-                  <ArrowLeft size={20} />
+                  <ArrowLeft size={18} />
                 </button>
-                <h3 className="flex-1 text-center text-lg font-semibold text-white font-satoshi">
+                <h3 className="flex-1 text-center text-base font-semibold text-white font-satoshi">
                   Delete Confirmation
                 </h3>
-                <div className="w-5"></div>
+                <div className="w-4"></div>
               </div>
 
               {/* Content */}
-              <div className="text-center mb-6">
-                <p className="text-gray-300 font-satoshi text-base mb-1">
+              <div className="text-center mb-4">
+                <p className="text-gray-300 font-satoshi text-sm mb-1">
                   Are you sure you want to delete
                 </p>
-                <p className="text-white font-satoshi text-base">
+                <p className="text-white font-satoshi text-sm">
                   @{friendToRemove.username}?
                 </p>
               </div>
 
               {/* Buttons */}
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <button
                   onClick={() => {
                     setShowRemoveConfirmation(false);
                     setFriendToRemove(null);
                   }}
-                  className="flex-1 px-4 py-2 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
+                  className="flex-1 px-3 py-2 bg-[#2C2C2C] text-white rounded-lg font-satoshi hover:bg-[#3C3C3C] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => removeFriend(friendToRemove.username)}
                   disabled={loading}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-satoshi font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+                  className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg font-satoshi font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
                   {loading ? "Deleting..." : "Delete"}
                 </button>

@@ -20,7 +20,7 @@ export default function TokenPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0F0F0F]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19]"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#E2AF19]"></div>
       </div>
     );
   }

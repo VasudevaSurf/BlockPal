@@ -1,4 +1,4 @@
-// src/components/profile/UserQRCodeModal.tsx
+// src/components/profile/UserQRCodeModal.tsx - COMPACT VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -162,29 +162,29 @@ export default function UserQRCodeModal({
     <>
       {/* Modal Overlay with faded background */}
       <div
-        className="fixed inset-0 z-50 bg-white/10 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 bg-white/10 flex items-center justify-center p-3"
         onClick={onClose}
       >
-        {/* Modal Container */}
+        {/* Modal Container - COMPACT */}
         <div
-          className="bg-black rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-800"
+          className="bg-black rounded-[20px] w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-800"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 pb-4">
+          {/* Header - COMPACT */}
+          <div className="flex items-center justify-between p-4 pb-3">
             <button
               onClick={onClose}
-              className="p-2 text-white hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-1.5 text-white hover:bg-gray-800 rounded-lg transition-colors"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={18} />
             </button>
 
-            <h1 className="text-white text-lg font-medium font-satoshi">
+            <h1 className="text-white text-base font-medium font-satoshi">
               Receive
             </h1>
 
-            {/* Profile Picture */}
-            <div className="w-8 h-8 rounded-lg overflow-hidden bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center">
+            {/* Profile Picture - COMPACT */}
+            <div className="w-6 h-6 rounded-lg overflow-hidden bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center">
               {userProfile?.avatar ? (
                 <img
                   src={userProfile.avatar}
@@ -192,26 +192,30 @@ export default function UserQRCodeModal({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <User size={14} className="text-black" />
+                <User size={12} className="text-black" />
               )}
             </div>
           </div>
 
-          {/* Content */}
-          <div className="flex flex-col items-center px-6 pb-8">
+          {/* Content - COMPACT */}
+          <div className="flex flex-col items-center px-4 pb-6">
             {loading && (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
-                <p className="text-gray-400 font-satoshi">Loading QR code...</p>
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-3"></div>
+                <p className="text-gray-400 font-satoshi text-sm">
+                  Loading QR code...
+                </p>
               </div>
             )}
 
             {error && (
-              <div className="text-center py-12">
-                <p className="text-red-400 font-satoshi mb-4">{error}</p>
+              <div className="text-center py-8">
+                <p className="text-red-400 font-satoshi mb-3 text-sm">
+                  {error}
+                </p>
                 <button
                   onClick={fetchQRData}
-                  className="bg-yellow-500 text-black px-4 py-2 rounded-lg font-satoshi hover:bg-yellow-400 transition-colors"
+                  className="bg-yellow-500 text-black px-3 py-1.5 rounded-lg font-satoshi hover:bg-yellow-400 transition-colors text-sm"
                 >
                   Try Again
                 </button>
@@ -220,55 +224,57 @@ export default function UserQRCodeModal({
 
             {qrData && !loading && !error && (
               <>
-                {/* Network Warning */}
-                <div className="bg-gray-800/50 text-gray-300 px-4 py-2.5 rounded-xl mb-8 font-satoshi text-sm text-center">
+                {/* Network Warning - COMPACT */}
+                <div className="bg-gray-800/50 text-gray-300 px-3 py-2 rounded-xl mb-6 font-satoshi text-sm text-center">
                   Assets can only be sent within the same network
                 </div>
 
-                {/* QR Code Container */}
-                <div className="bg-gray-300 p-8 rounded-3xl mb-8 shadow-2xl">
-                  <div className="w-56 h-56 flex items-center justify-center bg-white rounded-2xl">
+                {/* QR Code Container - COMPACT */}
+                <div className="bg-gray-300 p-6 rounded-[20px] mb-6 shadow-2xl">
+                  <div className="w-44 h-44 flex items-center justify-center bg-white rounded-xl">
                     {qrData.hasWallet ? (
                       <img
-                        src={`/api/users/qr?format=svg&size=224`}
+                        src={`/api/users/qr?format=svg&size=176`}
                         alt="Wallet QR Code"
-                        className="w-full h-full rounded-2xl"
+                        className="w-full h-full rounded-xl"
                       />
                     ) : (
                       <div className="text-center text-gray-500">
-                        <p className="font-satoshi">No wallet available</p>
+                        <p className="font-satoshi text-sm">
+                          No wallet available
+                        </p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Wallet Address */}
+                {/* Wallet Address - COMPACT */}
                 {qrData.activeWallet && (
-                  <div className="text-center mb-8 px-4">
+                  <div className="text-center mb-6 px-3">
                     <p className="text-gray-300 font-mono text-sm tracking-wider font-satoshi break-all leading-relaxed italic">
                       {qrData.activeWallet.address}
                     </p>
                   </div>
                 )}
 
-                {/* Copy Button */}
+                {/* Copy Button - COMPACT */}
                 <button
                   onClick={copyToClipboard}
-                  className="flex items-center justify-center space-x-3 bg-gray-800/70 hover:bg-gray-700/70 text-white px-8 py-4 rounded-2xl transition-colors font-satoshi border border-gray-700 backdrop-blur-sm"
+                  className="flex items-center justify-center space-x-2.5 bg-gray-800/70 hover:bg-gray-700/70 text-white px-6 py-3 rounded-xl transition-colors font-satoshi border border-gray-700 backdrop-blur-sm"
                 >
                   {copied ? (
                     <>
-                      <span className="text-base font-mayeka-demi-bold-demo">
+                      <span className="text-sm font-mayeka-demi-bold-demo">
                         Copied!
                       </span>
-                      <CheckCircle size={20} className="text-green-400" />
+                      <CheckCircle size={16} className="text-green-400" />
                     </>
                   ) : (
                     <>
-                      <span className="text-base font-mayeka-demi-bold-demo">
+                      <span className="text-sm font-mayeka-demi-bold-demo">
                         Copy Address
                       </span>
-                      <Copy size={20} />
+                      <Copy size={16} />
                     </>
                   )}
                 </button>
@@ -276,10 +282,10 @@ export default function UserQRCodeModal({
                 {/* Hidden Share and Download buttons - can be accessed via long press or additional menu */}
                 <div className="hidden">
                   <button onClick={shareQR}>
-                    <Share2 size={20} />
+                    <Share2 size={18} />
                   </button>
                   <button onClick={downloadQR}>
-                    <Download size={20} />
+                    <Download size={18} />
                   </button>
                 </div>
               </>

@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED: Efficient loading without flash issues
+// src/app/dashboard/page.tsx - COMPACT VERSION
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -379,23 +379,23 @@ export default function DashboardPage() {
   // Show loading skeleton during initial setup
   if (shouldShowSkeleton) {
     return (
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
         <RealtimeDashboardNotifications />
 
         {/* Mobile Layout Skeleton */}
-        <div className="flex flex-col xl:hidden gap-4 flex-1 min-h-0">
+        <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0">
           <SkeletonWalletBalance />
           <SkeletonTokenList />
           <SkeletonSwapSection />
         </div>
 
         {/* Desktop Layout Skeleton */}
-        <div className="hidden xl:flex gap-6 flex-1 min-h-0">
-          <div className="flex-1 flex flex-col gap-6 min-w-0">
+        <div className="hidden xl:flex gap-4 flex-1 min-h-0">
+          <div className="flex-1 flex flex-col gap-4 min-w-0">
             <SkeletonWalletBalance />
             <SkeletonTokenList />
           </div>
-          <div className="w-[400px] flex-shrink-0 h-full">
+          <div className="w-[320px] flex-shrink-0 h-full">
             <SkeletonSwapSection />
           </div>
         </div>
@@ -409,14 +409,14 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
+    <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
       <RealtimeDashboardNotifications />
 
       {/* Main Dashboard Content */}
       {wallets.length > 0 ? (
-        <div className="flex flex-col xl:flex-row gap-4 lg:gap-6 flex-1 min-h-0">
+        <div className="flex flex-col xl:flex-row gap-3 lg:gap-4 flex-1 min-h-0">
           {/* Mobile Layout */}
-          <div className="flex xl:hidden flex-col gap-4 lg:gap-6 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+          <div className="flex xl:hidden flex-col gap-3 lg:gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
             <div className="flex-shrink-0">
               <WalletBalance />
             </div>
@@ -429,7 +429,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Desktop Layout */}
-          <div className="hidden xl:flex flex-1 flex-col gap-6 min-w-0">
+          <div className="hidden xl:flex flex-1 flex-col gap-4 min-w-0">
             <div className="flex-shrink-0">
               <WalletBalance />
             </div>
@@ -438,7 +438,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="hidden xl:block w-[400px] 2xl:w-[480px] flex-shrink-0 h-full">
+          <div className="hidden xl:block w-[320px] 2xl:w-[380px] flex-shrink-0 h-full">
             <SwapSection />
           </div>
         </div>
@@ -446,10 +446,10 @@ export default function DashboardPage() {
         // Empty state - no content, just let welcome modal handle it
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-black text-2xl font-bold">₿</span>
+            <div className="w-12 h-12 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-black text-lg font-bold">₿</span>
             </div>
-            <h3 className="text-white text-lg font-satoshi mb-2">
+            <h3 className="text-white text-base font-satoshi mb-2">
               Welcome to Blockpal
             </h3>
             <p className="text-gray-400 font-satoshi text-sm">

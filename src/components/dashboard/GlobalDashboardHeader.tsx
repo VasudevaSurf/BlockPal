@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - Fixed wallet button toggle
+// src/components/dashboard/GlobalDashboardHeader.tsx - COMPACT VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -338,38 +338,38 @@ export default function GlobalDashboardHeader({
   return (
     <>
       {/* Global Header - Fixed across all pages */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 flex-shrink-0 gap-4 sm:gap-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 flex-shrink-0 gap-3 sm:gap-0">
         <div>
           <div className="flex items-center">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-mayeka">
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white font-mayeka">
               {displayTitle}
             </h1>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 lg:space-x-6">
+        <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4">
           {/* Wallet Selector with Real-time Data */}
           {wallets.length > 0 && (
             <button
               ref={walletButtonRef}
               onClick={handleWalletButtonClick}
-              className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-3 lg:px-4 py-2 lg:py-3 w-full sm:w-auto hover:border-[#E2AF19] transition-colors group"
+              className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto hover:border-[#E2AF19] transition-colors group"
             >
               <div
-                className={`w-6 h-6 lg:w-8 lg:h-8 ${getWalletColor()} rounded-full mr-2 lg:mr-3 flex items-center justify-center relative flex-shrink-0`}
+                className={`w-5 h-5 lg:w-6 lg:h-6 ${getWalletColor()} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
               >
                 <div
                   className="absolute inset-0 rounded-full opacity-30"
                   style={{
                     backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
                                    linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
-                    backgroundSize: "6px 6px lg:8px 8px",
+                    backgroundSize: "4px 4px lg:6px 6px",
                   }}
                 ></div>
                 {/* Real-time pulse indicator */}
                 {isMonitoring && (
                   <div
-                    className={`absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse ${
+                    className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-pulse ${
                       isDataStale ? "bg-yellow-400" : "bg-green-400"
                     }`}
                   />
@@ -377,25 +377,25 @@ export default function GlobalDashboardHeader({
               </div>
 
               <div className="flex-1 min-w-0">
-                <span className="text-white text-xs sm:text-sm font-satoshi mr-2 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors block">
+                <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors block">
                   {activeWalletData.name}
                 </span>
               </div>
 
-              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mr-2 lg:mr-3 hidden sm:block"></div>
+              <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mr-1.5 lg:mr-2 hidden sm:block"></div>
 
-              <span className="text-gray-400 text-xs sm:text-sm font-satoshi italic mr-2 lg:mr-3 hidden sm:block truncate">
+              <span className="text-gray-400 text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
                 {activeWalletData.address
                   ? `${activeWalletData.address.slice(
                       0,
-                      10
-                    )}...${activeWalletData.address.slice(-8)}`
+                      8
+                    )}...${activeWalletData.address.slice(-6)}`
                   : "Loading..."}
               </span>
 
               <ChevronDown
-                size={14}
-                className={`text-gray-400 group-hover:text-[#E2AF19] transition-all lg:w-4 lg:h-4 ${
+                size={12}
+                className={`text-gray-400 group-hover:text-[#E2AF19] transition-all lg:w-3 lg:h-3 ${
                   walletSwitcherOpen ? "rotate-180" : ""
                 }`}
               />
@@ -403,17 +403,16 @@ export default function GlobalDashboardHeader({
           )}
 
           {/* Action Icons Container */}
-          {/* Action Icons Container */}
-          <div className="flex items-center space-x-3 relative">
-            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2 lg:px-3 py-2 lg:py-3">
+          <div className="flex items-center space-x-2 relative">
+            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-1.5 lg:px-2 py-1.5 lg:py-2">
               {/* Notification Bell with UNIFIED count */}
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
+                className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
               >
-                <Bell size={16} className="text-gray-400 lg:w-5 lg:h-5" />
+                <Bell size={14} className="text-gray-400 lg:w-4 lg:h-4" />
                 {totalUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-satoshi">
+                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-satoshi">
                     {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
                   </span>
                 )}
@@ -427,12 +426,12 @@ export default function GlobalDashboardHeader({
                 />
               )}
 
-              <div className="w-px h-3 lg:h-4 bg-[#2C2C2C] mx-1 lg:mx-2"></div>
+              <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
 
-              <button className="p-1.5 lg:p-2 transition-colors hover:bg-[#2C2C2C] rounded-full">
+              <button className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full">
                 <SettingsIcon
-                  size={16}
-                  className="text-gray-400 lg:w-5 lg:h-5"
+                  size={14}
+                  className="text-gray-400 lg:w-4 lg:h-4"
                 />
               </button>
             </div>
@@ -442,20 +441,20 @@ export default function GlobalDashboardHeader({
 
       {/* Real-time Status Dropdown */}
       {showRealtimeStatus && (
-        <div className="absolute top-16 right-4 z-50 bg-black/95 backdrop-blur-sm border border-[#2C2C2C] rounded-lg p-4 w-80 shadow-xl">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white font-semibold text-sm font-satoshi">
+        <div className="absolute top-12 right-3 z-50 bg-black/95 backdrop-blur-sm border border-[#2C2C2C] rounded-lg p-3 w-64 shadow-xl">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-white font-semibold text-xs font-satoshi">
               Real-time Dashboard Status
             </h3>
             <button
               onClick={() => setShowRealtimeStatus(false)}
               className="text-gray-400 hover:text-white transition-colors"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           </div>
 
-          <div className="space-y-2 text-xs">
+          <div className="space-y-1.5 text-[10px]">
             <div className="flex justify-between">
               <span className="text-gray-400">Monitoring Status:</span>
               <span
@@ -550,15 +549,18 @@ export default function GlobalDashboardHeader({
             )}
           </div>
 
-          <div className="mt-3 pt-3 border-t border-[#2C2C2C] flex items-center justify-between">
+          <div className="mt-2 pt-2 border-t border-[#2C2C2C] flex items-center justify-between">
             <div className="flex items-center">
               {isMonitoring ? (
-                <Wifi size={14} className="text-green-400 animate-pulse mr-2" />
+                <Wifi
+                  size={12}
+                  className="text-green-400 animate-pulse mr-1.5"
+                />
               ) : (
-                <WifiOff size={14} className="text-gray-400 mr-2" />
+                <WifiOff size={12} className="text-gray-400 mr-1.5" />
               )}
               <span
-                className={`text-xs font-satoshi ${
+                className={`text-[10px] font-satoshi ${
                   isMonitoring ? "text-green-400" : "text-gray-400"
                 }`}
               >
@@ -568,7 +570,7 @@ export default function GlobalDashboardHeader({
 
             <button
               onClick={refreshDashboard}
-              className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+              className="bg-[#E2AF19] text-black px-2 py-1 rounded-lg text-[10px] font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
             >
               Force Refresh
             </button>

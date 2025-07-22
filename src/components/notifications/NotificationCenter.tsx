@@ -128,21 +128,21 @@ export default function NotificationCenter({
   const getNotificationIcon = (notification: Notification) => {
     switch (notification.type) {
       case "fund_request":
-        return <DollarSign size={20} className="text-green-400" />;
+        return <DollarSign size={18} className="text-green-400" />;
       case "fund_request_response":
         // FIXED: Show different icons based on action
         if (notification.relatedData?.action === "fulfill") {
-          return <CheckCircle size={20} className="text-green-400" />;
+          return <CheckCircle size={18} className="text-green-400" />;
         } else if (notification.relatedData?.action === "decline") {
-          return <XCircle size={20} className="text-red-400" />;
+          return <XCircle size={18} className="text-red-400" />;
         }
-        return <DollarSign size={20} className="text-blue-400" />;
+        return <DollarSign size={18} className="text-blue-400" />;
       case "friend_request":
-        return <UserPlus size={20} className="text-purple-400" />;
+        return <UserPlus size={18} className="text-purple-400" />;
       case "friend_request_response":
-        return <Check size={20} className="text-blue-400" />;
+        return <Check size={18} className="text-blue-400" />;
       default:
-        return <Bell size={20} className="text-gray-400" />;
+        return <Bell size={18} className="text-gray-400" />;
     }
   };
 
@@ -225,7 +225,7 @@ export default function NotificationCenter({
       case "fund_request":
         return (
           <div className="flex items-center text-xs text-[#E2AF19]">
-            <Clock size={12} className="mr-1" />
+            <Clock size={10} className="mr-1" />
             View Request
           </div>
         );
@@ -237,21 +237,21 @@ export default function NotificationCenter({
         ) {
           return (
             <div className="flex items-center text-xs text-green-400">
-              <ExternalLink size={12} className="mr-1" />
+              <ExternalLink size={10} className="mr-1" />
               View Transaction
             </div>
           );
         } else if (notification.relatedData?.action === "decline") {
           return (
             <div className="flex items-center text-xs text-red-400">
-              <XCircle size={12} className="mr-1" />
+              <XCircle size={10} className="mr-1" />
               Declined
             </div>
           );
         }
         return (
           <div className="flex items-center text-xs text-blue-400">
-            <DollarSign size={12} className="mr-1" />
+            <DollarSign size={10} className="mr-1" />
             Response
           </div>
         );
@@ -259,7 +259,7 @@ export default function NotificationCenter({
       case "friend_request":
         return (
           <div className="flex items-center text-xs text-purple-400">
-            <UserPlus size={12} className="mr-1" />
+            <UserPlus size={10} className="mr-1" />
             View Request
           </div>
         );
@@ -267,7 +267,7 @@ export default function NotificationCenter({
       case "friend_request_response":
         return (
           <div className="flex items-center text-xs text-blue-400">
-            <Check size={12} className="mr-1" />
+            <Check size={10} className="mr-1" />
             View Friends
           </div>
         );
@@ -279,7 +279,7 @@ export default function NotificationCenter({
 
   // FIXED: Enhanced notification styling based on status
   const getNotificationStyles = (notification: Notification) => {
-    const baseStyles = "p-4 rounded-lg mb-3 cursor-pointer transition-colors";
+    const baseStyles = "p-3 rounded-lg mb-2 cursor-pointer transition-colors";
     const readStyles = notification.isRead
       ? "bg-[#0F0F0F] border border-[#2C2C2C] hover:bg-[#1A1A1A]"
       : "bg-[#E2AF19]/10 border border-[#E2AF19]/30 hover:bg-[#E2AF19]/20";
@@ -298,14 +298,14 @@ export default function NotificationCenter({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md max-h-[80vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3">
+      <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md max-h-[80vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
+        <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
           <div className="flex items-center">
-            <Bell size={24} className="text-[#E2AF19] mr-3" />
+            <Bell size={20} className="text-[#E2AF19] mr-2" />
             <div>
-              <h3 className="text-lg font-semibold text-white font-satoshi">
+              <h3 className="text-base font-semibold text-white font-satoshi">
                 Notifications
               </h3>
               {unreadCount > 0 && (
@@ -326,26 +326,26 @@ export default function NotificationCenter({
             )}
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+              className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="max-h-[60vh] overflow-y-auto scrollbar-hide">
           {loading ? (
-            <div className="p-6 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
+            <div className="p-4 text-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
               <p className="text-gray-400 font-satoshi">
                 Loading notifications...
               </p>
             </div>
           ) : notifications.length === 0 ? (
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mx-auto mb-4">
-                <Bell size={24} className="text-gray-400" />
+            <div className="p-4 text-center">
+              <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mx-auto mb-3">
+                <Bell size={20} className="text-gray-400" />
               </div>
               <h4 className="text-white font-semibold font-satoshi mb-2">
                 No notifications
@@ -355,15 +355,15 @@ export default function NotificationCenter({
               </p>
             </div>
           ) : (
-            <div className="p-3">
+            <div className="p-2">
               {notifications.map((notification) => (
                 <div
                   key={notification._id}
                   onClick={() => handleNotificationClick(notification)}
                   className={getNotificationStyles(notification)}
                 >
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 mt-1">
+                  <div className="flex items-start space-x-2">
+                    <div className="flex-shrink-0 mt-0.5">
                       {getNotificationIcon(notification)}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -372,18 +372,18 @@ export default function NotificationCenter({
                           {notification.title}
                         </h5>
                         {!notification.isRead && (
-                          <div className="w-2 h-2 bg-[#E2AF19] rounded-full flex-shrink-0 ml-2 mt-1"></div>
+                          <div className="w-1.5 h-1.5 bg-[#E2AF19] rounded-full flex-shrink-0 ml-2 mt-1"></div>
                         )}
                       </div>
 
-                      <p className="text-gray-400 text-sm font-satoshi mb-2">
+                      <p className="text-gray-400 text-sm font-satoshi mb-1.5">
                         {notification.message}
                       </p>
 
                       {/* FIXED: Enhanced notification details */}
                       {notification.type === "fund_request_response" &&
                         notification.relatedData && (
-                          <div className="bg-[#1A1A1A] rounded p-2 mb-2 border border-[#2C2C2C]">
+                          <div className="bg-[#1A1A1A] rounded p-1.5 mb-1.5 border border-[#2C2C2C]">
                             <div className="flex items-center justify-between text-xs">
                               <span className="text-gray-400 font-satoshi">
                                 Amount: {notification.relatedData.amount}{" "}
@@ -433,7 +433,7 @@ export default function NotificationCenter({
 
         {/* Footer */}
         {notifications.length > 0 && (
-          <div className="border-t border-[#2C2C2C] p-4">
+          <div className="border-t border-[#2C2C2C] p-3">
             <button
               onClick={fetchNotifications}
               className="w-full text-center text-gray-400 hover:text-white transition-colors text-sm font-satoshi"

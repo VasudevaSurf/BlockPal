@@ -185,27 +185,27 @@ export default function NotificationPanel({
     if (source === "realtime") {
       switch (type) {
         case "portfolio_increased":
-          return <TrendingUp size={16} className="text-green-400" />;
+          return <TrendingUp size={14} className="text-green-400" />;
         case "portfolio_decreased":
-          return <TrendingDown size={16} className="text-red-400" />;
+          return <TrendingDown size={14} className="text-red-400" />;
         case "token_count_changed":
-          return <Coins size={16} className="text-blue-400" />;
+          return <Coins size={14} className="text-blue-400" />;
         case "fetch_error":
-          return <AlertTriangle size={16} className="text-yellow-400" />;
+          return <AlertTriangle size={14} className="text-yellow-400" />;
         default:
-          return <Radio size={16} className="text-gray-400" />;
+          return <Radio size={14} className="text-gray-400" />;
       }
     } else {
       // Database notification icons
       switch (type) {
         case "fund_request":
         case "fund_request_response":
-          return <TrendingUp size={16} className="text-green-400" />;
+          return <TrendingUp size={14} className="text-green-400" />;
         case "friend_request":
         case "friend_request_response":
-          return <Bell size={16} className="text-blue-400" />;
+          return <Bell size={14} className="text-blue-400" />;
         default:
-          return <Info size={16} className="text-gray-400" />;
+          return <Info size={14} className="text-gray-400" />;
       }
     }
   };
@@ -319,21 +319,21 @@ export default function NotificationPanel({
       {/* ADDED: Backdrop similar to WelcomeModal */}
       <div className="fixed inset-0 z-30 bg-white/10" onClick={onClose} />
 
-      <div className="absolute top-16 right-0 z-50 w-80 bg-black/95 backdrop-blur-sm border border-[#2C2C2C] rounded-lg shadow-xl">
+      <div className="absolute top-12 right-0 z-50 w-72 bg-black/95 backdrop-blur-sm border border-[#2C2C2C] rounded-lg shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
+        <div className="flex items-center justify-between p-3 border-b border-[#2C2C2C]">
           <div className="flex items-center">
-            <Bell size={18} className="text-white mr-2" />
+            <Bell size={16} className="text-white mr-1.5" />
             <h3 className="text-white font-semibold font-satoshi">
               Notifications
             </h3>
             {unreadCount > 0 && (
-              <span className="ml-2 bg-[#E2AF19] text-black text-xs font-satoshi font-medium px-2 py-1 rounded-full">
+              <span className="ml-1.5 bg-[#E2AF19] text-black text-xs font-satoshi font-medium px-1.5 py-0.5 rounded-full">
                 {unreadCount}
               </span>
             )}
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1.5">
             {unreadCount > 0 && (
               <button
                 onClick={clearAllNotifications}
@@ -346,22 +346,22 @@ export default function NotificationPanel({
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           </div>
         </div>
 
-        <div className="max-h-64 overflow-y-auto scrollbar-hide">
+        <div className="max-h-56 overflow-y-auto scrollbar-hide">
           {loadingDb && databaseNotifications.length === 0 ? (
-            <div className="p-6 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
+            <div className="p-4 text-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
               <p className="text-gray-400 font-satoshi">
                 Loading notifications...
               </p>
             </div>
           ) : unifiedNotifications.length === 0 ? (
-            <div className="p-6 text-center">
-              <CheckCircle size={32} className="text-gray-400 mx-auto mb-2" />
+            <div className="p-4 text-center">
+              <CheckCircle size={24} className="text-gray-400 mx-auto mb-2" />
               <p className="text-gray-400 text-sm font-satoshi">
                 No new notifications
               </p>
@@ -370,11 +370,11 @@ export default function NotificationPanel({
               </p>
             </div>
           ) : (
-            <div className="p-2">
+            <div className="p-1.5">
               {unifiedNotifications.slice(0, 20).map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-3 rounded-lg border-l-4 mb-2 transition-colors ${getNotificationColor(
+                  className={`p-2.5 rounded-lg border-l-4 mb-1.5 transition-colors ${getNotificationColor(
                     notification.type,
                     notification.source
                   )} ${
@@ -390,17 +390,17 @@ export default function NotificationPanel({
                         )}
                       </div>
 
-                      <div className="ml-3 flex-1">
+                      <div className="ml-2 flex-1">
                         <div className="flex items-center justify-between">
                           <p className="text-white text-sm font-satoshi font-medium">
                             {notification.title}
                           </p>
                           {!notification.isRead && (
-                            <div className="w-2 h-2 bg-[#E2AF19] rounded-full flex-shrink-0 ml-2"></div>
+                            <div className="w-1.5 h-1.5 bg-[#E2AF19] rounded-full flex-shrink-0 ml-2"></div>
                           )}
                         </div>
 
-                        <p className="text-gray-400 text-sm font-satoshi mt-1">
+                        <p className="text-gray-400 text-sm font-satoshi mt-0.5">
                           {notification.message}
                         </p>
 
@@ -409,7 +409,7 @@ export default function NotificationPanel({
                           <>
                             {notification.type === "portfolio_increased" &&
                               notification.data && (
-                                <p className="text-green-400 text-xs font-satoshi mt-1">
+                                <p className="text-green-400 text-xs font-satoshi mt-0.5">
                                   New total: $
                                   {notification.data.totalValue.toFixed(2)}
                                 </p>
@@ -417,7 +417,7 @@ export default function NotificationPanel({
 
                             {notification.type === "portfolio_decreased" &&
                               notification.data && (
-                                <p className="text-red-400 text-xs font-satoshi mt-1">
+                                <p className="text-red-400 text-xs font-satoshi mt-0.5">
                                   New total: $
                                   {notification.data.totalValue.toFixed(2)}
                                 </p>
@@ -425,7 +425,7 @@ export default function NotificationPanel({
 
                             {notification.type === "token_count_changed" &&
                               notification.data && (
-                                <p className="text-blue-400 text-xs font-satoshi mt-1">
+                                <p className="text-blue-400 text-xs font-satoshi mt-0.5">
                                   {notification.data.previousCount} →{" "}
                                   {notification.data.newCount} tokens
                                 </p>
@@ -437,7 +437,7 @@ export default function NotificationPanel({
                         {notification.source === "database" &&
                           notification.type === "fund_request_response" &&
                           notification.data && (
-                            <div className="bg-[#1A1A1A] rounded p-2 mt-2 border border-[#2C2C2C]">
+                            <div className="bg-[#1A1A1A] rounded p-1.5 mt-1.5 border border-[#2C2C2C]">
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-gray-400 font-satoshi">
                                   Amount: {notification.data.amount}{" "}
@@ -456,7 +456,7 @@ export default function NotificationPanel({
                                 </span>
                               </div>
                               {notification.data.transactionHash && (
-                                <div className="text-xs text-gray-400 font-satoshi mt-1">
+                                <div className="text-xs text-gray-400 font-satoshi mt-0.5">
                                   Tx:{" "}
                                   {notification.data.transactionHash.slice(
                                     0,
@@ -469,7 +469,7 @@ export default function NotificationPanel({
                             </div>
                           )}
 
-                        <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center justify-between mt-1.5">
                           <span className="text-gray-500 text-xs font-satoshi">
                             {getTimeAgo(notification.timestamp)}
                           </span>
@@ -500,24 +500,24 @@ export default function NotificationPanel({
 
         {/* Footer */}
         {unifiedNotifications.length > 0 && (
-          <div className="p-3 border-t border-[#2C2C2C] bg-[#0F0F0F]/50">
+          <div className="p-2.5 border-t border-[#2C2C2C] bg-[#0F0F0F]/50">
             <div className="flex items-center justify-between">
               <span className="text-gray-400 text-xs font-satoshi">
                 {unifiedNotifications.length} notification
                 {unifiedNotifications.length !== 1 ? "s" : ""}
                 {unreadCount > 0 && ` (${unreadCount} unread)`}
               </span>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5">
                 <button
                   onClick={fetchDatabaseNotifications}
-                  className="text-gray-400 hover:text-white text-xs font-satoshi px-2 py-1 rounded transition-colors"
+                  className="text-gray-400 hover:text-white text-xs font-satoshi px-1.5 py-0.5 rounded transition-colors"
                 >
                   Refresh
                 </button>
                 {unreadCount > 0 && (
                   <button
                     onClick={clearAllNotifications}
-                    className="text-[#E2AF19] hover:text-white text-xs font-satoshi px-3 py-1 rounded-lg bg-[#2C2C2C] hover:bg-[#3C3C3C] transition-colors"
+                    className="text-[#E2AF19] hover:text-white text-xs font-satoshi px-2 py-0.5 rounded-lg bg-[#2C2C2C] hover:bg-[#3C3C3C] transition-colors"
                   >
                     Read All ({unreadCount})
                   </button>

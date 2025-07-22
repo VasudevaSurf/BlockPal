@@ -72,8 +72,8 @@ interface TransactionResult {
 const ProfileIcon = ({ className = "" }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    width="20"
-    height="21"
+    width="18"
+    height="19"
     viewBox="0 0 30 31"
     fill="none"
     className={className}
@@ -532,26 +532,26 @@ export default function SimpleTransferModal({
       {/* FIXED: Stronger fade effect to match other modals */}
       <div className="fixed inset-0 z-40 bg-white/10" onClick={handleClose} />
 
-      <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-black border rounded-[20px] w-full max-w-lg max-h-[90vh] overflow-hidden">
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+        <div className="bg-black border rounded-[16px] w-full max-w-lg max-h-[90vh] overflow-hidden">
           {/* Header matching the image design */}
-          <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center justify-between px-4 py-3">
             <button
               onClick={handleClose}
               className="text-gray-400 hover:text-white transition-colors"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={18} />
             </button>
-            <h2 className="text-lg font-semibold text-white font-mayeka-demi-bold-demo">
+            <h2 className="text-base font-semibold text-white font-mayeka-demi-bold-demo">
               Send
             </h2>
             {/* Token icon in header */}
-            <div className="w-8 h-8 bg-[#E2AF19] rounded-lg flex items-center justify-center">
+            <div className="w-6 h-6 bg-[#E2AF19] rounded-lg flex items-center justify-center">
               {tokenInfo.priceData?.image ? (
                 <img
                   src={tokenInfo.priceData.image}
                   alt={tokenInfo.symbol}
-                  className="w-6 h-6 rounded-md"
+                  className="w-5 h-5 rounded-md"
                 />
               ) : (
                 <span className="text-black text-sm font-bold">
@@ -561,27 +561,27 @@ export default function SimpleTransferModal({
             </div>
           </div>
           {/* Content */}
-          <div className="p-4 sm:p-6 max-h-[calc(90vh-80px)] overflow-y-auto">
+          <div className="p-3 sm:p-4 max-h-[calc(90vh-80px)] overflow-y-auto scrollbar-hide">
             {/* Form Step - FIXED: Responsive mobile layout */}
             {step === "form" && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Recipient Box */}
-                <div className="bg-black border border-[#2C2C2C] rounded-lg p-4">
+                <div className="bg-black border border-[#2C2C2C] rounded-lg p-3">
                   {/* Recipient heading */}
-                  <div className="text-white text-sm font-satoshi mb-3">
+                  <div className="text-white text-sm font-satoshi mb-2">
                     Recipient
                   </div>
 
                   {/* Input row with user icon and placeholder */}
-                  <div className="flex items-center mb-3">
+                  <div className="flex items-center mb-2">
                     {/* User icon */}
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center mr-2 flex-shrink-0">
                       {selectedUser ? (
                         selectedUser.avatar ? (
                           <img
                             src={selectedUser.avatar}
                             alt={selectedUser.username}
-                            className="w-8 h-8 rounded-lg object-cover"
+                            className="w-6 h-6 rounded-lg object-cover"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               target.style.display = "none";
@@ -593,7 +593,7 @@ export default function SimpleTransferModal({
                             }}
                           />
                         ) : (
-                          <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg flex items-center justify-center">
+                          <div className="w-6 h-6 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg flex items-center justify-center">
                             <span className="text-white text-xs font-bold">
                               {selectedUser.username?.[0]?.toUpperCase() ||
                                 selectedUser.displayName?.[0]?.toUpperCase() ||
@@ -602,10 +602,10 @@ export default function SimpleTransferModal({
                           </div>
                         )
                       ) : (
-                        <div className="w-8 h-8 bg-[#E2AF19] rounded-lg flex items-center justify-center">
+                        <div className="w-6 h-6 bg-[#E2AF19] rounded-lg flex items-center justify-center">
                           <svg
-                            width="16"
-                            height="16"
+                            width="14"
+                            height="14"
                             viewBox="0 0 24 24"
                             fill="none"
                             className="text-black"
@@ -630,7 +630,7 @@ export default function SimpleTransferModal({
                       )}
 
                       {selectedUser?.avatar && (
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg flex items-center justify-center hidden">
+                        <div className="w-6 h-6 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg flex items-center justify-center hidden">
                           <span className="text-white text-xs font-bold">
                             {selectedUser.username?.[0]?.toUpperCase() ||
                               selectedUser.displayName?.[0]?.toUpperCase() ||
@@ -648,7 +648,7 @@ export default function SimpleTransferModal({
                         onUserSelect={handleUserSelect}
                         placeholder="Paste address / username"
                         error=""
-                        className="w-full bg-transparent border-none text-white placeholder-gray-400 font-satoshi text-base sm:text-lg focus:outline-none"
+                        className="w-full bg-transparent border-none text-white placeholder-gray-400 font-satoshi text-sm sm:text-base focus:outline-none"
                       />
                     </div>
 
@@ -669,7 +669,7 @@ export default function SimpleTransferModal({
 
                 {/* Error for recipient */}
                 {errors.recipientAddress && (
-                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                  <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                     <p className="text-red-400 text-sm font-satoshi">
                       {errors.recipientAddress}
                     </p>
@@ -677,16 +677,16 @@ export default function SimpleTransferModal({
                 )}
 
                 {/* Asset Box - FIXED: Mobile responsive layout */}
-                <div className="bg-black border border-[#2C2C2C] rounded-lg p-4">
+                <div className="bg-black border border-[#2C2C2C] rounded-lg p-3">
                   {/* Asset heading with percentage buttons */}
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="text-white text-sm font-satoshi">Asset</div>
 
                     {/* Percentage buttons - FIXED: Better mobile spacing */}
                     <div className="flex gap-1">
                       <button
                         onClick={() => handlePercentageSelect(25)}
-                        className={`px-2 py-1 text-xs font-satoshi transition-colors ${
+                        className={`px-1.5 py-0.5 text-xs font-satoshi transition-colors ${
                           selectedPercentage === 25
                             ? "text-[#E2AF19] font-medium"
                             : "text-[#E2AF19] hover:opacity-80"
@@ -696,7 +696,7 @@ export default function SimpleTransferModal({
                       </button>
                       <button
                         onClick={() => handlePercentageSelect(50)}
-                        className={`px-2 py-1 text-xs font-satoshi transition-colors ${
+                        className={`px-1.5 py-0.5 text-xs font-satoshi transition-colors ${
                           selectedPercentage === 50
                             ? "text-[#E2AF19] font-medium"
                             : "text-[#E2AF19] hover:opacity-80"
@@ -706,7 +706,7 @@ export default function SimpleTransferModal({
                       </button>
                       <button
                         onClick={() => handlePercentageSelect(75)}
-                        className={`px-2 py-1 text-xs font-satoshi transition-colors ${
+                        className={`px-1.5 py-0.5 text-xs font-satoshi transition-colors ${
                           selectedPercentage === 75
                             ? "text-[#E2AF19] font-medium"
                             : "text-[#E2AF19] hover:opacity-80"
@@ -716,7 +716,7 @@ export default function SimpleTransferModal({
                       </button>
                       <button
                         onClick={() => handlePercentageSelect(100)}
-                        className={`px-2 py-1 text-xs font-satoshi transition-colors ${
+                        className={`px-1.5 py-0.5 text-xs font-satoshi transition-colors ${
                           selectedPercentage === 100
                             ? "text-[#E2AF19] font-medium"
                             : "text-[#E2AF19] hover:opacity-80"
@@ -728,14 +728,14 @@ export default function SimpleTransferModal({
                   </div>
 
                   {/* Token row with amount input - FIXED: Mobile responsive */}
-                  <div className="flex items-center justify-between mb-3 gap-3">
+                  <div className="flex items-center justify-between mb-2 gap-2">
                     {/* Token info - FIXED: Prevent overflow */}
                     <div className="flex items-center min-w-0 flex-shrink">
                       {tokenInfo.priceData?.image ? (
                         <div
-                          className={`w-10 h-10 ${getTokenIcon(
+                          className={`w-8 h-8 ${getTokenIcon(
                             tokenInfo.symbol
-                          )} rounded-full mr-3 p-0.5 flex items-center justify-center flex-shrink-0`}
+                          )} rounded-full mr-2 p-0.5 flex items-center justify-center flex-shrink-0`}
                         >
                           <img
                             src={tokenInfo.priceData.image}
@@ -755,19 +755,19 @@ export default function SimpleTransferModal({
                       ) : null}
 
                       <div
-                        className={`w-10 h-10 ${getTokenIcon(
+                        className={`w-8 h-8 ${getTokenIcon(
                           tokenInfo.symbol
-                        )} rounded-full mr-3 flex items-center justify-center flex-shrink-0 ${
+                        )} rounded-full mr-2 flex items-center justify-center flex-shrink-0 ${
                           tokenInfo.priceData?.image ? "hidden" : ""
                         }`}
                       >
-                        <span className="text-white text-base font-bold">
+                        <span className="text-white text-sm font-bold">
                           {getTokenLetter(tokenInfo.symbol)}
                         </span>
                       </div>
 
                       {/* FIXED: Token name with proper truncation */}
-                      <div className="text-white font-satoshi text-sm sm:text-base truncate">
+                      <div className="text-white font-satoshi text-sm truncate">
                         {tokenInfo.name}
                       </div>
                     </div>
@@ -779,9 +779,9 @@ export default function SimpleTransferModal({
                         placeholder="0"
                         value={formData.amount}
                         onChange={(e) => handleAmountChange(e.target.value)}
-                        className="bg-transparent text-white text-lg sm:text-2xl font-bold font-satoshi placeholder-gray-500 focus:outline-none text-right mr-3 w-16 sm:w-24"
+                        className="bg-transparent text-white text-base sm:text-xl font-bold font-satoshi placeholder-gray-500 focus:outline-none text-right mr-2 w-12 sm:w-20"
                       />
-                      <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                      <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-xs">○</span>
                       </div>
                     </div>
@@ -795,7 +795,7 @@ export default function SimpleTransferModal({
 
                 {/* Error for amount */}
                 {errors.amount && (
-                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                  <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                     <p className="text-red-400 text-sm font-satoshi">
                       {errors.amount}
                     </p>
@@ -816,7 +816,7 @@ export default function SimpleTransferModal({
 
                 {/* Error display */}
                 {errors.general && (
-                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                  <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                     <p className="text-red-400 text-sm font-satoshi">
                       {errors.general}
                     </p>
@@ -832,12 +832,12 @@ export default function SimpleTransferModal({
                     !formData.recipientAddress ||
                     !formData.amount
                   }
-                  className="w-full bg-[#E2AF19] text-black font-semibold py-4 rounded-lg hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-satoshi"
+                  className="w-full bg-[#E2AF19] text-black font-semibold py-3 rounded-lg hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-satoshi"
                 >
                   {isLoading ? (
                     <>
                       <RefreshCw
-                        size={16}
+                        size={14}
                         className="inline mr-2 animate-spin"
                       />
                       Creating Preview...
@@ -851,13 +851,13 @@ export default function SimpleTransferModal({
 
             {/* Preview Step */}
             {step === "preview" && preview && (
-              <div className="space-y-6">
-                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                  <h3 className="text-white font-semibold font-satoshi mb-4">
+              <div className="space-y-4">
+                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+                  <h3 className="text-white font-semibold font-satoshi mb-3">
                     Transfer Details
                   </h3>
 
-                  <div className="space-y-3 text-sm">
+                  <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Network:</span>
                       <span className="text-white">{preview.network}</span>
@@ -930,7 +930,7 @@ export default function SimpleTransferModal({
                   </div>
                 </div>
 
-                <div className="flex space-x-3">
+                <div className="flex space-x-2">
                   <Button
                     variant="secondary"
                     onClick={() => setStep("form")}
@@ -945,7 +945,7 @@ export default function SimpleTransferModal({
                   >
                     {isLoading ? (
                       <>
-                        <RefreshCw size={16} className="mr-2 animate-spin" />
+                        <RefreshCw size={14} className="mr-2 animate-spin" />
                         Processing...
                       </>
                     ) : (
@@ -958,18 +958,18 @@ export default function SimpleTransferModal({
 
             {/* Processing Step */}
             {step === "processing" && (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                  <RefreshCw size={32} className="text-black animate-spin" />
+              <div className="text-center py-6">
+                <div className="w-12 h-12 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
+                  <RefreshCw size={24} className="text-black animate-spin" />
                 </div>
-                <h3 className="text-white text-lg font-semibold font-satoshi mb-2">
+                <h3 className="text-white text-base font-semibold font-satoshi mb-1.5">
                   Processing Transaction
                 </h3>
                 <p className="text-gray-400 font-satoshi">
                   Please wait while your transfer is being processed on the
                   blockchain...
                 </p>
-                <div className="mt-4 text-xs text-gray-500 font-satoshi">
+                <div className="mt-3 text-xs text-gray-500 font-satoshi">
                   This may take a few moments. Do not close this window.
                 </div>
               </div>
@@ -977,12 +977,12 @@ export default function SimpleTransferModal({
 
             {/* Success Step */}
             {step === "success" && transactionResult && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle size={32} className="text-white" />
+                  <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle size={24} className="text-white" />
                   </div>
-                  <h3 className="text-white text-lg font-semibold font-satoshi mb-2">
+                  <h3 className="text-white text-base font-semibold font-satoshi mb-1.5">
                     Transfer Successful!
                   </h3>
                   <p className="text-gray-400 font-satoshi">
@@ -990,12 +990,12 @@ export default function SimpleTransferModal({
                   </p>
                 </div>
 
-                <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
-                  <h4 className="text-white font-semibold font-satoshi mb-3">
+                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+                  <h4 className="text-white font-semibold font-satoshi mb-2">
                     Transaction Details
                   </h4>
 
-                  <div className="space-y-3 text-sm">
+                  <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Transaction Hash:</span>
                       <div className="flex items-center">
@@ -1012,7 +1012,7 @@ export default function SimpleTransferModal({
                           }
                           className="text-gray-400 hover:text-white transition-colors"
                         >
-                          <Copy size={14} />
+                          <Copy size={12} />
                         </button>
                       </div>
                     </div>
@@ -1051,7 +1051,7 @@ export default function SimpleTransferModal({
                   )}
                 </div>
 
-                <div className="flex space-x-3">
+                <div className="flex space-x-2">
                   {transactionResult.explorerUrl && (
                     <Button
                       variant="secondary"
@@ -1060,7 +1060,7 @@ export default function SimpleTransferModal({
                       }
                       className="flex-1 font-satoshi"
                     >
-                      <ExternalLink size={16} className="mr-2" />
+                      <ExternalLink size={14} className="mr-2" />
                       View on Explorer
                     </Button>
                   )}
@@ -1073,22 +1073,22 @@ export default function SimpleTransferModal({
 
             {/* Error Step */}
             {step === "error" && transactionResult && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <X size={32} className="text-white" />
+                  <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <X size={24} className="text-white" />
                   </div>
-                  <h3 className="text-white text-lg font-semibold font-satoshi mb-2">
+                  <h3 className="text-white text-base font-semibold font-satoshi mb-1.5">
                     Transfer Failed
                   </h3>
-                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 text-left">
+                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2.5 text-left">
                     <p className="text-red-400 text-sm font-satoshi">
                       {transactionResult.error}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex space-x-3">
+                <div className="flex space-x-2">
                   <Button
                     variant="secondary"
                     onClick={() => setStep("form")}

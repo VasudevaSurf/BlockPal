@@ -1,4 +1,4 @@
-// src/components/ui/NavigationLoadingIndicator.tsx
+// src/components/ui/NavigationLoadingIndicator.tsx - Compact Version
 "use client";
 
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
@@ -25,10 +25,10 @@ export default function NavigationLoadingIndicator() {
 
       {/* Full Screen Loading Overlay */}
       <div className="fixed inset-0 z-[9998] bg-black/20 backdrop-blur-sm flex items-center justify-center">
-        <div className="bg-black/90 rounded-2xl p-6 border border-[#2C2C2C] flex flex-col items-center space-y-4">
-          <RefreshCw size={32} className="text-[#E2AF19] animate-spin" />
-          <div className="text-white font-satoshi text-lg">Loading...</div>
-          <div className="text-gray-400 font-satoshi text-sm">
+        <div className="bg-black/90 rounded-xl p-4 border border-[#2C2C2C] flex flex-col items-center space-y-3">
+          <RefreshCw size={24} className="text-[#E2AF19] animate-spin" />
+          <div className="text-white font-satoshi text-sm">Loading...</div>
+          <div className="text-gray-400 font-satoshi text-xs">
             Please wait while we load the page
           </div>
         </div>

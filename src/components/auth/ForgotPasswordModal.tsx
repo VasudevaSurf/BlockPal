@@ -196,14 +196,14 @@ export default function ForgotPasswordModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3">
+      <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-hide">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
+        <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
           <div className="flex items-center">
-            <Lock size={24} className="text-[#E2AF19] mr-3" />
+            <Lock size={20} className="text-[#E2AF19] mr-2" />
             <div>
-              <h3 className="text-lg font-semibold text-white font-satoshi">
+              <h3 className="text-base font-semibold text-white font-satoshi">
                 Reset Password
               </h3>
               <p className="text-gray-400 text-sm font-satoshi">
@@ -217,22 +217,22 @@ export default function ForgotPasswordModal({
           </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+            className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4">
           {/* Step 1: Email */}
           {step === "email" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="text-center">
-                <div className="w-16 h-16 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Mail size={32} className="text-[#E2AF19]" />
+                <div className="w-12 h-12 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Mail size={24} className="text-[#E2AF19]" />
                 </div>
-                <h4 className="text-white font-semibold font-satoshi mb-2">
+                <h4 className="text-white font-semibold font-satoshi mb-1.5">
                   Enter Your Email
                 </h4>
                 <p className="text-gray-400 text-sm font-satoshi">
@@ -242,10 +242,10 @@ export default function ForgotPasswordModal({
               </div>
 
               {error && (
-                <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                   <div className="flex items-start">
                     <AlertCircle
-                      size={16}
+                      size={14}
                       className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
                     />
                     <p className="text-red-400 text-sm font-satoshi">{error}</p>
@@ -254,9 +254,9 @@ export default function ForgotPasswordModal({
               )}
 
               {emailSending && (
-                <div className="p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+                <div className="p-2.5 bg-blue-900/20 border border-blue-500/50 rounded-lg">
                   <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400 mr-2"></div>
+                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-blue-400 mr-2"></div>
                     <p className="text-blue-400 text-sm font-satoshi">
                       Sending email...
                     </p>
@@ -272,14 +272,14 @@ export default function ForgotPasswordModal({
                   setEmail(e.target.value);
                   setError("");
                 }}
-                icon={<Mail size={20} />}
+                icon={<Mail size={18} />}
                 className="font-satoshi"
                 autoFocus
                 disabled={loading || emailSending}
               />
 
               {/* NEW: Info box about account types */}
-              <div className="bg-gray-900/20 border border-gray-600/50 rounded-lg p-3">
+              <div className="bg-gray-900/20 border border-gray-600/50 rounded-lg p-2.5">
                 <p className="text-gray-400 text-xs font-satoshi">
                   <strong>Note:</strong> If your account uses Google sign-in,
                   you'll need to sign in with Google instead. Password reset is
@@ -287,7 +287,7 @@ export default function ForgotPasswordModal({
                 </p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <Button
                   variant="secondary"
                   onClick={handleClose}
@@ -313,27 +313,27 @@ export default function ForgotPasswordModal({
 
           {/* Step 2: Verify Code */}
           {step === "verify" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="text-center">
-                <div className="w-16 h-16 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield size={32} className="text-[#E2AF19]" />
+                <div className="w-12 h-12 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Shield size={24} className="text-[#E2AF19]" />
                 </div>
-                <h4 className="text-white font-semibold font-satoshi mb-2">
+                <h4 className="text-white font-semibold font-satoshi mb-1.5">
                   Enter Verification Code
                 </h4>
                 <p className="text-gray-400 text-sm font-satoshi">
                   We sent a 6-digit code to <strong>{email}</strong>
                 </p>
-                <p className="text-gray-500 text-xs font-satoshi mt-2">
+                <p className="text-gray-500 text-xs font-satoshi mt-1.5">
                   Please check your email inbox and spam folder
                 </p>
               </div>
 
               {error && (
-                <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                   <div className="flex items-start">
                     <AlertCircle
-                      size={16}
+                      size={14}
                       className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
                     />
                     <p className="text-red-400 text-sm font-satoshi">{error}</p>
@@ -350,12 +350,12 @@ export default function ForgotPasswordModal({
                   setCode(value);
                   setError("");
                 }}
-                className="font-satoshi text-center text-2xl tracking-widest"
+                className="font-satoshi text-center text-xl tracking-widest"
                 maxLength={6}
                 autoFocus
               />
 
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <Button
                   variant="secondary"
                   onClick={() => setStep("email")}
@@ -387,12 +387,12 @@ export default function ForgotPasswordModal({
 
           {/* Step 3: Reset Password */}
           {step === "reset" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="text-center">
-                <div className="w-16 h-16 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Lock size={32} className="text-[#E2AF19]" />
+                <div className="w-12 h-12 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Lock size={24} className="text-[#E2AF19]" />
                 </div>
-                <h4 className="text-white font-semibold font-satoshi mb-2">
+                <h4 className="text-white font-semibold font-satoshi mb-1.5">
                   Create New Password
                 </h4>
                 <p className="text-gray-400 text-sm font-satoshi">
@@ -401,10 +401,10 @@ export default function ForgotPasswordModal({
               </div>
 
               {error && (
-                <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                   <div className="flex items-start">
                     <AlertCircle
-                      size={16}
+                      size={14}
                       className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
                     />
                     <p className="text-red-400 text-sm font-satoshi">{error}</p>
@@ -420,7 +420,7 @@ export default function ForgotPasswordModal({
                   setNewPassword(e.target.value);
                   setError("");
                 }}
-                icon={<Lock size={20} />}
+                icon={<Lock size={18} />}
                 className="font-satoshi"
                 autoFocus
               />
@@ -433,17 +433,17 @@ export default function ForgotPasswordModal({
                   setConfirmPassword(e.target.value);
                   setError("");
                 }}
-                icon={<Lock size={20} />}
+                icon={<Lock size={18} />}
                 className="font-satoshi"
               />
 
-              <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3">
+              <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-2.5">
                 <p className="text-blue-400 text-xs font-satoshi">
                   Password must be at least 6 characters long
                 </p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <Button
                   variant="secondary"
                   onClick={() => setStep("verify")}
@@ -465,12 +465,12 @@ export default function ForgotPasswordModal({
 
           {/* Step 4: Success */}
           {step === "success" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="text-center">
-                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle size={32} className="text-green-400" />
+                <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle size={24} className="text-green-400" />
                 </div>
-                <h4 className="text-white font-semibold font-satoshi mb-2">
+                <h4 className="text-white font-semibold font-satoshi mb-1.5">
                   Password Reset Successful
                 </h4>
                 <p className="text-gray-400 text-sm font-satoshi">
@@ -479,7 +479,7 @@ export default function ForgotPasswordModal({
                 </p>
               </div>
 
-              <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3">
+              <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-2.5">
                 <p className="text-green-400 text-sm font-satoshi text-center">
                   🎉 You can now log in with your new password!
                 </p>

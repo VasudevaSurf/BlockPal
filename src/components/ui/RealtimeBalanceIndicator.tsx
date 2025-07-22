@@ -1,4 +1,4 @@
-// src/components/ui/RealtimeBalanceIndicator.tsx - Real-time balance indicator
+// src/components/ui/RealtimeBalanceIndicator.tsx - Compact Version
 "use client";
 
 import { Radio, TrendingUp, TrendingDown } from "lucide-react";
@@ -33,21 +33,21 @@ export default function RealtimeBalanceIndicator({
     switch (size) {
       case "sm":
         return {
-          text: "text-sm",
-          icon: 12,
+          text: "text-xs",
+          icon: 10,
           gap: "space-x-1",
         };
       case "lg":
         return {
-          text: "text-lg",
-          icon: 20,
-          gap: "space-x-3",
+          text: "text-sm",
+          icon: 16,
+          gap: "space-x-2",
         };
       default:
         return {
-          text: "text-base",
-          icon: 16,
-          gap: "space-x-2",
+          text: "text-xs",
+          icon: 12,
+          gap: "space-x-1.5",
         };
     }
   };
@@ -84,7 +84,7 @@ export default function RealtimeBalanceIndicator({
         />
         {showLabel && (
           <span
-            className={`ml-1 ${sizeClasses.text} ${
+            className={`ml-0.5 ${sizeClasses.text} ${
               isMonitoring ? "text-green-400" : "text-gray-400"
             } font-satoshi`}
           >
@@ -105,7 +105,7 @@ export default function RealtimeBalanceIndicator({
         {targetWallet.changeAmount &&
           Math.abs(targetWallet.changeAmount) > 0.01 && (
             <div
-              className={`ml-2 flex items-center ${
+              className={`ml-1.5 flex items-center ${
                 targetWallet.changeAmount > 0
                   ? "text-green-400"
                   : "text-red-400"
@@ -116,7 +116,7 @@ export default function RealtimeBalanceIndicator({
               ) : (
                 <TrendingDown size={sizeClasses.icon * 0.75} />
               )}
-              <span className={`ml-1 ${sizeClasses.text} font-medium`}>
+              <span className={`ml-0.5 ${sizeClasses.text} font-medium`}>
                 ${Math.abs(targetWallet.changeAmount).toFixed(2)}
               </span>
             </div>

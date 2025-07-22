@@ -12,7 +12,7 @@ export default function Card({
   className,
   variant = "default",
 }: CardProps) {
-  const baseStyles = "rounded-lg p-6";
+  const baseStyles = "rounded-lg p-3";
 
   const cardStyle = {
     backgroundColor: variant === "glass" ? "rgba(26, 26, 26, 0.8)" : "#1A1A1A",

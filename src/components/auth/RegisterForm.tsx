@@ -1,4 +1,4 @@
-// src/components/auth/RegisterForm.tsx - UPDATED with email verification (No scroll indicators)
+// src/components/auth/RegisterForm.tsx - COMPACT VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -261,34 +261,26 @@ export default function RegisterForm() {
   // Step 1: Registration Form
   if (step === "form") {
     return (
-      <div
-        className="w-full overflow-hidden"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        <style jsx>{`
-          div::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-white mb-2 font-mayeka-bold-demo">
+      <div className="w-full overflow-hidden scrollbar-hide">
+        <div className="mb-4 text-center">
+          <h1 className="text-lg font-bold text-white mb-1 font-mayeka-bold-demo">
             Create your Account
           </h1>
-          <p className="text-gray-400 font-satoshi">
+          <p className="text-gray-400 font-satoshi text-sm">
             Let's get you set up, your journey starts here.
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-            <p className="text-red-400 text-sm font-satoshi">{error}</p>
+          <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
+            <p className="text-red-400 text-xs font-satoshi">{error}</p>
           </div>
         )}
 
         {/* Google Error */}
         {formErrors.google && (
-          <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-            <p className="text-red-400 text-sm font-satoshi">
+          <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
+            <p className="text-red-400 text-xs font-satoshi">
               {formErrors.google}
             </p>
           </div>
@@ -296,8 +288,8 @@ export default function RegisterForm() {
 
         {/* General Error */}
         {formErrors.general && (
-          <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-            <p className="text-red-400 text-sm font-satoshi">
+          <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
+            <p className="text-red-400 text-xs font-satoshi">
               {formErrors.general}
             </p>
           </div>
@@ -308,19 +300,19 @@ export default function RegisterForm() {
             e.preventDefault();
             handleSendVerificationCode();
           }}
-          className="space-y-3"
+          className="space-y-2.5"
         >
           <Button
             type="button"
             variant="secondary"
-            className="w-full flex items-center justify-center py-4 px-6 text-base font-satoshi"
+            className="w-full flex items-center justify-center py-3 px-4 text-sm font-satoshi"
             onClick={handleGoogleRegister}
             disabled={loading || googleLoading || sendingCode}
           >
             {googleLoading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#E2AF19] mr-2"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#E2AF19] mr-2"></div>
             ) : (
-              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -342,12 +334,12 @@ export default function RegisterForm() {
             {googleLoading ? "Creating account..." : "Register with Google"}
           </Button>
 
-          <div className="relative my-3">
+          <div className="relative my-2">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-[#2C2C2C]" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-3 text-gray-400 bg-black font-satoshi">
+              <span className="px-2 text-gray-400 bg-black font-satoshi text-xs">
                 OR
               </span>
             </div>
@@ -364,8 +356,8 @@ export default function RegisterForm() {
               }
             }}
             error={formErrors.name}
-            icon={<UserIcon size={16} color="#6E6E6E" />}
-            className="font-satoshi w-full h-14 text-base px-4"
+            icon={<UserIcon size={14} color="#6E6E6E" />}
+            className="font-satoshi w-full h-11 text-sm px-3"
             disabled={loading || googleLoading || sendingCode}
           />
 
@@ -380,8 +372,8 @@ export default function RegisterForm() {
               }
             }}
             error={formErrors.email}
-            icon={<MailIcon size={22} color="#6E6E6E" />}
-            className="font-satoshi w-full h-14 text-base px-4"
+            icon={<MailIcon size={18} color="#6E6E6E" />}
+            className="font-satoshi w-full h-11 text-sm px-3"
             disabled={loading || googleLoading || sendingCode}
           />
 
@@ -397,20 +389,20 @@ export default function RegisterForm() {
                 }
               }}
               error={formErrors.password}
-              icon={<LockIcon size={22} color="#6E6E6E" />}
-              className="font-satoshi w-full h-14 text-base px-4"
+              icon={<LockIcon size={18} color="#6E6E6E" />}
+              className="font-satoshi w-full h-11 text-sm px-3"
               disabled={loading || googleLoading || sendingCode}
             />
             <button
               type="button"
-              className="absolute inset-y-0 right-0 pr-4 flex items-center"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
               onClick={() => setShowPassword(!showPassword)}
               disabled={loading || googleLoading || sendingCode}
             >
               {showPassword ? (
-                <EyeOff size={22} color="#9CA3AF" />
+                <EyeOff size={18} color="#9CA3AF" />
               ) : (
-                <Eye size={22} color="#9CA3AF" />
+                <Eye size={18} color="#9CA3AF" />
               )}
             </button>
           </div>
@@ -427,32 +419,38 @@ export default function RegisterForm() {
                 }
               }}
               error={formErrors.confirmPassword}
-              icon={<LockIcon size={22} color="#6E6E6E" />}
-              className="font-satoshi w-full h-14 text-base px-4"
+              icon={<LockIcon size={18} color="#6E6E6E" />}
+              className="font-satoshi w-full h-11 text-sm px-3"
               disabled={loading || googleLoading || sendingCode}
             />
             <button
               type="button"
-              className="absolute inset-y-0 right-0 pr-4 flex items-center"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               disabled={loading || googleLoading || sendingCode}
             >
               {showConfirmPassword ? (
-                <EyeOff size={22} color="#9CA3AF" />
+                <EyeOff size={18} color="#9CA3AF" />
               ) : (
-                <Eye size={22} color="#9CA3AF" />
+                <Eye size={18} color="#9CA3AF" />
               )}
             </button>
           </div>
 
           <Button
             type="submit"
-            className="w-full py-4 px-6 text-lg font-semibold font-satoshi mt-4"
+            className="w-full py-3 px-4 text-base font-semibold font-satoshi mt-3"
             disabled={loading || googleLoading || sendingCode}
           >
             {sendingCode ? "Sending Code..." : "Send Verification Code"}
           </Button>
         </form>
+
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
       </div>
     );
   }
@@ -460,38 +458,30 @@ export default function RegisterForm() {
   // Step 2: Email Verification
   if (step === "verify") {
     return (
-      <div
-        className="w-full overflow-hidden"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        <style jsx>{`
-          div::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
-        <div className="mb-6 text-center">
-          <div className="w-16 h-16 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Mail size={32} className="text-[#E2AF19]" />
+      <div className="w-full overflow-hidden scrollbar-hide">
+        <div className="mb-4 text-center">
+          <div className="w-12 h-12 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Mail size={24} className="text-[#E2AF19]" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2 font-mayeka-bold-demo">
+          <h1 className="text-lg font-bold text-white mb-1 font-mayeka-bold-demo">
             Verify Your Email
           </h1>
-          <p className="text-gray-400 font-satoshi">
+          <p className="text-gray-400 font-satoshi text-sm">
             We sent a 6-digit code to <strong>{formData.email}</strong>
           </p>
-          <p className="text-gray-500 text-sm font-satoshi mt-2">
+          <p className="text-gray-500 text-xs font-satoshi mt-1">
             Please check your email inbox and spam folder
           </p>
         </div>
 
         {formErrors.code && (
-          <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+          <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
             <div className="flex items-start">
               <AlertCircle
-                size={16}
+                size={14}
                 className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
               />
-              <p className="text-red-400 text-sm font-satoshi">
+              <p className="text-red-400 text-xs font-satoshi">
                 {formErrors.code}
               </p>
             </div>
@@ -503,7 +493,7 @@ export default function RegisterForm() {
             e.preventDefault();
             handleVerifyAndRegister();
           }}
-          className="space-y-6"
+          className="space-y-4"
         >
           <Input
             type="text"
@@ -516,13 +506,13 @@ export default function RegisterForm() {
                 setFormErrors({ ...formErrors, code: "" });
               }
             }}
-            className="font-satoshi text-center text-2xl tracking-widest"
+            className="font-satoshi text-center text-lg tracking-widest"
             maxLength={6}
             autoFocus
             disabled={verifyingCode}
           />
 
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <Button
               type="button"
               variant="secondary"
@@ -545,7 +535,7 @@ export default function RegisterForm() {
             <button
               type="button"
               onClick={handleSendVerificationCode}
-              className="text-[#E2AF19] hover:opacity-80 text-sm font-satoshi"
+              className="text-[#E2AF19] hover:opacity-80 text-xs font-satoshi"
               disabled={verifyingCode || sendingCode}
             >
               {sendingCode
@@ -554,6 +544,12 @@ export default function RegisterForm() {
             </button>
           </div>
         </form>
+
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
       </div>
     );
   }
@@ -561,32 +557,30 @@ export default function RegisterForm() {
   // Step 3: Success
   if (step === "success") {
     return (
-      <div
-        className="w-full overflow-hidden"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
+      <div className="w-full overflow-hidden scrollbar-hide">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+            <CheckCircle size={24} className="text-green-400" />
+          </div>
+          <h1 className="text-lg font-bold text-white mb-1 font-mayeka-bold-demo">
+            Account Created Successfully!
+          </h1>
+          <p className="text-gray-400 font-satoshi mb-4 text-sm">
+            Welcome to Blockpal! Redirecting you to the dashboard...
+          </p>
+
+          <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3">
+            <p className="text-green-400 text-xs font-satoshi text-center">
+              🎉 Your account has been verified and created successfully!
+            </p>
+          </div>
+        </div>
+
         <style jsx>{`
           div::-webkit-scrollbar {
             display: none;
           }
         `}</style>
-        <div className="text-center">
-          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={32} className="text-green-400" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2 font-mayeka-bold-demo">
-            Account Created Successfully!
-          </h1>
-          <p className="text-gray-400 font-satoshi mb-6">
-            Welcome to Blockpal! Redirecting you to the dashboard...
-          </p>
-
-          <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4">
-            <p className="text-green-400 text-sm font-satoshi text-center">
-              🎉 Your account has been verified and created successfully!
-            </p>
-          </div>
-        </div>
       </div>
     );
   }

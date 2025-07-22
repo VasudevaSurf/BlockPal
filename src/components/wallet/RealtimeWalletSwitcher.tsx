@@ -1,4 +1,4 @@
-// src/components/wallet/RealtimeWalletSwitcher.tsx - FIXED: Added backdrop like WelcomeModal
+// src/components/wallet/RealtimeWalletSwitcher.tsx - COMPACT VERSION
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -44,7 +44,7 @@ export default function RealtimeWalletSwitcher({
   const [dropdownPosition, setDropdownPosition] = useState({
     top: 0,
     left: 0,
-    width: 320,
+    width: 280, // Reduced from 320
   });
 
   // FIXED: Close modal state when wallet modal is opened/closed
@@ -64,30 +64,31 @@ export default function RealtimeWalletSwitcher({
       const headerContainer = triggerRef.current.closest(
         ".flex.flex-col.sm\\:flex-row"
       );
-      let rightEdge = window.innerWidth - 16; // Default fallback with padding
+      let rightEdge = window.innerWidth - 12; // Reduced padding
 
       if (headerContainer) {
         const headerRect = headerContainer.getBoundingClientRect();
         rightEdge = headerRect.right;
       }
 
-      const dropdownHeight = 400; // Approximate dropdown height
+      const dropdownHeight = 320; // Reduced from 400
       const viewportHeight = window.innerHeight;
       const spaceBelow = viewportHeight - triggerRect.bottom;
       const spaceAbove = triggerRect.top;
 
-      let top = triggerRect.bottom + 12; // 12px gap below button
+      let top = triggerRect.bottom + 8; // Reduced gap from 12px to 8px
       let left = triggerRect.left;
       let width = rightEdge - triggerRect.left; // Stretch to the end of header
 
       // If not enough space below, show above
       if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-        top = triggerRect.top - dropdownHeight - 12;
+        top = triggerRect.top - dropdownHeight - 8; // Reduced gap
       }
 
       // Ensure minimum width
-      if (width < 320) {
-        width = 320;
+      if (width < 280) {
+        // Reduced minimum width
+        width = 280;
       }
 
       setDropdownPosition({ top, left, width });
@@ -205,17 +206,21 @@ export default function RealtimeWalletSwitcher({
       {/* Dropdown positioned below trigger button */}
       <div
         ref={dropdownRef}
-        className="fixed z-40 bg-black border border-[#2C2C2C] rounded-[16px] shadow-2xl overflow-hidden"
+        className="fixed z-40 bg-black border border-[#2C2C2C] rounded-[12px] shadow-2xl overflow-hidden" // Reduced border radius
         style={{
           top: `${dropdownPosition.top}px`,
           left: `${dropdownPosition.left}px`,
           width: `${dropdownPosition.width}px`,
-          maxHeight: "400px",
+          maxHeight: "320px", // Reduced from 400px
         }}
       >
         {/* Wallets List */}
-        <div className="px-4 py-3 max-h-[280px] overflow-y-auto scrollbar-hide">
-          <div className="space-y-2">
+        <div className="px-3 py-2 max-h-[220px] overflow-y-auto scrollbar-hide">
+          {" "}
+          {/* Reduced padding and height */}
+          <div className="space-y-1.5">
+            {" "}
+            {/* Reduced gap */}
             {realtimeBalances.map((wallet, index) => {
               const isActive = activeWallet?.id === wallet.id;
               const isSwitching = switchingWallet === wallet.id;
@@ -223,12 +228,13 @@ export default function RealtimeWalletSwitcher({
               return (
                 <div
                   key={wallet.id}
-                  className="w-full border border-[#6E6E6E] rounded-2xl overflow-hidden"
+                  className="w-full border border-[#6E6E6E] rounded-xl overflow-hidden" // Reduced border radius
                 >
                   <button
                     onClick={() => handleSelectWallet(wallet.id)}
                     disabled={isSwitching}
-                    className={`w-full flex items-center p-3 hover:bg-[#1A1A1A] transition-colors text-left relative ${
+                    className={`w-full flex items-center p-2.5 hover:bg-[#1A1A1A] transition-colors text-left relative ${
+                      // Reduced padding
                       isSwitching ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
@@ -236,15 +242,15 @@ export default function RealtimeWalletSwitcher({
                     {isSwitching && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
                         <RefreshCw
-                          size={14}
+                          size={12} // Reduced size
                           className="animate-spin text-white"
                         />
                       </div>
                     )}
-
                     {/* Wallet Icon */}
                     <div
-                      className={`w-8 h-8 ${getWalletColor(
+                      className={`w-6 h-6 ${getWalletColor(
+                        // Reduced from w-8 h-8
                         index
                       )} rounded-full flex items-center justify-center relative flex-shrink-0`}
                     >
@@ -254,20 +260,23 @@ export default function RealtimeWalletSwitcher({
                         style={{
                           backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
                                          linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
-                          backgroundSize: "6px 6px",
+                          backgroundSize: "4px 4px", // Reduced from 6px
                         }}
                       ></div>
                     </div>
-
                     {/* Divider after icon */}
-                    <div className="w-px h-4 bg-[#6E6E6E] mx-3 flex-shrink-0"></div>
-
+                    <div className="w-px h-3 bg-[#6E6E6E] mx-2.5 flex-shrink-0"></div>{" "}
+                    {/* Reduced height and margin */}
                     {/* Wallet Info */}
                     <div className="flex-1 min-w-0 overflow-hidden">
-                      <div className="text-white font-medium text-sm font-satoshi truncate">
+                      <div className="text-white font-medium text-xs font-satoshi truncate">
+                        {" "}
+                        {/* Reduced text size */}
                         {wallet.name}
                       </div>
-                      <div className="text-gray-400 text-xs font-satoshi truncate">
+                      <div className="text-gray-400 text-[10px] font-satoshi truncate">
+                        {" "}
+                        {/* Reduced text size */}
                         {wallet.address
                           ? `${wallet.address.slice(
                               0,
@@ -276,11 +285,12 @@ export default function RealtimeWalletSwitcher({
                           : "Loading..."}
                       </div>
                     </div>
-
                     {/* Active indicator (yellow radio button) */}
-                    <div className="w-4 h-4 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-3">
+                    <div className="w-3 h-3 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-2.5">
+                      {" "}
+                      {/* Reduced size */}
                       {isActive && (
-                        <div className="w-2 h-2 bg-[#E2AF19] rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-[#E2AF19] rounded-full" /> // Reduced size
                       )}
                     </div>
                   </button>
@@ -291,12 +301,15 @@ export default function RealtimeWalletSwitcher({
         </div>
 
         {/* Footer with Add Wallet */}
-        <div className="px-4 py-4">
+        <div className="px-3 py-3">
+          {" "}
+          {/* Reduced padding */}
           <button
             onClick={handleAddWallet}
-            className="w-full bg-[#E2AF19] text-black py-2.5 rounded-[12px] font-satoshi font-medium text-sm hover:bg-[#D4A853] transition-colors flex items-center justify-center"
+            className="w-full bg-[#E2AF19] text-black py-2 rounded-[10px] font-satoshi font-medium text-xs hover:bg-[#D4A853] transition-colors flex items-center justify-center" // Reduced padding and text size
           >
-            <Plus size={16} className="mr-2" />
+            <Plus size={14} className="mr-1.5" />{" "}
+            {/* Reduced size and margin */}
             Add wallet
           </button>
         </div>

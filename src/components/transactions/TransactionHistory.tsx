@@ -315,17 +315,17 @@ export default function TransactionHistory({
   return (
     <div className={`flex flex-col min-h-0 ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h3 className="text-lg font-semibold text-white font-mayeka-demi-bold-demo">
+      <div className="flex items-center justify-between mb-2.5 flex-shrink-0">
+        <h3 className="text-base font-semibold text-white font-mayeka-demi-bold-demo">
           {title}
         </h3>
         {showRefresh && (
           <button
             onClick={fetchTransactions}
-            className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+            className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
             disabled={loading}
           >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
         )}
       </div>
@@ -333,18 +333,18 @@ export default function TransactionHistory({
       {/* Transaction List */}
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <RefreshCw size={16} className="animate-spin text-gray-400 mr-2" />
+          <div className="flex items-center justify-center py-6">
+            <RefreshCw size={14} className="animate-spin text-gray-400 mr-2" />
             <span className="text-gray-400 text-sm font-satoshi">
               Loading transactions...
             </span>
           </div>
         ) : transactions.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-[#2C2C2C] rounded-full flex items-center justify-center mx-auto mb-4">
-              <Calendar size={24} className="text-gray-400" />
+          <div className="text-center py-8">
+            <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mx-auto mb-3">
+              <Calendar size={20} className="text-gray-400" />
             </div>
-            <h3 className="text-white text-lg font-satoshi mb-2">
+            <h3 className="text-white text-base font-satoshi mb-1.5">
               No transactions found
             </h3>
             <p className="text-gray-400 text-sm font-satoshi">
@@ -354,7 +354,7 @@ export default function TransactionHistory({
             </p>
           </div>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {transactions.map((tx, index) => {
               const txInfo = getBatchTransactionInfo(tx);
               const tokenIcon = getTokenIcon(txInfo.displaySymbol);
@@ -366,38 +366,38 @@ export default function TransactionHistory({
               return (
                 <div
                   key={txId}
-                  className="bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-4 hover:bg-[#1A1A1A] transition-colors"
+                  className="bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-2.5 hover:bg-[#1A1A1A] transition-colors"
                 >
                   {/* Main Transaction Row */}
                   <div className="flex items-center justify-between">
                     {/* Left Side - Direction & Token */}
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2.5">
                       {/* Direction Icon */}
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
                           direction === "sent"
                             ? "bg-red-500/20 text-red-400"
                             : "bg-green-500/20 text-green-400"
                         }`}
                       >
                         {direction === "sent" ? (
-                          <ArrowUpRight size={16} />
+                          <ArrowUpRight size={14} />
                         ) : (
-                          <ArrowDownLeft size={16} />
+                          <ArrowDownLeft size={14} />
                         )}
                       </div>
 
                       {/* Token Info */}
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1.5">
                         {txInfo.displaySymbol === "MIXED" ? (
-                          <div className="w-6 h-6 bg-[#E2AF19] rounded-full flex items-center justify-center">
+                          <div className="w-5 h-5 bg-[#E2AF19] rounded-full flex items-center justify-center">
                             <span className="text-white text-xs font-bold">
                               M
                             </span>
                           </div>
                         ) : (
                           <div
-                            className={`w-6 h-6 ${tokenIcon.bg} rounded-full flex items-center justify-center`}
+                            className={`w-5 h-5 ${tokenIcon.bg} rounded-full flex items-center justify-center`}
                           >
                             <span className="text-white text-xs font-bold">
                               {tokenIcon.symbol}
@@ -406,28 +406,21 @@ export default function TransactionHistory({
                         )}
 
                         <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-white font-medium font-satoshi">
+                          <div className="flex items-center space-x-1.5">
+                            <span className="text-white font-medium font-satoshi text-sm">
                               {direction === "sent" ? "Sent" : "Received"}
                             </span>
 
                             {/* Transaction Type Badges */}
-                            {/* {txInfo.isBatch && (
-                              <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full flex items-center font-satoshi">
-                                <Users size={8} className="mr-1" />
-                                Batch
-                              </span>
-                            )} */}
-
                             {tx.type?.includes("scheduled") && (
-                              <span className="px-2 py-0.5 bg-purple-500 text-white text-xs rounded-full font-satoshi">
+                              <span className="px-1.5 py-0.5 bg-purple-500 text-white text-xs rounded-full font-satoshi flex items-center">
                                 <Clock size={8} className="mr-1" />
                                 Scheduled
                               </span>
                             )}
                           </div>
 
-                          <div className="text-gray-400 text-sm font-satoshi">
+                          <div className="text-gray-400 text-xs font-satoshi">
                             {txInfo.isBatch
                               ? `${txInfo.batchInfo} • ${
                                   txInfo.tokenCount
@@ -439,16 +432,16 @@ export default function TransactionHistory({
                     </div>
 
                     {/* Right Side - Amount & Actions */}
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2.5">
                       {/* Amount */}
                       <div className="text-right">
-                        <div className="text-white font-semibold font-satoshi">
+                        <div className="text-white font-semibold font-satoshi text-sm">
                           {txInfo.isBatch
                             ? `$${txInfo.displayValue.toFixed(2)}`
                             : `${txInfo.displayAmount} ${txInfo.displaySymbol}`}
                         </div>
 
-                        <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-xs font-satoshi">
                           {tx.timestamp
                             ? formatDateTime(tx.timestamp)
                             : tx.date}
@@ -456,7 +449,7 @@ export default function TransactionHistory({
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center space-x-0.5">
                         {hash && (
                           <>
                             <button
@@ -466,17 +459,17 @@ export default function TransactionHistory({
                                   "_blank"
                                 )
                               }
-                              className="p-2 text-gray-400 hover:text-[#E2AF19] hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                              className="p-1.5 text-gray-400 hover:text-[#E2AF19] hover:bg-[#2C2C2C] rounded-lg transition-colors"
                               title="View on Etherscan"
                             >
-                              <ExternalLink size={14} />
+                              <ExternalLink size={12} />
                             </button>
 
                             <button
                               onClick={() =>
                                 copyToClipboard(hash, `hash-${index}`)
                               }
-                              className="p-2 text-gray-400 hover:text-[#E2AF19] hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                              className="p-1.5 text-gray-400 hover:text-[#E2AF19] hover:bg-[#2C2C2C] rounded-lg transition-colors"
                               title="Copy transaction hash"
                             >
                               {copied === `hash-${index}` ? (
@@ -484,7 +477,7 @@ export default function TransactionHistory({
                                   ✓
                                 </span>
                               ) : (
-                                <Copy size={14} />
+                                <Copy size={12} />
                               )}
                             </button>
                           </>
@@ -496,7 +489,7 @@ export default function TransactionHistory({
                           tx.transfers.length > 0 && (
                             <button
                               onClick={() => toggleExpanded(txId)}
-                              className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                              className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
                               title={
                                 isExpanded
                                   ? "Collapse details"
@@ -504,9 +497,9 @@ export default function TransactionHistory({
                               }
                             >
                               {isExpanded ? (
-                                <ChevronUp size={14} />
+                                <ChevronUp size={12} />
                               ) : (
-                                <ChevronDown size={14} />
+                                <ChevronDown size={12} />
                               )}
                             </button>
                           )}
@@ -516,20 +509,20 @@ export default function TransactionHistory({
 
                   {/* Expanded Details for Batch Transactions */}
                   {txInfo.isBatch && isExpanded && tx.transfers && (
-                    <div className="mt-4 pt-4 border-t border-[#2C2C2C]">
-                      <div className="space-y-2">
-                        <div className="text-gray-400 text-sm font-satoshi mb-3">
+                    <div className="mt-3 pt-3 border-t border-[#2C2C2C]">
+                      <div className="space-y-1.5">
+                        <div className="text-gray-400 text-xs font-satoshi mb-2">
                           Transfer Details:
                         </div>
 
                         {tx.transfers.map((transfer, i) => (
                           <div
                             key={i}
-                            className="flex items-center justify-between py-2 px-3 bg-[#2C2C2C]/30 rounded-lg"
+                            className="flex items-center justify-between py-1.5 px-2.5 bg-[#2C2C2C]/30 rounded-lg"
                           >
-                            <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2.5">
                               <div
-                                className={`w-4 h-4 ${
+                                className={`w-3.5 h-3.5 ${
                                   getTokenIcon(transfer.tokenSymbol).bg
                                 } rounded-full flex items-center justify-center`}
                               >
@@ -537,14 +530,14 @@ export default function TransactionHistory({
                                   {getTokenIcon(transfer.tokenSymbol).symbol}
                                 </span>
                               </div>
-                              <span className="text-gray-300 text-sm font-mono">
-                                {transfer.recipient.slice(0, 8)}...
-                                {transfer.recipient.slice(-6)}
+                              <span className="text-gray-300 text-xs font-mono">
+                                {transfer.recipient.slice(0, 6)}...
+                                {transfer.recipient.slice(-4)}
                               </span>
                             </div>
 
                             <div className="text-right">
-                              <div className="text-white text-sm font-satoshi">
+                              <div className="text-white text-xs font-satoshi">
                                 {transfer.amount} {transfer.tokenSymbol}
                               </div>
                               <div className="text-gray-400 text-xs font-satoshi">
@@ -559,11 +552,11 @@ export default function TransactionHistory({
 
                   {/* Transaction Hash (always visible but clean) */}
                   {hash && (
-                    <div className="mt-3 pt-3 border-t border-[#2C2C2C]">
-                      <div className="flex items-center space-x-2">
-                        <Hash size={12} className="text-gray-400" />
+                    <div className="mt-2.5 pt-2.5 border-t border-[#2C2C2C]">
+                      <div className="flex items-center space-x-1.5">
+                        <Hash size={10} className="text-gray-400" />
                         <span className="text-gray-400 text-xs font-mono">
-                          {hash.slice(0, 16)}...{hash.slice(-16)}
+                          {hash.slice(0, 14)}...{hash.slice(-14)}
                         </span>
                       </div>
                     </div>

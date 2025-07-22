@@ -165,19 +165,19 @@ export default function ProfilePictureUpload({
               onError={() => console.log("❌ Avatar failed")}
             />
           ) : (
-            <User size={24} className="text-white" />
+            <User size={20} className="text-white" />
           )}
         </div>
 
         {/* Pencil Edit Icon */}
         <button
           onClick={triggerFileInput}
-          className="absolute -bottom-1 -right-1 w-8 h-8 bg-[#E2AF19] hover:bg-[#D4A853] rounded-full flex items-center justify-center shadow-lg transition-colors"
+          className="absolute -bottom-0.5 -right-0.5 w-6 h-6 bg-[#E2AF19] hover:bg-[#D4A853] rounded-full flex items-center justify-center shadow-lg transition-colors"
           title="Edit profile picture"
         >
           <svg
-            width="14"
-            height="14"
+            width="12"
+            height="12"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -205,26 +205,26 @@ export default function ProfilePictureUpload({
       {showModal && (
         <>
           <div className="fixed inset-0 z-40 bg-white/10" />
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-white font-satoshi">
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-white font-satoshi">
                   Update Profile Picture
                 </h3>
                 <button
                   onClick={handleCloseModal}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+                  className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
                   disabled={isUploading}
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
               {success && (
-                <div className="mb-4 p-3 bg-green-900/20 border border-green-500/50 rounded-lg">
+                <div className="mb-3 p-2.5 bg-green-900/20 border border-green-500/50 rounded-lg">
                   <div className="flex items-start">
                     <CheckCircle
-                      size={16}
+                      size={14}
                       className="text-green-400 mr-2 flex-shrink-0 mt-0.5"
                     />
                     <p className="text-green-400 text-sm font-satoshi">
@@ -235,10 +235,10 @@ export default function ProfilePictureUpload({
               )}
 
               {error && (
-                <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+                <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                   <div className="flex items-start">
                     <AlertCircle
-                      size={16}
+                      size={14}
                       className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
                     />
                     <p className="text-red-400 text-sm font-satoshi">{error}</p>
@@ -247,9 +247,9 @@ export default function ProfilePictureUpload({
               )}
 
               {previewUrl && (
-                <div className="mb-6">
+                <div className="mb-4">
                   <div className="text-center">
-                    <div className="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden border-2 border-[#2C2C2C]">
+                    <div className="w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden border-2 border-[#2C2C2C]">
                       <img
                         src={previewUrl}
                         alt="Preview"
@@ -264,7 +264,7 @@ export default function ProfilePictureUpload({
               )}
 
               {selectedFile && (
-                <div className="mb-6 p-3 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C]">
+                <div className="mb-4 p-2.5 bg-[#0F0F0F] rounded-lg border border-[#2C2C2C]">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-400 font-satoshi">File:</span>
                     <span className="text-white font-satoshi">
@@ -281,7 +281,7 @@ export default function ProfilePictureUpload({
               )}
 
               {!success && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {selectedFile && (
                     <Button
                       onClick={handleUpload}
@@ -290,12 +290,12 @@ export default function ProfilePictureUpload({
                     >
                       {isUploading ? (
                         <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
+                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-black mr-2"></div>
                           Uploading...
                         </div>
                       ) : (
                         <div className="flex items-center justify-center">
-                          <Upload size={16} className="mr-2" />
+                          <Upload size={14} className="mr-2" />
                           Upload Picture
                         </div>
                       )}
@@ -311,12 +311,12 @@ export default function ProfilePictureUpload({
                     >
                       {isUploading ? (
                         <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white mr-2"></div>
                           Removing...
                         </div>
                       ) : (
                         <div className="flex items-center justify-center">
-                          <Trash2 size={16} className="mr-2" />
+                          <Trash2 size={14} className="mr-2" />
                           Remove Picture
                         </div>
                       )}
@@ -329,7 +329,7 @@ export default function ProfilePictureUpload({
                     variant="secondary"
                     className="w-full"
                   >
-                    <Camera size={16} className="mr-2" />
+                    <Camera size={14} className="mr-2" />
                     Choose Different File
                   </Button>
 
@@ -344,7 +344,7 @@ export default function ProfilePictureUpload({
                 </div>
               )}
 
-              <div className="mt-6 p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+              <div className="mt-4 p-2.5 bg-blue-900/20 border border-blue-500/50 rounded-lg">
                 <p className="text-blue-400 text-xs font-satoshi">
                   <strong>Guidelines:</strong>
                   <br />• Maximum file size: 5MB

@@ -1,4 +1,4 @@
-// src/components/friends/EnhancedFriendsSearch.tsx - FIXED: Better self-user filtering
+// src/components/friends/EnhancedFriendsSearch.tsx - COMPACT VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -69,18 +69,15 @@ export default function EnhancedFriendsSearch({
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout>();
 
-  // Check if input looks like a wallet address
   const isWalletAddress = (input: string): boolean => {
     return /^0x[a-fA-F0-9]{40}$/.test(input);
   };
 
-  // FIXED: Enhanced validation to prevent self-requests
   const isCurrentUser = (username: string): boolean => {
     if (!currentUsername) return false;
     return username.toLowerCase() === currentUsername.toLowerCase();
   };
 
-  // Enhanced search that includes existing relationships
   const searchUsers = async (query: string) => {
     if (!query.trim() || query.length < 2) {
       setSuggestions([]);
@@ -88,14 +85,12 @@ export default function EnhancedFriendsSearch({
       return;
     }
 
-    // Don't search if it's a wallet address
     if (isWalletAddress(query)) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
-    // FIXED: Don't search if query matches current user
     if (isCurrentUser(query)) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -105,7 +100,6 @@ export default function EnhancedFriendsSearch({
     try {
       setSearchLoading(true);
 
-      // Search for users from API
       const response = await fetch(
         `/api/users/search?q=${encodeURIComponent(query)}`,
         { credentials: "include" }
@@ -117,13 +111,11 @@ export default function EnhancedFriendsSearch({
         apiUsers = data.users || [];
       }
 
-      // Create a map of all known users and their relationships
       const userRelationships = new Map<string, SearchSuggestion>();
 
-      // Add existing friends
       friends.forEach((friend) => {
         if (
-          !isCurrentUser(friend.username) && // FIXED: Exclude current user
+          !isCurrentUser(friend.username) &&
           (friend.username.toLowerCase().includes(query.toLowerCase()) ||
             friend.displayName?.toLowerCase().includes(query.toLowerCase()))
         ) {
@@ -134,12 +126,11 @@ export default function EnhancedFriendsSearch({
         }
       });
 
-      // Add incoming friend requests
       friendRequests.forEach((request) => {
         const user = request.requesterData;
         if (
           user &&
-          !isCurrentUser(user.username) && // FIXED: Exclude current user
+          !isCurrentUser(user.username) &&
           (user.username.toLowerCase().includes(query.toLowerCase()) ||
             user.displayName?.toLowerCase().includes(query.toLowerCase()))
         ) {
@@ -151,12 +142,11 @@ export default function EnhancedFriendsSearch({
         }
       });
 
-      // Add outgoing friend requests (sent by current user)
       sentRequests.forEach((request) => {
         const user = request.receiverData;
         if (
           user &&
-          !isCurrentUser(user.username) && // FIXED: Exclude current user
+          !isCurrentUser(user.username) &&
           (user.username.toLowerCase().includes(query.toLowerCase()) ||
             user.displayName?.toLowerCase().includes(query.toLowerCase()))
         ) {
@@ -168,12 +158,11 @@ export default function EnhancedFriendsSearch({
         }
       });
 
-      // Add API results (new users) - ENHANCED: Multiple checks for current user
       apiUsers.forEach((user) => {
         if (
           !userRelationships.has(user.username) &&
-          !isCurrentUser(user.username) && // FIXED: Exclude current user
-          user.username !== currentUsername // FIXED: Double check
+          !isCurrentUser(user.username) &&
+          user.username !== currentUsername
         ) {
           userRelationships.set(user.username, {
             ...user,
@@ -182,7 +171,6 @@ export default function EnhancedFriendsSearch({
         }
       });
 
-      // Convert to array and sort by relationship type priority
       const sortedSuggestions = Array.from(userRelationships.values()).sort(
         (a, b) => {
           const priority = {
@@ -195,7 +183,7 @@ export default function EnhancedFriendsSearch({
         }
       );
 
-      setSuggestions(sortedSuggestions.slice(0, 8)); // Limit to 8 results
+      setSuggestions(sortedSuggestions.slice(0, 6));
       setShowSuggestions(true);
       setSelectedIndex(-1);
     } catch (error) {
@@ -206,7 +194,6 @@ export default function EnhancedFriendsSearch({
     }
   };
 
-  // Debounced search
   useEffect(() => {
     if (searchTimeout.current) {
       clearTimeout(searchTimeout.current);
@@ -228,7 +215,6 @@ export default function EnhancedFriendsSearch({
     };
   }, [searchQuery, friends, friendRequests, sentRequests, currentUsername]);
 
-  // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!showSuggestions || suggestions.length === 0) return;
@@ -265,7 +251,6 @@ export default function EnhancedFriendsSearch({
     }
   }, [showSuggestions, suggestions, selectedIndex]);
 
-  // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -282,7 +267,6 @@ export default function EnhancedFriendsSearch({
   }, []);
 
   const handleSuggestionClick = async (suggestion: SearchSuggestion) => {
-    // FIXED: Final check before sending request
     if (isCurrentUser(suggestion.username)) {
       console.warn(
         "Attempted to send friend request to self:",
@@ -300,18 +284,14 @@ export default function EnhancedFriendsSearch({
       } catch (error) {
         console.error("Error sending friend request:", error);
       }
-    }
-    // For other relationship types, just close the suggestions
-    else {
+    } else {
       setShowSuggestions(false);
       setSelectedIndex(-1);
     }
   };
 
-  // FIXED: Enhanced wallet address validation
   const handleWalletAddressSubmit = async () => {
     if (isWalletAddress(searchQuery)) {
-      // FIXED: Check if wallet address belongs to current user
       if (searchQuery.toLowerCase() === currentUsername?.toLowerCase()) {
         console.warn("Attempted to send friend request to own wallet address");
         return;
@@ -330,28 +310,28 @@ export default function EnhancedFriendsSearch({
     switch (suggestion.relationshipType) {
       case "friend":
         return {
-          icon: <Check size={14} className="text-green-400" />,
+          icon: <Check size={12} className="text-green-400" />,
           label: "Friend",
           color: "text-green-400",
           actionDisabled: true,
         };
       case "incoming_request":
         return {
-          icon: <Clock size={14} className="text-blue-400" />,
+          icon: <Clock size={12} className="text-blue-400" />,
           label: "Sent you request",
           color: "text-blue-400",
           actionDisabled: true,
         };
       case "outgoing_request":
         return {
-          icon: <Clock size={14} className="text-orange-400" />,
+          icon: <Clock size={12} className="text-orange-400" />,
           label: "Request sent",
           color: "text-orange-400",
           actionDisabled: true,
         };
       case "none":
         return {
-          icon: <UserPlus size={14} className="text-[#E2AF19]" />,
+          icon: <UserPlus size={12} className="text-[#E2AF19]" />,
           label: "Add Friend",
           color: "text-[#E2AF19]",
           actionDisabled: false,
@@ -359,7 +339,6 @@ export default function EnhancedFriendsSearch({
     }
   };
 
-  // Determine if dropdown is open (suggestions or no results message)
   const isDropdownOpen =
     showSuggestions ||
     (showSuggestions &&
@@ -367,16 +346,14 @@ export default function EnhancedFriendsSearch({
       searchQuery.length >= 2 &&
       !searchLoading &&
       !isWalletAddress(searchQuery) &&
-      !isCurrentUser(searchQuery)); // FIXED: Don't show "no results" for current user
+      !isCurrentUser(searchQuery));
 
   return (
     <>
-      {/* ADDED: Backdrop for dropdown */}
       {isDropdownOpen && <div className="fixed inset-0 z-10 bg-white/10" />}
 
       <div className="relative w-full" ref={searchRef}>
-        <div className="flex items-center gap-3">
-          {/* Enhanced Search Input */}
+        <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Input
               type="text"
@@ -391,10 +368,10 @@ export default function EnhancedFriendsSearch({
               onChange={(e) => {
                 setSearchQuery(e.target.value);
               }}
-              className={`font-satoshi pr-10 ${
+              className={`font-satoshi pr-8 ${
                 isCurrentUser(searchQuery) ? "border-red-500 text-red-400" : ""
               }`}
-              style={{ fontSize: "16px" }}
+              style={{ fontSize: "14px" }}
               onFocus={() => {
                 if (suggestions.length > 0 && !isCurrentUser(searchQuery)) {
                   setShowSuggestions(true);
@@ -402,50 +379,45 @@ export default function EnhancedFriendsSearch({
               }}
             />
             <Search
-              size={16}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              size={14}
+              className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400"
             />
 
-            {/* Loading indicator */}
             {searchLoading && (
-              <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#E2AF19]"></div>
+              <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#E2AF19]"></div>
               </div>
             )}
           </div>
 
-          {/* Wallet Address Add Button - FIXED: Disable for current user */}
           {searchQuery &&
             isWalletAddress(searchQuery) &&
             !isCurrentUser(searchQuery) && (
               <Button
                 onClick={handleWalletAddressSubmit}
                 disabled={loading}
-                className="whitespace-nowrap text-sm lg:text-base"
+                className="whitespace-nowrap text-xs lg:text-sm"
               >
                 {loading ? "Adding..." : "Add Friend"}
               </Button>
             )}
 
-          {/* FIXED: Show warning for current user wallet */}
           {searchQuery &&
             isWalletAddress(searchQuery) &&
             isCurrentUser(searchQuery) && (
-              <div className="text-red-400 text-sm font-satoshi whitespace-nowrap">
+              <div className="text-red-400 text-xs font-satoshi whitespace-nowrap">
                 Your wallet
               </div>
             )}
         </div>
 
-        {/* Enhanced Suggestions Dropdown - FIXED: Don't show for current user */}
         {showSuggestions &&
           suggestions.length > 0 &&
           !isCurrentUser(searchQuery) && (
-            <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-80 overflow-y-auto scrollbar-hide">
-              {/* Search Results Header */}
-              <div className="px-4 py-3 border-b border-[#2C2C2C] bg-[#0F0F0F]">
+            <div className="absolute top-full left-0 right-0 z-20 mt-1.5 bg-black border border-[#2C2C2C] rounded-lg shadow-xl max-h-64 overflow-y-auto scrollbar-hide">
+              <div className="px-3 py-2 border-b border-[#2C2C2C] bg-[#0F0F0F]">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm font-satoshi">
+                  <span className="text-gray-400 text-xs font-satoshi">
                     Search Results
                   </span>
                   <span className="text-gray-500 text-xs font-satoshi">
@@ -454,8 +426,7 @@ export default function EnhancedFriendsSearch({
                 </div>
               </div>
 
-              {/* Suggestions List */}
-              <div className="py-2">
+              <div className="py-1.5">
                 {suggestions.map((suggestion, index) => {
                   const relationshipDisplay =
                     getRelationshipDisplay(suggestion);
@@ -464,31 +435,28 @@ export default function EnhancedFriendsSearch({
                   return (
                     <div
                       key={suggestion._id}
-                      className={`flex items-center justify-between px-4 py-3 transition-colors cursor-pointer ${
+                      className={`flex items-center justify-between px-3 py-2.5 transition-colors cursor-pointer ${
                         isSelected ? "bg-[#2C2C2C]" : "hover:bg-[#1A1A1A]"
                       }`}
                       onClick={() => handleSuggestionClick(suggestion)}
                       onMouseEnter={() => setSelectedIndex(index)}
                     >
-                      {/* User Info */}
                       <div className="flex items-center flex-1 min-w-0">
-                        {/* Avatar */}
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-3 flex items-center justify-center flex-shrink-0">
-                          <span className="text-white text-sm font-medium">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-2.5 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs font-medium">
                             {suggestion.displayName?.[0]?.toUpperCase() ||
                               suggestion.username[0]?.toUpperCase()}
                           </span>
                         </div>
 
-                        {/* User Details */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-white font-satoshi text-sm truncate">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="text-white font-satoshi text-xs truncate">
                               {suggestion.displayName || suggestion.username}
                             </span>
                             {relationshipDisplay.icon}
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <span className="text-gray-400 font-satoshi text-xs truncate">
                               @{suggestion.username}
                             </span>
@@ -501,8 +469,7 @@ export default function EnhancedFriendsSearch({
                         </div>
                       </div>
 
-                      {/* Action Button */}
-                      <div className="flex-shrink-0 ml-3">
+                      <div className="flex-shrink-0 ml-2.5">
                         {!relationshipDisplay.actionDisabled ? (
                           <button
                             onClick={(e) => {
@@ -510,14 +477,14 @@ export default function EnhancedFriendsSearch({
                               handleSuggestionClick(suggestion);
                             }}
                             disabled={loading}
-                            className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-xs flex items-center gap-1 disabled:opacity-50"
+                            className="bg-[#E2AF19] text-black px-2.5 py-1 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-xs flex items-center gap-1 disabled:opacity-50"
                           >
-                            <UserPlus size={12} />
+                            <UserPlus size={10} />
                             Add
                           </button>
                         ) : (
                           <div
-                            className={`px-3 py-1.5 rounded-lg text-xs font-satoshi ${relationshipDisplay.color} bg-opacity-10 flex items-center gap-1`}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-satoshi ${relationshipDisplay.color} bg-opacity-10 flex items-center gap-1`}
                             style={{
                               backgroundColor:
                                 relationshipDisplay.color.includes("green")
@@ -537,8 +504,7 @@ export default function EnhancedFriendsSearch({
                 })}
               </div>
 
-              {/* Footer with shortcut hints */}
-              <div className="px-4 py-2 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+              <div className="px-3 py-1.5 border-t border-[#2C2C2C] bg-[#0F0F0F]">
                 <div className="flex items-center justify-between text-xs text-gray-500 font-satoshi">
                   <span>Use ↑↓ to navigate, Enter to select</span>
                   <span>ESC to close</span>
@@ -547,16 +513,15 @@ export default function EnhancedFriendsSearch({
             </div>
           )}
 
-        {/* No Results Message - FIXED: Don't show for current user */}
         {showSuggestions &&
           suggestions.length === 0 &&
           searchQuery.length >= 2 &&
           !searchLoading &&
           !isWalletAddress(searchQuery) &&
           !isCurrentUser(searchQuery) && (
-            <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-4">
+            <div className="absolute top-full left-0 right-0 z-20 mt-1.5 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-3">
               <div className="text-center">
-                <div className="text-gray-400 text-sm font-satoshi mb-2">
+                <div className="text-gray-400 text-xs font-satoshi mb-1.5">
                   No users found for "{searchQuery}"
                 </div>
                 <div className="text-gray-500 text-xs font-satoshi">
@@ -566,11 +531,10 @@ export default function EnhancedFriendsSearch({
             </div>
           )}
 
-        {/* FIXED: Self-user warning message */}
         {isCurrentUser(searchQuery) && searchQuery.length >= 2 && (
-          <div className="absolute top-full left-0 right-0 z-20 mt-2 bg-red-900/20 border border-red-500/50 rounded-lg shadow-xl p-4">
+          <div className="absolute top-full left-0 right-0 z-20 mt-1.5 bg-red-900/20 border border-red-500/50 rounded-lg shadow-xl p-3">
             <div className="text-center">
-              <div className="text-red-400 text-sm font-satoshi mb-2">
+              <div className="text-red-400 text-xs font-satoshi mb-1.5">
                 You cannot add yourself as a friend
               </div>
               <div className="text-red-400 text-xs font-satoshi">

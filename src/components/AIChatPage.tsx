@@ -297,8 +297,8 @@ How can I assist you today with your crypto needs? Try asking about:
     return parts.map((part, index) => {
       if (part.type === "code") {
         return (
-          <div key={index} className="relative my-4">
-            <div className="flex items-center justify-between bg-[#1a1a1a] border border-[#2c2c2c] rounded-t-lg px-4 py-2">
+          <div key={index} className="relative my-2">
+            <div className="flex items-center justify-between bg-[#1a1a1a] border border-[#2c2c2c] rounded-t-lg px-3 py-1.5">
               <span className="text-xs text-gray-400 font-mono">
                 {part.language}
               </span>
@@ -308,18 +308,18 @@ How can I assist you today with your crypto needs? Try asking about:
               >
                 {copiedItems.has(part.blockId) ? (
                   <>
-                    <Check size={12} />
+                    <Check size={10} />
                     Copied!
                   </>
                 ) : (
                   <>
-                    <Copy size={12} />
+                    <Copy size={10} />
                   </>
                 )}
               </button>
             </div>
-            <pre className="bg-[#1a1a1a] border border-[#2c2c2c] border-t-0 rounded-b-lg p-4 overflow-x-auto">
-              <code className="text-sm font-mono text-gray-200">
+            <pre className="bg-[#1a1a1a] border border-[#2c2c2c] border-t-0 rounded-b-lg p-3 overflow-x-auto">
+              <code className="text-xs font-mono text-gray-200">
                 {part.content}
               </code>
             </pre>
@@ -363,26 +363,26 @@ How can I assist you today with your crypto needs? Try asking about:
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] flex flex-col overflow-hidden">
+    <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] flex flex-col overflow-hidden">
       {/* Chat Container - Normal WhatsApp-like layout */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Messages Area - Messages stick to bottom like WhatsApp */}
-        <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 flex flex-col justify-end scrollbar-hide">
-          <div className="space-y-4 lg:space-y-6 py-4">
+        <div className="flex-1 overflow-y-auto px-2 sm:px-3 lg:px-4 flex flex-col justify-end scrollbar-hide">
+          <div className="space-y-2 lg:space-y-3 py-2">
             {/* Messages in normal order */}
             {messages.map((message, index) => (
-              <div key={message.id} className="flex flex-col space-y-2">
+              <div key={message.id} className="flex flex-col space-y-1">
                 {message.type === "assistant" ? (
-                  <div className="flex flex-col items-start space-y-2">
+                  <div className="flex flex-col items-start space-y-1">
                     {/* Message Content */}
-                    <div className="max-w-full sm:max-w-4xl bg-black p-3 lg:p-4 rounded-2xl border border-[#2C2C2C]">
+                    <div className="max-w-full sm:max-w-4xl bg-black p-2 lg:p-3 rounded-xl border border-[#2C2C2C]">
                       {message.processing && !message.content ? (
                         <div className="flex items-center space-x-2">
                           <RefreshCw
-                            size={16}
+                            size={14}
                             className="text-[#E2AF19] animate-spin"
                           />
-                          <span className="text-[#F9EFD1] text-xs sm:text-sm font-satoshi">
+                          <span className="text-[#F9EFD1] text-xs font-satoshi">
                             🧠 AI analyzing your request...
                           </span>
                         </div>
@@ -390,7 +390,7 @@ How can I assist you today with your crypto needs? Try asking about:
                         <div className="text-[#F9EFD1] text-xs sm:text-sm leading-relaxed font-satoshi message-content">
                           {formatMessage(message.content, message.id)}
                           {message.typing && (
-                            <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1"></span>
+                            <span className="inline-block w-1.5 h-3 bg-[#E2AF19] animate-pulse ml-1"></span>
                           )}
                         </div>
                       )}
@@ -404,11 +404,11 @@ How can I assist you today with your crypto needs? Try asking about:
                           onClick={() =>
                             copyMessage(message.content, message.id)
                           }
-                          className="bg-[#E2AF19] text-black px-2 lg:px-3 py-1 rounded-md text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1"
+                          className="bg-[#E2AF19] text-black px-2 lg:px-2.5 py-0.5 rounded-md text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1"
                         >
                           {copiedItems.has(message.id) ? (
                             <>
-                              <Check size={10} className="lg:w-3 lg:h-3" />
+                              <Check size={8} className="lg:w-2.5 lg:h-2.5" />
                               Copied!
                             </>
                           ) : (
@@ -419,7 +419,7 @@ How can I assist you today with your crypto needs? Try asking about:
                   </div>
                 ) : (
                   <div className="flex justify-end">
-                    <div className="bg-[#F9EFD1] text-black p-3 lg:p-4 max-w-full sm:max-w-2xl rounded-2xl">
+                    <div className="bg-[#F9EFD1] text-black p-2 lg:p-3 max-w-full sm:max-w-2xl rounded-xl">
                       <p className="text-xs sm:text-sm font-satoshi">
                         {message.content}
                       </p>
@@ -435,7 +435,7 @@ How can I assist you today with your crypto needs? Try asking about:
         </div>
 
         {/* Input Area at bottom */}
-        <div className="p-3 sm:p-4 lg:p-6 flex-shrink-0">
+        <div className="p-2 sm:p-3 lg:p-4 flex-shrink-0">
           <div className="relative">
             <textarea
               ref={inputRef}
@@ -443,11 +443,11 @@ How can I assist you today with your crypto needs? Try asking about:
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Ask me about crypto tokens, security checks, smart contracts, or DeFi..."
-              className="w-full bg-black text-white placeholder-gray-400 resize-none font-satoshi focus:outline-none pr-12 sm:pr-16 pl-4 sm:pl-6 py-3 sm:py-4 min-h-[50px] sm:min-h-[60px] max-h-32 text-sm sm:text-base border border-[#2C2C2C] focus:border-[#E2AF19] transition-colors"
+              className="w-full bg-black text-white placeholder-gray-400 resize-none font-satoshi focus:outline-none pr-10 sm:pr-12 pl-3 sm:pl-4 py-2 sm:py-3 min-h-[40px] sm:min-h-[50px] max-h-32 text-sm border border-[#2C2C2C] focus:border-[#E2AF19] transition-colors"
               rows={1}
               disabled={isTyping}
               style={{
-                borderRadius: "100px",
+                borderRadius: "50px",
                 scrollbarWidth: "none",
                 msOverflowStyle: "none",
                 fontSize:
@@ -459,33 +459,30 @@ How can I assist you today with your crypto needs? Try asking about:
             <button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || isTyping}
-              className="absolute right-1 sm:right-2 top-1/2 transform -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 disabled:cursor-not-allowed text-black rounded-full transition-colors flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center"
+              className="absolute right-1 sm:right-1.5 top-1/2 transform -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 disabled:cursor-not-allowed text-black rounded-full transition-colors flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center"
               style={{
-                borderRadius: "200px",
+                borderRadius: "50px",
               }}
             >
               {isTyping ? (
-                <RefreshCw
-                  size={14}
-                  className="sm:w-[18px] sm:h-[18px] animate-spin"
-                />
+                <RefreshCw size={12} className="sm:w-4 sm:h-4 animate-spin" />
               ) : (
-                <Send size={14} className="sm:w-[18px] sm:h-[18px]" />
+                <Send size={12} className="sm:w-4 sm:h-4" />
               )}
             </button>
           </div>
 
           {/* Status indicator */}
           {isTyping && (
-            <div className="flex items-center justify-center mt-2">
+            <div className="flex items-center justify-center mt-1.5">
               <div className="flex space-x-1 mr-2">
-                <div className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-[#E2AF19] rounded-full animate-bounce"></div>
                 <div
-                  className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"
+                  className="w-1.5 h-1.5 bg-[#E2AF19] rounded-full animate-bounce"
                   style={{ animationDelay: "0.1s" }}
                 ></div>
                 <div
-                  className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"
+                  className="w-1.5 h-1.5 bg-[#E2AF19] rounded-full animate-bounce"
                   style={{ animationDelay: "0.2s" }}
                 ></div>
               </div>
@@ -523,10 +520,10 @@ How can I assist you today with your crypto needs? Try asking about:
         .message-content .inline-code {
           background: #2c2c2c;
           color: #e2af19;
-          padding: 2px 6px;
-          border-radius: 4px;
+          padding: 1px 4px;
+          border-radius: 3px;
           font-family: "Courier New", monospace;
-          font-size: 11px;
+          font-size: 10px;
         }
 
         .animate-bounce {
@@ -540,7 +537,7 @@ How can I assist you today with your crypto needs? Try asking about:
             transform: translateY(0);
           }
           40% {
-            transform: translateY(-6px);
+            transform: translateY(-4px);
           }
         }
 
