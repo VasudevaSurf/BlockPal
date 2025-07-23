@@ -24,7 +24,7 @@ export default function NavigationLoadingIndicator() {
       </div>
 
       {/* Full Screen Loading Overlay */}
-      <div className="fixed inset-0 z-[9998] bg-black/20 backdrop-blur-sm flex items-center justify-center">
+      {/* <div className="fixed inset-0 z-[9998] bg-black/20 backdrop-blur-sm flex items-center justify-center">
         <div className="bg-black/90 rounded-xl p-4 border border-[#2C2C2C] flex flex-col items-center space-y-3">
           <RefreshCw size={24} className="text-[#E2AF19] animate-spin" />
           <div className="text-white font-satoshi text-sm">Loading...</div>
@@ -32,7 +32,7 @@ export default function NavigationLoadingIndicator() {
             Please wait while we load the page
           </div>
         </div>
-      </div>
+      </div> */}
 
       <style jsx>{`
         @keyframes shimmer {

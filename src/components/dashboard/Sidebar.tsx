@@ -206,7 +206,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
       {/* Logo Section */}
       <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
-        <div className="flex items-center mb-3 lg:mb-6">
+        <div className="flex items-center justify-center mb-3 lg:mb-6">
           <img
             src="/blockName.png"
             alt="Blockpal"
