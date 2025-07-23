@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - COMPACT VERSION
+// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -26,6 +26,9 @@ import {
   setActiveWallet,
   setActiveWalletInDB,
   getActiveWalletFromDB,
+  fetchWalletTokens,
+  updateWalletBalance,
+  clearTokens, // Add this import
 } from "@/store/slices/walletSlice";
 import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
 import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
@@ -219,7 +222,7 @@ export default function GlobalDashboardHeader({
     }
   }, [isAuthenticated, user, dispatch]);
 
-  // Active wallet sync effect - sync with database after wallets are loaded
+  // Active wallet sync effect
   useEffect(() => {
     if (
       isAuthenticated &&
@@ -259,18 +262,61 @@ export default function GlobalDashboardHeader({
     }
   };
 
-  // Handle wallet selection with DB sync
+  // FIXED: Enhanced wallet selection with proper data loading
   const handleWalletSelect = async (walletId: string) => {
-    dispatch(setActiveWallet(walletId));
+    console.log("🎯 Header - Wallet selected:", walletId);
+
+    // Find the selected wallet
+    const selectedWallet = wallets.find((w) => w.id === walletId);
+    if (!selectedWallet) {
+      console.error("❌ Selected wallet not found");
+      return;
+    }
 
     try {
+      // Step 1: Clear existing tokens to show loading state
+      dispatch(clearTokens());
+      console.log("🧹 Cleared existing tokens");
+
+      // Step 2: Set active wallet locally first
+      dispatch(setActiveWallet(walletId));
+      console.log("🎯 Set active wallet locally");
+
+      // Step 3: Sync with database
       await dispatch(setActiveWalletInDB(walletId));
+      console.log("💾 Synced with database");
+
+      // Step 4: Load fresh data for the new wallet
+      console.log("📡 Loading fresh data for:", selectedWallet.address);
+
+      const [tokensResult, balanceResult] = await Promise.all([
+        dispatch(fetchWalletTokens(selectedWallet.address)),
+        dispatch(updateWalletBalance(selectedWallet.address)),
+      ]);
+
+      const tokensSuccess =
+        tokensResult.type === "wallet/fetchWalletTokens/fulfilled";
+      const balanceSuccess =
+        balanceResult.type === "wallet/updateWalletBalance/fulfilled";
+
+      if (tokensSuccess && balanceSuccess) {
+        console.log("✅ Wallet data loaded successfully");
+      } else {
+        console.warn("⚠️ Some wallet data may not have loaded properly");
+      }
+
+      // Force refresh dashboard if available
+      if (refreshDashboard) {
+        setTimeout(() => {
+          refreshDashboard();
+        }, 500);
+      }
     } catch (error) {
-      console.error("❌ Failed to sync active wallet with database:", error);
+      console.error("❌ Failed to switch wallet:", error);
     }
   };
 
-  // FIXED: Handle wallet button click with proper toggle
+  // Handle wallet button click
   const handleWalletButtonClick = () => {
     console.log("🎯 Wallet button clicked, current state:", walletSwitcherOpen);
     setWalletSwitcherOpen(!walletSwitcherOpen);
@@ -337,7 +383,7 @@ export default function GlobalDashboardHeader({
 
   return (
     <>
-      {/* Global Header - Fixed across all pages */}
+      {/* Global Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 flex-shrink-0 gap-3 sm:gap-0">
         <div>
           <div className="flex items-center">
@@ -405,7 +451,7 @@ export default function GlobalDashboardHeader({
           {/* Action Icons Container */}
           <div className="flex items-center space-x-2 relative">
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-1.5 lg:px-2 py-1.5 lg:py-2">
-              {/* Notification Bell with UNIFIED count */}
+              {/* Notification Bell */}
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
@@ -418,7 +464,7 @@ export default function GlobalDashboardHeader({
                 )}
               </button>
 
-              {/* Unified Notification Panel */}
+              {/* Notification Panel */}
               {notificationsOpen && (
                 <NotificationPanel
                   isOpen={notificationsOpen}
@@ -439,154 +485,15 @@ export default function GlobalDashboardHeader({
         </div>
       </div>
 
-      {/* Real-time Status Dropdown */}
-      {showRealtimeStatus && (
-        <div className="absolute top-12 right-3 z-50 bg-black/95 backdrop-blur-sm border border-[#2C2C2C] rounded-lg p-3 w-64 shadow-xl">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-white font-semibold text-xs font-satoshi">
-              Real-time Dashboard Status
-            </h3>
-            <button
-              onClick={() => setShowRealtimeStatus(false)}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              <X size={14} />
-            </button>
-          </div>
-
-          <div className="space-y-1.5 text-[10px]">
-            <div className="flex justify-between">
-              <span className="text-gray-400">Monitoring Status:</span>
-              <span
-                className={isMonitoring ? "text-green-400" : "text-red-400"}
-              >
-                {isMonitoring ? "Active" : "Inactive"}
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-400">Active Polling:</span>
-              <span
-                className={
-                  status.isPolling ? "text-green-400" : "text-gray-400"
-                }
-              >
-                {status.isPolling ? "Yes" : "No"}
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-400">Background Refresh:</span>
-              <span
-                className={
-                  status.hasBackgroundRefresh
-                    ? "text-green-400"
-                    : "text-gray-400"
-                }
-              >
-                {status.hasBackgroundRefresh ? "Active" : "Inactive"}
-              </span>
-            </div>
-
-            {lastUpdated && (
-              <div className="flex justify-between">
-                <span className="text-gray-400">Last Update:</span>
-                <span className="text-white">
-                  {lastUpdated.toLocaleTimeString()}
-                </span>
-              </div>
-            )}
-
-            {status.dataAge && (
-              <div className="flex justify-between">
-                <span className="text-gray-400">Data Age:</span>
-                <span
-                  className={`${
-                    isDataStale ? "text-yellow-400" : "text-white"
-                  }`}
-                >
-                  {formatTimeSince()}
-                </span>
-              </div>
-            )}
-
-            {realtimeData && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Portfolio Value:</span>
-                  <span className="text-white">
-                    ${realtimeData.totalValue.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Token Count:</span>
-                  <span className="text-white">
-                    {realtimeData.tokens.length}
-                  </span>
-                </div>
-
-                {hasChanges && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Recent Change:</span>
-                    <span
-                      className={
-                        changeAmount >= 0 ? "text-green-400" : "text-red-400"
-                      }
-                    >
-                      {changeAmount >= 0 ? "+" : ""}${changeAmount.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-              </>
-            )}
-
-            {status.retryCount > 0 && (
-              <div className="flex justify-between">
-                <span className="text-gray-400">Retry Count:</span>
-                <span className="text-yellow-400">{status.retryCount}/3</span>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-2 pt-2 border-t border-[#2C2C2C] flex items-center justify-between">
-            <div className="flex items-center">
-              {isMonitoring ? (
-                <Wifi
-                  size={12}
-                  className="text-green-400 animate-pulse mr-1.5"
-                />
-              ) : (
-                <WifiOff size={12} className="text-gray-400 mr-1.5" />
-              )}
-              <span
-                className={`text-[10px] font-satoshi ${
-                  isMonitoring ? "text-green-400" : "text-gray-400"
-                }`}
-              >
-                {isMonitoring ? "CONNECTED" : "DISCONNECTED"}
-              </span>
-            </div>
-
-            <button
-              onClick={refreshDashboard}
-              className="bg-[#E2AF19] text-black px-2 py-1 rounded-lg text-[10px] font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
-            >
-              Force Refresh
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Page-specific content below header */}
       {children}
 
-      {/* Wallet Switcher Dropdown */}
+      {/* FIXED: Wallet Switcher Dropdown with enhanced wallet selection */}
       {wallets.length > 0 && (
         <RealtimeWalletSwitcher
           isOpen={walletSwitcherOpen}
           onClose={() => setWalletSwitcherOpen(false)}
-          onWalletSelect={handleWalletSelect}
+          onWalletSelect={handleWalletSelect} // Pass the enhanced handler
           triggerRef={walletButtonRef}
         />
       )}

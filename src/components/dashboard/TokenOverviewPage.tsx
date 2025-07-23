@@ -64,7 +64,6 @@ interface ChartData {
 }
 
 const TIME_PERIODS = [
-  { label: "1H", value: "1H", days: 1, interval: "hourly" },
   { label: "1D", value: "1D", days: 1, interval: "hourly" },
   { label: "1W", value: "1W", days: 7, interval: "daily" },
   { label: "1M", value: "1M", days: 30, interval: "daily" },
@@ -85,12 +84,35 @@ export default function TokenOverviewPage() {
   const [copied, setCopied] = useState<string>("");
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [hoveredPoint, setHoveredPoint] = useState<{
+
+  // Perfect cursor tracking states
+  const [cursorPosition, setCursorPosition] = useState<{
     x: number;
     y: number;
+  } | null>(null);
+  const [priceData, setPriceData] = useState<{
     price: number;
     date: string;
+    time: string;
+    y: number;
   } | null>(null);
+
+  // Force clear tooltip function
+  const forceClearTooltip = () => {
+    setCursorPosition(null);
+    setPriceData(null);
+  };
+
+  // Auto-clear tooltip after a short delay when not actively hovering
+  useEffect(() => {
+    if (cursorPosition || priceData) {
+      const timer = setTimeout(() => {
+        forceClearTooltip();
+      }, 100); // Clear after 100ms of inactivity
+
+      return () => clearTimeout(timer);
+    }
+  }, [cursorPosition, priceData]);
 
   const contractAddress = params.tokenId as string;
   const walletAddress = searchParams.get("wallet") || activeWallet?.address;
@@ -137,7 +159,10 @@ export default function TokenOverviewPage() {
       setChartLoading(true);
 
       const periodConfig = TIME_PERIODS.find((p) => p.value === period);
-      if (!periodConfig) return;
+      if (!periodConfig) {
+        createMockChartData(period);
+        return;
+      }
 
       const response = await fetch(
         `/api/tokens/chart?tokenId=${tokenInfo.priceData.id}&days=${periodConfig.days}&interval=${periodConfig.interval}`,
@@ -167,37 +192,59 @@ export default function TokenOverviewPage() {
     let timeInterval = 60 * 60 * 1000;
 
     switch (period) {
-      case "1H":
-        dataPoints = 60;
-        timeInterval = 60 * 1000;
-        break;
       case "1D":
-        dataPoints = 24;
-        timeInterval = 60 * 60 * 1000;
+        dataPoints = 24; // 24 hours
+        timeInterval = 60 * 60 * 1000; // 1 hour intervals
         break;
       case "1W":
-        dataPoints = 7;
-        timeInterval = 24 * 60 * 60 * 1000;
+        dataPoints = 7; // 7 days
+        timeInterval = 24 * 60 * 60 * 1000; // 1 day intervals
         break;
       case "1M":
-        dataPoints = 30;
-        timeInterval = 24 * 60 * 60 * 1000;
+        dataPoints = 30; // 30 days
+        timeInterval = 24 * 60 * 60 * 1000; // 1 day intervals
         break;
       case "1Y":
-        dataPoints = 12;
-        timeInterval = 30 * 24 * 60 * 60 * 1000;
+        dataPoints = 12; // 12 months
+        timeInterval = 30 * 24 * 60 * 60 * 1000; // ~1 month intervals
+        break;
+      default:
+        dataPoints = 24;
+        timeInterval = 60 * 60 * 1000;
         break;
     }
 
     for (let i = 0; i < dataPoints; i++) {
       const timestamp = (now - (dataPoints - i - 1) * timeInterval) / 1000;
       const date = new Date(timestamp * 1000);
-      const variation = (Math.random() - 0.5) * 0.1;
-      const price = basePrice * (1 + variation * (i / dataPoints));
+
+      // Create realistic price movements based on timeframe
+      let volatility = 0.02;
+      switch (period) {
+        case "1D":
+          volatility = 0.015;
+          break;
+        case "1W":
+          volatility = 0.03;
+          break;
+        case "1M":
+          volatility = 0.05;
+          break;
+        case "1Y":
+          volatility = 0.08;
+          break;
+      }
+
+      const trend = Math.sin(i * 0.1) * 0.001;
+      const randomWalk = (Math.random() - 0.5) * volatility;
+
+      const priceChange = i === 0 ? 0 : trend + randomWalk;
+      const price =
+        i === 0 ? basePrice : prices[i - 1].price * (1 + priceChange);
 
       prices.push({
         timestamp,
-        price,
+        price: Math.max(0, price),
         date: date.toLocaleDateString(),
         time: date.toLocaleTimeString(),
       });
@@ -228,12 +275,6 @@ export default function TokenOverviewPage() {
       let label = "";
 
       switch (period) {
-        case "1H":
-          label = date.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-          break;
         case "1D":
           label = date.toLocaleTimeString([], {
             hour: "2-digit",
@@ -272,12 +313,6 @@ export default function TokenOverviewPage() {
       let lastLabel = "";
 
       switch (period) {
-        case "1H":
-          lastLabel = lastDate.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-          break;
         case "1D":
           lastLabel = lastDate.toLocaleTimeString([], {
             hour: "2-digit",
@@ -452,6 +487,7 @@ export default function TokenOverviewPage() {
     return { path, areaPath, points, yAxisValues, xAxisLabels };
   };
 
+  // Perfect cursor tracking implementation
   const handleChartMouseMove = (
     event: React.MouseEvent<SVGSVGElement>,
     points: Array<{
@@ -460,32 +496,92 @@ export default function TokenOverviewPage() {
       price: number;
       date: string;
       time: string;
-    }>,
-    svgRect: DOMRect
+    }>
   ) => {
-    const mouseX = event.clientX - svgRect.left;
-    const mouseY = event.clientY - svgRect.top;
-    const scaledMouseX =
-      (mouseX / svgRect.width) * event.currentTarget.viewBox.baseVal.width;
-    const scaledMouseY =
-      (mouseY / svgRect.height) * event.currentTarget.viewBox.baseVal.height;
+    const svgElement = event.currentTarget;
+    const rect = svgElement.getBoundingClientRect();
 
-    const closestPoint = points.reduce((prev, curr) => {
-      return Math.abs(curr.x - scaledMouseX) < Math.abs(prev.x - scaledMouseX)
-        ? curr
-        : prev;
-    });
+    // Get EXACT mouse coordinates relative to SVG
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    const rectLeft = rect.left;
+    const rectTop = rect.top;
+    const rectWidth = rect.width;
+    const rectHeight = rect.height;
 
-    const distance = Math.sqrt(
-      Math.pow(scaledMouseX - closestPoint.x, 2) +
-        Math.pow(scaledMouseY - closestPoint.y, 2)
-    );
+    // Calculate mouse position within SVG viewport
+    const mouseX = clientX - rectLeft;
+    const mouseY = clientY - rectTop;
 
-    if (distance <= 25) {
-      setHoveredPoint(closestPoint);
+    // Convert to SVG coordinate system
+    const viewBox = svgElement.viewBox.baseVal;
+    const svgX = (mouseX / rectWidth) * viewBox.width;
+    const svgY = (mouseY / rectHeight) * viewBox.height;
+
+    // Strict boundary check - must be within exact chart area
+    const isWithinBounds =
+      mouseX >= 0 && mouseX <= rectWidth && mouseY >= 0 && mouseY <= rectHeight;
+
+    if (isWithinBounds) {
+      // Only update cursor position when within bounds
+      setCursorPosition({ x: svgX, y: svgY });
+
+      // Calculate price data when within bounds
+      if (points && points.length > 0) {
+        // Find the closest data point for price information
+        const progress = svgX / viewBox.width;
+        const dataIndex = progress * (points.length - 1);
+
+        // Get the two surrounding points
+        const lowerIndex = Math.floor(dataIndex);
+        const upperIndex = Math.ceil(dataIndex);
+
+        // Ensure indices are valid
+        const idx1 = Math.max(0, Math.min(points.length - 1, lowerIndex));
+        const idx2 = Math.max(0, Math.min(points.length - 1, upperIndex));
+
+        if (idx1 === idx2) {
+          // Exact point
+          const point = points[idx1];
+          setPriceData({
+            price: point.price,
+            date: point.date,
+            time: point.time,
+            y: point.y,
+          });
+        } else {
+          // Interpolate between points
+          const point1 = points[idx1];
+          const point2 = points[idx2];
+          const t = dataIndex - idx1;
+
+          const interpolatedPrice =
+            point1.price + (point2.price - point1.price) * t;
+          const interpolatedY = point1.y + (point2.y - point1.y) * t;
+
+          setPriceData({
+            price: interpolatedPrice,
+            date: point1.date,
+            time: point1.time,
+            y: interpolatedY,
+          });
+        }
+      }
     } else {
-      setHoveredPoint(null);
+      // Immediately clear everything when mouse moves outside bounds
+      setCursorPosition(null);
+      setPriceData(null);
     }
+  };
+
+  const handleMouseLeave = () => {
+    // Immediately clear all states when mouse leaves
+    forceClearTooltip();
+  };
+
+  const handleMouseEnter = () => {
+    // Clear states when entering to ensure clean start
+    forceClearTooltip();
   };
 
   const handleTimeframeChange = (period: string) => {
@@ -557,25 +653,30 @@ export default function TokenOverviewPage() {
             ))}
           </div>
 
-          <div className="flex-1 flex flex-col relative">
-            {hoveredPoint && (
+          <div
+            className="flex-1 flex flex-col relative"
+            onMouseLeave={handleMouseLeave}
+          >
+            {/* Price Tooltip - only when we have BOTH price data AND cursor position */}
+            {priceData && cursorPosition && (
               <div
                 className="absolute bg-black bg-opacity-95 border border-[#2C2C2C] rounded-lg p-2 z-20 pointer-events-none shadow-lg"
                 style={{
-                  left: `${hoveredPoint.x + 18}px`,
-                  top: `${Math.max(hoveredPoint.y - 65, 10)}px`,
-                  transform:
-                    hoveredPoint.x > width - 140
-                      ? "translateX(-100%)"
-                      : "translateX(0)",
-                  marginLeft: hoveredPoint.x > width - 140 ? "-18px" : "0",
+                  left:
+                    cursorPosition.x > width - 140
+                      ? Math.max(5, cursorPosition.x - 140)
+                      : Math.max(5, cursorPosition.x + 15),
+                  top: Math.max(
+                    5,
+                    Math.min(height - 70, cursorPosition.y - 35)
+                  ),
                 }}
               >
                 <div className="text-white font-semibold text-sm whitespace-nowrap">
-                  {formatCurrency(hoveredPoint.price)}
+                  {formatCurrency(priceData.price)}
                 </div>
                 <div className="text-gray-400 text-xs whitespace-nowrap">
-                  {hoveredPoint.date} {hoveredPoint.time}
+                  {priceData.date} {priceData.time}
                 </div>
               </div>
             )}
@@ -583,11 +684,10 @@ export default function TokenOverviewPage() {
             <svg
               className="w-full flex-1 cursor-crosshair"
               viewBox={`0 0 ${width} ${height}`}
-              onMouseMove={(e) => {
-                const svgRect = e.currentTarget.getBoundingClientRect();
-                handleChartMouseMove(e, points, svgRect);
-              }}
-              onMouseLeave={() => setHoveredPoint(null)}
+              onMouseMove={(e) => handleChartMouseMove(e, points)}
+              onMouseLeave={handleMouseLeave}
+              onMouseEnter={handleMouseEnter}
+              style={{ overflow: "visible" }}
             >
               <defs>
                 <linearGradient
@@ -616,6 +716,16 @@ export default function TokenOverviewPage() {
                 </linearGradient>
               </defs>
 
+              {/* Background */}
+              <rect
+                x="0"
+                y="0"
+                width={width}
+                height={height}
+                fill="transparent"
+              />
+
+              {/* Grid lines */}
               {[0, height / 4, height / 2, (3 * height) / 4, height].map(
                 (y) => (
                   <line
@@ -630,6 +740,7 @@ export default function TokenOverviewPage() {
                   />
                 )
               )}
+
               {xAxisLabels.map((label) => (
                 <line
                   key={label.x}
@@ -643,8 +754,10 @@ export default function TokenOverviewPage() {
                 />
               ))}
 
+              {/* Area fill */}
               <path d={areaPath} fill="url(#priceGradient)" />
 
+              {/* Price line */}
               <path
                 d={path}
                 fill="none"
@@ -658,36 +771,48 @@ export default function TokenOverviewPage() {
                 strokeLinejoin="round"
               />
 
-              <path
-                d={path}
-                fill="none"
-                stroke="transparent"
-                strokeWidth="17"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ pointerEvents: "stroke" }}
-              />
-
-              {hoveredPoint && (
-                <>
+              {/* Crosshair - ALWAYS follows exact cursor position */}
+              {cursorPosition && (
+                <g>
+                  {/* Vertical crosshair line - exact cursor X */}
                   <line
-                    x1={hoveredPoint.x}
-                    y1="0"
-                    x2={hoveredPoint.x}
+                    x1={cursorPosition.x}
+                    y1={0}
+                    x2={cursorPosition.x}
                     y2={height}
                     stroke="#E2AF19"
                     strokeWidth="1.5"
-                    strokeDasharray="5,5"
+                    strokeDasharray="4,4"
+                    opacity="0.9"
                   />
-                  <circle
-                    cx={hoveredPoint.x}
-                    cy={hoveredPoint.y}
-                    r="4.5"
-                    fill="#E2AF19"
-                    stroke="#000"
-                    strokeWidth="2"
-                  />
-                </>
+
+                  {/* Horizontal crosshair line - only when we have price data */}
+                  {priceData && (
+                    <line
+                      x1={0}
+                      y1={priceData.y}
+                      x2={width}
+                      y2={priceData.y}
+                      stroke="#E2AF19"
+                      strokeWidth="1.5"
+                      strokeDasharray="4,4"
+                      opacity="0.9"
+                    />
+                  )}
+
+                  {/* Intersection point - only when we have price data */}
+                  {priceData && (
+                    <circle
+                      cx={cursorPosition.x}
+                      cy={priceData.y}
+                      r="5"
+                      fill="#E2AF19"
+                      stroke="#000"
+                      strokeWidth="2"
+                      opacity="1"
+                    />
+                  )}
+                </g>
               )}
             </svg>
 
@@ -760,9 +885,25 @@ export default function TokenOverviewPage() {
 
   return (
     <>
-      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden">
-        <div className="flex flex-col xl:hidden gap-2.5 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-          <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
+      <div
+        className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden"
+        onMouseMove={(e) => {
+          // Global mouse tracking - clear tooltip if not over chart
+          const target = e.target as HTMLElement;
+          const isOverChart = target.closest(".chart-container");
+          if (!isOverChart && (cursorPosition || priceData)) {
+            forceClearTooltip();
+          }
+        }}
+      >
+        <div
+          className="flex flex-col xl:hidden gap-2.5 flex-1 min-h-0 overflow-y-auto scrollbar-hide"
+          onMouseEnter={forceClearTooltip}
+        >
+          <div
+            className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0"
+            onMouseEnter={forceClearTooltip}
+          >
             <div className="flex items-center mb-2.5">
               <button
                 onClick={() => router.back()}
@@ -840,7 +981,10 @@ export default function TokenOverviewPage() {
             )}
           </div>
 
-          <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
+          <div
+            className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0"
+            onMouseEnter={forceClearTooltip}
+          >
             <div className="flex justify-between items-center mb-2.5">
               <h3 className="text-base font-semibold text-white font-satoshi">
                 Price Chart
@@ -1028,7 +1172,10 @@ export default function TokenOverviewPage() {
             )}
           </div>
 
-          <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
+          <div
+            className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0"
+            onMouseEnter={forceClearTooltip}
+          >
             <div className="max-h-44 overflow-y-auto scrollbar-hide">
               <TransactionHistory
                 walletAddress={walletAddress}
@@ -1043,7 +1190,10 @@ export default function TokenOverviewPage() {
           </div>
         </div>
 
-        <div className="hidden xl:flex gap-3 flex-1 min-h-0">
+        <div
+          className="hidden xl:flex gap-3 flex-1 min-h-0"
+          onMouseEnter={forceClearTooltip}
+        >
           <div className="flex-1 flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto space-y-3 scrollbar-hide">
               <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3.5 flex-shrink-0">
@@ -1144,11 +1294,13 @@ export default function TokenOverviewPage() {
                 </div>
 
                 <div className="mb-3.5">
-                  <EnhancedChart
-                    width={550}
-                    height={170}
-                    showXAxisLabels={false}
-                  />
+                  <div className="chart-container">
+                    <EnhancedChart
+                      width={550}
+                      height={170}
+                      showXAxisLabels={false}
+                    />
+                  </div>
                 </div>
 
                 {tokenInfo.priceData && (
@@ -1288,7 +1440,10 @@ export default function TokenOverviewPage() {
             </div>
           </div>
 
-          <div className="w-[355px] flex-shrink-0 h-full">
+          <div
+            className="w-[355px] flex-shrink-0 h-full"
+            onMouseEnter={forceClearTooltip}
+          >
             <div className="bg-black rounded-[14px] border border-[#2C2C2C] h-full flex flex-col p-3">
               <div className="flex items-center mb-3">
                 <span className="text-white font-semibold font-mayeka-demi-bold-demo">

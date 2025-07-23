@@ -516,6 +516,44 @@ export default function ScheduledPaymentsPage() {
         return;
       }
 
+      // Find the original token info from the tokens array to get proper contract address and decimals
+      const originalToken = tokens.find(
+        (t) =>
+          t.symbol === editingPayment.tokenSymbol ||
+          t.contractAddress === editingPayment.contractAddress ||
+          t.id === editingPayment.contractAddress
+      );
+
+      // Construct proper tokenInfo object
+      const tokenInfo = originalToken
+        ? {
+            name: originalToken.name,
+            symbol: originalToken.symbol,
+            contractAddress: originalToken.contractAddress || originalToken.id,
+            decimals: originalToken.decimals || 18,
+            isETH: originalToken.symbol === "ETH",
+            balance: originalToken.balance,
+            price: originalToken.price,
+            icon: originalToken.icon,
+          }
+        : {
+            // Fallback if token not found in current tokens array
+            name: editingPayment.tokenName,
+            symbol: editingPayment.tokenSymbol,
+            contractAddress: editingPayment.contractAddress,
+            decimals: 18, // Default fallback
+            isETH: editingPayment.tokenSymbol === "ETH",
+          };
+
+      console.log("🔍 Token info for update:", {
+        originalTokenFound: !!originalToken,
+        tokenInfo,
+        editingPayment: {
+          tokenSymbol: editingPayment.tokenSymbol,
+          contractAddress: editingPayment.contractAddress,
+        },
+      });
+
       // Since update isn't supported, we'll need to cancel and recreate
       // First cancel the existing payment
       const cancelResponse = await fetch(
@@ -534,7 +572,10 @@ export default function ScheduledPaymentsPage() {
       );
 
       if (!cancelResponse.ok) {
-        throw new Error("Failed to cancel existing payment");
+        const cancelError = await cancelResponse.json();
+        throw new Error(
+          cancelError.error || "Failed to cancel existing payment"
+        );
       }
 
       // Create new payment with updated details
@@ -542,13 +583,7 @@ export default function ScheduledPaymentsPage() {
 
       const createBody = {
         action: "create",
-        tokenInfo: {
-          name: editingPayment.tokenName,
-          symbol: editingPayment.tokenSymbol,
-          contractAddress: editingPayment.contractAddress,
-          decimals: 18, // Default, you might want to store this
-          isETH: editingPayment.tokenSymbol === "ETH",
-        },
+        tokenInfo: tokenInfo, // Use the properly constructed tokenInfo
         fromAddress: editingPayment.walletAddress,
         recipient: editingPayment.recipient,
         amount: editFormData.amount,
@@ -557,6 +592,11 @@ export default function ScheduledPaymentsPage() {
         timezone: editSelectedTimezone.tz,
         description: editFormData.description,
       };
+
+      console.log(
+        "📡 Sending recreate request with proper token info:",
+        createBody
+      );
 
       const createResponse = await fetch("/api/scheduled-payments", {
         method: "POST",
@@ -569,10 +609,16 @@ export default function ScheduledPaymentsPage() {
 
       if (!createResponse.ok) {
         const errorData = await createResponse.json();
+        console.error("❌ Create failed:", errorData);
+
+        // If creation failed, we should try to restore the cancelled payment
+        // But since that's complex, we'll just show the error
         throw new Error(errorData.error || "Failed to create updated payment");
       }
 
-      console.log("✅ Payment updated successfully (recreated)");
+      const createResult = await createResponse.json();
+      console.log("✅ Payment updated successfully (recreated):", createResult);
+
       setShowEditModal(false);
       setEditingPayment(null);
       setIsEditing(false);
@@ -921,39 +967,15 @@ export default function ScheduledPaymentsPage() {
 
   const renderMobileActionButtons = (payment: ScheduledPayment) => {
     if (activeTab === "active") {
-      if (!isEditing || editingPayment?.id !== payment.id) {
-        // Show only Edit button initially
-        return (
-          <button
-            onClick={() => handleEditPayment(payment)}
-            className="bg-[#E2AF19] text-black px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
-          >
-            <Edit3 size={10} className="mr-1" />
-            Edit
-          </button>
-        );
-      } else {
-        // Show Cancel and Delete when editing
-        return (
-          <>
-            <button
-              onClick={() => handleCancelEdit(payment)}
-              className="bg-gray-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
-            >
-              <X size={10} className="mr-1" />
-              Cancel
-            </button>
-            <button
-              onClick={() => handleDeletePayment(payment.scheduleId)}
-              disabled={loading}
-              className="bg-red-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
-            >
-              <Trash2 size={10} className="mr-1" />
-              {loading ? "..." : "Delete"}
-            </button>
-          </>
-        );
-      }
+      return (
+        <button
+          onClick={() => handleEditPayment(payment)}
+          className="bg-[#E2AF19] text-black px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+        >
+          <Edit3 size={10} className="mr-1" />
+          Edit
+        </button>
+      );
     } else {
       return (
         <>
@@ -983,42 +1005,18 @@ export default function ScheduledPaymentsPage() {
 
   const renderDesktopActionButtons = (payment: ScheduledPayment) => {
     if (activeTab === "active") {
-      if (!isEditing || editingPayment?.id !== payment.id) {
-        // Show only Edit button initially
-        return (
-          <div className="flex items-center justify-center space-x-1">
-            <button
-              onClick={() => handleEditPayment(payment)}
-              className="bg-[#E2AF19] text-black px-2 gap-1 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
-              title="Edit"
-            >
-              Edit
-              <Edit3 size={8} />
-            </button>
-          </div>
-        );
-      } else {
-        // Show Cancel and Delete when editing
-        return (
-          <div className="flex items-center justify-center space-x-1">
-            <button
-              onClick={() => handleCancelEdit(payment)}
-              className="bg-gray-600 text-white px-1.5 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
-              title="Cancel Edit"
-            >
-              <X size={8} />
-            </button>
-            <button
-              onClick={() => handleDeletePayment(payment.scheduleId)}
-              disabled={loading}
-              className="bg-red-600 text-white px-1.5 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center disabled:opacity-50"
-              title="Delete"
-            >
-              <Trash2 size={8} />
-            </button>
-          </div>
-        );
-      }
+      return (
+        <div className="flex items-center justify-center space-x-1">
+          <button
+            onClick={() => handleEditPayment(payment)}
+            className="bg-[#E2AF19] text-black px-2 gap-1 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+            title="Edit Payment"
+          >
+            Edit
+            <Edit3 size={8} />
+          </button>
+        </div>
+      );
     } else {
       return (
         <div className="flex items-center justify-center space-x-1">
@@ -1313,9 +1311,10 @@ export default function ScheduledPaymentsPage() {
                       <div className="relative recurring-dropdown">
                         <select
                           value={recurringFrequency}
-                          onChange={(e) =>
-                            setRecurringFrequency(e.target.value)
-                          }
+                          onChange={(e) => {
+                            setRecurringFrequency(e.target.value);
+                            setIsRecurringDropdownOpen(false); // Add this line
+                          }}
                           onFocus={() => setIsRecurringDropdownOpen(true)}
                           onBlur={() => setIsRecurringDropdownOpen(false)}
                           className="bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-xs min-w-[80px] scrollbar-hide"
@@ -1406,10 +1405,15 @@ export default function ScheduledPaymentsPage() {
                   </p>
                 </div>
               ) : filteredPayments.length === 0 ? (
-                <div className="text-center py-6">
+                <div className="text-center py-8 flex flex-col items-center justify-center min-h-[200px]">
                   <Clock size={20} className="text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-400 font-satoshi text-xs">
                     No {activeTab} scheduled payments found
+                  </p>
+                  <p className="text-gray-400 font-satoshi text-xs mt-1">
+                    {activeTab === "active"
+                      ? "Create your first scheduled payment to automate your crypto transfers"
+                      : "Completed payments will appear here"}
                   </p>
                 </div>
               ) : (
@@ -1444,11 +1448,17 @@ export default function ScheduledPaymentsPage() {
                               {payment.recipient.slice(-6)}
                             </div>
                             <div className="flex items-center mt-0.5">
-                              <TokenIcon
-                                token={paymentToken}
-                                size="w-3 h-3"
-                                showBg={true}
-                              />
+                              <div
+                                className={`w-3 h-3 ${getTokenBackgroundColor(
+                                  paymentToken.symbol,
+                                  payment.contractAddress
+                                )} rounded-full flex items-center justify-center`}
+                              >
+                                <TokenIcon
+                                  token={paymentToken}
+                                  size="w-2 h-2"
+                                />
+                              </div>
                               <span className="text-gray-400 text-xs font-satoshi ml-1">
                                 {payment.tokenSymbol}
                               </span>
@@ -1589,8 +1599,9 @@ export default function ScheduledPaymentsPage() {
                         >
                           <div className="flex items-center flex-1">
                             <div
-                              className={`w-5 h-5 ${getRandomTokenBgColor(
-                                token.symbol
+                              className={`w-5 h-5 ${getTokenBackgroundColor(
+                                token.symbol,
+                                token.contractAddress
                               )} rounded-full flex items-center justify-center`}
                             >
                               <TokenIcon token={token} size="w-3.5 h-3.5" />
@@ -1711,7 +1722,10 @@ export default function ScheduledPaymentsPage() {
                     <div className="relative recurring-dropdown">
                       <select
                         value={recurringFrequency}
-                        onChange={(e) => setRecurringFrequency(e.target.value)}
+                        onChange={(e) => {
+                          setRecurringFrequency(e.target.value);
+                          setIsRecurringDropdownOpen(false); // Add this line
+                        }}
                         onFocus={() => setIsRecurringDropdownOpen(true)}
                         onBlur={() => setIsRecurringDropdownOpen(false)}
                         className="bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-xs min-w-[80px] h-[32px] scrollbar-hide"
@@ -1843,7 +1857,7 @@ export default function ScheduledPaymentsPage() {
                   </span>
                 </div>
               ) : filteredPayments.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8">
+                <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
                   <Clock size={32} className="text-gray-400 mb-4" />
                   <h3 className="text-white text-lg font-satoshi mb-2">
                     No {activeTab} scheduled payments
@@ -1884,11 +1898,17 @@ export default function ScheduledPaymentsPage() {
                         </div>
 
                         <div className="flex items-center min-w-0">
-                          <TokenIcon
-                            token={paymentToken}
-                            size="w-5 h-5"
-                            showBg={true}
-                          />
+                          <div
+                            className={`w-5 h-5 ${getTokenBackgroundColor(
+                              paymentToken.symbol,
+                              payment.contractAddress
+                            )} rounded-full flex items-center justify-center`}
+                          >
+                            <TokenIcon
+                              token={paymentToken}
+                              size="w-3.5 h-3.5"
+                            />
+                          </div>
                           <span className="text-white font-satoshi text-xs truncate ml-2">
                             {payment.tokenSymbol}
                           </span>
@@ -1972,7 +1992,7 @@ export default function ScheduledPaymentsPage() {
                     </div>
                   </div>
                   <p className="text-gray-400 text-xs font-satoshi">
-                    Modify your scheduled payment details
+                    Modify your scheduled payment details or delete it
                   </p>
                 </div>
                 <button
@@ -2004,12 +2024,27 @@ export default function ScheduledPaymentsPage() {
                           {editingPayment.recipient.slice(0, 10)}...
                         </span>
                       </div>
+                      <div>
+                        <span className="text-gray-400">Current Amount:</span>
+                        <span className="text-white ml-2">
+                          {editingPayment.amount} {editingPayment.tokenSymbol}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Status:</span>
+                        <span className="text-green-400 ml-2 capitalize">
+                          {editingPayment.status}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Edit Form */}
                   <div className="space-y-3">
                     <div>
+                      <label className="text-gray-400 text-xs font-satoshi mb-1.5 block">
+                        Amount
+                      </label>
                       <Input
                         type="text"
                         placeholder="Enter amount"
@@ -2025,6 +2060,9 @@ export default function ScheduledPaymentsPage() {
                     </div>
 
                     <div>
+                      <label className="text-gray-400 text-xs font-satoshi mb-1.5 block">
+                        Scheduled Date & Time
+                      </label>
                       <DateTimePicker
                         dateValue={editFormData.date}
                         timeValue={editFormData.time}
@@ -2040,6 +2078,9 @@ export default function ScheduledPaymentsPage() {
                     </div>
 
                     <div>
+                      <label className="text-gray-400 text-xs font-satoshi mb-1.5 block">
+                        Description (Optional)
+                      </label>
                       <Input
                         type="text"
                         placeholder="Add a description"
@@ -2055,54 +2096,59 @@ export default function ScheduledPaymentsPage() {
                     </div>
 
                     {/* Recurring Toggle */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Repeat size={14} className="text-gray-400 mr-1.5" />
-                        <span className="text-white font-satoshi text-xs">
-                          Enable recurring payments
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() =>
-                            setEditRecurringEnabled(!editRecurringEnabled)
-                          }
-                          className={`relative w-10 h-5 rounded-full transition-colors ${
-                            editRecurringEnabled
-                              ? "bg-[#E2AF19]"
-                              : "bg-gray-600"
-                          }`}
-                        >
-                          <div
-                            className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-transform ${
-                              editRecurringEnabled
-                                ? "translate-x-6"
-                                : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                        {editRecurringEnabled && (
-                          <select
-                            value={editFormData.frequency}
-                            onChange={(e) =>
-                              setEditFormData({
-                                ...editFormData,
-                                frequency: e.target.value,
-                              })
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          <Repeat size={14} className="text-gray-400 mr-1.5" />
+                          <span className="text-white font-satoshi text-xs">
+                            Enable recurring payments
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() =>
+                              setEditRecurringEnabled(!editRecurringEnabled)
                             }
-                            className="bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-xs min-w-[80px] scrollbar-hide"
+                            className={`relative w-10 h-5 rounded-full transition-colors ${
+                              editRecurringEnabled
+                                ? "bg-[#E2AF19]"
+                                : "bg-gray-600"
+                            }`}
                           >
-                            <option value="daily">Daily</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="yearly">Yearly</option>
-                          </select>
-                        )}
+                            <div
+                              className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-transform ${
+                                editRecurringEnabled
+                                  ? "translate-x-6"
+                                  : "translate-x-0.5"
+                              }`}
+                            />
+                          </button>
+                          {editRecurringEnabled && (
+                            <select
+                              value={editFormData.frequency}
+                              onChange={(e) =>
+                                setEditFormData({
+                                  ...editFormData,
+                                  frequency: e.target.value,
+                                })
+                              }
+                              className="bg-black border border-[#2C2C2C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-xs min-w-[80px] scrollbar-hide"
+                            >
+                              <option value="daily">Daily</option>
+                              <option value="weekly">Weekly</option>
+                              <option value="monthly">Monthly</option>
+                              <option value="yearly">Yearly</option>
+                            </select>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     {/* Timezone Selector */}
                     <div>
+                      <label className="text-gray-400 text-xs font-satoshi mb-1.5 block">
+                        Timezone
+                      </label>
                       <div className="relative timezone-dropdown">
                         <button
                           onClick={() =>
@@ -2136,6 +2182,37 @@ export default function ScheduledPaymentsPage() {
                         )}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Danger Zone */}
+                  <div className="bg-red-900/10 border border-red-500/20 rounded-lg p-3">
+                    <div className="flex items-center mb-2">
+                      <AlertTriangle
+                        size={14}
+                        className="text-red-400 mr-1.5"
+                      />
+                      <span className="text-red-400 font-satoshi text-xs font-semibold">
+                        Danger Zone
+                      </span>
+                    </div>
+                    <p className="text-red-300 text-xs font-satoshi mb-3">
+                      Permanently delete this scheduled payment. This action
+                      cannot be undone.
+                    </p>
+                    <button
+                      onClick={() => {
+                        // Remove the confirm() from here since handleDeletePayment already has it
+                        handleDeletePayment(editingPayment.scheduleId);
+                        setShowEditModal(false);
+                        setEditingPayment(null);
+                        setIsEditing(false);
+                      }}
+                      disabled={loading}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-satoshi text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    >
+                      <Trash2 size={12} className="mr-1.5" />
+                      {loading ? "Deleting..." : "Delete Payment"}
+                    </button>
                   </div>
                 </div>
               </div>

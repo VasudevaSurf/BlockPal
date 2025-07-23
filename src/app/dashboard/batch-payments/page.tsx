@@ -1,4 +1,4 @@
-// src/app/dashboard/batch-payments/page.tsx - COMPACT VERSION
+// src/app/dashboard/batch-payments/page.tsx - UPDATED WITH CENTERED TOKEN ICONS
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -111,6 +111,36 @@ const getRandomTokenBgColor = (symbol: string) => {
   return colors[index];
 };
 
+const getTokenBackgroundColor = (symbol: string, contractAddress?: string) => {
+  const colors: Record<string, string> = {
+    ETH: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
+    ETHEREUM: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
+    SOL: "bg-gradient-to-br from-purple-500/20 to-purple-600/30",
+    BTC: "bg-gradient-to-br from-orange-500/20 to-orange-600/30",
+    SUI: "bg-gradient-to-br from-cyan-500/20 to-cyan-600/30",
+    XRP: "bg-gradient-to-br from-gray-500/20 to-gray-600/30",
+    ADA: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
+    AVAX: "bg-gradient-to-br from-red-500/20 to-red-600/30",
+    TON: "bg-gradient-to-br from-blue-400/20 to-blue-500/30",
+    DOT: "bg-gradient-to-br from-pink-500/20 to-pink-600/30",
+    USDT: "bg-gradient-to-br from-green-500/20 to-green-600/30",
+    USDC: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
+    YAI: "bg-gradient-to-br from-yellow-500/20 to-yellow-600/30",
+    LINK: "bg-gradient-to-br from-blue-700/20 to-blue-800/30",
+  };
+
+  // Special handling for ETH/native token
+  if (
+    symbol === "ETH" ||
+    contractAddress === "native" ||
+    symbol === "ETHEREUM"
+  ) {
+    return colors.ETH || "bg-gradient-to-br from-blue-500/20 to-blue-600/30";
+  }
+
+  return colors[symbol] || "bg-gradient-to-br from-gray-500/20 to-gray-600/30";
+};
+
 const getTokenLetter = (symbol: string, contractAddress?: string) => {
   const letters: Record<string, string> = {
     ETH: "Ξ",
@@ -186,32 +216,23 @@ const TokenIcon = ({
   const hasValidImage =
     !imageError && isValidImageUrl(token.icon || token.logoUrl);
 
-  return (
-    <>
-      {hasValidImage && (
-        <img
-          src={token.icon || token.logoUrl}
-          alt={token.symbol}
-          className={`${size} rounded-full mr-1.5 flex-shrink-0`}
-          onError={() => {
-            setImageError(true);
-          }}
-        />
-      )}
+  if (hasValidImage) {
+    return (
+      <img
+        src={token.icon || token.logoUrl}
+        alt={token.symbol}
+        className={`${size} rounded-full object-cover`}
+        onError={() => {
+          setImageError(true);
+        }}
+      />
+    );
+  }
 
-      <div
-        className={`${size} ${getTokenIcon(
-          token.symbol,
-          token.contractAddress
-        )} rounded-full flex items-center justify-center mr-1.5 flex-shrink-0 shadow-sm border border-white/10 ${
-          hasValidImage ? "hidden" : ""
-        }`}
-      >
-        <span className="text-white text-xs font-medium">
-          {getTokenLetter(token.symbol, token.contractAddress)}
-        </span>
-      </div>
-    </>
+  return (
+    <span className="text-white text-xs font-medium">
+      {getTokenLetter(token.symbol, token.contractAddress)}
+    </span>
   );
 };
 
@@ -659,10 +680,14 @@ export default function BatchPaymentsPage() {
                   <div className="flex items-center">
                     {selectedToken && (
                       <>
-                        <TokenIconWithBg
-                          token={selectedToken}
-                          size="w-2.5 h-2.5"
-                        />
+                        <div
+                          className={`w-5 h-5 ${getTokenBackgroundColor(
+                            selectedToken.symbol,
+                            selectedToken.contractAddress
+                          )} rounded-full flex items-center justify-center mr-2`}
+                        >
+                          <TokenIcon token={selectedToken} size="w-3 h-3" />
+                        </div>
                         <span className="text-white font-satoshi text-xs">
                           {selectedToken.symbol}
                         </span>
@@ -697,7 +722,14 @@ export default function BatchPaymentsPage() {
                           className="w-full flex items-center p-2 hover:bg-[#1A1A1A] transition-colors text-left"
                         >
                           <div className="flex items-center flex-1">
-                            <TokenIconWithBg token={token} size="w-3 h-3" />
+                            <div
+                              className={`w-6 h-6 ${getTokenBackgroundColor(
+                                token.symbol,
+                                token.contractAddress
+                              )} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
+                            >
+                              <TokenIcon token={token} size="w-4 h-4" />
+                            </div>
                             <div className="flex-1 ml-1">
                               <div className="text-white font-satoshi text-xs">
                                 {token.symbol}
@@ -823,17 +855,15 @@ export default function BatchPaymentsPage() {
                             )}
                           <div className="flex items-center mt-0.5">
                             <div
-                              className={`w-2.5 h-2.5 ${getTokenIcon(
+                              className={`w-5 h-5 ${getTokenBackgroundColor(
                                 payment.tokenInfo.symbol,
                                 payment.tokenInfo.contractAddress
-                              )} rounded-full flex items-center justify-center mr-1 flex-shrink-0 shadow-sm border border-white/10`}
+                              )} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
                             >
-                              <span className="text-white text-xs font-medium">
-                                {getTokenLetter(
-                                  payment.tokenInfo.symbol,
-                                  payment.tokenInfo.contractAddress
-                                )}
-                              </span>
+                              <TokenIcon
+                                token={payment.tokenInfo}
+                                size="w-3 h-3"
+                              />
                             </div>
                             <span className="text-gray-400 text-xs font-satoshi">
                               {payment.tokenInfo.symbol}
@@ -900,10 +930,14 @@ export default function BatchPaymentsPage() {
                 <div className="flex items-center min-w-0">
                   {selectedToken && (
                     <>
-                      <TokenIconWithBg
-                        token={selectedToken}
-                        size="w-2.5 h-2.5"
-                      />
+                      <div
+                        className={`w-5 h-5 ${getTokenBackgroundColor(
+                          selectedToken.symbol,
+                          selectedToken.contractAddress
+                        )} rounded-full flex items-center justify-center mr-2`}
+                      >
+                        <TokenIcon token={selectedToken} size="w-3 h-3" />
+                      </div>
                       <span className="text-white font-satoshi text-xs truncate">
                         {selectedToken.symbol}
                       </span>
@@ -937,7 +971,14 @@ export default function BatchPaymentsPage() {
                         className="w-full flex items-center p-2 hover:bg-[#1A1A1A] transition-colors text-left"
                       >
                         <div className="flex items-center flex-1">
-                          <TokenIconWithBg token={token} size="w-3 h-3" />
+                          <div
+                            className={`w-6 h-6 ${getTokenBackgroundColor(
+                              token.symbol,
+                              token.contractAddress
+                            )} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
+                          >
+                            <TokenIcon token={token} size="w-4 h-4" />
+                          </div>
                           <div className="flex-1 min-w-0 ml-1">
                             <div className="text-white font-satoshi text-xs truncate">
                               {token.symbol}
@@ -1003,7 +1044,7 @@ export default function BatchPaymentsPage() {
 
           <div className="overflow-y-auto scrollbar-hide mb-2 flex-1 min-h-0">
             {batchPayments.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-3">
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
                 <div className="w-8 h-8 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-1.5">
                   <Plus size={14} className="text-gray-400" />
                 </div>
@@ -1043,17 +1084,15 @@ export default function BatchPaymentsPage() {
 
                         <div className="flex items-center min-w-0">
                           <div
-                            className={`w-2.5 h-2.5 ${getTokenIcon(
+                            className={`w-5 h-5 ${getTokenBackgroundColor(
                               payment.tokenInfo.symbol,
                               payment.tokenInfo.contractAddress
-                            )} rounded-full flex items-center justify-center mr-1 flex-shrink-0 shadow-sm border border-white/10`}
+                            )} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
                           >
-                            <span className="text-white text-xs font-medium">
-                              {getTokenLetter(
-                                payment.tokenInfo.symbol,
-                                payment.tokenInfo.contractAddress
-                              )}
-                            </span>
+                            <TokenIcon
+                              token={payment.tokenInfo}
+                              size="w-3 h-3"
+                            />
                           </div>
                           <span className="text-white font-satoshi text-xs truncate">
                             {payment.tokenInfo.symbol}

@@ -221,47 +221,33 @@ export function SkeletonSwapSection() {
 }
 
 // AI Chat Skeleton (NO SCROLLING INDICATORS)
+// Simple AI Chat Skeleton - Just input area
 export function SkeletonAIChat() {
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] flex flex-col">
-      {/* Chat Container - Normal WhatsApp-like layout */}
-      <div className="flex-1 flex flex-col">
-        {/* Messages Area - Messages stick to bottom like WhatsApp */}
-        <div className="flex-1 px-1.5 sm:px-3 lg:px-4 flex flex-col justify-end">
-          <div className="space-y-3 lg:space-y-4 py-3">
-            {/* Single Welcome Message */}
-            <div className="flex flex-col items-start space-y-1.5">
-              <div className="max-w-full sm:max-w-4xl bg-black p-2.5 lg:p-3 rounded-xl border border-[#2C2C2C]">
-                <Skeleton className="h-3 w-full mb-1.5" />
-                <Skeleton className="h-3 w-2/3" />
-              </div>
-              <Skeleton variant="rounded" className="h-5 w-10" />
-            </div>
+      {/* Empty chat area */}
+      <div className="flex-1"></div>
 
-            {/* Scroll anchor at the bottom */}
-            <div className="h-0"></div>
-          </div>
+      {/* Input Area at bottom */}
+      <div className="p-2 sm:p-3 lg:p-4 flex-shrink-0">
+        <div className="relative">
+          {/* Input skeleton */}
+          <Skeleton className="w-full h-10 sm:h-12 rounded-full" />
+          {/* Send button skeleton */}
+          <Skeleton
+            variant="circular"
+            className="absolute right-1 sm:right-1.5 top-1/2 transform -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 bg-[#E2AF19]/20"
+          />
         </div>
 
-        {/* Input Area at bottom */}
-        <div className="p-2.5 sm:p-3 lg:p-4 flex-shrink-0">
-          <div className="relative">
-            <Skeleton className="w-full h-10 sm:h-12 rounded-full" />
-            <Skeleton
-              variant="circular"
-              className="absolute right-0.5 sm:right-1.5 top-1/2 transform -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10"
-            />
+        {/* Status indicator skeleton */}
+        <div className="flex items-center justify-center mt-1.5">
+          <div className="flex space-x-1 mr-2">
+            <Skeleton variant="circular" className="w-1.5 h-1.5" />
+            <Skeleton variant="circular" className="w-1.5 h-1.5" />
+            <Skeleton variant="circular" className="w-1.5 h-1.5" />
           </div>
-
-          {/* Status indicator skeleton */}
-          <div className="flex items-center justify-center mt-1.5">
-            <div className="flex space-x-0.5 mr-1.5">
-              <Skeleton variant="circular" className="w-1.5 h-1.5" />
-              <Skeleton variant="circular" className="w-1.5 h-1.5" />
-              <Skeleton variant="circular" className="w-1.5 h-1.5" />
-            </div>
-            <Skeleton className="h-2.5 w-20" />
-          </div>
+          <Skeleton className="h-2.5 w-20" />
         </div>
       </div>
     </div>

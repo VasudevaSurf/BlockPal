@@ -396,6 +396,26 @@ export default function SimpleTransferModal({
     }
   };
 
+  const getRandomTokenBg = (symbol: string) => {
+    const backgrounds = [
+      "bg-blue-500/20",
+      "bg-purple-500/20",
+      "bg-green-500/20",
+      "bg-yellow-500/20",
+      "bg-red-500/20",
+      "bg-cyan-500/20",
+      "bg-pink-500/20",
+      "bg-orange-500/20",
+      "bg-indigo-500/20",
+      "bg-teal-500/20",
+    ];
+
+    const index =
+      symbol.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) %
+      backgrounds.length;
+    return backgrounds[index];
+  };
+
   const handleExecuteTransfer = async () => {
     console.log("🚀 Executing transfer...");
 
@@ -546,12 +566,16 @@ export default function SimpleTransferModal({
               Send
             </h2>
             {/* Token icon in header */}
-            <div className="w-6 h-6 bg-[#E2AF19] rounded-lg flex items-center justify-center">
+            <div
+              className={`w-6 h-6 ${getRandomTokenBg(
+                tokenInfo.symbol
+              )} rounded-lg flex items-center justify-center p-0.5`}
+            >
               {tokenInfo.priceData?.image ? (
                 <img
                   src={tokenInfo.priceData.image}
                   alt={tokenInfo.symbol}
-                  className="w-5 h-5 rounded-md"
+                  className="w-5 h-5 rounded-md object-cover"
                 />
               ) : (
                 <span className="text-black text-sm font-bold">
@@ -733,7 +757,7 @@ export default function SimpleTransferModal({
                     <div className="flex items-center min-w-0 flex-shrink">
                       {tokenInfo.priceData?.image ? (
                         <div
-                          className={`w-8 h-8 ${getTokenIcon(
+                          className={`w-8 h-8 ${getRandomTokenBg(
                             tokenInfo.symbol
                           )} rounded-full mr-2 p-0.5 flex items-center justify-center flex-shrink-0`}
                         >
