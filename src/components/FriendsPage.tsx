@@ -811,7 +811,8 @@ export default function FriendsPage() {
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  Friends ({friends.length})
+                  Friends
+                  {/* ({friends.length}) */}
                 </button>
                 <button
                   onClick={() => setActiveTab("Requests")}
@@ -821,7 +822,8 @@ export default function FriendsPage() {
                       : "text-gray-400 hover:text-white border-[#2C2C2C]"
                   }`}
                 >
-                  Requests ({friendRequests.length})
+                  Requests
+                  {/* ({friendRequests.length}) */}
                 </button>
                 <button
                   onClick={() => setActiveTab("FundRequests")}
@@ -831,7 +833,8 @@ export default function FriendsPage() {
                       : "text-gray-400 hover:text-white border-[#2C2C2C]"
                   }`}
                 >
-                  Fund Requests ({fundRequests.length})
+                  Fund Requests
+                  {/* ({fundRequests.length}) */}
                 </button>
               </div>
 

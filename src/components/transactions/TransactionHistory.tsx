@@ -319,7 +319,7 @@ export default function TransactionHistory({
         <h3 className="text-base font-semibold text-white font-mayeka-demi-bold-demo">
           {title}
         </h3>
-        {showRefresh && (
+        {/* {showRefresh && (
           <button
             onClick={fetchTransactions}
             className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
@@ -327,14 +327,14 @@ export default function TransactionHistory({
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
-        )}
+        )} */}
       </div>
 
       {/* Transaction List */}
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {loading ? (
           <div className="flex items-center justify-center py-6">
-            <RefreshCw size={14} className="animate-spin text-gray-400 mr-2" />
+            {/* <RefreshCw size={14} className="animate-spin text-gray-400 mr-2" /> */}
             <span className="text-gray-400 text-sm font-satoshi">
               Loading transactions...
             </span>

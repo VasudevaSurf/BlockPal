@@ -383,7 +383,7 @@ export default function TokenList() {
         <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
           Token Holdings
         </h2>
-        <WalletRefreshButton />
+        {/* <WalletRefreshButton /> */}
       </div>
 
       {/* Mobile Grid Layout */}

@@ -1218,7 +1218,7 @@ export default function ScheduledPaymentsPage() {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="w-full sm:col-span-1 md:col-span-1">
                   {/* Amount Input */}
                   <Input
@@ -1231,7 +1231,7 @@ export default function ScheduledPaymentsPage() {
                     className="font-satoshi"
                   />
                 </div>
-                
+
                 {/* Timezone Selector */}
                 <div className="relative timezone-dropdown w-full sm:col-span-2 md:col-span-1">
                   <button
@@ -1401,7 +1401,9 @@ export default function ScheduledPaymentsPage() {
                     size={16}
                     className="animate-spin text-gray-400 mx-auto mb-2"
                   />
-                  <p className="text-gray-400 font-satoshi text-xs">Loading...</p>
+                  <p className="text-gray-400 font-satoshi text-xs">
+                    Loading...
+                  </p>
                 </div>
               ) : filteredPayments.length === 0 ? (
                 <div className="text-center py-6">
@@ -1545,7 +1547,10 @@ export default function ScheduledPaymentsPage() {
                           )} rounded-full flex items-center justify-center`}
                         >
                           <div className="w-3.5 h-3.5 flex items-center justify-center">
-                            <TokenIcon token={selectedToken} size="w-3.5 h-3.5" />
+                            <TokenIcon
+                              token={selectedToken}
+                              size="w-3.5 h-3.5"
+                            />
                           </div>
                         </div>
                         <span className="text-white font-satoshi text-xs ml-2">
@@ -1775,7 +1780,8 @@ export default function ScheduledPaymentsPage() {
                     htmlFor="active-radio-desktop"
                     className="text-white font-satoshi text-xs"
                   >
-                    Active ({activeCount})
+                    Active
+                    {/* ({activeCount}) */}
                   </label>
                 </div>
 
@@ -1793,7 +1799,8 @@ export default function ScheduledPaymentsPage() {
                     htmlFor="completed-radio-desktop"
                     className="text-white font-satoshi text-xs"
                   >
-                    Completed ({completedCount})
+                    Completed
+                    {/* ({completedCount}) */}
                   </label>
                 </div>
               </div>
@@ -1831,7 +1838,9 @@ export default function ScheduledPaymentsPage() {
                     size={16}
                     className="animate-spin text-gray-400 mr-2"
                   />
-                  <span className="text-gray-400 font-satoshi text-xs">Loading...</span>
+                  <span className="text-gray-400 font-satoshi text-xs">
+                    Loading...
+                  </span>
                 </div>
               ) : filteredPayments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8">
@@ -1902,7 +1911,9 @@ export default function ScheduledPaymentsPage() {
                             </div>
                           ) : payment.status === "completed" ? (
                             <div className="text-gray-400 text-xs">
-                              {formatDateTime(payment.lastExecutionAt || payment.scheduledFor)}
+                              {formatDateTime(
+                                payment.lastExecutionAt || payment.scheduledFor
+                              )}
                             </div>
                           ) : (
                             <span className="text-gray-400">—</span>
