@@ -345,8 +345,17 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
           {/* Go to Website Button */}
           <button
-            className="w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-xs lg:text-sm"
+            onClick={() => {
+              // FIXED: Add https:// protocol to the URL
+              window.open(
+                "https://blockpal.tech", // ✅ Correct: includes protocol
+                "_blank",
+                "noopener,noreferrer"
+              );
+            }}
+            className="w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-xs lg:text-sm cursor-pointer"
             disabled={isLoading}
+            title="Visit Blockpal website"
           >
             <WebsiteIcon size={16} className="mr-3 flex-shrink-0" />
             <span className="truncate">Go to website</span>
@@ -356,7 +365,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
           </button>
 
           {/* Dark Mode Toggle */}
-          <button
+          {/* <button
             onClick={() => dispatch(toggleTheme())}
             disabled={isLoading}
             className="w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-xs lg:text-sm"
@@ -368,7 +377,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 <div className="w-3 lg:w-4 h-3 lg:h-4 bg-white rounded-full absolute top-1 right-1"></div>
               </div>
             </div>
-          </button>
+          </button> */}
         </div>
       </div>
     </div>
