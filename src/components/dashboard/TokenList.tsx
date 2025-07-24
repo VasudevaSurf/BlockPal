@@ -365,13 +365,13 @@ export default function TokenList() {
           <p className="text-gray-400 font-satoshi text-xs lg:text-sm mb-3">
             This wallet doesn't have any tokens yet
           </p>
-          <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3 max-w-xs">
+          {/* <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3 max-w-xs">
             <p className="text-blue-400 text-xs font-satoshi">
               💡 <strong>Tip:</strong> Send some tokens to your wallet address:{" "}
               {activeWallet.address.slice(0, 6)}...
               {activeWallet.address.slice(-4)}
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
     );
@@ -383,7 +383,7 @@ export default function TokenList() {
         <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
           Token Holdings
         </h2>
-        {/* <WalletRefreshButton /> */}
+        <WalletRefreshButton />
       </div>
 
       {/* Mobile Grid Layout */}
