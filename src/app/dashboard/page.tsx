@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED VERSION WITH BETTER WALLET SWITCHING
+// src/app/dashboard/page.tsx - Final implementation with pure real-time updates
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -11,17 +11,15 @@ import {
   setActiveWallet,
   setActiveWalletInDB,
   getActiveWalletFromDB,
-  fetchWalletTokens,
-  updateWalletBalance,
-  clearTokens, // Add this import
 } from "@/store/slices/walletSlice";
-import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
+import { usePureRealtimeDashboard } from "@/hooks/usePureRealtimeDashboard";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
 import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
-import RealtimeDashboardNotifications from "@/components/notifications/RealtimeDashboardNotifications";
+import PureRealtimeNotifications from "@/components/notifications/PureRealtimeNotifications";
+import PureRealtimeStatusBar from "@/components/dashboard/PureRealtimeStatusBar";
 import {
   SkeletonWalletBalance,
   SkeletonTokenList,
@@ -29,32 +27,18 @@ import {
 } from "@/components/ui/Skeleton";
 
 interface DashboardState {
-  // Loading phases
   authLoading: boolean;
   walletsLoading: boolean;
-  tokensLoading: boolean;
-  balanceLoading: boolean;
-
-  // Completion flags
   authResolved: boolean;
   walletsResolved: boolean;
   activeWalletResolved: boolean;
-  tokensResolved: boolean;
-  balanceResolved: boolean;
-
-  // Data flags
   hasWallets: boolean;
   hasActiveWallet: boolean;
-  hasTokens: boolean;
-  hasBalance: boolean;
-
-  // UI states
   showWelcomeModal: boolean;
   initialLoadComplete: boolean;
-  dataRefreshed: boolean;
 }
 
-export default function DashboardPage() {
+export default function PureRealtimeDashboardPage() {
   const {
     isAuthenticated,
     loading: authLoading,
@@ -70,24 +54,40 @@ export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
+  // Pure real-time dashboard hook - NO MANUAL TRIGGERS NEEDED!
+  const {
+    data: blockchainData,
+    isMonitoring,
+    lastUpdated,
+    totalValueChange,
+    hasRecentChanges,
+    recentChanges,
+    status,
+    notifications,
+    unreadNotificationCount,
+    highPriorityNotifications,
+    refreshDashboard,
+    clearNotifications,
+    markNotificationAsRead,
+    removeNotification,
+    getTimeSinceUpdate,
+    isDataStale,
+    isConnected,
+    isActive,
+    changeHistory,
+  } = usePureRealtimeDashboard();
+
   // Enhanced state tracking
   const [dashboardState, setDashboardState] = useState<DashboardState>({
     authLoading: true,
     walletsLoading: false,
-    tokensLoading: false,
-    balanceLoading: false,
     authResolved: false,
     walletsResolved: false,
     activeWalletResolved: false,
-    tokensResolved: false,
-    balanceResolved: false,
     hasWallets: false,
     hasActiveWallet: false,
-    hasTokens: false,
-    hasBalance: false,
-    showWelletModal: false,
+    showWelcomeModal: false,
     initialLoadComplete: false,
-    dataRefreshed: false,
   });
 
   // Wallet switcher state
@@ -98,64 +98,13 @@ export default function DashboardPage() {
     authChecked: false,
     walletsLoaded: false,
     activeWalletSynced: false,
-    tokensLoaded: false,
-    balanceLoaded: false,
     pageLoadTime: Date.now(),
     currentWalletAddress: null as string | null,
   });
 
-  // Real-time dashboard hook
-  const {
-    data: realtimeData,
-    isMonitoring,
-    lastUpdated,
-    changeAmount,
-    hasChanges,
-    notifications,
-    refreshDashboard,
-    status,
-    isDataStale,
-  } = useRealtimeDashboard();
-
-  // ENHANCED: Track active wallet changes and reset loading state
-  useEffect(() => {
-    const currentWalletAddress = activeWallet?.address;
-    const previousWalletAddress =
-      initializationRef.current.currentWalletAddress;
-
-    if (currentWalletAddress !== previousWalletAddress) {
-      console.log("🔄 Active wallet changed:", {
-        from: previousWalletAddress,
-        to: currentWalletAddress,
-      });
-
-      // Update tracking
-      initializationRef.current.currentWalletAddress = currentWalletAddress;
-
-      // If this is a wallet switch (not initial load), reset data loading flags
-      if (previousWalletAddress && currentWalletAddress) {
-        console.log("🔄 Wallet switched - resetting data loading flags");
-
-        initializationRef.current.tokensLoaded = false;
-        initializationRef.current.balanceLoaded = false;
-
-        setDashboardState((prev) => ({
-          ...prev,
-          tokensLoading: false,
-          balanceLoading: false,
-          tokensResolved: false,
-          balanceResolved: false,
-          hasTokens: false,
-          hasBalance: false,
-          dataRefreshed: false,
-        }));
-      }
-    }
-  }, [activeWallet?.address]);
-
   // STEP 1: Auth Check Effect
   useEffect(() => {
-    console.log("🔍 Dashboard - Auth initialization");
+    console.log("🔍 Pure Real-time Dashboard - Auth initialization");
 
     if (!initializationRef.current.authChecked) {
       initializationRef.current.authChecked = true;
@@ -175,7 +124,7 @@ export default function DashboardPage() {
   // STEP 2: Auth Resolution Effect
   useEffect(() => {
     if (dashboardState.authResolved && !isAuthenticated && !authLoading) {
-      console.log("🚪 Dashboard - Redirecting to auth");
+      console.log("🚪 Pure Real-time Dashboard - Redirecting to auth");
       router.push("/auth");
     }
   }, [dashboardState.authResolved, isAuthenticated, authLoading, router]);
@@ -188,7 +137,7 @@ export default function DashboardPage() {
       user &&
       !initializationRef.current.walletsLoaded
     ) {
-      console.log("📡 Dashboard - Loading wallets");
+      console.log("📡 Pure Real-time Dashboard - Loading wallets");
 
       initializationRef.current.walletsLoaded = true;
       setDashboardState((prev) => ({ ...prev, walletsLoading: true }));
@@ -201,7 +150,7 @@ export default function DashboardPage() {
 
         const hasWallets = walletsData && walletsData.length > 0;
 
-        console.log("📦 Wallets fetch completed:", {
+        console.log("📦 Pure Real-time Wallets fetch completed:", {
           hasWallets,
           walletsCount: walletsData?.length || 0,
         });
@@ -223,7 +172,7 @@ export default function DashboardPage() {
       wallets.length > 0 &&
       !initializationRef.current.activeWalletSynced
     ) {
-      console.log("🎯 Dashboard - Syncing active wallet");
+      console.log("🎯 Pure Real-time Dashboard - Syncing active wallet");
 
       initializationRef.current.activeWalletSynced = true;
 
@@ -249,101 +198,34 @@ export default function DashboardPage() {
           ...prev,
           activeWalletResolved: true,
           hasActiveWallet: true,
+          initialLoadComplete: true,
         }));
       });
     }
   }, [dashboardState.walletsResolved, wallets.length, dispatch]);
 
-  // STEP 5: ENHANCED - Load tokens and balance when active wallet is available
+  // Track active wallet changes for pure blockchain monitoring
   useEffect(() => {
-    if (
-      dashboardState.activeWalletResolved &&
-      activeWallet?.address &&
-      (!initializationRef.current.tokensLoaded ||
-        !initializationRef.current.balanceLoaded ||
-        initializationRef.current.currentWalletAddress !== activeWallet.address)
-    ) {
-      console.log(
-        "🪙💰 Dashboard - Loading tokens and balance for active wallet"
-      );
+    const currentWalletAddress = activeWallet?.address;
+    const previousWalletAddress =
+      initializationRef.current.currentWalletAddress;
 
-      const needsTokens =
-        !initializationRef.current.tokensLoaded ||
-        initializationRef.current.currentWalletAddress !== activeWallet.address;
-      const needsBalance =
-        !initializationRef.current.balanceLoaded ||
-        initializationRef.current.currentWalletAddress !== activeWallet.address;
-
-      setDashboardState((prev) => ({
-        ...prev,
-        tokensLoading: needsTokens,
-        balanceLoading: needsBalance,
-      }));
-
-      const loadPromises: Promise<any>[] = [];
-
-      if (needsTokens) {
-        initializationRef.current.tokensLoaded = true;
-        loadPromises.push(
-          dispatch(fetchWalletTokens(activeWallet.address)).then((result) => {
-            const tokensData =
-              result.type === "wallet/fetchWalletTokens/fulfilled"
-                ? (result.payload as any)?.tokens || []
-                : [];
-
-            console.log("🪙 Tokens fetch completed:", {
-              tokensCount: tokensData.length,
-            });
-
-            setDashboardState((prev) => ({
-              ...prev,
-              tokensLoading: false,
-              tokensResolved: true,
-              hasTokens: tokensData.length > 0,
-            }));
-
-            return result;
-          })
-        );
-      }
-
-      if (needsBalance) {
-        initializationRef.current.balanceLoaded = true;
-        loadPromises.push(
-          dispatch(updateWalletBalance(activeWallet.address)).then((result) => {
-            console.log("💰 Balance update completed");
-
-            setDashboardState((prev) => ({
-              ...prev,
-              balanceLoading: false,
-              balanceResolved: true,
-              hasBalance: true,
-            }));
-
-            return result;
-          })
-        );
-      }
-
-      // Wait for all loading to complete
-      Promise.all(loadPromises).then(() => {
-        setDashboardState((prev) => ({
-          ...prev,
-          initialLoadComplete: true,
-          dataRefreshed: true,
-        }));
+    if (currentWalletAddress !== previousWalletAddress) {
+      console.log("🔄 Pure Real-time Dashboard - Active wallet changed:", {
+        from: previousWalletAddress,
+        to: currentWalletAddress,
       });
-    }
-  }, [
-    dashboardState.activeWalletResolved,
-    activeWallet?.address,
-    dispatch,
-    initializationRef.current.currentWalletAddress,
-  ]);
 
-  // FIXED: Enhanced wallet selection handler
+      initializationRef.current.currentWalletAddress = currentWalletAddress;
+
+      // The pure blockchain service automatically starts monitoring!
+      // No manual data loading or refresh needed - it detects ALL changes automatically!
+    }
+  }, [activeWallet?.address]);
+
+  // Pure wallet selection handler - NO MANUAL REFRESH NEEDED!
   const handleWalletSelect = async (walletId: string) => {
-    console.log("🎯 Dashboard - Wallet selected:", walletId);
+    console.log("🎯 Pure Real-time Dashboard - Wallet selected:", walletId);
 
     // Find the selected wallet
     const selectedWallet = wallets.find((w) => w.id === walletId);
@@ -351,25 +233,6 @@ export default function DashboardPage() {
       console.error("❌ Selected wallet not found");
       return;
     }
-
-    // Clear existing data to show loading state
-    dispatch(clearTokens());
-
-    // Reset loading state for new wallet
-    initializationRef.current.tokensLoaded = false;
-    initializationRef.current.balanceLoaded = false;
-    initializationRef.current.currentWalletAddress = selectedWallet.address;
-
-    setDashboardState((prev) => ({
-      ...prev,
-      tokensLoading: true,
-      balanceLoading: true,
-      tokensResolved: false,
-      balanceResolved: false,
-      hasTokens: false,
-      hasBalance: false,
-      dataRefreshed: false,
-    }));
 
     try {
       // Set locally first for immediate UI response
@@ -379,25 +242,20 @@ export default function DashboardPage() {
       await dispatch(setActiveWalletInDB(walletId));
       console.log("✅ Active wallet synced with database");
 
-      // Force refresh dashboard data for new wallet
-      setTimeout(() => {
-        if (refreshDashboard) {
-          refreshDashboard();
-        }
-      }, 500);
+      // The pure blockchain service will AUTOMATICALLY detect the wallet change
+      // and start monitoring the new wallet in real-time!
+      // NO MANUAL REFRESH OR API CALLS NEEDED! 🎉
     } catch (error) {
       console.error("❌ Failed to sync active wallet with database:", error);
     }
   };
 
   const handleWalletCreated = () => {
-    // Reset all initialization flags
+    // Reset initialization flags
     initializationRef.current = {
       authChecked: true,
       walletsLoaded: false,
       activeWalletSynced: false,
-      tokensLoaded: false,
-      balanceLoaded: false,
       pageLoadTime: Date.now(),
       currentWalletAddress: null,
     };
@@ -406,28 +264,23 @@ export default function DashboardPage() {
     setDashboardState((prev) => ({
       ...prev,
       walletsLoading: false,
-      tokensLoading: false,
-      balanceLoading: false,
       walletsResolved: false,
       activeWalletResolved: false,
-      tokensResolved: false,
-      balanceResolved: false,
       hasWallets: false,
       hasActiveWallet: false,
-      hasTokens: false,
-      hasBalance: false,
       showWelcomeModal: false,
       initialLoadComplete: false,
-      dataRefreshed: false,
     }));
 
     // Reload wallets
     dispatch(fetchWallets());
   };
 
-  // Manual refresh handler
+  // Manual refresh handler (rarely needed with pure monitoring!)
   const handleManualRefresh = async () => {
-    console.log("🔄 Manual refresh triggered");
+    console.log(
+      "🔄 Manual refresh triggered (though pure monitoring runs automatically!)"
+    );
     try {
       if (refreshDashboard) {
         await refreshDashboard();
@@ -444,10 +297,7 @@ export default function DashboardPage() {
     !dashboardState.authResolved ||
     (isAuthenticated &&
       (!dashboardState.walletsResolved || dashboardState.walletsLoading)) ||
-    (wallets.length > 0 && !dashboardState.activeWalletResolved) ||
-    (dashboardState.hasActiveWallet &&
-      (dashboardState.tokensLoading || dashboardState.balanceLoading) &&
-      !dashboardState.dataRefreshed);
+    (wallets.length > 0 && !dashboardState.activeWalletResolved);
 
   const shouldShowContent =
     dashboardState.authResolved &&
@@ -462,25 +312,34 @@ export default function DashboardPage() {
     wallets.length === 0 &&
     dashboardState.initialLoadComplete;
 
-  console.log("🎨 Dashboard render state:", {
+  console.log("🎨 Pure Real-time Dashboard render state:", {
     authResolved: dashboardState.authResolved,
     walletsResolved: dashboardState.walletsResolved,
     activeWalletResolved: dashboardState.activeWalletResolved,
-    tokensResolved: dashboardState.tokensResolved,
-    balanceResolved: dashboardState.balanceResolved,
     walletsFromRedux: wallets.length,
     shouldShowSkeleton,
     shouldShowContent,
     shouldShowWelcomeModal,
-    currentWalletAddress: initializationRef.current.currentWalletAddress,
-    activeWalletAddress: activeWallet?.address,
+    pureMonitoring: isMonitoring,
+    isConnected,
+    lastUpdate: getTimeSinceUpdate(),
+    totalValueChange: totalValueChange?.toFixed(4),
+    hasRecentChanges,
+    recentChangesCount: recentChanges.length,
+    notificationsCount: notifications.length,
+    highPriorityCount: highPriorityNotifications.length,
   });
 
   // Show loading skeleton during initial setup
   if (shouldShowSkeleton) {
     return (
       <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
-        <RealtimeDashboardNotifications />
+        <PureRealtimeNotifications
+          notifications={notifications}
+          onMarkAsRead={markNotificationAsRead}
+          onRemove={removeNotification}
+          onClearAll={clearNotifications}
+        />
 
         {/* Mobile Layout Skeleton */}
         <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0">
@@ -510,9 +369,29 @@ export default function DashboardPage() {
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
-      <RealtimeDashboardNotifications />
+      {/* Pure Real-time Notifications - Shows incoming/outgoing transactions automatically! */}
+      <PureRealtimeNotifications
+        notifications={notifications}
+        onMarkAsRead={markNotificationAsRead}
+        onRemove={removeNotification}
+        onClearAll={clearNotifications}
+      />
 
-      {/* Main Dashboard Content */}
+      {/* Pure Real-time Status Bar - Shows live blockchain monitoring status */}
+      <PureRealtimeStatusBar
+        isMonitoring={isMonitoring}
+        isConnected={isConnected}
+        lastUpdated={lastUpdated}
+        totalValueChange={totalValueChange}
+        hasRecentChanges={hasRecentChanges}
+        timeSinceUpdate={getTimeSinceUpdate()}
+        status={status}
+        isDataStale={isDataStale}
+        changeCount={recentChanges.length}
+        onManualRefresh={handleManualRefresh}
+      />
+
+      {/* Main Dashboard Content - Updates automatically with pure blockchain monitoring! */}
       {wallets.length > 0 ? (
         <div className="flex flex-col xl:flex-row gap-3 lg:gap-4 flex-1 min-h-0">
           {/* Mobile Layout */}
@@ -543,18 +422,25 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : (
-        // Empty state
+        // Empty state with pure real-time readiness indicator
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-12 h-12 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-3 relative">
               <span className="text-black text-lg font-bold">₿</span>
+              {/* Real-time indicator */}
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-pulse">
+                <div className="absolute inset-0 w-4 h-4 bg-green-400 rounded-full animate-ping opacity-25"></div>
+              </div>
             </div>
             <h3 className="text-white text-base font-satoshi mb-2">
-              Welcome to Blockpal
+              Welcome to Pure Real-time Blockpal
             </h3>
-            <p className="text-gray-400 font-satoshi text-sm">
-              Setting up your wallet experience...
+            <p className="text-gray-400 font-satoshi text-sm mb-3">
+              Your dashboard will update automatically when transactions happen
             </p>
+            <div className="text-xs text-green-400 font-satoshi">
+              🔴 Live • Pure blockchain monitoring ready
+            </div>
           </div>
         </div>
       )}
@@ -569,7 +455,7 @@ export default function DashboardPage() {
         onWalletCreated={handleWalletCreated}
       />
 
-      {/* Wallet Switcher */}
+      {/* Enhanced Wallet Switcher */}
       {wallets.length > 0 && (
         <RealtimeWalletSwitcher
           isOpen={walletSwitcherOpen}
