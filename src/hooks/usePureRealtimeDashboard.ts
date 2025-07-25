@@ -1,4 +1,4 @@
-// src/hooks/usePureRealtimeDashboard.ts - Pure real-time dashboard hook without triggers
+// src/hooks/usePureRealtimeDashboard.ts - FIXED VERSION
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/store";
@@ -16,7 +16,7 @@ import {
 export interface PureRealtimeDashboardState {
   data: BlockchainData | null;
   isMonitoring: boolean;
-  lastUpdated: Date | null;
+  lastUpdated: string | null; // FIXED: Use string instead of Date
   totalValueChange: number;
   hasRecentChanges: boolean;
   recentChanges: BalanceChange[];
@@ -42,7 +42,7 @@ export interface RealtimeNotification {
   message: string;
   amount?: number;
   token?: string;
-  timestamp: Date;
+  timestamp: string; // FIXED: Use string instead of Date
   isRead: boolean;
   priority: "low" | "medium" | "high";
 }
@@ -84,15 +84,73 @@ export function usePureRealtimeDashboard() {
         totalValue: data.totalValue.toFixed(4),
         tokenCount: data.tokens.length,
         isInitial,
+        ethBalance: data.ethBalance,
+      });
+
+      // FIXED: Convert tokens to proper format for Redux
+      const formattedTokens = data.tokens.map((token: any) => ({
+        id:
+          token.contractAddress === "native"
+            ? "native-eth"
+            : token.contractAddress || `${token.symbol}-${Date.now()}`,
+        symbol: token.symbol,
+        name: token.name,
+        balance: token.balance,
+        value: token.value,
+        price: token.price,
+        change24h: token.change24h,
+        logoUrl: token.logoUrl,
+        contractAddress: token.contractAddress,
+        decimals: token.decimals,
+      }));
+
+      // FIXED: Include ETH as a token if it has balance
+      const ethBalance = parseFloat(data.ethBalance || "0");
+      if (ethBalance > 0) {
+        const ethToken = {
+          id: "native-eth",
+          symbol: "ETH",
+          name: "Ethereum",
+          balance: ethBalance,
+          value: ethBalance * (data.ethPriceUSD || 0),
+          price: data.ethPriceUSD || 0,
+          change24h: 0, // You might want to get this from the API
+          logoUrl:
+            "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
+          contractAddress: "native",
+          decimals: 18,
+        };
+
+        // Check if ETH token already exists in the list
+        const ethTokenExists = formattedTokens.some(
+          (token: any) =>
+            token.contractAddress === "native" || token.symbol === "ETH"
+        );
+
+        if (!ethTokenExists) {
+          formattedTokens.unshift(ethToken); // Add ETH as first token
+        }
+      }
+
+      // FIXED: Calculate total value including ETH
+      const totalValue = formattedTokens.reduce(
+        (sum: number, token: any) => sum + (token.value || 0),
+        0
+      );
+
+      console.log("📊 Formatted tokens:", {
+        count: formattedTokens.length,
+        totalValue: totalValue.toFixed(4),
+        ethIncluded: formattedTokens.some((t: any) => t.symbol === "ETH"),
       });
 
       // Update Redux store
       dispatch(
         batchUpdateFromRealtimeService({
-          tokens: data.tokens,
-          totalBalance: data.totalValue,
-          activeWalletBalance: data.totalValue,
-          timestamp: data.lastUpdated,
+          tokens: formattedTokens,
+          totalBalance: totalValue,
+          activeWalletBalance: totalValue,
+          timestamp: new Date(data.lastUpdated).toISOString(), // FIXED: Convert to string
         })
       );
 
@@ -100,13 +158,13 @@ export function usePureRealtimeDashboard() {
       setDashboardState((prev) => ({
         ...prev,
         data,
-        lastUpdated: data.lastUpdated,
+        lastUpdated: data.lastUpdated.toISOString(), // FIXED: Convert to string
         totalValueChange: 0, // Reset on initial load
         hasRecentChanges: false,
         status: pureRealtimeBlockchainService.getStatus(),
       }));
 
-      previousTotalValue.current = data.totalValue;
+      previousTotalValue.current = totalValue;
     };
 
     const handleDataUpdated = (event: any) => {
@@ -116,17 +174,67 @@ export function usePureRealtimeDashboard() {
         totalValue: data.totalValue.toFixed(4),
         previousValue: previousData.totalValue.toFixed(4),
         changeCount,
+        tokensCount: data.tokens.length,
       });
 
-      const valueChange = data.totalValue - previousData.totalValue;
+      // FIXED: Same token formatting as in handleDataLoaded
+      const formattedTokens = data.tokens.map((token: any) => ({
+        id:
+          token.contractAddress === "native"
+            ? "native-eth"
+            : token.contractAddress || `${token.symbol}-${Date.now()}`,
+        symbol: token.symbol,
+        name: token.name,
+        balance: token.balance,
+        value: token.value,
+        price: token.price,
+        change24h: token.change24h,
+        logoUrl: token.logoUrl,
+        contractAddress: token.contractAddress,
+        decimals: token.decimals,
+      }));
+
+      // FIXED: Include ETH token
+      const ethBalance = parseFloat(data.ethBalance || "0");
+      if (ethBalance > 0) {
+        const ethToken = {
+          id: "native-eth",
+          symbol: "ETH",
+          name: "Ethereum",
+          balance: ethBalance,
+          value: ethBalance * (data.ethPriceUSD || 0),
+          price: data.ethPriceUSD || 0,
+          change24h: 0,
+          logoUrl:
+            "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
+          contractAddress: "native",
+          decimals: 18,
+        };
+
+        const ethTokenExists = formattedTokens.some(
+          (token: any) =>
+            token.contractAddress === "native" || token.symbol === "ETH"
+        );
+
+        if (!ethTokenExists) {
+          formattedTokens.unshift(ethToken);
+        }
+      }
+
+      const totalValue = formattedTokens.reduce(
+        (sum: number, token: any) => sum + (token.value || 0),
+        0
+      );
+
+      const valueChange = totalValue - previousTotalValue.current;
 
       // Update Redux store
       dispatch(
         batchUpdateFromRealtimeService({
-          tokens: data.tokens,
-          totalBalance: data.totalValue,
-          activeWalletBalance: data.totalValue,
-          timestamp: data.lastUpdated,
+          tokens: formattedTokens,
+          totalBalance: totalValue,
+          activeWalletBalance: totalValue,
+          timestamp: new Date(data.lastUpdated).toISOString(), // FIXED: Convert to string
         })
       );
 
@@ -134,12 +242,14 @@ export function usePureRealtimeDashboard() {
       setDashboardState((prev) => ({
         ...prev,
         data,
-        lastUpdated: data.lastUpdated,
+        lastUpdated: data.lastUpdated.toISOString(), // FIXED: Convert to string
         totalValueChange: valueChange,
         hasRecentChanges: true,
         recentChanges: changes.slice(0, 10), // Keep last 10 changes
         status: pureRealtimeBlockchainService.getStatus(),
       }));
+
+      previousTotalValue.current = totalValue;
 
       // Clear "recent changes" flag after a few seconds
       setTimeout(() => {
@@ -150,11 +260,70 @@ export function usePureRealtimeDashboard() {
     const handleDataRefreshed = (event: any) => {
       const { data } = event;
 
+      // FIXED: Same formatting for refresh
+      const formattedTokens = data.tokens.map((token: any) => ({
+        id:
+          token.contractAddress === "native"
+            ? "native-eth"
+            : token.contractAddress || `${token.symbol}-${Date.now()}`,
+        symbol: token.symbol,
+        name: token.name,
+        balance: token.balance,
+        value: token.value,
+        price: token.price,
+        change24h: token.change24h,
+        logoUrl: token.logoUrl,
+        contractAddress: token.contractAddress,
+        decimals: token.decimals,
+      }));
+
+      // Include ETH
+      const ethBalance = parseFloat(data.ethBalance || "0");
+      if (ethBalance > 0) {
+        const ethToken = {
+          id: "native-eth",
+          symbol: "ETH",
+          name: "Ethereum",
+          balance: ethBalance,
+          value: ethBalance * (data.ethPriceUSD || 0),
+          price: data.ethPriceUSD || 0,
+          change24h: 0,
+          logoUrl:
+            "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
+          contractAddress: "native",
+          decimals: 18,
+        };
+
+        const ethTokenExists = formattedTokens.some(
+          (token: any) =>
+            token.contractAddress === "native" || token.symbol === "ETH"
+        );
+
+        if (!ethTokenExists) {
+          formattedTokens.unshift(ethToken);
+        }
+      }
+
+      const totalValue = formattedTokens.reduce(
+        (sum: number, token: any) => sum + (token.value || 0),
+        0
+      );
+
+      // Update Redux store for refresh
+      dispatch(
+        batchUpdateFromRealtimeService({
+          tokens: formattedTokens,
+          totalBalance: totalValue,
+          activeWalletBalance: totalValue,
+          timestamp: data.lastUpdated.toISOString(),
+        })
+      );
+
       // Update status without triggering change notifications
       setDashboardState((prev) => ({
         ...prev,
         data,
-        lastUpdated: data.lastUpdated,
+        lastUpdated: data.lastUpdated.toISOString(),
         status: pureRealtimeBlockchainService.getStatus(),
       }));
     };
@@ -170,7 +339,7 @@ export function usePureRealtimeDashboard() {
         message: `Received ${amount.toFixed(6)} ${token}`,
         amount,
         token,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(), // FIXED: Convert to string
         priority: "high",
       });
     };
@@ -186,7 +355,7 @@ export function usePureRealtimeDashboard() {
         message: `Sent ${amount.toFixed(6)} ${token}`,
         amount,
         token,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(), // FIXED: Convert to string
         priority: "medium",
       });
     };
@@ -201,7 +370,7 @@ export function usePureRealtimeDashboard() {
         title: "New Token Detected! 🆕",
         message: `${token} appeared in your wallet`,
         token,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(), // FIXED: Convert to string
         priority: "medium",
       });
     };
@@ -216,7 +385,7 @@ export function usePureRealtimeDashboard() {
         title: "Token Removed 🗑️",
         message: `${token} was removed from your wallet`,
         token,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(), // FIXED: Convert to string
         priority: "low",
       });
     };
@@ -232,7 +401,7 @@ export function usePureRealtimeDashboard() {
           type: "error",
           title: "Connection Issue ⚠️",
           message: "Temporarily unable to update data",
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(), // FIXED: Convert to string
           priority: "low",
         });
       }
@@ -269,20 +438,69 @@ export function usePureRealtimeDashboard() {
 
       console.log("💰 Token prices updated");
 
+      // FIXED: Format tokens for price updates too
+      const formattedTokens = data.tokens.map((token: any) => ({
+        id:
+          token.contractAddress === "native"
+            ? "native-eth"
+            : token.contractAddress || `${token.symbol}-${Date.now()}`,
+        symbol: token.symbol,
+        name: token.name,
+        balance: token.balance,
+        value: token.value,
+        price: token.price,
+        change24h: token.change24h,
+        logoUrl: token.logoUrl,
+        contractAddress: token.contractAddress,
+        decimals: token.decimals,
+      }));
+
+      // Include ETH
+      const ethBalance = parseFloat(data.ethBalance || "0");
+      if (ethBalance > 0) {
+        const ethToken = {
+          id: "native-eth",
+          symbol: "ETH",
+          name: "Ethereum",
+          balance: ethBalance,
+          value: ethBalance * (data.ethPriceUSD || 0),
+          price: data.ethPriceUSD || 0,
+          change24h: 0,
+          logoUrl:
+            "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
+          contractAddress: "native",
+          decimals: 18,
+        };
+
+        const ethTokenExists = formattedTokens.some(
+          (token: any) =>
+            token.contractAddress === "native" || token.symbol === "ETH"
+        );
+
+        if (!ethTokenExists) {
+          formattedTokens.unshift(ethToken);
+        }
+      }
+
+      const totalValue = formattedTokens.reduce(
+        (sum: number, token: any) => sum + (token.value || 0),
+        0
+      );
+
       // Update Redux store with new prices
       dispatch(
         batchUpdateFromRealtimeService({
-          tokens: data.tokens,
-          totalBalance: data.totalValue,
-          activeWalletBalance: data.totalValue,
-          timestamp: data.lastUpdated,
+          tokens: formattedTokens,
+          totalBalance: totalValue,
+          activeWalletBalance: totalValue,
+          timestamp: data.lastUpdated.toISOString(),
         })
       );
 
       setDashboardState((prev) => ({
         ...prev,
         data,
-        lastUpdated: data.lastUpdated,
+        lastUpdated: data.lastUpdated.toISOString(),
         status: pureRealtimeBlockchainService.getStatus(),
       }));
     };
@@ -411,7 +629,7 @@ export function usePureRealtimeDashboard() {
         type: "error",
         title: "Refresh Failed ❌",
         message: "Could not refresh dashboard data",
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
         priority: "medium",
       });
     }
@@ -442,7 +660,8 @@ export function usePureRealtimeDashboard() {
   // Get time since last update
   const getTimeSinceUpdate = useCallback(() => {
     if (!dashboardState.lastUpdated) return null;
-    const timeSince = Date.now() - dashboardState.lastUpdated.getTime();
+    const lastUpdateTime = new Date(dashboardState.lastUpdated).getTime();
+    const timeSince = Date.now() - lastUpdateTime;
 
     if (timeSince < 1000) return "Just now";
     if (timeSince < 60000) return `${Math.floor(timeSince / 1000)}s ago`;
@@ -459,7 +678,9 @@ export function usePureRealtimeDashboard() {
     // Pure blockchain state
     data: dashboardState.data,
     isMonitoring: dashboardState.isMonitoring,
-    lastUpdated: dashboardState.lastUpdated,
+    lastUpdated: dashboardState.lastUpdated
+      ? new Date(dashboardState.lastUpdated)
+      : null,
     totalValueChange: dashboardState.totalValueChange,
     hasRecentChanges: dashboardState.hasRecentChanges,
     recentChanges: dashboardState.recentChanges,

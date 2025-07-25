@@ -1,10 +1,11 @@
-// src/lib/pure-realtime-blockchain-service.ts - Pure real-time blockchain monitoring without triggers
+// src/lib/pure-realtime-blockchain-service.ts - FIXED timestamp handling
 import { EventEmitter } from "events";
 
 export interface BlockchainData {
   walletAddress: string;
   ethBalance: string;
   ethBalanceWei: string;
+  ethPriceUSD: number;
   totalValue: number;
   tokens: Array<{
     id: string;
@@ -34,13 +35,13 @@ export interface BalanceChange {
 }
 
 export interface PureRealtimeConfig {
-  pollInterval: number; // How often to check blockchain
-  deepScanInterval: number; // How often to do full token scan
-  priceUpdateInterval: number; // How often to update prices
-  enableBlockNumberTracking: boolean; // Track block numbers for faster detection
-  enableMemoryOptimization: boolean; // Optimize memory usage
-  maxHistoryLength: number; // Max change history to keep
-  balanceChangeThreshold: number; // Minimum change to consider significant
+  pollInterval: number;
+  deepScanInterval: number;
+  priceUpdateInterval: number;
+  enableBlockNumberTracking: boolean;
+  enableMemoryOptimization: boolean;
+  maxHistoryLength: number;
+  balanceChangeThreshold: number;
 }
 
 export class PureRealtimeBlockchainService extends EventEmitter {
@@ -65,13 +66,13 @@ export class PureRealtimeBlockchainService extends EventEmitter {
   private lastApiReset = Date.now();
 
   private config: PureRealtimeConfig = {
-    pollInterval: 8000, // 8 seconds - fast enough for real-time feel
-    deepScanInterval: 30000, // 30 seconds for full token discovery
-    priceUpdateInterval: 60000, // 1 minute for price updates
+    pollInterval: 8000,
+    deepScanInterval: 30000,
+    priceUpdateInterval: 60000,
     enableBlockNumberTracking: true,
     enableMemoryOptimization: true,
     maxHistoryLength: 50,
-    balanceChangeThreshold: 0.0001, // Very sensitive detection
+    balanceChangeThreshold: 0.0001,
   };
 
   constructor(config?: Partial<PureRealtimeConfig>) {
@@ -82,6 +83,20 @@ export class PureRealtimeBlockchainService extends EventEmitter {
 
     this.setupPerformanceTracking();
     this.setupCleanup();
+  }
+
+  // FIXED: Helper function to ensure Date objects
+  private ensureDate(timestamp: any): Date {
+    if (timestamp instanceof Date) {
+      return timestamp;
+    }
+    if (typeof timestamp === "string") {
+      return new Date(timestamp);
+    }
+    if (typeof timestamp === "number") {
+      return new Date(timestamp);
+    }
+    return new Date(); // Fallback to current time
   }
 
   // Start pure blockchain monitoring
@@ -198,23 +213,43 @@ export class PureRealtimeBlockchainService extends EventEmitter {
         return;
       }
 
-      // Fetch wallet data directly from blockchain APIs
-      const [walletTokens, ethBalance] = await Promise.all([
-        this.fetchWalletTokensFromBlockchain(this.activeWalletAddress),
+      // FIXED: Fetch wallet data with better error handling
+      const [ethBalanceData, walletTokensData] = await Promise.all([
         this.fetchETHBalanceFromBlockchain(this.activeWalletAddress),
+        this.fetchWalletTokensFromBlockchain(this.activeWalletAddress),
       ]);
+
+      // FIXED: Better token processing
+      const processedTokens = this.processTokenData(
+        walletTokensData.tokens || []
+      );
+
+      // FIXED: Calculate total value including ETH
+      const totalValue = this.calculateTotalValue(
+        ethBalanceData,
+        processedTokens
+      );
 
       // Create new blockchain data
       const newData: BlockchainData = {
         walletAddress: this.activeWalletAddress,
-        ethBalance: ethBalance.formatted,
-        ethBalanceWei: ethBalance.wei,
-        totalValue: this.calculateTotalValue(ethBalance, walletTokens),
-        tokens: walletTokens,
+        ethBalance: ethBalanceData.formatted || "0",
+        ethBalanceWei: ethBalanceData.wei || "0",
+        ethPriceUSD: ethBalanceData.priceUSD || 0,
+        totalValue,
+        tokens: processedTokens,
         lastBlockNumber: currentBlock,
-        lastUpdated: new Date(),
-        dataHash: this.generateDataHash(ethBalance, walletTokens),
+        lastUpdated: new Date(), // Always create new Date object
+        dataHash: this.generateDataHash(ethBalanceData, processedTokens),
       };
+
+      console.log("📊 Blockchain scan completed:", {
+        ethBalance: newData.ethBalance,
+        ethPrice: newData.ethPriceUSD,
+        tokensCount: newData.tokens.length,
+        totalValue: newData.totalValue.toFixed(4),
+        lastUpdated: newData.lastUpdated.toISOString(),
+      });
 
       // Detect and process changes
       this.processDataChanges(newData);
@@ -233,6 +268,40 @@ export class PureRealtimeBlockchainService extends EventEmitter {
     }
   }
 
+  // FIXED: Process token data with better formatting
+  private processTokenData(rawTokens: any[]): BlockchainData["tokens"] {
+    return rawTokens.map((token, index) => {
+      const balance =
+        typeof token.balance === "number"
+          ? token.balance
+          : parseFloat(token.balanceFormatted || token.balance || "0");
+
+      const price =
+        typeof token.price === "number"
+          ? token.price
+          : parseFloat(token.priceUSD || token.price || "0");
+
+      const value = balance * price;
+
+      return {
+        id: token.contractAddress || `token-${index}`,
+        symbol: token.symbol || "UNKNOWN",
+        name: token.name || "Unknown Token",
+        balance,
+        balanceRaw: token.balanceRaw || token.tokenBalance || "0",
+        value,
+        price,
+        change24h:
+          typeof token.change24h === "number"
+            ? token.change24h
+            : parseFloat(token.change24h || "0"),
+        logoUrl: token.logoUrl || token.icon,
+        contractAddress: token.contractAddress || "",
+        decimals: token.decimals || 18,
+      };
+    });
+  }
+
   // Fetch ETH balance directly from blockchain
   private async fetchETHBalanceFromBlockchain(address: string) {
     const response = await fetch(
@@ -246,7 +315,14 @@ export class PureRealtimeBlockchainService extends EventEmitter {
       throw new Error(`Failed to fetch ETH balance: ${response.status}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    console.log("🔷 ETH balance fetched:", {
+      formatted: data.formatted,
+      priceUSD: data.priceUSD,
+      valueUSD: data.valueUSD,
+    });
+
+    return data;
   }
 
   // Fetch tokens directly from blockchain
@@ -263,7 +339,12 @@ export class PureRealtimeBlockchainService extends EventEmitter {
     }
 
     const data = await response.json();
-    return data.tokens || [];
+    console.log("🪙 Wallet tokens fetched:", {
+      tokenCount: data.tokens?.length || 0,
+      totalValue: data.totalValue || 0,
+    });
+
+    return data;
   }
 
   // Get current block number
@@ -283,20 +364,30 @@ export class PureRealtimeBlockchainService extends EventEmitter {
     }
   }
 
-  // Calculate total portfolio value
+  // FIXED: Calculate total portfolio value including ETH
   private calculateTotalValue(ethBalance: any, tokens: any[]): number {
     const ethValue =
-      parseFloat(ethBalance.formatted) * (ethBalance.priceUSD || 0);
+      parseFloat(ethBalance.formatted || "0") * (ethBalance.priceUSD || 0);
     const tokensValue = tokens.reduce(
       (sum, token) => sum + (token.value || 0),
       0
     );
-    return ethValue + tokensValue;
+    const total = ethValue + tokensValue;
+
+    console.log("💰 Portfolio value calculation:", {
+      ethBalance: ethBalance.formatted,
+      ethPrice: ethBalance.priceUSD,
+      ethValue: ethValue.toFixed(4),
+      tokensValue: tokensValue.toFixed(4),
+      totalValue: total.toFixed(4),
+    });
+
+    return total;
   }
 
   // Generate data hash for change detection
   private generateDataHash(ethBalance: any, tokens: any[]): string {
-    const ethPart = `${ethBalance.wei}`;
+    const ethPart = `${ethBalance.wei || "0"}`;
     const tokensPart = tokens
       .map((t) => `${t.contractAddress}:${t.balanceRaw}:${t.price}`)
       .join("|");
@@ -391,7 +482,7 @@ export class PureRealtimeBlockchainService extends EventEmitter {
           token: "ETH",
           fromBalance: oldETH,
           toBalance: newETH,
-          timestamp: new Date(),
+          timestamp: new Date(), // Always create new Date object
         });
       }
     }
@@ -413,7 +504,7 @@ export class PureRealtimeBlockchainService extends EventEmitter {
           token: newToken.symbol,
           fromBalance: 0,
           toBalance: newToken.balance,
-          timestamp: new Date(),
+          timestamp: new Date(), // Always create new Date object
         });
       }
     });
@@ -427,7 +518,7 @@ export class PureRealtimeBlockchainService extends EventEmitter {
           token: oldToken.symbol,
           fromBalance: oldToken.balance,
           toBalance: 0,
-          timestamp: new Date(),
+          timestamp: new Date(), // Always create new Date object
         });
       }
     });
@@ -445,7 +536,7 @@ export class PureRealtimeBlockchainService extends EventEmitter {
             token: newToken.symbol,
             fromBalance: oldToken.balance,
             toBalance: newToken.balance,
-            timestamp: new Date(),
+            timestamp: new Date(), // Always create new Date object
           });
         }
       }
@@ -489,18 +580,37 @@ export class PureRealtimeBlockchainService extends EventEmitter {
         })
       );
 
+      // FIXED: Update ETH price too
+      let updatedEthPrice = this.currentData.ethPriceUSD;
+      try {
+        const ethPriceResponse = await fetch(
+          "/api/blockchain/eth-balance?address=" + this.activeWalletAddress,
+          {
+            credentials: "include",
+          }
+        );
+        if (ethPriceResponse.ok) {
+          const ethData = await ethPriceResponse.json();
+          updatedEthPrice = ethData.priceUSD || this.currentData.ethPriceUSD;
+        }
+      } catch (error) {
+        console.warn("⚠️ Could not update ETH price:", error);
+      }
+
       // Update current data with new prices
       this.currentData = {
         ...this.currentData,
         tokens: updatedTokens,
+        ethPriceUSD: updatedEthPrice,
         totalValue: this.calculateTotalValue(
           {
             formatted: this.currentData.ethBalance,
             wei: this.currentData.ethBalanceWei,
+            priceUSD: updatedEthPrice,
           },
           updatedTokens
         ),
-        lastUpdated: new Date(),
+        lastUpdated: new Date(), // Always create new Date object
       };
 
       this.emit("prices_updated", { data: this.currentData });
@@ -589,6 +699,7 @@ export class PureRealtimeBlockchainService extends EventEmitter {
     return this.isMonitoring;
   }
 
+  // FIXED: Ensure proper timestamp handling in status
   getStatus() {
     return {
       isMonitoring: this.isMonitoring,
@@ -599,7 +710,7 @@ export class PureRealtimeBlockchainService extends EventEmitter {
       errorCount: this.errorCount,
       apiCallsPerMinute: this.apiCallCount,
       dataAge: this.currentData
-        ? Date.now() - this.currentData.lastUpdated.getTime()
+        ? Date.now() - this.ensureDate(this.currentData.lastUpdated).getTime()
         : null,
     };
   }

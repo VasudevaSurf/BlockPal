@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - ENHANCED VERSION WITH AUTO-REFRESH ON PAGE LOAD
+// src/components/dashboard/WalletBalance.tsx - SIMPLIFIED with better loading logic
 "use client";
 
 import { useSelector, useDispatch } from "react-redux";
@@ -18,19 +18,64 @@ export default function WalletBalance() {
     (state: RootState) => state.wallet
   );
 
-  // Enhanced loading state management
+  // SIMPLIFIED: Better loading state management
   const [balanceLoadingState, setBalanceLoadingState] = useState({
     isInitialLoad: true,
     hasAttemptedLoad: false,
     balanceLoaded: false,
     tokensLoaded: false,
+    dataStabilized: false, // NEW: Simple flag for when data is ready
   });
 
-  // Use ref to prevent duplicate balance updates
+  // Track when we first get meaningful data
+  const [hasRealData, setHasRealData] = useState(false);
+  const stabilizationTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Use refs to prevent duplicate balance updates
   const balanceLoaded = useRef<string | null>(null);
   const tokensLoaded = useRef<string | null>(null);
 
-  // ENHANCED: Combined effect for balance and tokens loading
+  // SIMPLIFIED: Data stabilization effect - wait for real data then stabilize
+  useEffect(() => {
+    // Check if we have meaningful data (either balance > 0 or tokens)
+    const hasMeaningfulData = totalBalance > 0 || tokens.length > 0;
+    
+    if (hasMeaningfulData && !hasRealData) {
+      console.log("📊 First real data received:", {
+        totalBalance,
+        tokensCount: tokens.length,
+      });
+      setHasRealData(true);
+      
+      // Clear any existing timer
+      if (stabilizationTimer.current) {
+        clearTimeout(stabilizationTimer.current);
+      }
+      
+      // Wait a short time for data to stabilize, then show it
+      stabilizationTimer.current = setTimeout(() => {
+        console.log("✅ Data stabilized, showing balance");
+        setBalanceLoadingState(prev => ({
+          ...prev,
+          dataStabilized: true,
+          isInitialLoad: false,
+        }));
+      }, 1500); // 1.5 seconds to let real-time data settle
+    }
+    
+    // If we lose all data (wallet switch), reset
+    if (!hasMeaningfulData && hasRealData) {
+      console.log("🔄 Data cleared, resetting state");
+      setHasRealData(false);
+      setBalanceLoadingState(prev => ({
+        ...prev,
+        dataStabilized: false,
+        isInitialLoad: true,
+      }));
+    }
+  }, [totalBalance, tokens.length, hasRealData]);
+
+  // Main data loading effect
   useEffect(() => {
     console.log("💰 WalletBalance - Effect triggered", {
       activeWalletAddress: activeWallet?.address,
@@ -39,10 +84,7 @@ export default function WalletBalance() {
       totalBalance,
       tokensCount: tokens.length,
       loading,
-      shouldUpdate:
-        activeWallet?.address &&
-        (balanceLoaded.current !== activeWallet.address ||
-          tokensLoaded.current !== activeWallet.address),
+      dataStabilized: balanceLoadingState.dataStabilized,
     });
 
     // Only update if we have an active wallet and haven't loaded data for this wallet
@@ -57,11 +99,21 @@ export default function WalletBalance() {
           { needsBalanceUpdate, needsTokensUpdate }
         );
 
+        // Reset state for new wallet
         setBalanceLoadingState((prev) => ({
           ...prev,
           hasAttemptedLoad: true,
           isInitialLoad: true,
+          dataStabilized: false,
         }));
+        
+        setHasRealData(false);
+        
+        // Clear stabilization timer
+        if (stabilizationTimer.current) {
+          clearTimeout(stabilizationTimer.current);
+          stabilizationTimer.current = null;
+        }
 
         // Load both balance and tokens
         const loadPromises: Promise<any>[] = [];
@@ -92,22 +144,19 @@ export default function WalletBalance() {
 
         // Wait for all loading to complete
         Promise.all(loadPromises).then(() => {
-          setBalanceLoadingState((prev) => ({
-            ...prev,
-            isInitialLoad: false,
-          }));
+          console.log("✅ Initial data loading completed");
         });
       } else if (
         (totalBalance > 0 || tokens.length > 0) &&
         (!balanceLoadingState.balanceLoaded ||
-          !balanceLoadingState.tokensLoaded)
+          !balanceLoadingState.tokensLoaded) &&
+        !balanceLoadingState.dataStabilized
       ) {
-        // If we already have data, mark as loaded
+        // If we already have data but haven't marked as loaded
         setBalanceLoadingState((prev) => ({
           ...prev,
           balanceLoaded: totalBalance > 0 || prev.balanceLoaded,
           tokensLoaded: tokens.length > 0 || prev.tokensLoaded,
-          isInitialLoad: false,
           hasAttemptedLoad: true,
         }));
       }
@@ -119,27 +168,38 @@ export default function WalletBalance() {
     tokens.length,
     balanceLoadingState.balanceLoaded,
     balanceLoadingState.tokensLoaded,
+    balanceLoadingState.dataStabilized,
   ]);
 
-  // ENHANCED: Reset loading state when active wallet changes
+  // Reset loading state when active wallet changes
   useEffect(() => {
     if (
       activeWallet?.address &&
       (balanceLoaded.current !== activeWallet.address ||
         tokensLoaded.current !== activeWallet.address)
     ) {
+      console.log("🔄 Active wallet changed, resetting balance state");
+      
+      // Clear stabilization timer
+      if (stabilizationTimer.current) {
+        clearTimeout(stabilizationTimer.current);
+        stabilizationTimer.current = null;
+      }
+      
       setBalanceLoadingState({
         isInitialLoad: true,
         hasAttemptedLoad: false,
         balanceLoaded: false,
         tokensLoaded: false,
+        dataStabilized: false,
       });
+      
+      setHasRealData(false);
     }
   }, [activeWallet?.address]);
 
-  // ENHANCED: Auto-refresh on page load/mount
+  // Auto-refresh on page load/mount
   useEffect(() => {
-    // Force refresh when component mounts (page reload)
     const handlePageLoad = () => {
       if (activeWallet?.address) {
         console.log("🔄 Page loaded - forcing wallet data refresh");
@@ -154,7 +214,15 @@ export default function WalletBalance() {
           hasAttemptedLoad: false,
           balanceLoaded: false,
           tokensLoaded: false,
+          dataStabilized: false,
         });
+        
+        setHasRealData(false);
+        
+        if (stabilizationTimer.current) {
+          clearTimeout(stabilizationTimer.current);
+          stabilizationTimer.current = null;
+        }
       }
     };
 
@@ -166,6 +234,15 @@ export default function WalletBalance() {
       return () => window.removeEventListener("load", handlePageLoad);
     }
   }, [activeWallet?.address]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (stabilizationTimer.current) {
+        clearTimeout(stabilizationTimer.current);
+      }
+    };
+  }, []);
 
   const formatBalance = (balance: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -188,28 +265,46 @@ export default function WalletBalance() {
     dispatch(openWalletSelector());
   };
 
-  // ENHANCED: Better skeleton loading conditions
+  // SIMPLIFIED: Show skeleton conditions
   const shouldShowSkeleton =
     balanceLoadingState.isInitialLoad ||
+    !balanceLoadingState.dataStabilized ||
     (loading && !activeWallet) ||
-    (!balanceLoadingState.hasAttemptedLoad && activeWallet?.address) ||
-    (activeWallet?.address &&
-      !balanceLoadingState.balanceLoaded &&
-      !balanceLoadingState.tokensLoaded);
+    (!balanceLoadingState.hasAttemptedLoad && activeWallet?.address);
+
+  // FALLBACK: If we've been loading too long (over 10 seconds), force show data
+  useEffect(() => {
+    if (balanceLoadingState.hasAttemptedLoad && !balanceLoadingState.dataStabilized) {
+      const fallbackTimer = setTimeout(() => {
+        console.log("⚠️ Forcing balance display after timeout");
+        setBalanceLoadingState(prev => ({
+          ...prev,
+          dataStabilized: true,
+          isInitialLoad: false,
+        }));
+      }, 10000); // 10 second fallback
+
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [balanceLoadingState.hasAttemptedLoad, balanceLoadingState.dataStabilized]);
 
   if (shouldShowSkeleton) {
     console.log("🔄 WalletBalance - Showing skeleton", {
       isInitialLoad: balanceLoadingState.isInitialLoad,
+      dataStabilized: balanceLoadingState.dataStabilized,
+      hasRealData,
       loading,
       activeWallet: !!activeWallet,
       hasAttemptedLoad: balanceLoadingState.hasAttemptedLoad,
       balanceLoaded: balanceLoadingState.balanceLoaded,
       tokensLoaded: balanceLoadingState.tokensLoaded,
+      currentBalance: totalBalance,
+      tokensCount: tokens.length,
     });
     return <SkeletonWalletBalance />;
   }
 
-  // ENHANCED: Calculate display balance from tokens if available
+  // Calculate display balance from tokens if available
   const calculateTotalFromTokens = () => {
     if (tokens && tokens.length > 0) {
       return tokens.reduce((sum, token) => sum + (token.value || 0), 0);
@@ -223,7 +318,7 @@ export default function WalletBalance() {
       ? tokensTotalValue
       : totalBalance || activeWallet?.balance || 0;
 
-  // ENHANCED: Calculate 24h change from tokens
+  // Calculate 24h change from tokens
   const calculate24hChange = () => {
     if (tokens && tokens.length > 0) {
       const totalChange = tokens.reduce((sum, token) => {
@@ -270,7 +365,7 @@ export default function WalletBalance() {
         </div>
       </div>
 
-      {/* Balance Display - Enhanced with real-time data */}
+      {/* Balance Display - Enhanced with stable real-time data */}
       <div>
         {displayBalance > 0 ? (
           <>
@@ -316,9 +411,10 @@ export default function WalletBalance() {
       {/* Debug info (remove in production) */}
       {/* {process.env.NODE_ENV === "development" && (
         <div className="mt-2 text-xs text-gray-500 font-mono">
-          Debug: Balance={displayBalance.toFixed(2)}, Tokens={tokens.length},
-          Change24h={change24h.toFixed(2)}, Loaded=
-          {balanceLoadingState.balanceLoaded ? "Y" : "N"}
+          Stabilized: {balanceLoadingState.dataStabilized ? "✅" : "⏳"} | 
+          RealData: {hasRealData ? "✅" : "❌"} | 
+          Balance: {displayBalance.toFixed(4)} | 
+          Tokens: {tokens.length}
         </div>
       )} */}
     </div>

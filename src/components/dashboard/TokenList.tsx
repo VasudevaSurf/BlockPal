@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - COMPACT VERSION
+// src/components/dashboard/TokenList.tsx - ORIGINAL DESIGN with fixed loading
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -19,15 +19,56 @@ export default function TokenList() {
   );
   const { isLoading: isNavigating, startLoading } = useNavigationLoading();
 
-  // Enhanced loading state management
+  // SIMPLIFIED: Much simpler loading state
   const [tokenLoadingState, setTokenLoadingState] = useState({
     isInitialLoad: true,
     hasAttemptedLoad: false,
     tokensLoaded: false,
+    dataStabilized: false,
   });
+
+  // Track when we get meaningful token data
+  const [hasTokenData, setHasTokenData] = useState(false);
+  const stabilizationTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Use ref to prevent duplicate API calls
   const tokensLoaded = useRef<string | null>(null);
+
+  // SIMPLIFIED: Data stabilization - just wait for tokens then show them
+  useEffect(() => {
+    const hasMeaningfulTokens = tokens.length > 0;
+    
+    if (hasMeaningfulTokens && !hasTokenData) {
+      console.log("🪙 First tokens received:", tokens.length);
+      setHasTokenData(true);
+      
+      // Clear any existing timer
+      if (stabilizationTimer.current) {
+        clearTimeout(stabilizationTimer.current);
+      }
+      
+      // Wait briefly for data to stabilize, then show tokens
+      stabilizationTimer.current = setTimeout(() => {
+        console.log("✅ Token data stabilized, showing tokens");
+        setTokenLoadingState(prev => ({
+          ...prev,
+          dataStabilized: true,
+          isInitialLoad: false,
+        }));
+      }, 1000); // Just 1 second delay
+    }
+    
+    // If we lose tokens (wallet switch), reset
+    if (!hasMeaningfulTokens && hasTokenData) {
+      console.log("🔄 Tokens cleared, resetting state");
+      setHasTokenData(false);
+      setTokenLoadingState(prev => ({
+        ...prev,
+        dataStabilized: false,
+        isInitialLoad: true,
+      }));
+    }
+  }, [tokens.length, hasTokenData]);
 
   useEffect(() => {
     console.log("🪙 TokenList - Effect triggered", {
@@ -54,13 +95,21 @@ export default function TokenList() {
         ...prev,
         hasAttemptedLoad: true,
         isInitialLoad: true,
+        dataStabilized: false,
       }));
+
+      setHasTokenData(false);
+      
+      // Clear stabilization timer
+      if (stabilizationTimer.current) {
+        clearTimeout(stabilizationTimer.current);
+        stabilizationTimer.current = null;
+      }
 
       dispatch(fetchWalletTokens(activeWallet.address)).then(() => {
         setTokenLoadingState((prev) => ({
           ...prev,
           tokensLoaded: true,
-          isInitialLoad: false,
         }));
       });
     } else if (tokens.length > 0 && !tokenLoadingState.tokensLoaded) {
@@ -89,9 +138,25 @@ export default function TokenList() {
         isInitialLoad: true,
         hasAttemptedLoad: false,
         tokensLoaded: false,
+        dataStabilized: false,
       });
+      setHasTokenData(false);
+      
+      if (stabilizationTimer.current) {
+        clearTimeout(stabilizationTimer.current);
+        stabilizationTimer.current = null;
+      }
     }
   }, [activeWallet?.address]);
+
+  // Cleanup timer
+  useEffect(() => {
+    return () => {
+      if (stabilizationTimer.current) {
+        clearTimeout(stabilizationTimer.current);
+      }
+    };
+  }, []);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -107,7 +172,7 @@ export default function TokenList() {
     return `${sign}${value.toFixed(2)}%`;
   };
 
-  // UPDATED: Enhanced token background colors
+  // RESTORED: Original background colors and design
   const getTokenBackgroundColor = (
     symbol: string,
     contractAddress?: string
@@ -143,7 +208,7 @@ export default function TokenList() {
     );
   };
 
-  // UPDATED: Enhanced icon colors
+  // RESTORED: Original icon colors
   const getTokenIcon = (symbol: string, contractAddress?: string) => {
     const colors: Record<string, string> = {
       ETH: "bg-blue-500",
@@ -174,7 +239,7 @@ export default function TokenList() {
     return colors[symbol] || "bg-gray-500";
   };
 
-  // FIXED: Proper ETH symbol handling
+  // RESTORED: Original token letters
   const getTokenLetter = (symbol: string, contractAddress?: string) => {
     const letters: Record<string, string> = {
       ETH: "Ξ",
@@ -205,7 +270,7 @@ export default function TokenList() {
     return letters[symbol] || symbol.charAt(0);
   };
 
-  // FIXED: Better icon URL validation
+  // FIXED: Better icon URL validation and image handling
   const isValidImageUrl = (url: string | null | undefined): boolean => {
     if (!url || url === "null" || url === "undefined" || url === "") {
       return false;
@@ -214,7 +279,123 @@ export default function TokenList() {
       url.startsWith("http") &&
       (url.includes("coingecko") ||
         url.includes("coinbase") ||
-        url.includes("cdn"))
+        url.includes("cryptocompare") ||
+        url.includes("assets") ||
+        url.includes("cdn") ||
+        url.includes("imgur") ||
+        url.includes("github"))
+    );
+  };
+
+  // Enhanced token icon component with proper image loading
+  const TokenIcon = ({ token, size = "w-9 h-9", className = "" }: { 
+    token: any; 
+    size?: string; 
+    className?: string; 
+  }) => {
+    const [imageState, setImageState] = useState<'loading' | 'loaded' | 'error'>('loading');
+    const [imageSrc, setImageSrc] = useState<string | null>(null);
+
+    // Get high-quality image URL
+    const getImageUrl = (token: any): string | null => {
+      // High-quality URLs for popular tokens
+      const knownTokens: Record<string, string> = {
+        'ETH': 'https://coin-images.coingecko.com/coins/images/279/large/ethereum.png',
+        'ETHEREUM': 'https://coin-images.coingecko.com/coins/images/279/large/ethereum.png',
+        'USDT': 'https://coin-images.coingecko.com/coins/images/325/large/Tether.png',
+        'USDC': 'https://coin-images.coingecko.com/coins/images/6319/large/USD_Coin_icon.png',
+        'LINK': 'https://coin-images.coingecko.com/coins/images/877/large/chainlink-new-logo.png',
+        'UNI': 'https://coin-images.coingecko.com/coins/images/12504/large/uni.jpg',
+        'DAI': 'https://coin-images.coingecko.com/coins/images/9956/large/Badge_Dai.png',
+        'WETH': 'https://coin-images.coingecko.com/coins/images/2518/large/weth.png',
+        'PEPE': 'https://coin-images.coingecko.com/coins/images/29850/large/pepe-token.jpeg',
+        'SHIB': 'https://coin-images.coingecko.com/coins/images/11939/large/shiba.png',
+      };
+
+      const symbol = token.symbol?.toUpperCase();
+      
+      // First try known high-quality URLs
+      if (symbol && knownTokens[symbol]) {
+        return knownTokens[symbol];
+      }
+
+      // Handle ETH/native specially
+      if (token.contractAddress === 'native' || symbol === 'ETH') {
+        return knownTokens['ETH'];
+      }
+
+      // Then try token's own URLs
+      const tokenUrls = [
+        token.logoUrl,
+        token.icon,
+        token.image,
+        token.logo,
+      ].filter(url => isValidImageUrl(url));
+
+      return tokenUrls[0] || null;
+    };
+
+    useEffect(() => {
+      const imageUrl = getImageUrl(token);
+      
+      if (!imageUrl) {
+        setImageState('error');
+        return;
+      }
+
+      setImageSrc(imageUrl);
+      setImageState('loading');
+
+      // Create new image to test loading
+      const img = new Image();
+      
+      img.onload = () => {
+        setImageState('loaded');
+      };
+      
+      img.onerror = () => {
+        console.log(`❌ Failed to load image for ${token.symbol}: ${imageUrl}`);
+        setImageState('error');
+      };
+      
+      // Set crossOrigin to handle CORS issues
+      img.crossOrigin = 'anonymous';
+      img.src = imageUrl;
+
+      return () => {
+        img.onload = null;
+        img.onerror = null;
+      };
+    }, [token.symbol, token.contractAddress, token.logoUrl, token.icon]);
+
+    // Show image if loaded successfully
+    if (imageState === 'loaded' && imageSrc) {
+      return (
+        <div className={`${size} ${className} ${getTokenBackgroundColor(token.symbol, token.contractAddress)} rounded-full flex items-center justify-center p-0.5`}>
+          <img
+            src={imageSrc}
+            alt={token.symbol}
+            className={`${size.replace('w-', 'w-').replace('h-', 'h-')} rounded-full object-cover`}
+            style={{ width: 'calc(100% - 4px)', height: 'calc(100% - 4px)' }}
+            onError={() => {
+              console.log(`❌ Image error after successful load for ${token.symbol}`);
+              setImageState('error');
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Show fallback icon while loading or on error
+    return (
+      <div className={`${size} ${className} ${getTokenBackgroundColor(token.symbol, token.contractAddress)} rounded-full flex items-center justify-center p-0.5`}>
+        <div className={`${size.replace('w-', 'w-').replace('h-', 'h-')} ${getTokenIcon(token.symbol, token.contractAddress)} rounded-full flex items-center justify-center`}
+             style={{ width: 'calc(100% - 4px)', height: 'calc(100% - 4px)' }}>
+          <span className="text-white font-medium" style={{ fontSize: size.includes('8') ? '0.75rem' : '0.875rem' }}>
+            {getTokenLetter(token.symbol, token.contractAddress)}
+          </span>
+        </div>
+      </div>
     );
   };
 
@@ -275,43 +456,40 @@ export default function TokenList() {
     }
   };
 
-  // DEBUG: Log token 24h changes
-  useEffect(() => {
-    if (tokens.length > 0) {
-      console.log("📊 Token 24h Changes Debug:");
-      tokens.forEach((token) => {
-        console.log(
-          `  ${token.symbol}: ${token.change24h?.toFixed(2)}% (raw: ${
-            token.change24h
-          })`
-        );
-        if (token.symbol === "ETH") {
-          console.log(`  🔷 ETH 24h change details:`, {
-            change24h: token.change24h,
-            type: typeof token.change24h,
-            isZero: token.change24h === 0,
-            formatted: formatPercentage(token.change24h || 0),
-          });
-        }
-      });
-    }
-  }, [tokens]);
-
   const displayTokens = tokens;
 
-  // UPDATED: Show skeleton during initial load or when loading and no tokens yet
+  // SIMPLIFIED: Show skeleton conditions
   const shouldShowSkeleton =
     tokenLoadingState.isInitialLoad ||
+    !tokenLoadingState.dataStabilized ||
     (loading && tokens.length === 0) ||
     (!tokenLoadingState.hasAttemptedLoad && activeWallet?.address);
+
+  // FALLBACK: Force show tokens after 8 seconds
+  useEffect(() => {
+    if (tokenLoadingState.hasAttemptedLoad && !tokenLoadingState.dataStabilized && tokens.length > 0) {
+      const fallbackTimer = setTimeout(() => {
+        console.log("⚠️ Forcing token display after timeout");
+        setTokenLoadingState(prev => ({
+          ...prev,
+          dataStabilized: true,
+          isInitialLoad: false,
+        }));
+      }, 8000);
+
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [tokenLoadingState.hasAttemptedLoad, tokenLoadingState.dataStabilized, tokens.length]);
 
   if (shouldShowSkeleton) {
     console.log("🔄 TokenList - Showing skeleton", {
       isInitialLoad: tokenLoadingState.isInitialLoad,
+      dataStabilized: tokenLoadingState.dataStabilized,
+      hasTokenData,
       loading,
       tokensLength: tokens.length,
       hasAttemptedLoad: tokenLoadingState.hasAttemptedLoad,
-      activeWallet: !!activeWallet?.address,
+      balanceLoaded: tokenLoadingState.tokensLoaded,
     });
     return <SkeletonTokenList />;
   }
@@ -365,13 +543,6 @@ export default function TokenList() {
           <p className="text-gray-400 font-satoshi text-xs lg:text-sm mb-3">
             This wallet doesn't have any tokens yet
           </p>
-          {/* <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3 max-w-xs">
-            <p className="text-blue-400 text-xs font-satoshi">
-              💡 <strong>Tip:</strong> Send some tokens to your wallet address:{" "}
-              {activeWallet.address.slice(0, 6)}...
-              {activeWallet.address.slice(-4)}
-            </p>
-          </div> */}
         </div>
       </div>
     );

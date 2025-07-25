@@ -1,4 +1,4 @@
-// src/store/slices/walletSlice.ts - Updated with real-time dashboard support
+// src/store/slices/walletSlice.ts - FIXED VERSION with proper serialization
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { WalletState, Wallet, Token } from "@/types";
 
@@ -306,7 +306,9 @@ const walletSlice = createSlice({
       );
       console.log(
         "📊 Tokens updated from real-time service:",
-        action.payload.length
+        action.payload.length,
+        "Total value:",
+        state.totalBalance.toFixed(4)
       );
     },
 
@@ -317,6 +319,7 @@ const walletSlice = createSlice({
       if (state.activeWallet) {
         state.activeWallet.balance = action.payload;
       }
+      console.log("💰 Total balance updated:", action.payload.toFixed(4));
     },
 
     // NEW: Update single token from real-time data
@@ -487,35 +490,66 @@ const walletSlice = createSlice({
       }
     },
 
-    // NEW: Batch update for real-time changes
+    // FIXED: Batch update for real-time changes with proper serialization
     batchUpdateFromRealtimeService: (
       state,
       action: PayloadAction<{
         tokens?: Token[];
         totalBalance?: number;
         activeWalletBalance?: number;
-        timestamp: Date;
+        timestamp: string; // FIXED: Use string instead of Date
       }>
     ) => {
       const { tokens, totalBalance, activeWalletBalance, timestamp } =
         action.payload;
 
       if (tokens) {
-        state.tokens = tokens;
+        // FIXED: Ensure all tokens have proper serializable data
+        state.tokens = tokens.map((token) => ({
+          ...token,
+          // Ensure all numeric values are properly serialized
+          balance:
+            typeof token.balance === "number"
+              ? token.balance
+              : parseFloat(String(token.balance)) || 0,
+          value:
+            typeof token.value === "number"
+              ? token.value
+              : parseFloat(String(token.value)) || 0,
+          price:
+            typeof token.price === "number"
+              ? token.price
+              : parseFloat(String(token.price)) || 0,
+          change24h:
+            typeof token.change24h === "number"
+              ? token.change24h
+              : parseFloat(String(token.change24h)) || 0,
+        }));
       }
 
       if (totalBalance !== undefined) {
-        state.totalBalance = totalBalance;
+        state.totalBalance =
+          typeof totalBalance === "number"
+            ? totalBalance
+            : parseFloat(String(totalBalance)) || 0;
       }
 
       if (activeWalletBalance !== undefined && state.activeWallet) {
-        state.activeWallet.balance = activeWalletBalance;
+        state.activeWallet.balance =
+          typeof activeWalletBalance === "number"
+            ? activeWalletBalance
+            : parseFloat(String(activeWalletBalance)) || 0;
       }
 
       console.log("📊 Batch update from real-time service:", {
         tokensCount: tokens?.length,
         totalBalance,
-        timestamp: timestamp.toISOString(),
+        timestamp,
+        tokenDetails: tokens?.map((t) => ({
+          symbol: t.symbol,
+          balance: t.balance,
+          value: t.value,
+        })),
       });
     },
   },
@@ -629,11 +663,23 @@ const walletSlice = createSlice({
             id: token.contractAddress || `${token.symbol}-${Date.now()}`,
             symbol: token.symbol,
             name: token.name,
-            balance: token.balance || 0,
-            value: token.value || 0,
-            change24h: token.change24h || 0,
+            balance:
+              typeof token.balance === "number"
+                ? token.balance
+                : parseFloat(String(token.balance)) || 0,
+            value:
+              typeof token.value === "number"
+                ? token.value
+                : parseFloat(String(token.value)) || 0,
+            change24h:
+              typeof token.change24h === "number"
+                ? token.change24h
+                : parseFloat(String(token.change24h)) || 0,
             icon: token.logoUrl || "/icons/default-token.svg",
-            price: token.price || 0,
+            price:
+              typeof token.price === "number"
+                ? token.price
+                : parseFloat(String(token.price)) || 0,
             contractAddress: token.contractAddress,
             decimals: token.decimals || 18,
           }));
