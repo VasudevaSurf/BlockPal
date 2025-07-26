@@ -1,11 +1,46 @@
 // src/app/api/ai-chat/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
+import { connectToDatabase } from "@/lib/mongodb";
+import OpenAI from "openai";
+import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
 
-/**
- * Production-Level Crypto AI Assistant API Route
- * Integrates with GoPlus Security and CoinGecko APIs
- */
+// =====================================
+// Configuration and Constants
+// =====================================
+
+const CONFIG = {
+  MONGODB_URI: process.env.MONGODB_URI!,
+  DATABASE_NAME: "BlockPal",
+  COLLECTIONS: {
+    SESSIONS: "ai_chat_sessions",
+    MESSAGES: "ai_chat_messages",
+    CONTEXT_CACHE: "ai_chat_context_cache",
+  },
+  MAX_CONTEXT_MESSAGES: 10,
+  MAX_CONTEXT_TOKENS: 2000,
+  SESSION_TIMEOUT_HOURS: 2,
+  OPENAI_MODEL: "gpt-4o",
+  APIs: {
+    ALCHEMY: {
+      BASE_URL: "https://eth-mainnet.g.alchemy.com/v2/",
+      API_KEY: process.env.ALCHEMY_API_KEY,
+    },
+    ETHERSCAN: {
+      BASE_URL: "https://api.etherscan.io/api",
+      API_KEY: process.env.ETHERSCAN_API_KEY,
+    },
+    COINGECKO: {
+      BASE_URL: "https://api.coingecko.com/api/v3",
+      API_KEY: process.env.COINGECKO_API_KEY,
+    },
+    MORALIS: {
+      BASE_URL: "https://deep-index.moralis.io/api/v2.2",
+      API_KEY: process.env.MORALIS_API_KEY,
+    },
+  },
+};
 
 interface ChatMessage {
   id: string;
@@ -15,1450 +50,1822 @@ interface ChatMessage {
   metadata?: {
     intent?: string;
     processing?: boolean;
+    utility?: string;
+    entities?: any;
+    walletAddress?: string;
+    txHash?: string;
+    tokenInfo?: string;
+    contractAddress?: string;
   };
 }
 
 interface AiIntentAnalysis {
-  primary_intent: string;
-  confidence: number;
-  contract_address?: string;
-  token_identifier?: string;
-  contract_type?: string;
-  comparison_type?: string;
-  items_to_compare?: string[];
-  specific_requirements?: string;
-  token_analysis_type?: string;
-  specific_data_requested?: string[];
-  reasoning: string;
+  utility: string;
+  data: {
+    identifier?: string;
+    type?: string;
+    confidence?: string;
+    resolvedFrom?: string;
+    specificFocus?: string;
+  };
 }
 
-class CryptoAIService {
-  private config = {
-    COINGECKO_API_KEY:
-      process.env.COINGECKO_API_KEY || "CG-JxUrd1Y1MHtzK2LSkonPTam9",
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
-    ENDPOINTS: {
-      COINGECKO: "https://api.coingecko.com/api/v3",
-      OPENAI: "https://api.openai.com/v1",
-      GOPLUS: "https://api.gopluslabs.io/api/v1",
+// =====================================
+// Enhanced BlockPal AI Chat Service
+// =====================================
+
+class BlockPalAIService {
+  private openai: OpenAI;
+  private db: any;
+  private sessionId: string;
+  private userId: string;
+
+  // Enhanced Context Management System
+  private contextSummary = {
+    recentTopics: [] as any[],
+    userPreferences: {} as any,
+    activeArtifacts: {
+      wallets: [] as string[],
+      transactions: [] as string[],
+      tokens: [] as string[],
+      contracts: [] as string[],
     },
   };
 
-  constructor() {
-    if (!this.config.OPENAI_API_KEY) {
-      console.warn("⚠️ OPENAI_API_KEY not found in environment variables");
+  // Entity-Role Tracking System
+  private entityTracking = {
+    entities: {} as any,
+    relationships: {} as any,
+    aliases: {} as any,
+    lastMentioned: {
+      wallet: null as string | null,
+      transaction: null as string | null,
+      token: null as string | null,
+      contract: null as string | null,
+      timestamp: null as string | null,
+    },
+  };
+
+  // Conversation State Machine
+  private conversationState = {
+    currentTopic: null as string | null,
+    stage: null as string | null,
+    expectations: [] as string[],
+    completedSteps: [] as string[],
+    lastQueryType: null as string | null,
+  };
+
+  constructor(sessionId: string, userId: string) {
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY!,
+    });
+    this.sessionId = sessionId;
+    this.userId = userId;
+  }
+
+  async initialize() {
+    const { db } = await connectToDatabase();
+    this.db = db;
+
+    await this.createIndexes();
+    await this.loadContextSummary();
+  }
+
+  async createIndexes() {
+    try {
+      const sessionsCollection = this.db.collection(
+        CONFIG.COLLECTIONS.SESSIONS
+      );
+      await sessionsCollection.createIndex({ sessionId: 1 }, { unique: true });
+      await sessionsCollection.createIndex({ userId: 1 });
+      await sessionsCollection.createIndex(
+        { lastActivity: 1 },
+        {
+          expireAfterSeconds: CONFIG.SESSION_TIMEOUT_HOURS * 3600,
+        }
+      );
+
+      const messagesCollection = this.db.collection(
+        CONFIG.COLLECTIONS.MESSAGES
+      );
+      await messagesCollection.createIndex({ sessionId: 1, timestamp: -1 });
+      await messagesCollection.createIndex({ userId: 1, timestamp: -1 });
+      await messagesCollection.createIndex(
+        { lastActivity: 1 },
+        {
+          expireAfterSeconds: CONFIG.SESSION_TIMEOUT_HOURS * 3600,
+        }
+      );
+
+      const contextCacheCollection = this.db.collection(
+        CONFIG.COLLECTIONS.CONTEXT_CACHE
+      );
+      await contextCacheCollection.createIndex(
+        { sessionId: 1 },
+        { unique: true }
+      );
+      await contextCacheCollection.createIndex(
+        { lastUpdated: 1 },
+        {
+          expireAfterSeconds: CONFIG.SESSION_TIMEOUT_HOURS * 3600,
+        }
+      );
+    } catch (error) {
+      console.log("Index creation skipped (may already exist)");
     }
   }
 
-  private contextManager = new ContextManager();
-
-  async processInput(userInput: string): Promise<string> {
+  async loadContextSummary() {
     try {
-      // Add user message to context
-      this.contextManager.addMessage("user", userInput);
+      const cached = await this.db
+        .collection(CONFIG.COLLECTIONS.CONTEXT_CACHE)
+        .findOne({
+          sessionId: this.sessionId,
+        });
 
-      // Use AI to detect intent and extract data
-      console.log("🧠 AI analyzing your request...");
-      const intentAnalysis = await this.analyzeIntent(
-        userInput,
-        this.contextManager.getRecentContext()
+      if (cached && cached.summary) {
+        this.contextSummary = cached.summary;
+        if (cached.entityTracking) {
+          this.entityTracking = cached.entityTracking;
+        }
+        if (cached.conversationState) {
+          this.conversationState = cached.conversationState;
+        }
+      }
+    } catch (error) {
+      console.log("Failed to load context summary:", error);
+    }
+  }
+
+  async saveContextSummary() {
+    try {
+      await this.db.collection(CONFIG.COLLECTIONS.CONTEXT_CACHE).replaceOne(
+        { sessionId: this.sessionId },
+        {
+          sessionId: this.sessionId,
+          userId: this.userId,
+          summary: this.contextSummary,
+          entityTracking: this.entityTracking,
+          conversationState: this.conversationState,
+          lastUpdated: new Date(),
+        },
+        { upsert: true }
       );
+    } catch (error) {
+      console.log("Failed to save context summary:", error);
+    }
+  }
 
-      console.log(`🎯 AI detected intent: ${intentAnalysis.primary_intent}`);
+  // =====================================
+  // Helper Functions
+  // =====================================
 
-      let response: string;
+  calculateDaysSince(timestamp: string): number | null {
+    if (!timestamp) return null;
+    try {
+      const then = new Date(timestamp);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - then.getTime());
+      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    } catch (error) {
+      return null;
+    }
+  }
 
-      // Route to appropriate handler based on AI-detected intent
-      switch (intentAnalysis.primary_intent) {
-        case "smart_contract_generation":
-          response = await this.handleSmartContractGeneration(intentAnalysis);
-          break;
-        case "smart_contract_audit":
-        case "token_security_check":
-          response = await this.handleTokenSecurityCheck(intentAnalysis);
-          break;
-        case "token_information":
-          response = await this.handleTokenInformation(intentAnalysis);
-          break;
-        case "comparison_analysis":
-          response = await this.handleComparisonAnalysis(intentAnalysis);
-          break;
-        case "educational_explanation":
-          response = await this.handleEducationalExplanation(
-            userInput,
-            intentAnalysis
-          );
-          break;
-        case "investment_advice":
-          response = await this.handleInvestmentAdvice(
-            userInput,
-            intentAnalysis
-          );
-          break;
-        case "general_crypto_discussion":
-        default:
-          response = await this.handleGeneralCryptoDiscussion(userInput);
-          break;
+  truncateAddress(address: string): string {
+    if (!address) return "";
+    return `${address.substring(0, 6)}...${address.substring(
+      address.length - 4
+    )}`;
+  }
+
+  isEthereumAddress(str: string): boolean {
+    return /^0x[a-fA-F0-9]{40}$/.test(str);
+  }
+
+  validateAndIdentifyInput(text: string) {
+    const validation = {
+      walletAddresses: [] as string[],
+      contractAddresses: [] as string[],
+      transactionHashes: [] as string[],
+      tokens: [] as string[],
+      type: null as string | null,
+      primary: null as string | null,
+    };
+
+    const patterns = {
+      ethereumAddress: /0x[a-fA-F0-9]{40}\b/g,
+      transactionHash: /0x[a-fA-F0-9]{64}\b/g,
+      tokenSymbol: /\b[A-Z]{2,5}\b/g,
+      ensDomain: /\b[\w-]+\.eth\b/g,
+    };
+
+    const addresses = text.match(patterns.ethereumAddress) || [];
+    const txHashes = text.match(patterns.transactionHash) || [];
+    const tokenSymbols = text.match(patterns.tokenSymbol) || [];
+
+    for (const address of addresses) {
+      validation.walletAddresses.push(address);
+    }
+
+    validation.transactionHashes = txHashes;
+
+    const commonWords = ["ETH", "USD", "API", "AI", "ID", "URL", "TX"];
+    validation.tokens = tokenSymbols.filter(
+      (symbol) => !commonWords.includes(symbol) && symbol.length >= 2
+    );
+
+    if (txHashes.length > 0) {
+      validation.type = "transaction";
+      validation.primary = txHashes[0];
+    } else if (addresses.length > 0) {
+      validation.type = "wallet";
+      validation.primary = addresses[0];
+    } else if (validation.tokens.length > 0) {
+      validation.type = "token";
+      validation.primary = validation.tokens[0];
+    }
+
+    return validation;
+  }
+
+  // =====================================
+  // Message Storage and Processing
+  // =====================================
+
+  async saveMessage(role: string, content: string, metadata: any = {}) {
+    try {
+      const message = {
+        userId: this.userId,
+        sessionId: this.sessionId,
+        role,
+        content,
+        timestamp: new Date(),
+        lastActivity: new Date(),
+        metadata: metadata,
+      };
+
+      await this.db.collection(CONFIG.COLLECTIONS.MESSAGES).insertOne(message);
+      await this.updateSessionActivity();
+      await this.updateContextSummary(content, metadata);
+    } catch (error) {
+      console.error("Error saving message:", error);
+    }
+  }
+
+  async updateSessionActivity() {
+    try {
+      await this.db.collection(CONFIG.COLLECTIONS.SESSIONS).updateOne(
+        { sessionId: this.sessionId },
+        {
+          $set: { lastActivity: new Date() },
+          $setOnInsert: {
+            sessionId: this.sessionId,
+            userId: this.userId,
+            createdAt: new Date(),
+          },
+        },
+        { upsert: true }
+      );
+    } catch (error) {
+      console.error("Error updating session activity:", error);
+    }
+  }
+
+  async updateContextSummary(message: string, metadata: any = {}) {
+    if (metadata.utility && metadata.utility !== "general") {
+      this.contextSummary.recentTopics.push({
+        utility: metadata.utility,
+        timestamp: new Date(),
+        summary: this.generateTopicSummary(message, metadata),
+      });
+
+      if (this.contextSummary.recentTopics.length > 5) {
+        this.contextSummary.recentTopics.shift();
+      }
+    }
+
+    if (metadata.walletAddress) {
+      this.addToArtifacts("wallets", metadata.walletAddress);
+    }
+    if (metadata.txHash) {
+      this.addToArtifacts("transactions", metadata.txHash);
+    }
+    if (metadata.tokenInfo) {
+      this.addToArtifacts("tokens", metadata.tokenInfo);
+    }
+    if (metadata.contractAddress) {
+      this.addToArtifacts("contracts", metadata.contractAddress);
+    }
+
+    await this.saveContextSummary();
+  }
+
+  addToArtifacts(type: string, value: string) {
+    const artifacts =
+      this.contextSummary.activeArtifacts[
+        type as keyof typeof this.contextSummary.activeArtifacts
+      ];
+
+    const index = artifacts.indexOf(value);
+    if (index > -1) {
+      artifacts.splice(index, 1);
+    }
+
+    artifacts.push(value);
+
+    if (artifacts.length > 3) {
+      artifacts.shift();
+    }
+  }
+
+  generateTopicSummary(message: string, metadata: any): string {
+    const summaries: { [key: string]: string } = {
+      wallet_analysis: `Analyzed wallet ${this.truncateAddress(
+        metadata.walletAddress
+      )}`,
+      transaction_breakdown: `Examined transaction ${this.truncateAddress(
+        metadata.txHash
+      )}`,
+      token_info: `Looked up token ${metadata.tokenInfo}`,
+      smart_contract: `Worked with smart contract`,
+      contract_audit: `Audited contract ${this.truncateAddress(
+        metadata.contractAddress
+      )}`,
+      gas_analysis: `Checked gas prices and network status`,
+      trending_tokens: `Reviewed trending tokens and market`,
+      default: `Discussed ${metadata.utility || "crypto topics"}`,
+    };
+
+    return summaries[metadata.utility] || summaries.default;
+  }
+
+  // =====================================
+  // Intent Analysis and Query Processing
+  // =====================================
+
+  async determineIntent(userInput: string): Promise<AiIntentAnalysis> {
+    const validation = this.validateAndIdentifyInput(userInput);
+
+    const systemPrompt = `You are BlockPal AI's advanced intent classifier with entity tracking.
+
+USER INPUT: "${userInput}"
+
+VALIDATION FOUND: ${JSON.stringify(validation)}
+
+AVAILABLE UTILITIES:
+1. crypto_knowledge - Educational crypto/blockchain questions
+2. smart_contract - Generate, analyze, or modify smart contracts
+3. wallet_analysis - Analyze wallet holdings (needs wallet address)
+4. transaction_breakdown - Analyze transaction details (needs tx hash)
+5. token_info - Get token information (needs token identifier)
+6. contract_audit - Security audit of contracts (needs contract address)
+7. trending_tokens - Market trends and sentiment analysis
+8. gas_analysis - Gas fee analysis and optimization
+9. wallet_assistant - Personal portfolio insights (needs wallet address)
+10. blockpal_assistant - Help with BlockPal platform features
+11. general - Other queries
+
+INTENT DETERMINATION RULES:
+- If user mentions wallet address (0x40 chars) → wallet_analysis
+- If user mentions transaction hash (0x64 chars) → transaction_breakdown
+- If user asks about token price/info → token_info
+- If user asks about "trending", "hot tokens", "what's popular" → trending_tokens
+- If user asks about gas prices, fees → gas_analysis
+- If user asks to create/generate contract → smart_contract
+- If user asks about security, audit, honeypot → contract_audit
+- If user asks "what can you do", "help", "features" → blockpal_assistant
+- If user asks general crypto questions → crypto_knowledge
+
+Respond with JSON only:
+{
+  "utility": "utility_name",
+  "data": {
+    "identifier": "exact address/hash to use or null",
+    "type": "wallet|transaction|contract|token",
+    "confidence": "high|medium|low",
+    "specificFocus": "what to focus on"
+  }
+}`;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userInput },
+        ],
+        temperature: 0.1,
+        max_tokens: 200,
+        response_format: { type: "json_object" },
+      });
+
+      const intent = JSON.parse(response.choices[0].message.content || "{}");
+
+      // Use validation data if no identifier found
+      if (!intent.data.identifier && validation.primary) {
+        intent.data.identifier = validation.primary;
+        intent.data.type = validation.type;
       }
 
-      // Add AI response to context
-      this.contextManager.addMessage("assistant", response, {
-        intent: intentAnalysis.primary_intent,
+      // Auto-detect based on input patterns
+      if (!intent.data.identifier) {
+        const lowerInput = userInput.toLowerCase();
+
+        // Check for common token symbols
+        const tokenSymbols = [
+          "btc",
+          "eth",
+          "usdc",
+          "usdt",
+          "dai",
+          "link",
+          "uni",
+          "aave",
+          "sol",
+          "ada",
+        ];
+        for (const symbol of tokenSymbols) {
+          if (lowerInput.includes(symbol)) {
+            intent.utility = "token_info";
+            intent.data.identifier = symbol.toUpperCase();
+            intent.data.type = "token";
+            break;
+          }
+        }
+
+        // Check for trending requests
+        if (
+          lowerInput.includes("trending") ||
+          lowerInput.includes("hot") ||
+          lowerInput.includes("popular")
+        ) {
+          intent.utility = "trending_tokens";
+        }
+
+        // Check for gas requests
+        if (lowerInput.includes("gas") || lowerInput.includes("fee")) {
+          intent.utility = "gas_analysis";
+        }
+
+        // Check for price requests
+        if (lowerInput.includes("price") && !intent.data.identifier) {
+          intent.utility = "token_info";
+          // Try to extract token from question
+          const priceMatch = lowerInput.match(/price of (\w+)/);
+          if (priceMatch) {
+            intent.data.identifier = priceMatch[1].toUpperCase();
+            intent.data.type = "token";
+          }
+        }
+      }
+
+      return intent;
+    } catch (error) {
+      console.error("Intent determination error:", error);
+      return {
+        utility: "general",
+        data: {
+          identifier: validation.primary,
+          type: validation.type,
+        },
+      };
+    }
+  }
+
+  async processUserQuery(userInput: string): Promise<string> {
+    try {
+      await this.saveMessage("user", userInput);
+      const intent = await this.determineIntent(userInput);
+
+      let response: string;
+      let additionalMetadata: any = {};
+
+      switch (intent.utility) {
+        case "crypto_knowledge":
+          response = await this.handleCryptoKnowledge(userInput);
+          break;
+        case "smart_contract":
+          response = await this.handleSmartContract(userInput);
+          break;
+        case "wallet_analysis":
+          response = await this.handleWalletAnalysis(userInput, intent.data);
+          additionalMetadata.walletAddress = intent.data.identifier;
+          break;
+        case "transaction_breakdown":
+          response = await this.handleTransactionBreakdown(
+            userInput,
+            intent.data
+          );
+          additionalMetadata.txHash = intent.data.identifier;
+          break;
+        case "token_info":
+          response = await this.handleTokenInfo(userInput, intent.data);
+          additionalMetadata.tokenInfo = intent.data.identifier;
+          break;
+        case "contract_audit":
+          response = await this.handleContractAudit(userInput, intent.data);
+          additionalMetadata.contractAddress = intent.data.identifier;
+          break;
+        case "trending_tokens":
+          response = await this.handleTrendingTokens(userInput);
+          break;
+        case "gas_analysis":
+          response = await this.handleGasAnalysis(userInput);
+          break;
+        case "wallet_assistant":
+          response = await this.handleWalletAssistant(userInput, intent.data);
+          break;
+        case "blockpal_assistant":
+          response = await this.handleBlockPalAssistant(userInput);
+          break;
+        default:
+          response = await this.handleGeneralQuery(userInput);
+      }
+
+      await this.saveMessage("assistant", response, {
+        utility: intent.utility,
+        ...additionalMetadata,
       });
 
       return response;
     } catch (error) {
-      const errorResponse = `❌ I encountered an error: ${error.message}\n\nPlease try again or rephrase your question.`;
-      this.contextManager.addMessage("assistant", errorResponse);
+      console.error("Error processing query:", error);
+      const errorResponse =
+        "I encountered an error processing your request. Please try again.";
+      await this.saveMessage("assistant", errorResponse, { error: true });
       return errorResponse;
     }
   }
 
-  private async analyzeIntent(
-    userInput: string,
-    recentContext: string = ""
-  ): Promise<AiIntentAnalysis> {
-    const intentAnalysisPrompt = `You are an expert AI intent classifier for a crypto assistant. Analyze the user's input and determine their primary intent.
+  // =====================================
+  // API Integration Methods (from original aichat.js)
+  // =====================================
 
-AVAILABLE INTENTS:
-1. smart_contract_generation - User wants to create/generate smart contract code
-2. smart_contract_audit - User wants to audit/analyze/check security of a smart contract (use token_security_check for GoPlus API)
-3. token_security_check - User wants to check token security, honeypot detection, or contract safety using GoPlus
-4. token_information - User wants information about a specific token/cryptocurrency
-5. comparison_analysis - User wants to compare tokens, contracts, or crypto projects
-6. educational_explanation - User wants to learn about crypto concepts, DeFi, etc.
-7. investment_advice - User wants investment guidance or financial advice
-8. general_crypto_discussion - General crypto conversation, questions, or chat
-
-TOKEN INFORMATION SUB-CATEGORIES:
-- full_analysis: Complete token overview (price, market cap, volume, description, etc.)
-- specific_data: User wants only specific information (just price, just market cap, etc.)
-
-SPECIFIC DATA TYPES:
-- price: current price, price changes
-- market_cap: market capitalization, market cap rank
-- volume: trading volume
-- supply: circulating/total/max supply
-- performance: price changes, ATH/ATL
-- basic_info: name, symbol, description
-- links: website, explorer links
-- technical: contract address, blockchain details
-- security: security analysis, honeypot check, contract safety
-
-CONTEXT FROM PREVIOUS CONVERSATION:
-${recentContext}
-
-USER INPUT: "${userInput}"
-
-Analyze the user's input and respond with ONLY a valid JSON object in this exact format:
-{
-  "primary_intent": "one_of_the_intents_above",
-  "confidence": 0.95,
-  "extracted_data": {
-    "contract_address": "0x... if found, otherwise null",
-    "token_identifier": "token symbol/name/address if relevant, otherwise null",
-    "contract_type": "erc20/erc721/defi/dao/etc if relevant, otherwise null",
-    "comparison_type": "tokens/contracts/projects if comparison, otherwise null",
-    "items_to_compare": ["item1", "item2"] if comparison, otherwise null,
-    "specific_requirements": "any specific requirements mentioned",
-    "token_analysis_type": "full_analysis or specific_data (only for token_information intent)",
-    "specific_data_requested": ["price", "market_cap", "volume", "security", etc.] if specific_data, otherwise null
-  },
-  "reasoning": "brief explanation of why this intent was chosen"
-}`;
-
+  async getMoralisWalletData(walletAddress: string) {
     try {
-      const response = await this.openAiChatCompletion(
-        [
-          { role: "system", content: intentAnalysisPrompt },
-          { role: "user", content: userInput },
-        ],
-        {
-          temperature: 0.1,
-          max_tokens: 500,
-        }
-      );
+      const headers = {
+        "X-API-Key": CONFIG.APIs.MORALIS.API_KEY!,
+        "Content-Type": "application/json",
+      };
 
-      const cleanResponse = response.trim();
-      const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
-
-      if (!jsonMatch) {
-        throw new Error("Invalid JSON format in intent analysis");
+      let nativeBalance = "0";
+      try {
+        const nativeBalanceResponse = await axios.get(
+          `${CONFIG.APIs.MORALIS.BASE_URL}/${walletAddress}/balance`,
+          {
+            headers,
+            params: { chain: "eth" },
+          }
+        );
+        nativeBalance = nativeBalanceResponse.data.balance || "0";
+      } catch (error) {
+        console.log("Native balance endpoint failed, using fallback...");
+        nativeBalance = "0";
       }
 
-      const intentAnalysis = JSON.parse(jsonMatch[0]);
+      let tokens = [];
+      try {
+        const tokenBalancesResponse = await axios.get(
+          `${CONFIG.APIs.MORALIS.BASE_URL}/wallets/${walletAddress}/tokens`,
+          {
+            headers,
+            params: { chain: "eth" },
+          }
+        );
+        tokens =
+          tokenBalancesResponse.data?.result ||
+          tokenBalancesResponse.data ||
+          [];
+      } catch (error) {
+        console.log("Token endpoint using alternative method...");
+        try {
+          const altTokenResponse = await axios.get(
+            `${CONFIG.APIs.MORALIS.BASE_URL}/${walletAddress}/erc20`,
+            {
+              headers,
+              params: { chain: "eth" },
+            }
+          );
+          tokens = altTokenResponse.data || [];
+        } catch (altError) {
+          console.log("Both token endpoints failed, using Alchemy fallback...");
+          return await this.getAlchemyWalletData(walletAddress);
+        }
+      }
+
+      let nfts = [];
+      try {
+        const nftsResponse = await axios.get(
+          `${CONFIG.APIs.MORALIS.BASE_URL}/${walletAddress}/nft`,
+          {
+            headers,
+            params: {
+              chain: "eth",
+              format: "decimal",
+              normalizeMetadata: true,
+              limit: 10,
+            },
+          }
+        );
+        nfts = nftsResponse.data?.result || [];
+      } catch (error) {
+        console.log("NFT endpoint failed");
+        nfts = [];
+      }
+
+      let transactions = [];
+      try {
+        const transactionsResponse = await axios.get(
+          `${CONFIG.APIs.MORALIS.BASE_URL}/${walletAddress}`,
+          {
+            headers,
+            params: {
+              chain: "eth",
+              limit: 20,
+            },
+          }
+        );
+        transactions = transactionsResponse.data?.result || [];
+      } catch (error) {
+        console.log("Transaction history endpoint failed");
+        transactions = [];
+      }
 
       return {
-        primary_intent: intentAnalysis.primary_intent,
-        confidence: intentAnalysis.confidence || 0.8,
-        contract_address: intentAnalysis.extracted_data?.contract_address,
-        token_identifier: intentAnalysis.extracted_data?.token_identifier,
-        contract_type: intentAnalysis.extracted_data?.contract_type,
-        comparison_type: intentAnalysis.extracted_data?.comparison_type,
-        items_to_compare: intentAnalysis.extracted_data?.items_to_compare,
-        specific_requirements:
-          intentAnalysis.extracted_data?.specific_requirements,
-        token_analysis_type: intentAnalysis.extracted_data?.token_analysis_type,
-        specific_data_requested:
-          intentAnalysis.extracted_data?.specific_data_requested,
-        reasoning: intentAnalysis.reasoning,
+        native: { balance: nativeBalance },
+        tokens: Array.isArray(tokens) ? tokens : [],
+        nfts: nfts,
+        transactions: transactions,
       };
     } catch (error) {
-      console.error("❌ Intent detection error:", error.message);
+      console.error("Moralis API Error:", error.message);
+      console.log("Falling back to Alchemy...");
+      return await this.getAlchemyWalletData(walletAddress);
+    }
+  }
+
+  async getAlchemyWalletData(walletAddress: string) {
+    try {
+      const url = `${CONFIG.APIs.ALCHEMY.BASE_URL}${CONFIG.APIs.ALCHEMY.API_KEY}`;
+
+      const ethResponse = await axios.post(url, {
+        jsonrpc: "2.0",
+        method: "eth_getBalance",
+        params: [walletAddress, "latest"],
+        id: 1,
+      });
+
+      const tokenResponse = await axios.post(url, {
+        jsonrpc: "2.0",
+        method: "alchemy_getTokenBalances",
+        params: [walletAddress],
+        id: 2,
+      });
+
+      const tokenBalances = tokenResponse.data.result?.tokenBalances || [];
+
+      const tokensWithMetadata = await Promise.all(
+        tokenBalances.slice(0, 20).map(async (token: any) => {
+          try {
+            const metadataResponse = await axios.post(url, {
+              jsonrpc: "2.0",
+              method: "alchemy_getTokenMetadata",
+              params: [token.contractAddress],
+              id: 3,
+            });
+
+            const metadata = metadataResponse.data.result;
+            const decimals = metadata.decimals || 18;
+            const balance =
+              parseInt(token.tokenBalance, 16) / Math.pow(10, decimals);
+
+            return {
+              token_address: token.contractAddress,
+              name: metadata.name || "Unknown",
+              symbol: metadata.symbol || "N/A",
+              decimals: decimals,
+              balance: balance.toString(),
+              logo: metadata.logo || null,
+              possible_spam: false,
+            };
+          } catch (err) {
+            return null;
+          }
+        })
+      );
+
       return {
-        primary_intent: "general_crypto_discussion",
-        confidence: 0.5,
-        reasoning: "Fallback due to intent detection error",
+        native: { balance: ethResponse.data.result || "0x0" },
+        tokens: tokensWithMetadata.filter((t) => t !== null),
+        nfts: [],
+        transactions: [],
+      };
+    } catch (error) {
+      console.error("Alchemy fallback error:", error.message);
+      throw new Error("Both Moralis and Alchemy APIs failed");
+    }
+  }
+
+  async getETHPrice() {
+    try {
+      const response = await axios.get(
+        `${CONFIG.APIs.COINGECKO.BASE_URL}/simple/price`,
+        {
+          params: {
+            ids: "ethereum",
+            vs_currencies: "usd",
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return { ethereum: { usd: 2000 } };
+    }
+  }
+
+  async getCurrentGasPrices() {
+    try {
+      const response = await axios.get(CONFIG.APIs.ETHERSCAN.BASE_URL!, {
+        params: {
+          module: "gastracker",
+          action: "gasoracle",
+          apikey: CONFIG.APIs.ETHERSCAN.API_KEY,
+        },
+      });
+
+      return response.data.result;
+    } catch (error) {
+      return {
+        SafeGasPrice: "20",
+        StandardGasPrice: "25",
+        FastGasPrice: "30",
       };
     }
   }
 
-  private async handleTokenInformation(
-    intentAnalysis: AiIntentAnalysis
-  ): Promise<string> {
-    console.log(
-      `📊 Fetching token info for: ${intentAnalysis.token_identifier}...`
+  async generateWalletInsights(data: any) {
+    const insights = {
+      portfolio: {
+        health: [] as string[],
+        risks: [] as string[],
+        opportunities: [] as string[],
+      },
+      summary: "",
+      actionableRecommendations: [] as string[],
+    };
+
+    const ethPercent =
+      data.totalValueUSD > 0
+        ? (data.ethValueUSD / data.totalValueUSD) * 100
+        : 0;
+
+    if (ethPercent > 80) {
+      insights.portfolio.risks.push(
+        `Heavy ETH concentration (${ethPercent.toFixed(
+          1
+        )}%) - vulnerable to ETH price swings`
+      );
+      insights.actionableRecommendations.push(
+        "Consider diversifying into top DeFi tokens or stablecoins"
+      );
+    } else if (ethPercent < 20 && data.totalValueUSD > 100) {
+      insights.portfolio.health.push(
+        `Well diversified - only ${ethPercent.toFixed(1)}% in ETH`
+      );
+    }
+
+    const stablecoins = data.tokens.filter((t: any) =>
+      ["USDC", "USDT", "DAI", "BUSD", "USDD", "TUSD", "FRAX"].includes(
+        t.symbol?.toUpperCase() || ""
+      )
     );
+    const stablecoinValue = stablecoins.reduce(
+      (sum: number, t: any) => sum + (t.usdValue || 0),
+      0
+    );
+    const stablecoinPercent =
+      data.totalValueUSD > 0 ? (stablecoinValue / data.totalValueUSD) * 100 : 0;
+
+    if (stablecoinPercent > 50) {
+      insights.portfolio.opportunities.push(
+        `${stablecoinPercent.toFixed(
+          1
+        )}% in stablecoins (${stablecoinValue.toFixed(
+          2
+        )}) - could earn 4-8% APY in DeFi`
+      );
+      insights.actionableRecommendations.push(
+        "Explore Aave, Compound, or Curve for stablecoin yields"
+      );
+    }
+
+    if (
+      data.daysSinceLastActivity !== null &&
+      data.daysSinceLastActivity !== undefined
+    ) {
+      if (data.daysSinceLastActivity > 90) {
+        insights.portfolio.health.push(
+          `Dormant wallet - no activity for ${data.daysSinceLastActivity} days`
+        );
+      } else if (
+        data.daysSinceLastActivity < 7 &&
+        data.transactions &&
+        data.transactions.length > 10
+      ) {
+        insights.portfolio.health.push(
+          "Very active wallet - frequent transactions detected"
+        );
+        insights.actionableRecommendations.push(
+          "Consider using a gas tracker to optimize transaction timing"
+        );
+      }
+    }
+
+    const dustTokens = data.tokens.filter(
+      (t: any) => t.usdValue > 0 && t.usdValue < 10
+    );
+    if (dustTokens.length > 5) {
+      insights.portfolio.opportunities.push(
+        `${dustTokens.length} small token balances (<$10) could be consolidated`
+      );
+    }
+
+    if (data.nfts && data.nfts.count > 0) {
+      insights.portfolio.health.push(
+        `Holds ${data.nfts.count} NFTs - consider marketplace valuations`
+      );
+    }
+
+    const suspiciousTokens = data.tokens.filter(
+      (t: any) => !t.logo || t.name === "Unknown" || t.possibleSpam === true
+    );
+    if (suspiciousTokens.length > 0) {
+      insights.portfolio.risks.push(
+        `${suspiciousTokens.length} unverified or suspicious tokens detected`
+      );
+    }
+
+    if (data.totalValueUSD < 100) {
+      insights.summary =
+        "Small portfolio - focus on accumulation and gas optimization";
+    } else if (data.totalValueUSD < 10000) {
+      insights.summary =
+        "Growing portfolio - consider DeFi strategies and diversification";
+    } else {
+      insights.summary =
+        "Substantial portfolio - implement risk management and yield strategies";
+    }
+
+    if (data.tokens.length === 0) {
+      insights.portfolio.opportunities.push(
+        "No tokens detected - explore DeFi ecosystem"
+      );
+    } else if (data.tokens.length > 20) {
+      insights.portfolio.risks.push(
+        "High token count - consider consolidating smaller positions"
+      );
+    }
+
+    return insights;
+  }
+
+  async generateAnalysisResponse(
+    userQuery: string,
+    data: any,
+    analysisType: string
+  ): Promise<string> {
+    const entityContext = this.buildEntityContext();
+
+    const prompt = `You are analyzing ${analysisType} data with advanced entity tracking.
+
+ENTITY CONTEXT:
+${JSON.stringify(entityContext, null, 2)}
+
+USER QUESTION: "${userQuery}"
+
+AVAILABLE DATA:
+${JSON.stringify(data, null, 2)}
+
+CRITICAL INSTRUCTIONS:
+- Answer ONLY what the user specifically asked about
+- You MUST use the correct entity based on their reference
+- If they ask about "the sender", use the sender's data
+- If they ask about "the receiver", use the receiver's data
+- DO NOT confuse sender with receiver
+- If user asks about fraud/suspicious funds, focus ONLY on that aspect
+- If user asks for a list, provide ONLY the list without extra recommendations
+- DO NOT add unsolicited advice about gas optimization, portfolio strategies, etc.
+- Be concise and direct - no fluff or generic advice
+- Format numbers nicely (2-4 decimal places for decimals, use commas for thousands)
+- NEVER use emojis in responses
+- Present data in a clean, professional manner
+
+IMPORTANT API RULES:
+- NEVER mention API names (Moralis, Alchemy, Etherscan, CoinGecko, etc.)
+- NEVER say "using X API" or "X API shows"
+- Instead say: "I analyzed", "The blockchain data shows", "On-chain analysis reveals"
+- If asked how you get data, say "I analyze blockchain data directly"
+- Focus on the insights, not the data source
+
+ENTITY RESOLUTION:
+- When user says "the sender" → They mean the address that SENT the transaction
+- When user says "the receiver" → They mean the address that RECEIVED the transaction
+- Always double-check you're analyzing the correct wallet
+
+RESPONSE GUIDELINES BY QUERY TYPE:
+- "List tokens" → List the tokens with balances and values, nothing else
+- "Find fraud" → Focus only on suspicious tokens or security concerns
+- "Show balance" → Show balances without investment advice
+- "Analyze sender/receiver" → Make sure you analyze the CORRECT wallet`;
 
     try {
-      const tokenData = await this.getTokenInfo(
-        intentAnalysis.token_identifier
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.4,
+        max_tokens: 1500,
+      });
+
+      return (
+        response.choices[0].message.content ||
+        `I have the ${analysisType} data but encountered an error formatting the response. Please try again.`
+      );
+    } catch (error) {
+      console.error(
+        `Error generating ${analysisType} response:`,
+        error.message
+      );
+      return `I have the ${analysisType} data but encountered an error formatting the response. Please try again.`;
+    }
+  }
+
+  buildEntityContext() {
+    const lastTx = this.entityTracking.lastMentioned.transaction;
+    const context = {
+      currentEntities: {} as any,
+      relationships: {} as any,
+    };
+
+    if (lastTx && this.entityTracking.relationships[lastTx]) {
+      const rel = this.entityTracking.relationships[lastTx];
+      context.relationships[lastTx] = {
+        sender: rel.sender,
+        receiver: rel.receiver,
+        senderRole: "The address that sent the transaction",
+        receiverRole: "The address that received the transaction",
+      };
+      context.currentFocus = `Transaction ${lastTx} from ${rel.sender} to ${rel.receiver}`;
+    }
+
+    return context;
+  }
+
+  async handleCryptoKnowledge(userInput: string): Promise<string> {
+    const systemPrompt = `You are BlockPal AI, a crypto expert assistant. Provide educational, accurate information about cryptocurrency and blockchain. Be conversational and helpful.`;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userInput },
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      return (
+        response.choices[0].message.content ||
+        "I'm unable to process your crypto knowledge query at the moment."
+      );
+    } catch (error) {
+      return "I'm unable to process your crypto knowledge query at the moment. Please try again.";
+    }
+  }
+
+  async handleSmartContract(userInput: string): Promise<string> {
+    const systemPrompt = `You are BlockPal AI's expert smart contract developer. Generate clean, secure, well-commented Solidity code. Include all necessary imports and interfaces. Follow best practices and latest Solidity version.`;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userInput },
+        ],
+        temperature: 0.3,
+        max_tokens: 2500,
+      });
+
+      return (
+        response.choices[0].message.content ||
+        "I'm unable to generate your smart contract at the moment."
+      );
+    } catch (error) {
+      return "I'm unable to generate your smart contract at the moment. Please try again.";
+    }
+  }
+
+  async handleWalletAnalysis(
+    userInput: string,
+    intentData: any
+  ): Promise<string> {
+    let walletAddress = intentData.identifier;
+
+    if (!walletAddress) {
+      return "Please provide a valid Ethereum wallet address for analysis. Example: 0x1234567890123456789012345678901234567890";
+    }
+
+    try {
+      console.log(`Analyzing wallet ${walletAddress} with blockchain data...`);
+
+      const moralisData = await this.getMoralisWalletData(walletAddress);
+
+      const [ethPrice, gasData] = await Promise.all([
+        this.getETHPrice(),
+        this.getCurrentGasPrices(),
+      ]);
+
+      const ethBalance = parseFloat(moralisData.native.balance) / 1e18;
+      const ethValueUSD = ethBalance * (ethPrice.ethereum?.usd || 2000);
+
+      const tokens = moralisData.tokens
+        .map((token: any) => {
+          try {
+            const decimals = parseInt(token.decimals) || 18;
+            const rawBalance = token.balance || "0";
+            const balance = parseFloat(rawBalance) / Math.pow(10, decimals);
+
+            return {
+              name: token.name || "Unknown Token",
+              symbol: token.symbol || "N/A",
+              balance: balance,
+              decimals: decimals,
+              contractAddress:
+                token.token_address || token.address || token.contractAddress,
+              logo: token.logo || token.thumbnail,
+              usdValue: parseFloat(token.usd_value || "0"),
+              possibleSpam: token.possible_spam || false,
+            };
+          } catch (err) {
+            console.error("Error processing token:", err);
+            return null;
+          }
+        })
+        .filter(
+          (token: any) =>
+            token !== null && !token.possibleSpam && token.balance > 0
+        );
+
+      let tokenValueUSD = 0;
+      tokens.forEach((token: any) => {
+        if (token.usdValue > 0) {
+          tokenValueUSD += token.usdValue;
+        }
+      });
+      const totalValueUSD = ethValueUSD + tokenValueUSD;
+
+      const nfts = moralisData.nfts.map((nft: any) => ({
+        name: nft.name || "Unknown NFT",
+        symbol: nft.symbol || "N/A",
+        tokenId: nft.token_id,
+        contractType: nft.contract_type,
+        metadata: nft.metadata
+          ? typeof nft.metadata === "string"
+            ? JSON.parse(nft.metadata)
+            : nft.metadata
+          : null,
+      }));
+
+      const daysSinceLastActivity =
+        moralisData.transactions.length > 0 &&
+        moralisData.transactions[0]?.block_timestamp
+          ? this.calculateDaysSince(moralisData.transactions[0].block_timestamp)
+          : null;
+
+      const insights = await this.generateWalletInsights({
+        ethBalance,
+        ethValueUSD,
+        tokens,
+        totalValueUSD,
+        tokenValueUSD,
+        nfts,
+        transactions: moralisData.transactions,
+        daysSinceLastActivity: daysSinceLastActivity,
+      });
+
+      const walletData = {
+        address: walletAddress,
+        balances: {
+          eth: {
+            balance: ethBalance,
+            usdValue: ethValueUSD,
+            percentOfPortfolio:
+              totalValueUSD > 0 ? (ethValueUSD / totalValueUSD) * 100 : 0,
+          },
+          tokens: tokens,
+          totalValueUSD: totalValueUSD,
+        },
+        nfts: {
+          count: nfts.length,
+          items: nfts.slice(0, 5),
+        },
+        activity: {
+          recentTransactions: moralisData.transactions.length,
+          lastActivity: moralisData.transactions[0]?.block_timestamp || null,
+          daysSinceLastActivity: daysSinceLastActivity,
+        },
+        insights: insights,
+        gasData: gasData,
+        analysisTimestamp: new Date().toISOString(),
+      };
+
+      // Track this wallet as analyzed
+      this.entityTracking.entities[walletAddress.toLowerCase()] = {
+        type: "wallet",
+        roles: ["analyzed_wallet"],
+        lastMentioned: new Date().toISOString(),
+      };
+      this.entityTracking.lastMentioned.wallet = walletAddress.toLowerCase();
+
+      return await this.generateAnalysisResponse(
+        userInput,
+        walletData,
+        "wallet_analysis"
+      );
+    } catch (error) {
+      console.error("Wallet analysis error:", error);
+      console.error("Error stack:", error.stack);
+      return "I encountered an error analyzing this wallet. Please verify the address and try again.";
+    }
+  }
+
+  async handleTransactionBreakdown(
+    userInput: string,
+    intentData: any
+  ): Promise<string> {
+    if (!intentData.identifier) {
+      return "Please provide a valid Ethereum transaction hash for analysis. Example: 0xa1b2c3d4...";
+    }
+
+    try {
+      console.log(`Analyzing transaction ${intentData.identifier}...`);
+
+      const analysisPrompt = `Analyze this Ethereum transaction: ${intentData.identifier}
+
+Provide details about:
+- Transaction parties (sender/receiver)
+- Value transferred
+- Gas costs and efficiency
+- Transaction status and confirmations
+- Any smart contract interactions
+
+Format the response clearly with transaction details.`;
+
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [{ role: "user", content: analysisPrompt }],
+        temperature: 0.3,
+        max_tokens: 1500,
+      });
+
+      return (
+        response.choices[0].message.content ||
+        "I encountered an error analyzing this transaction."
+      );
+    } catch (error) {
+      console.error("Transaction analysis error:", error);
+      return "I encountered an error analyzing this transaction. Please verify the hash and try again.";
+    }
+  }
+
+  async handleTokenInfo(userInput: string, intentData: any): Promise<string> {
+    let tokenIdentifier = intentData.identifier;
+
+    if (!tokenIdentifier) {
+      return "Please specify a token by name (Bitcoin), symbol (BTC), or contract address.";
+    }
+
+    try {
+      console.log(`Searching for token: ${tokenIdentifier}`);
+
+      const cleanIdentifier = tokenIdentifier.replace(/^\$/, "");
+
+      let tokenData = await this.searchTokenInCoinGecko(cleanIdentifier);
+
+      if (!tokenData && this.isEthereumAddress(cleanIdentifier)) {
+        console.log(
+          "Token not found in primary source, checking blockchain data..."
+        );
+
+        try {
+          const moralisData = await this.getMoralisTokenData(cleanIdentifier);
+
+          if (moralisData && moralisData.metadata) {
+            const symbolFromMoralis = moralisData.metadata.symbol;
+            const nameFromMoralis = moralisData.metadata.name;
+
+            if (symbolFromMoralis || nameFromMoralis) {
+              tokenData = await this.searchTokenInCoinGecko(
+                symbolFromMoralis || nameFromMoralis
+              );
+            }
+
+            if (!tokenData) {
+              tokenData = {
+                source: "blockchain",
+                found: true,
+                basic_info: {
+                  name: moralisData.metadata.name || "Unknown",
+                  symbol: moralisData.metadata.symbol || "N/A",
+                  decimals: moralisData.metadata.decimals || 18,
+                  contract_address: cleanIdentifier,
+                  logo: moralisData.metadata.logo,
+                },
+                price_info: moralisData.price
+                  ? {
+                      current_price_usd: moralisData.price.usdPrice,
+                      price_change_24h: moralisData.price["24hrPercentChange"],
+                      last_updated: new Date().toISOString(),
+                    }
+                  : null,
+                market_data: {
+                  source_note:
+                    "Limited data available - token data from blockchain",
+                },
+              };
+            }
+          }
+        } catch (moralisError) {
+          console.error("Blockchain lookup failed:", moralisError.message);
+        }
+      }
+
+      if (!tokenData || !tokenData.found) {
+        return `Token "${tokenIdentifier}" not found. Please verify the token name, symbol (without $), or contract address. You can try:
+- Full name: "Ethereum" instead of "ETH"
+- Contract address: 0x... (42 characters)
+- Different variations of the name`;
+      }
+
+      // Track this token
+      this.entityTracking.entities[cleanIdentifier.toLowerCase()] = {
+        type: "token",
+        roles: ["analyzed_token"],
+        lastMentioned: new Date().toISOString(),
+      };
+      this.entityTracking.lastMentioned.token = cleanIdentifier.toLowerCase();
+
+      return await this.generateAnalysisResponse(
+        userInput,
+        tokenData,
+        "token_information"
+      );
+    } catch (error) {
+      console.error("Token info error:", error.message);
+      return "I encountered an error retrieving token information. Please try again with a different identifier.";
+    }
+  }
+
+  async searchTokenInCoinGecko(identifier: string) {
+    try {
+      if (this.isEthereumAddress(identifier)) {
+        try {
+          const contractData = await axios.get(
+            `${
+              CONFIG.APIs.COINGECKO.BASE_URL
+            }/coins/ethereum/contract/${identifier.toLowerCase()}`
+          );
+
+          if (contractData.data) {
+            return await this.formatCoinGeckoData(contractData.data);
+          }
+        } catch (contractError) {
+          console.log("Contract not found in CoinGecko, trying search...");
+        }
+      }
+
+      const searchResponse = await axios.get(
+        `${CONFIG.APIs.COINGECKO.BASE_URL}/search`,
+        {
+          params: { query: identifier.toLowerCase() },
+        }
       );
 
       if (
-        intentAnalysis.token_analysis_type === "specific_data" &&
-        intentAnalysis.specific_data_requested
+        !searchResponse.data.coins ||
+        searchResponse.data.coins.length === 0
       ) {
-        return this.formatSpecificTokenData(
-          tokenData,
-          intentAnalysis.specific_data_requested
-        );
-      } else {
-        let securityData = null;
-        if (tokenData.contract_address) {
-          try {
-            securityData = await this.checkTokenSecurity(
-              tokenData.contract_address
-            );
-          } catch (secError) {
-            console.log("⚠️ Could not fetch security data:", secError.message);
+        return null;
+      }
+
+      let bestMatch = null;
+      const searchLower = identifier.toLowerCase();
+
+      for (const coin of searchResponse.data.coins) {
+        if (coin.symbol.toLowerCase() === searchLower) {
+          bestMatch = coin;
+          break;
+        }
+      }
+
+      if (!bestMatch) {
+        for (const coin of searchResponse.data.coins) {
+          if (coin.name.toLowerCase() === searchLower) {
+            bestMatch = coin;
+            break;
           }
         }
-        return this.formatTokenResponse(tokenData, securityData);
-      }
-    } catch (error) {
-      return `❌ Failed to fetch token information for ${intentAnalysis.token_identifier}: ${error.message}\n\nPlease check the token symbol or contract address.`;
-    }
-  }
-
-  private async handleTokenSecurityCheck(
-    intentAnalysis: AiIntentAnalysis
-  ): Promise<string> {
-    const identifier =
-      intentAnalysis.contract_address || intentAnalysis.token_identifier;
-    console.log(`🔍 Checking security for: ${identifier}...`);
-
-    try {
-      if (identifier && identifier.startsWith("0x")) {
-        const securityResult = await this.checkTokenSecurity(identifier);
-        return this.formatTokenSecurityResponse(securityResult, identifier);
-      } else if (identifier) {
-        const tokenData = await this.getTokenInfo(identifier);
-        if (tokenData.contract_address) {
-          const securityResult = await this.checkTokenSecurity(
-            tokenData.contract_address
-          );
-          return this.formatTokenSecurityResponse(
-            securityResult,
-            tokenData.contract_address,
-            tokenData
-          );
-        } else {
-          return `❌ Could not find contract address for ${identifier}. Please provide a contract address directly for security analysis.`;
-        }
-      } else {
-        return `❌ Please provide a contract address (0x...) or token symbol for security analysis.`;
-      }
-    } catch (error) {
-      return `❌ Failed to check security for ${identifier}: ${error.message}\n\nPlease verify the contract address or token symbol.`;
-    }
-  }
-
-  private async handleSmartContractGeneration(
-    intentAnalysis: AiIntentAnalysis
-  ): Promise<string> {
-    console.log("🔧 Generating smart contract...");
-
-    try {
-      const contractCode = await this.generateSmartContract(intentAnalysis);
-      return this.formatSmartContractResponse(contractCode, intentAnalysis);
-    } catch (error) {
-      return `❌ Failed to generate smart contract: ${error.message}\n\nPlease provide more specific requirements or try again.`;
-    }
-  }
-
-  private async handleComparisonAnalysis(
-    intentAnalysis: AiIntentAnalysis
-  ): Promise<string> {
-    console.log(`🔄 Performing comparison analysis...`);
-
-    try {
-      if (intentAnalysis.comparison_type === "contracts") {
-        return await this.compareContracts(intentAnalysis.items_to_compare);
-      } else if (intentAnalysis.comparison_type === "tokens") {
-        return await this.compareTokens(intentAnalysis.items_to_compare);
-      } else {
-        return await this.handleGeneralCryptoDiscussion(
-          `Compare ${intentAnalysis.items_to_compare?.join(" vs ")}`
-        );
-      }
-    } catch (error) {
-      return `❌ Failed to perform comparison: ${error.message}`;
-    }
-  }
-
-  private async handleEducationalExplanation(
-    userInput: string,
-    intentAnalysis: AiIntentAnalysis
-  ): Promise<string> {
-    console.log("📚 Providing educational explanation...");
-    return await this.handleGeneralCryptoDiscussion(userInput);
-  }
-
-  private async handleInvestmentAdvice(
-    userInput: string,
-    intentAnalysis: AiIntentAnalysis
-  ): Promise<string> {
-    console.log("💰 Providing investment advice...");
-    return await this.handleGeneralCryptoDiscussion(userInput);
-  }
-
-  private async handleGeneralCryptoDiscussion(input: string): Promise<string> {
-    const systemPrompt = this.contextManager.buildSystemPrompt();
-    const messages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: input },
-    ];
-
-    try {
-      const response = await this.openAiChatCompletion(messages);
-      return response;
-    } catch (error) {
-      return `❌ AI service temporarily unavailable: ${error.message}`;
-    }
-  }
-
-  private async getTokenInfo(query: string): Promise<any> {
-    const cleanQuery = query.replace("$", "").toLowerCase().trim();
-
-    try {
-      if (cleanQuery.startsWith("0x") && cleanQuery.length === 42) {
-        return await this.getTokenByContract(cleanQuery);
       }
 
-      const directId = this.getDirectTokenMapping(cleanQuery);
-      if (directId) {
-        try {
-          return await this.getTokenById(directId);
-        } catch (mappingError) {
-          console.log(
-            `Direct mapping failed for ${cleanQuery}, trying search...`
-          );
+      if (!bestMatch) {
+        for (const coin of searchResponse.data.coins) {
+          if (coin.symbol.toLowerCase().startsWith(searchLower)) {
+            bestMatch = coin;
+            break;
+          }
         }
       }
 
-      if (cleanQuery.length < 15 && !cleanQuery.includes(" ")) {
-        try {
-          return await this.getTokenById(cleanQuery);
-        } catch (idError) {
-          console.log(`Direct ID failed for ${cleanQuery}, trying search...`);
-        }
+      if (!bestMatch) {
+        bestMatch = searchResponse.data.coins[0];
       }
 
-      return await this.searchToken(cleanQuery);
-    } catch (error) {
-      throw new Error(
-        `Token not found: ${query}. Try using the full name (e.g., 'Solana' instead of 'SOL') or contract address.`
-      );
-    }
-  }
-
-  private getDirectTokenMapping(ticker: string): string | null {
-    const tickerMappings: Record<string, string> = {
-      btc: "bitcoin",
-      bitcoin: "bitcoin",
-      eth: "ethereum",
-      ethereum: "ethereum",
-      sol: "solana",
-      solana: "solana",
-      ada: "cardano",
-      cardano: "cardano",
-      dot: "polkadot",
-      polkadot: "polkadot",
-      avax: "avalanche-2",
-      avalanche: "avalanche-2",
-      matic: "matic-network",
-      polygon: "matic-network",
-      link: "chainlink",
-      chainlink: "chainlink",
-      usdt: "tether",
-      tether: "tether",
-      usdc: "usd-coin",
-      "usd-coin": "usd-coin",
-      busd: "binance-usd",
-      dai: "dai",
-      uni: "uniswap",
-      uniswap: "uniswap",
-      aave: "aave",
-      comp: "compound-governance-token",
-      mkr: "maker",
-      doge: "dogecoin",
-      dogecoin: "dogecoin",
-      shib: "shiba-inu",
-      ltc: "litecoin",
-      bch: "bitcoin-cash",
-      xrp: "ripple",
-      bnb: "binancecoin",
-      trx: "tron",
-      atom: "cosmos",
-      near: "near",
-      algo: "algorand",
-      icp: "internet-computer",
-      ftm: "fantom",
-      sand: "the-sandbox",
-      mana: "decentraland",
-      axs: "axie-infinity",
-      gala: "gala",
-      ens: "ethereum-name-service",
-      ldo: "lido-dao",
-      gmx: "gmx",
-      inj: "injective-protocol",
-    };
-
-    return tickerMappings[ticker] || null;
-  }
-
-  private async getTokenById(tokenId: string): Promise<any> {
-    const response = await fetch(
-      `${this.config.ENDPOINTS.COINGECKO}/coins/${tokenId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&x_cg_demo_api_key=${this.config.COINGECKO_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`CoinGecko API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return this.formatTokenData(data);
-  }
-
-  private async getTokenByContract(
-    contractAddress: string,
-    platform = "ethereum"
-  ): Promise<any> {
-    const response = await fetch(
-      `${this.config.ENDPOINTS.COINGECKO}/coins/${platform}/contract/${contractAddress}?x_cg_demo_api_key=${this.config.COINGECKO_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`CoinGecko API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return this.formatTokenData(data);
-  }
-
-  private async searchToken(query: string): Promise<any> {
-    const response = await fetch(
-      `${this.config.ENDPOINTS.COINGECKO}/search?query=${query}&x_cg_demo_api_key=${this.config.COINGECKO_API_KEY}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`CoinGecko API error: ${response.status}`);
-    }
-
-    const searchResults = await response.json();
-
-    if (!searchResults.coins || searchResults.coins.length === 0) {
-      throw new Error(`No tokens found for: ${query}`);
-    }
-
-    const exactMatch = searchResults.coins.find(
-      (coin: any) => coin.symbol?.toLowerCase() === query.toLowerCase()
-    );
-
-    const tokenId = exactMatch ? exactMatch.id : searchResults.coins[0].id;
-    return await this.getTokenById(tokenId);
-  }
-
-  private formatTokenData(data: any): any {
-    const marketData = data.market_data || {};
-
-    return {
-      name: data.name,
-      symbol: data.symbol?.toUpperCase(),
-      contract_address: data.contract_address,
-      current_price: marketData.current_price?.usd,
-      market_cap: marketData.market_cap?.usd,
-      market_cap_rank: marketData.market_cap_rank,
-      total_volume: marketData.total_volume?.usd,
-      price_change_24h: marketData.price_change_percentage_24h,
-      price_change_7d: marketData.price_change_percentage_7d,
-      price_change_30d: marketData.price_change_percentage_30d,
-      ath: marketData.ath?.usd,
-      ath_change_percentage: marketData.ath_change_percentage?.usd,
-      atl: marketData.atl?.usd,
-      circulating_supply: marketData.circulating_supply,
-      total_supply: marketData.total_supply,
-      max_supply: marketData.max_supply,
-      description: data.description?.en?.substring(0, 200) + "...",
-      homepage: data.links?.homepage?.[0],
-      blockchain_site: data.links?.blockchain_site?.[0],
-    };
-  }
-
-  private async checkTokenSecurity(
-    contractAddress: string,
-    chain = "1"
-  ): Promise<any> {
-    if (!contractAddress.startsWith("0x") || contractAddress.length !== 42) {
-      throw new Error("Invalid contract address format");
-    }
-
-    const response = await fetch(
-      `${
-        this.config.ENDPOINTS.GOPLUS
-      }/token_security/${chain}?contract_addresses=${contractAddress.toLowerCase()}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`GoPlus API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.code !== 1) {
-      throw new Error(`GoPlus API error: ${data.message || "Unknown error"}`);
-    }
-
-    const tokenData = data.result[contractAddress.toLowerCase()];
-
-    if (!tokenData) {
-      throw new Error(
-        "Token security data not found - this might be a native token or invalid contract"
-      );
-    }
-
-    return this.formatTokenSecurityData(tokenData, contractAddress);
-  }
-
-  private formatTokenSecurityData(data: any, contractAddress: string): any {
-    const securityScore = this.calculateTokenSecurityScore(data);
-
-    return {
-      contract_address: contractAddress,
-      token_name: data.token_name || "Unknown",
-      token_symbol: data.token_symbol || "Unknown",
-      security_score: securityScore,
-      risk_level: this.getRiskLevel(securityScore),
-      is_honeypot: data.is_honeypot === "1",
-      is_blacklisted: data.is_blacklisted === "1",
-      is_whitelisted: data.is_whitelisted === "1",
-      is_open_source: data.is_open_source === "1",
-      is_proxy: data.is_proxy === "1",
-      buy_tax: this.safeParseFloat(data.buy_tax, 0) * 100,
-      sell_tax: this.safeParseFloat(data.sell_tax, 0) * 100,
-      transfer_pausable: data.transfer_pausable === "1",
-      is_mintable: data.is_mintable === "1",
-      slippage_modifiable: data.slippage_modifiable === "1",
-      owner_change_balance: data.owner_change_balance === "1",
-      hidden_owner: data.hidden_owner === "1",
-      selfdestruct: data.selfdestruct === "1",
-      can_take_back_ownership: data.can_take_back_ownership === "1",
-      is_in_dex: data.is_in_dex === "1",
-      cannot_buy: data.cannot_buy === "1",
-      cannot_sell_all: data.cannot_sell_all === "1",
-      is_airdrop_scam: data.is_airdrop_scam === "1",
-      trust_list: data.trust_list === "1",
-      fake_token: data.fake_token ? data.fake_token.value === 1 : false,
-      holder_count: this.safeParseInt(data.holder_count, 0),
-      total_supply: data.total_supply || "0",
-      owner_balance: data.owner_balance || "0",
-      owner_percent: this.safeParseFloat(data.owner_percent, 0) * 100,
-      creator_balance: data.creator_balance || "0",
-      creator_percent: this.safeParseFloat(data.creator_percent, 0) * 100,
-      other_potential_risks: data.other_potential_risks || null,
-      note: data.note || null,
-      dex_info: data.dex || [],
-      raw_data: data,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  private safeParseFloat(value: any, defaultValue: number = 0): number {
-    if (value === null || value === undefined || value === "")
-      return defaultValue;
-    const parsed = parseFloat(value);
-    return isNaN(parsed) ? defaultValue : parsed;
-  }
-
-  private safeParseInt(value: any, defaultValue: number = 0): number {
-    if (value === null || value === undefined || value === "")
-      return defaultValue;
-    const parsed = parseInt(value);
-    return isNaN(parsed) ? defaultValue : parsed;
-  }
-
-  private calculateTokenSecurityScore(data: any): number {
-    let score = 10;
-
-    if (data.is_honeypot === "1") score -= 9;
-    if (data.is_blacklisted === "1") score -= 7;
-    if (data.selfdestruct === "1") score -= 6;
-    if (data.is_airdrop_scam === "1") score -= 8;
-    if (data.fake_token && data.fake_token.value === 1) score -= 7;
-
-    if (data.owner_change_balance === "1") score -= 4;
-    if (data.hidden_owner === "1") score -= 3;
-    if (data.transfer_pausable === "1") score -= 2;
-    if (data.cannot_buy === "1") score -= 5;
-
-    if (data.is_mintable === "1") score -= 1;
-    if (data.slippage_modifiable === "1") score -= 2;
-    if (data.is_proxy === "1") score -= 0.5;
-    if (data.is_open_source === "0") score -= 2;
-
-    const buyTax = data.buy_tax ? parseFloat(data.buy_tax) * 100 : 0;
-    const sellTax = data.sell_tax ? parseFloat(data.sell_tax) * 100 : 0;
-
-    if (buyTax > 10) score -= 1;
-    if (sellTax > 10) score -= 1;
-    if (buyTax > 20 || sellTax > 20) score -= 2;
-    if (buyTax > 50 || sellTax > 50) score -= 3;
-
-    if (data.trust_list === "1") score += 2;
-    if (data.is_whitelisted === "1") score += 1;
-    if (data.is_open_source === "1") score += 0.5;
-    if (data.is_in_dex === "1") score += 0.5;
-
-    return Math.max(1, Math.min(10, Math.round(score * 10) / 10));
-  }
-
-  private getRiskLevel(score: number): string {
-    if (score >= 8) return "LOW";
-    if (score >= 6) return "MEDIUM";
-    if (score >= 4) return "HIGH";
-    return "CRITICAL";
-  }
-
-  private async generateSmartContract(
-    intentAnalysis: AiIntentAnalysis
-  ): Promise<any> {
-    const contractType = intentAnalysis.contract_type || "erc20";
-    const requirements = intentAnalysis.specific_requirements || "basic token";
-
-    const generationPrompt = `You are an expert Solidity smart contract developer. Generate a secure, production-ready smart contract based on the user's requirements.
-
-CONTRACT TYPE: ${contractType}
-REQUIREMENTS: ${requirements}
-
-SECURITY REQUIREMENTS:
-- Use OpenZeppelin libraries for standard implementations
-- Include proper access controls
-- Add reentrancy protection where needed
-- Use SafeMath for older Solidity versions or built-in overflow protection for 0.8+
-- Include proper event emissions
-- Add comprehensive error messages
-
-Generate a complete, deployable smart contract with:
-1. Proper SPDX license identifier
-2. Solidity version pragma
-3. Import statements for OpenZeppelin contracts
-4. Comprehensive comments explaining functionality
-5. All necessary functions and events
-6. Security best practices implemented
-
-Respond with ONLY a JSON object in this format:
-{
-  "contract_code": "complete solidity code here",
-  "contract_name": "ContractName",
-  "description": "Brief description of what the contract does",
-  "features": ["list", "of", "key", "features"],
-  "security_considerations": ["security", "measures", "implemented"],
-  "deployment_instructions": "Brief deployment guide"
-}`;
-
-    try {
-      const response = await this.openAiChatCompletion(
-        [{ role: "system", content: generationPrompt }],
+      const detailedResponse = await axios.get(
+        `${CONFIG.APIs.COINGECKO.BASE_URL}/coins/${bestMatch.id}`,
         {
-          temperature: 0.3,
-          max_tokens: 3000,
+          params: {
+            localization: false,
+            tickers: false,
+            market_data: true,
+            community_data: true,
+            developer_data: false,
+            sparkline: false,
+          },
         }
       );
 
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-
-      if (!jsonMatch) {
-        throw new Error("Invalid response format from contract generator");
-      }
-
-      return JSON.parse(jsonMatch[0]);
+      return await this.formatCoinGeckoData(detailedResponse.data);
     } catch (error) {
-      console.error("❌ Contract generation error:", error.message);
-      throw new Error(`Failed to generate smart contract: ${error.message}`);
+      console.error("CoinGecko search error:", error.message);
+      return null;
     }
   }
 
-  private async compareContracts(contracts: string[]): Promise<string> {
-    console.log(`🔄 Comparing contract security: ${contracts.join(" vs ")}...`);
-
-    try {
-      const [security1, security2] = await Promise.all([
-        this.checkTokenSecurity(contracts[0]),
-        this.checkTokenSecurity(contracts[1]),
-      ]);
-
-      return this.formatContractSecurityComparison(
-        security1,
-        security2,
-        contracts
-      );
-    } catch (error) {
-      return `❌ Failed to compare contracts: ${error.message}`;
-    }
-  }
-
-  private async compareTokens(tokens: string[]): Promise<string> {
-    console.log(`🔄 Comparing tokens: ${tokens.join(" vs ")}...`);
-
-    try {
-      const [token1, token2] = await Promise.all([
-        this.getTokenInfo(tokens[0]),
-        this.getTokenInfo(tokens[1]),
-      ]);
-
-      let security1 = null,
-        security2 = null;
-      try {
-        if (token1.contract_address) {
-          security1 = await this.checkTokenSecurity(token1.contract_address);
-        }
-        if (token2.contract_address) {
-          security2 = await this.checkTokenSecurity(token2.contract_address);
-        }
-      } catch (secError) {
-        console.log("⚠️ Could not fetch all security data for comparison");
-      }
-
-      return this.formatTokenComparison(token1, token2, security1, security2);
-    } catch (error) {
-      return `❌ Failed to compare tokens: ${error.message}`;
-    }
-  }
-
-  private formatSpecificTokenData(
-    tokenData: any,
-    requestedData: string[]
-  ): string {
-    let response = `💰 ${tokenData.name} (${tokenData.symbol}) - Specific Information\n\n`;
-
-    requestedData.forEach((dataType) => {
-      switch (dataType) {
-        case "price":
-          const priceEmoji = tokenData.price_change_24h > 0 ? "📈" : "📉";
-          response += `💵 PRICE INFORMATION\n`;
-          response += `   Current Price: $${
-            tokenData.current_price?.toFixed(6) || "N/A"
-          } ${priceEmoji}\n`;
-          response += `   24h Change: ${
-            tokenData.price_change_24h?.toFixed(2) || "N/A"
-          }%\n`;
-          response += `   7d Change: ${
-            tokenData.price_change_7d?.toFixed(2) || "N/A"
-          }%\n`;
-          response += `   30d Change: ${
-            tokenData.price_change_30d?.toFixed(2) || "N/A"
-          }%\n\n`;
-          break;
-
-        case "market_cap":
-          response += `📊 MARKET CAPITALIZATION\n`;
-          response += `   Market Cap: $${this.formatNumber(
-            tokenData.market_cap
-          )}\n`;
-          response += `   Market Cap Rank: #${
-            tokenData.market_cap_rank || "N/A"
-          }\n\n`;
-          break;
-
-        case "volume":
-          response += `📈 TRADING VOLUME\n`;
-          response += `   24h Volume: $${this.formatNumber(
-            tokenData.total_volume
-          )}\n\n`;
-          break;
-
-        case "supply":
-          response += `🔢 SUPPLY METRICS\n`;
-          response += `   Circulating Supply: ${this.formatNumber(
-            tokenData.circulating_supply
-          )}\n`;
-          response += `   Total Supply: ${this.formatNumber(
-            tokenData.total_supply
-          )}\n`;
-          response += `   Max Supply: ${
-            this.formatNumber(tokenData.max_supply) || "Unlimited"
-          }\n\n`;
-          break;
-
-        case "performance":
-          response += `📊 PERFORMANCE DATA\n`;
-          response += `   All-Time High: $${
-            tokenData.ath?.toFixed(6) || "N/A"
-          }\n`;
-          response += `   ATH Change: ${
-            tokenData.ath_change_percentage?.toFixed(2) || "N/A"
-          }%\n`;
-          response += `   All-Time Low: $${
-            tokenData.atl?.toFixed(6) || "N/A"
-          }\n\n`;
-          break;
-
-        case "basic_info":
-          response += `ℹ️ BASIC INFORMATION\n`;
-          response += `   Name: ${tokenData.name}\n`;
-          response += `   Symbol: ${tokenData.symbol}\n`;
-          response += `   Description: ${
-            tokenData.description || "No description available"
-          }\n\n`;
-          break;
-
-        case "links":
-          response += `🌐 LINKS & RESOURCES\n`;
-          response += `   Website: ${tokenData.homepage || "N/A"}\n`;
-          response += `   Blockchain Explorer: ${
-            tokenData.blockchain_site || "N/A"
-          }\n\n`;
-          break;
-
-        case "technical":
-          response += `⚙️ TECHNICAL DETAILS\n`;
-          response += `   Contract Address: ${
-            tokenData.contract_address || "N/A"
-          }\n`;
-          response += `   Platform: Ethereum (if contract address available)\n\n`;
-          break;
-
-        case "security":
-          if (tokenData.contract_address) {
-            response += `🛡️ SECURITY ANALYSIS\n`;
-            response += `   Contract Address Available: ${tokenData.contract_address}\n`;
-            response += `   💡 Use "check security ${tokenData.contract_address}" for detailed GoPlus security analysis\n\n`;
-          } else {
-            response += `🛡️ SECURITY ANALYSIS\n`;
-            response += `   ⚠️ No contract address available for security analysis\n`;
-            response += `   This might be a native blockchain token (like BTC, ETH)\n\n`;
+  async formatCoinGeckoData(data: any) {
+    return {
+      source: "coingecko",
+      found: true,
+      basic_info: {
+        name: data.name,
+        symbol: data.symbol?.toUpperCase(),
+        coingecko_rank: data.market_cap_rank || null,
+        categories: data.categories || [],
+        contract_address:
+          data.contract_address || data.platforms?.ethereum || null,
+        website: data.links?.homepage?.[0] || null,
+        description: data.description?.en
+          ? data.description.en.length > 500
+            ? data.description.en.substring(0, 500) + "..."
+            : data.description.en
+          : null,
+      },
+      market_data: data.market_data
+        ? {
+            current_price_usd: data.market_data.current_price?.usd || 0,
+            market_cap_usd: data.market_data.market_cap?.usd || 0,
+            market_cap_rank: data.market_data.market_cap_rank || null,
+            total_volume_24h: data.market_data.total_volume?.usd || 0,
+            price_change_24h_percent:
+              data.market_data.price_change_percentage_24h || 0,
+            price_change_7d_percent:
+              data.market_data.price_change_percentage_7d || 0,
+            price_change_30d_percent:
+              data.market_data.price_change_percentage_30d || 0,
+            ath: data.market_data.ath?.usd || null,
+            ath_date: data.market_data.ath_date?.usd || null,
+            atl: data.market_data.atl?.usd || null,
+            circulating_supply: data.market_data.circulating_supply || 0,
+            total_supply: data.market_data.total_supply || null,
+            max_supply: data.market_data.max_supply || null,
           }
-          break;
+        : null,
+      social_links: {
+        twitter: data.links?.twitter_screen_name || null,
+        telegram: data.links?.telegram_channel_identifier || null,
+        reddit: data.links?.subreddit_url || null,
+        github: data.links?.repos_url?.github?.[0] || null,
+      },
+      last_updated: data.last_updated || new Date().toISOString(),
+    };
+  }
 
-        default:
-          response += `❓ Unknown data type: ${dataType}\n\n`;
+  async getMoralisTokenData(tokenAddress: string) {
+    try {
+      const headers = {
+        "X-API-Key": CONFIG.APIs.MORALIS.API_KEY!,
+        "Content-Type": "application/json",
+      };
+
+      const response = await axios.get(
+        `${CONFIG.APIs.MORALIS.BASE_URL}/erc20/metadata`,
+        {
+          headers,
+          params: {
+            chain: "eth",
+            addresses: [tokenAddress],
+          },
+        }
+      );
+
+      let price = null;
+      try {
+        const priceResponse = await axios.get(
+          `${CONFIG.APIs.MORALIS.BASE_URL}/erc20/${tokenAddress}/price`,
+          {
+            headers,
+            params: { chain: "eth" },
+          }
+        );
+        price = priceResponse.data;
+      } catch (priceError) {
+        console.log("Price data not available");
       }
-    });
 
-    response += `💡 Want more detailed analysis? Ask "Tell me about ${tokenData.symbol}" for complete information.`;
-
-    return response;
-  }
-
-  private formatTokenResponse(
-    tokenData: any,
-    securityData: any = null
-  ): string {
-    const priceEmoji = tokenData.price_change_24h > 0 ? "📈" : "📉";
-    const marketCapFormatted = this.formatNumber(tokenData.market_cap);
-    const volumeFormatted = this.formatNumber(tokenData.total_volume);
-
-    let response = `💰 ${tokenData.name} (${tokenData.symbol}) Token Analysis
-
-📊 PRICE INFORMATION
-   Current Price: $${tokenData.current_price?.toFixed(6) || "N/A"} ${priceEmoji}
-   24h Change: ${tokenData.price_change_24h?.toFixed(2) || "N/A"}%
-   7d Change: ${tokenData.price_change_7d?.toFixed(2) || "N/A"}%
-   30d Change: ${tokenData.price_change_30d?.toFixed(2) || "N/A"}%
-
-📈 MARKET DATA
-   Market Cap: $${marketCapFormatted} (Rank #${
-      tokenData.market_cap_rank || "N/A"
-    })
-   24h Volume: $${volumeFormatted}
-   All-Time High: $${tokenData.ath?.toFixed(6) || "N/A"}
-   All-Time Low: $${tokenData.atl?.toFixed(6) || "N/A"}
-
-🔢 SUPPLY METRICS
-   Circulating Supply: ${this.formatNumber(tokenData.circulating_supply)}
-   Total Supply: ${this.formatNumber(tokenData.total_supply)}
-   Max Supply: ${this.formatNumber(tokenData.max_supply) || "Unlimited"}
-
-📝 DETAILS
-   Contract: ${tokenData.contract_address || "N/A"}
-   Description: ${tokenData.description || "No description available"}
-   
-🌐 LINKS
-   Website: ${tokenData.homepage || "N/A"}
-   Explorer: ${tokenData.blockchain_site || "N/A"}`;
-
-    if (securityData) {
-      const securityEmoji = this.getSecurityEmoji(securityData.security_score);
-      response += `
-
-🛡️ SECURITY ANALYSIS (GoPlus Labs)
-   Security Score: ${securityData.security_score}/10 ${securityEmoji}
-   Risk Level: ${securityData.risk_level}
-   Honeypot: ${securityData.is_honeypot ? "❌ DETECTED" : "✅ CLEAR"}
-   Buy Tax: ${securityData.buy_tax}% | Sell Tax: ${securityData.sell_tax}%`;
-    } else if (tokenData.contract_address) {
-      response += `
-
-🛡️ SECURITY ANALYSIS
-   💡 Ask "check security ${tokenData.contract_address}" for detailed GoPlus security analysis`;
-    }
-
-    response += `
-
-💡 INVESTMENT ANALYSIS
-${this.generateTokenAdvice(tokenData, securityData)}
-
-Want to know more about this token's security or market trends?`;
-
-    return response;
-  }
-
-  private formatTokenSecurityResponse(
-    securityData: any,
-    contractAddress: string,
-    tokenData: any = null
-  ): string {
-    const securityEmoji = this.getSecurityEmoji(securityData.security_score);
-    const riskEmoji = this.getRiskEmoji(securityData.risk_level);
-
-    return `═══════════════════════════════════════════════════════════════════════
-                      🛡️ TOKEN SECURITY ANALYSIS REPORT
-                         Powered by GoPlus Labs
-═══════════════════════════════════════════════════════════════════════
-
-📋 TOKEN OVERVIEW
-   ${
-     tokenData
-       ? `Token: ${tokenData.name} (${tokenData.symbol})`
-       : `Token: ${securityData.token_name} (${securityData.token_symbol})`
-   }
-   Contract: ${contractAddress}
-   Chain: Ethereum
-   
-🏆 OVERALL SECURITY SCORE: ${securityData.security_score}/10 ${securityEmoji}
-🚨 RISK LEVEL: ${securityData.risk_level} ${riskEmoji}
-
-🔍 CRITICAL SECURITY CHECKS
-${this.formatSecurityChecks(securityData)}
-
-💸 TRADING ANALYSIS
-   Buy Tax: ${securityData.buy_tax ? securityData.buy_tax.toFixed(2) : "0"}%
-   Sell Tax: ${securityData.sell_tax ? securityData.sell_tax.toFixed(2) : "0"}%
-   Transfer Pausable: ${securityData.transfer_pausable ? "❌ YES" : "✅ NO"}
-   Mintable: ${securityData.is_mintable ? "⚠️ YES" : "✅ NO"}
-
-👥 OWNERSHIP & CONTROL
-   Hidden Owner: ${securityData.hidden_owner ? "❌ YES" : "✅ NO"}
-   Owner Can Change Balance: ${
-     securityData.owner_change_balance ? "❌ YES" : "✅ NO"
-   }
-   Self-Destruct Risk: ${securityData.selfdestruct ? "❌ YES" : "✅ NO"}
-
-📊 TOKEN METRICS
-   Holders: ${
-     securityData.holder_count
-       ? securityData.holder_count.toLocaleString()
-       : "N/A"
-   }
-   Creator Balance: ${
-     securityData.creator_percent
-       ? securityData.creator_percent.toFixed(2)
-       : "0"
-   }%
-   True Token: ${securityData.is_in_dex ? "✅ YES" : "❌ NO"}
-
-🎯 INVESTMENT RECOMMENDATION
-${this.generateSecurityAdvice(securityData)}
-
-${tokenData ? this.formatPriceData(tokenData) : ""}
-
-⚠️ DISCLAIMER: This analysis is based on GoPlus Labs security data. Always DYOR and consider multiple sources before investing.
-
-═══════════════════════════════════════════════════════════════════════
-
-Want me to explain any specific finding or check another token?`;
-  }
-
-  private formatSecurityChecks(securityData: any): string {
-    const checks = [
-      {
-        label: "Honeypot Detection",
-        value: securityData.is_honeypot,
-        critical: true,
-      },
-      {
-        label: "Blacklisted",
-        value: securityData.is_blacklisted,
-        critical: true,
-      },
-      {
-        label: "Airdrop Scam",
-        value: securityData.is_airdrop_scam,
-        critical: true,
-      },
-      { label: "Fake Token", value: securityData.fake_token, critical: true },
-      {
-        label: "Open Source",
-        value: securityData.is_open_source,
-        positive: true,
-      },
-      {
-        label: "Whitelisted",
-        value: securityData.is_whitelisted,
-        positive: true,
-      },
-      { label: "Trust List", value: securityData.trust_list, positive: true },
-      { label: "In DEX", value: securityData.is_in_dex, positive: true },
-    ];
-
-    return checks
-      .map((check) => {
-        const emoji = check.positive
-          ? check.value
-            ? "✅"
-            : "⚪"
-          : check.value
-          ? check.critical
-            ? "🔴"
-            : "⚠️"
-          : "✅";
-        const status = check.positive
-          ? check.value
-            ? "YES"
-            : "NO"
-          : check.value
-          ? "DETECTED"
-          : "CLEAR";
-
-        return `   ${emoji} ${check.label}: ${status}`;
-      })
-      .join("\n");
-  }
-
-  private formatPriceData(tokenData: any): string {
-    const priceEmoji = tokenData.price_change_24h > 0 ? "📈" : "📉";
-
-    return `
-💰 MARKET DATA
-   Current Price: $${tokenData.current_price?.toFixed(6) || "N/A"} ${priceEmoji}
-   24h Change: ${tokenData.price_change_24h?.toFixed(2) || "N/A"}%
-   Market Cap: $${this.formatNumber(tokenData.market_cap)} (Rank #${
-      tokenData.market_cap_rank || "N/A"
-    })
-   24h Volume: $${this.formatNumber(tokenData.total_volume)}`;
-  }
-
-  private formatSmartContractResponse(
-    contractData: any,
-    intentAnalysis: AiIntentAnalysis
-  ): string {
-    return `🔧 SMART CONTRACT GENERATED SUCCESSFULLY
-
-📋 CONTRACT DETAILS
-   Name: ${contractData.contract_name}
-   Type: ${intentAnalysis.contract_type || "Custom"}
-   Description: ${contractData.description}
-
-🛡️ SECURITY FEATURES
-${contractData.security_considerations
-  .map((item: string) => `   ✅ ${item}`)
-  .join("\n")}
-
-⭐ KEY FEATURES
-${contractData.features.map((item: string) => `   🔹 ${item}`).join("\n")}
-
-📝 SMART CONTRACT CODE:
-\`\`\`solidity
-${contractData.contract_code}
-\`\`\`
-
-🚀 DEPLOYMENT INSTRUCTIONS
-${contractData.deployment_instructions}
-
-⚠️ IMPORTANT NOTES:
-- Test thoroughly on testnets before mainnet deployment
-- Consider getting a professional audit for production contracts
-- Verify all parameters match your requirements
-- Keep private keys secure during deployment
-- Use GoPlus security APIs to verify your deployed contract
-
-Would you like me to explain any part of the code or help with deployment?`;
-  }
-
-  private formatContractSecurityComparison(
-    security1: any,
-    security2: any,
-    contracts: string[]
-  ): string {
-    return `🔄 CONTRACT SECURITY COMPARISON (GoPlus Labs)
-
-Contract A: ${contracts[0]}
-Security Score: ${security1.security_score}/10 ${this.getSecurityEmoji(
-      security1.security_score
-    )}
-Risk Level: ${security1.risk_level}
-
-Contract B: ${contracts[1]}  
-Security Score: ${security2.security_score}/10 ${this.getSecurityEmoji(
-      security2.security_score
-    )}
-Risk Level: ${security2.risk_level}
-
-${
-  security1.security_score > security2.security_score
-    ? "🏆 Contract A has better security"
-    : security2.security_score > security1.security_score
-    ? "🏆 Contract B has better security"
-    : "🤝 Both contracts have similar security scores"
-}
-
-🔍 Key Security Differences:
-Contract A:
-- Honeypot: ${security1.is_honeypot ? "❌ DETECTED" : "✅ CLEAR"}
-- Buy/Sell Tax: ${security1.buy_tax}%/${security1.sell_tax}%
-- Hidden Owner: ${security1.hidden_owner ? "❌ YES" : "✅ NO"}
-
-Contract B:
-- Honeypot: ${security2.is_honeypot ? "❌ DETECTED" : "✅ CLEAR"}
-- Buy/Sell Tax: ${security2.buy_tax}%/${security2.sell_tax}%
-- Hidden Owner: ${security2.hidden_owner ? "❌ YES" : "✅ NO"}
-
-💡 Recommendation: ${this.generateSecurityComparisonAdvice(
-      security1,
-      security2
-    )}`;
-  }
-
-  private formatTokenComparison(
-    token1: any,
-    token2: any,
-    security1: any = null,
-    security2: any = null
-  ): string {
-    let response = `🔄 TOKEN COMPARISON RESULTS
-
-${token1.symbol} vs ${token2.symbol}
-
-📊 Market Cap:
-- ${token1.symbol}: $${this.formatNumber(token1.market_cap)}
-- ${token2.symbol}: $${this.formatNumber(token2.market_cap)}
-
-📈 24h Performance:
-- ${token1.symbol}: ${token1.price_change_24h?.toFixed(2) || "N/A"}%
-- ${token2.symbol}: ${token2.price_change_24h?.toFixed(2) || "N/A"}%
-
-🏆 Market Position:
-- ${token1.symbol}: Rank #${token1.market_cap_rank || "N/A"}
-- ${token2.symbol}: Rank #${token2.market_cap_rank || "N/A"}`;
-
-    if (security1 && security2) {
-      response += `
-
-🛡️ Security Comparison (GoPlus Labs):
-- ${token1.symbol}: ${security1.security_score}/10 ${this.getSecurityEmoji(
-        security1.security_score
-      )} (${security1.risk_level} Risk)
-- ${token2.symbol}: ${security2.security_score}/10 ${this.getSecurityEmoji(
-        security2.security_score
-      )} (${security2.risk_level} Risk)`;
-    }
-
-    response += `
-
-💡 Investment Recommendation:
-${this.generateTokenComparisonAdvice(token1, token2, security1, security2)}`;
-
-    return response;
-  }
-
-  private getSecurityEmoji(score: number): string {
-    if (score >= 8) return "🟢";
-    if (score >= 6) return "🟡";
-    if (score >= 4) return "🟠";
-    return "🔴";
-  }
-
-  private getRiskEmoji(riskLevel: string): string {
-    switch (riskLevel) {
-      case "LOW":
-        return "🟢";
-      case "MEDIUM":
-        return "🟡";
-      case "HIGH":
-        return "🟠";
-      case "CRITICAL":
-        return "🔴";
-      default:
-        return "⚪";
+      return {
+        metadata: response.data[0] || {},
+        price: price,
+      };
+    } catch (error) {
+      console.error("Moralis token data error:", error.message);
+      throw error;
     }
   }
 
-  private generateSecurityAdvice(securityData: any): string {
-    const score = securityData.security_score;
-
-    if (securityData.is_honeypot) {
-      return "🚨 CRITICAL WARNING: This token is identified as a HONEYPOT. DO NOT INVEST! You may not be able to sell after buying.";
-    }
-
-    if (securityData.is_blacklisted) {
-      return "⛔ HIGH RISK: This token is BLACKLISTED. Avoid investment until further investigation.";
-    }
-
-    if (score >= 8) {
-      return "✅ EXCELLENT security profile. Low technical risk for investment. This token has passed most security checks.";
-    } else if (score >= 6) {
-      return "⚠️ GOOD security with some concerns. Moderate risk - suitable for experienced investors who understand the risks.";
-    } else if (score >= 4) {
-      return "🔶 FAIR security but multiple issues detected. HIGH RISK - only for very experienced investors.";
-    } else {
-      return "🔴 POOR security profile. VERY HIGH RISK - strongly consider avoiding this token.";
-    }
-  }
-
-  private generateSecurityComparisonAdvice(
-    security1: any,
-    security2: any
-  ): string {
-    if (security1.is_honeypot && !security2.is_honeypot) {
-      return "Choose Contract B - Contract A is a honeypot!";
-    } else if (security2.is_honeypot && !security1.is_honeypot) {
-      return "Choose Contract A - Contract B is a honeypot!";
-    } else if (security1.is_honeypot && security2.is_honeypot) {
-      return "AVOID BOTH - Both contracts are honeypots!";
-    }
-
-    if (security1.security_score > security2.security_score + 1) {
-      return "Contract A has significantly better security profile.";
-    } else if (security2.security_score > security1.security_score + 1) {
-      return "Contract B has significantly better security profile.";
-    } else {
-      return "Both contracts have similar security profiles. Consider other factors like tokenomics and project fundamentals.";
-    }
-  }
-
-  private generateTokenAdvice(
-    tokenData: any,
-    securityData: any = null
-  ): string {
-    const change24h = tokenData.price_change_24h || 0;
-    const marketCapRank = tokenData.market_cap_rank || 999;
-
-    let advice = "";
-
-    if (securityData) {
-      if (securityData.is_honeypot) {
-        return "🚨 AVOID - This token is a honeypot. You may not be able to sell after buying.";
-      }
-      if (securityData.security_score < 5) {
-        advice += "⚠️ HIGH SECURITY RISK detected. ";
-      } else if (securityData.security_score >= 8) {
-        advice += "✅ Good security profile. ";
-      }
-    }
-
-    if (marketCapRank <= 10) {
-      advice +=
-        "Large-cap token with established market presence. Lower volatility risk. ";
-    } else if (marketCapRank <= 100) {
-      advice +=
-        "Mid-cap token with moderate risk. Good for balanced portfolios. ";
-    } else {
-      advice +=
-        "Small-cap token with higher volatility. Suitable for risk-tolerant investors. ";
-    }
-
-    if (Math.abs(change24h) > 10) {
-      advice += "High price volatility detected - exercise caution. ⚠️";
-    } else {
-      advice += "Relatively stable price movement. ✅";
-    }
-
-    return advice;
-  }
-
-  private generateTokenComparisonAdvice(
-    token1: any,
-    token2: any,
-    security1: any = null,
-    security2: any = null
-  ): string {
-    if (security1 && security2) {
-      if (security1.is_honeypot && !security2.is_honeypot) {
-        return `${token2.symbol} is safer - ${token1.symbol} is a honeypot!`;
-      } else if (security2.is_honeypot && !security1.is_honeypot) {
-        return `${token1.symbol} is safer - ${token2.symbol} is a honeypot!`;
-      } else if (security1.security_score > security2.security_score + 1) {
-        return `${token1.symbol} has better security profile and should be preferred.`;
-      } else if (security2.security_score > security1.security_score + 1) {
-        return `${token2.symbol} has better security profile and should be preferred.`;
-      }
-    }
-
-    const rank1 = token1.market_cap_rank || 999;
-    const rank2 = token2.market_cap_rank || 999;
-
-    if (rank1 < rank2) {
-      return `${token1.symbol} has better market position and liquidity.`;
-    } else if (rank2 < rank1) {
-      return `${token2.symbol} has better market position and liquidity.`;
-    } else {
-      return "Both tokens have similar market positions. Consider your risk tolerance and project fundamentals.";
-    }
-  }
-
-  private formatNumber(num: number): string {
-    if (!num) return "N/A";
-
-    if (num >= 1e12) return (num / 1e12).toFixed(2) + "T";
-    if (num >= 1e9) return (num / 1e9).toFixed(2) + "B";
-    if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
-    if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
-
-    return num.toLocaleString();
-  }
-
-  private async openAiChatCompletion(
-    messages: any[],
-    options: any = {}
+  async handleContractAudit(
+    userInput: string,
+    intentData: any
   ): Promise<string> {
-    if (!this.config.OPENAI_API_KEY) {
-      throw new Error(
-        "OpenAI API key not configured. Please set OPENAI_API_KEY in your environment variables."
-      );
+    if (!intentData.identifier) {
+      return "Please provide a valid contract address for security auditing.";
     }
 
-    const data = {
-      model: "gpt-4o",
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 2000,
-      ...options,
-    };
+    try {
+      const analysisPrompt = `Perform a security audit analysis for smart contract: ${intentData.identifier}
 
-    const response = await fetch(
-      `${this.config.ENDPOINTS.OPENAI}/chat/completions`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.config.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
+Analyze:
+- Contract verification status
+- Security vulnerabilities and risks
+- Access controls and ownership
+- Potential honeypot indicators
+- Best practices compliance
+
+Provide a comprehensive security report with risk assessment.`;
+
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [{ role: "user", content: analysisPrompt }],
+        temperature: 0.3,
+        max_tokens: 1500,
+      });
+
+      return (
+        response.choices[0].message.content ||
+        "I encountered an error auditing this contract."
+      );
+    } catch (error) {
+      console.error("Contract audit error:", error);
+      return "I encountered an error auditing this contract. Please verify the address.";
+    }
+  }
+
+  async handleTrendingTokens(userInput: string): Promise<string> {
+    try {
+      const trendingData = await this.getCompleteTrendingData();
+
+      // Track trending analysis in context
+      this.contextSummary.recentTopics.push({
+        utility: "trending_tokens",
+        timestamp: new Date(),
+        summary: "Reviewed trending tokens and market trends",
+      });
+
+      return await this.generateAnalysisResponse(
+        userInput,
+        trendingData,
+        "trending_analysis"
+      );
+    } catch (error) {
+      console.error("Trending tokens error:", error.message);
+      return "I encountered an error retrieving trending token data.";
+    }
+  }
+
+  async getCompleteTrendingData() {
+    try {
+      const [trendingResponse, marketResponse, globalData] = await Promise.all([
+        axios.get(`${CONFIG.APIs.COINGECKO.BASE_URL}/search/trending`),
+        axios.get(`${CONFIG.APIs.COINGECKO.BASE_URL}/coins/markets`, {
+          params: {
+            vs_currency: "usd",
+            order: "price_change_percentage_24h_desc",
+            per_page: 20,
+            page: 1,
+          },
+        }),
+        axios.get(`${CONFIG.APIs.COINGECKO.BASE_URL}/global`),
+      ]);
+
+      return {
+        trending_searches: trendingResponse.data.coins || [],
+        top_gainers: marketResponse.data || [],
+        market_overview: globalData.data.data || {},
+        analysis_timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      throw new Error(`Failed to get trending data: ${error.message}`);
+    }
+  }
+
+  async handleGasAnalysis(userInput: string): Promise<string> {
+    try {
+      const gasData = await this.getCompleteGasData();
+
+      // Track gas analysis in context
+      this.contextSummary.recentTopics.push({
+        utility: "gas_analysis",
+        timestamp: new Date(),
+        summary: "Checked gas prices and network status",
+      });
+
+      return await this.generateAnalysisResponse(
+        userInput,
+        gasData,
+        "gas_analysis"
+      );
+    } catch (error) {
+      console.error("Gas analysis error:", error.message);
+      return "I encountered an error retrieving gas data.";
+    }
+  }
+
+  async getCompleteGasData() {
+    try {
+      const [currentGas, ethPrice] = await Promise.all([
+        this.getCurrentGasPrices(),
+        this.getETHPrice(),
+      ]);
+
+      const commonOperations = {
+        eth_transfer: {
+          gas: 21000,
+          safe_eth: (21000 * parseFloat(currentGas.SafeGasPrice)) / 1e9,
+          safe_usd:
+            ((21000 * parseFloat(currentGas.SafeGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+          fast_eth: (21000 * parseFloat(currentGas.FastGasPrice)) / 1e9,
+          fast_usd:
+            ((21000 * parseFloat(currentGas.FastGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
         },
-        body: JSON.stringify(data),
-      }
-    );
+        token_transfer: {
+          gas: 100000,
+          safe_eth: (100000 * parseFloat(currentGas.SafeGasPrice)) / 1e9,
+          safe_usd:
+            ((100000 * parseFloat(currentGas.SafeGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+          fast_eth: (100000 * parseFloat(currentGas.FastGasPrice)) / 1e9,
+          fast_usd:
+            ((100000 * parseFloat(currentGas.FastGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+        },
+        uniswap_v2_swap: {
+          gas: 150000,
+          safe_eth: (150000 * parseFloat(currentGas.SafeGasPrice)) / 1e9,
+          safe_usd:
+            ((150000 * parseFloat(currentGas.SafeGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+          fast_eth: (150000 * parseFloat(currentGas.FastGasPrice)) / 1e9,
+          fast_usd:
+            ((150000 * parseFloat(currentGas.FastGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+        },
+        uniswap_v3_swap: {
+          gas: 250000,
+          safe_eth: (250000 * parseFloat(currentGas.SafeGasPrice)) / 1e9,
+          safe_usd:
+            ((250000 * parseFloat(currentGas.SafeGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+          fast_eth: (250000 * parseFloat(currentGas.FastGasPrice)) / 1e9,
+          fast_usd:
+            ((250000 * parseFloat(currentGas.FastGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+        },
+        nft_mint: {
+          gas: 180000,
+          safe_eth: (180000 * parseFloat(currentGas.SafeGasPrice)) / 1e9,
+          safe_usd:
+            ((180000 * parseFloat(currentGas.SafeGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+          fast_eth: (180000 * parseFloat(currentGas.FastGasPrice)) / 1e9,
+          fast_usd:
+            ((180000 * parseFloat(currentGas.FastGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+        },
+        contract_deployment: {
+          gas: 1500000,
+          safe_eth: (1500000 * parseFloat(currentGas.SafeGasPrice)) / 1e9,
+          safe_usd:
+            ((1500000 * parseFloat(currentGas.SafeGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+          fast_eth: (1500000 * parseFloat(currentGas.FastGasPrice)) / 1e9,
+          fast_usd:
+            ((1500000 * parseFloat(currentGas.FastGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+        },
+        defi_complex_operation: {
+          gas: 400000,
+          safe_eth: (400000 * parseFloat(currentGas.SafeGasPrice)) / 1e9,
+          safe_usd:
+            ((400000 * parseFloat(currentGas.SafeGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+          fast_eth: (400000 * parseFloat(currentGas.FastGasPrice)) / 1e9,
+          fast_usd:
+            ((400000 * parseFloat(currentGas.FastGasPrice)) / 1e9) *
+            ethPrice.ethereum.usd,
+        },
+      };
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        `OpenAI API error: ${response.status} - ${
-          errorData.error?.message || response.statusText
-        }`
+      return {
+        current_prices: currentGas,
+        eth_price: ethPrice.ethereum.usd,
+        transaction_costs: commonOperations,
+        network_status: this.assessNetworkCongestion(currentGas),
+        recommendations: this.getGasRecommendations(currentGas),
+      };
+    } catch (error) {
+      throw new Error(`Failed to get gas data: ${error.message}`);
+    }
+  }
+
+  assessNetworkCongestion(gasData: any): string {
+    const avgGas =
+      (parseInt(gasData.SafeGasPrice) + parseInt(gasData.FastGasPrice)) / 2;
+
+    if (avgGas < 20) return "Low - Great time for transactions";
+    if (avgGas < 50) return "Moderate - Normal fees";
+    if (avgGas < 100) return "High - Consider waiting";
+    return "Very High - Use only for urgent transactions";
+  }
+
+  getGasRecommendations(gasData: any): string[] {
+    const recommendations = [];
+    const avgGas =
+      (parseInt(gasData.SafeGasPrice) + parseInt(gasData.FastGasPrice)) / 2;
+
+    if (avgGas < 30) {
+      recommendations.push("Low fees - good time for batch transactions");
+      recommendations.push("Consider consolidating small token balances");
+    } else if (avgGas > 100) {
+      recommendations.push("High fees - wait if possible");
+      recommendations.push("Use Layer 2 solutions for lower fees");
+    }
+
+    return recommendations;
+  }
+
+  async handleWalletAssistant(
+    userInput: string,
+    intentData: any
+  ): Promise<string> {
+    if (!intentData.identifier) {
+      return "Please provide your wallet address for personalized portfolio analysis.";
+    }
+
+    try {
+      const analysisPrompt = `Provide personalized portfolio insights for wallet: ${intentData.identifier}
+
+Include:
+- Portfolio diversification analysis
+- Risk assessment
+- Yield opportunities
+- Rebalancing suggestions
+- DeFi strategies
+
+Format as actionable investment guidance.`;
+
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [{ role: "user", content: analysisPrompt }],
+        temperature: 0.4,
+        max_tokens: 1500,
+      });
+
+      return (
+        response.choices[0].message.content ||
+        "I encountered an error analyzing your portfolio."
       );
-    }
-
-    const result = await response.json();
-    return result.choices[0].message.content;
-  }
-}
-
-class ContextManager {
-  private conversations: any[] = [];
-  private maxConversations = 5;
-  private userProfile = {
-    risk_tolerance: "moderate",
-    experience_level: "intermediate",
-    preferred_focus: "security and returns",
-  };
-
-  addMessage(role: string, content: string, metadata: any = {}) {
-    const message = {
-      role,
-      content,
-      metadata,
-      timestamp: new Date().toISOString(),
-    };
-
-    this.conversations.push(message);
-
-    if (this.conversations.length > this.maxConversations * 2) {
-      this.conversations = this.conversations.slice(-this.maxConversations * 2);
+    } catch (error) {
+      console.error("Wallet assistant error:", error);
+      return "I encountered an error accessing your wallet data.";
     }
   }
 
-  getRecentContext(): string {
-    const recentMessages = this.conversations.slice(-4);
-    return recentMessages
-      .map((m) => `${m.role}: ${m.content.substring(0, 200)}`)
-      .join("\n");
+  async handleBlockPalAssistant(userInput: string): Promise<string> {
+    const systemPrompt = `You are the BlockPal AI assistant explaining our platform's utilities.
+
+AVAILABLE UTILITIES TO EXPLAIN:
+
+1. **Wallet Analysis** - Analyze any Ethereum wallet address
+   - HOW TO USE: Simply provide a wallet address (0x...)
+   - EXAMPLE: "analyze wallet 0x742d35Cc..."
+   - PROVIDES: Token holdings, portfolio value, activity insights
+
+2. **Transaction Breakdown** - Decode any Ethereum transaction
+   - HOW TO USE: Provide a transaction hash
+   - EXAMPLE: "analyze transaction 0xa1b2c3d4..."
+   - PROVIDES: Sender/receiver info, value, gas costs
+
+3. **Token Information** - Get detailed cryptocurrency info
+   - HOW TO USE: Mention token name, symbol, or contract
+   - EXAMPLE: "tell me about USDC" or "what is Ethereum"
+   - PROVIDES: Price, market cap, project details
+
+4. **Smart Contract Generator** - Create custom contracts
+   - HOW TO USE: Describe what contract you need
+   - EXAMPLE: "create an ERC20 token contract"
+   - PROVIDES: Complete Solidity code with explanations
+
+5. **Contract Security Audit** - Check smart contract security
+   - HOW TO USE: Provide contract address
+   - EXAMPLE: "audit contract 0x..."
+   - PROVIDES: Security analysis, risk assessment
+
+6. **Gas Analysis** - Real-time gas prices and optimization
+   - HOW TO USE: Ask about gas prices
+   - EXAMPLE: "what are current gas prices"
+   - PROVIDES: Gas costs, optimization tips
+
+7. **Trending Tokens** - Market trends and hot cryptocurrencies
+   - HOW TO USE: Ask about trending tokens
+   - EXAMPLE: "show trending tokens"
+   - PROVIDES: Top gainers, market overview
+
+8. **Crypto Knowledge** - Educational content
+   - HOW TO USE: Ask any crypto question
+   - EXAMPLE: "explain DeFi"
+   - PROVIDES: Clear explanations
+
+Focus on WHAT the user can do with clear examples!`;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userInput },
+        ],
+        temperature: 0.5,
+        max_tokens: 1000,
+      });
+
+      return (
+        response.choices[0].message.content ||
+        "I'm here to help with BlockPal features!"
+      );
+    } catch (error) {
+      return "I'm here to help with BlockPal features. What would you like to know?";
+    }
   }
 
-  buildSystemPrompt(): string {
-    const recentConversations = this.conversations.slice(-6);
+  async handleGeneralQuery(userInput: string): Promise<string> {
+    const systemPrompt = `You are BlockPal AI assistant. Provide helpful crypto-related responses. Suggest specific utilities when appropriate. Be conversational and context-aware.`;
 
-    return `You are a world-class crypto expert AI assistant with deep knowledge of:
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userInput },
+        ],
+        temperature: 0.6,
+        max_tokens: 800,
+      });
 
-CORE CAPABILITIES:
-- Smart contract development and security analysis
-- Token security analysis using GoPlus Web3 security infrastructure
-- DeFi protocols, yield farming, and liquidity mining
-- Token economics and market analysis  
-- Blockchain technology and consensus mechanisms
-- Trading strategies and investment analysis
-- Regulatory compliance and legal considerations
-
-USER PROFILE:
-- Risk Tolerance: ${this.userProfile.risk_tolerance}
-- Experience Level: ${this.userProfile.experience_level}
-- Focus Areas: ${this.userProfile.preferred_focus}
-
-RECENT CONVERSATION CONTEXT:
-${recentConversations.map((c) => `${c.role}: ${c.content}`).join("\n")}
-
-PERSONALITY & APPROACH:
-- Provide actionable, well-researched advice
-- Always prioritize user safety and security
-- Explain complex concepts clearly with examples
-- Give honest risk assessments with pros/cons
-- Reference current market conditions when relevant
-- Be conversational but professional
-- Never provide financial advice as guaranteed outcomes
-
-RESPONSE GUIDELINES:
-- Always cite security scores and technical findings when available
-- Provide clear next steps and recommendations
-- Explain the reasoning behind your advice
-- Include relevant warnings and disclaimers
-- Use current conversation context naturally but prioritize the current user request
-
-Continue the conversation as a helpful, knowledgeable crypto expert with access to GoPlus security data.`;
-  }
-
-  clearSession() {
-    this.conversations = [];
-    console.log("🧹 Session context cleared.");
+      return (
+        response.choices[0].message.content ||
+        "I'm here to help with crypto questions!"
+      );
+    } catch (error) {
+      return "I'm here to help with crypto questions and BlockPal features!";
+    }
   }
 }
+
+// =====================================
+// API Route Handler
+// =====================================
 
 export async function POST(request: NextRequest) {
   try {
@@ -1469,7 +1876,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { message } = await request.json();
+    const { message, sessionId } = await request.json();
 
     if (!message || typeof message !== "string") {
       return NextResponse.json(
@@ -1480,15 +1887,89 @@ export async function POST(request: NextRequest) {
 
     console.log("🤖 Processing AI chat message:", message);
 
-    const aiService = new CryptoAIService();
-    const response = await aiService.processInput(message);
+    const userId = decoded.userId || decoded.username;
+    const currentSessionId =
+      sessionId ||
+      `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const aiService = new BlockPalAIService(currentSessionId, userId);
+    await aiService.initialize();
+
+    const response = await aiService.processUserQuery(message);
 
     return NextResponse.json({
       response: response,
+      sessionId: currentSessionId,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error("AI Chat API error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// GET endpoint to load a specific session
+export async function GET(request: NextRequest) {
+  try {
+    const token = request.cookies.get("auth-token")?.value;
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get("sessionId");
+
+    if (!sessionId) {
+      return NextResponse.json(
+        { error: "Session ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const { db } = await connectToDatabase();
+    const userId = decoded.userId || decoded.username;
+
+    // Get session
+    const session = await db.collection("ai_chat_sessions").findOne({
+      sessionId: sessionId,
+      userId: userId,
+    });
+
+    if (!session) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    // Get messages for this session
+    const messages = await db
+      .collection("ai_chat_messages")
+      .find({ sessionId: sessionId })
+      .sort({ timestamp: 1 })
+      .toArray();
+
+    const formattedMessages = messages.map((msg) => ({
+      id: msg._id.toString(),
+      type: msg.role,
+      content: msg.content,
+      timestamp: msg.timestamp,
+      metadata: msg.metadata,
+    }));
+
+    return NextResponse.json({
+      session: {
+        id: session.sessionId,
+        userId: session.userId,
+        createdAt: session.createdAt,
+        lastActivity: session.lastActivity,
+      },
+      messages: formattedMessages,
+    });
+  } catch (error) {
+    console.error("Get session error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
