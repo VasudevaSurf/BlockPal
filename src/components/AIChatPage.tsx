@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx - Improved with Sidebar
+// src/components/AIChatPage.tsx - Concise Version with Fixed Conversation Panel
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -11,12 +11,10 @@ import {
   Brain,
   Menu,
   X,
-  Settings,
-  MoreVertical,
+  Plus,
 } from "lucide-react";
 import { RootState } from "@/store";
 import { SkeletonAIChat } from "@/components/ui/Skeleton";
-import ChatSidebar from "./ChatSidebar";
 
 interface Message {
   id: string;
@@ -25,15 +23,19 @@ interface Message {
   timestamp: Date;
   processing?: boolean;
   typing?: boolean;
-  metadata?: {
-    utility?: string;
-    intent?: string;
-    entities?: any;
-  };
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  lastMessage: string;
+  timestamp: string;
+  messageCount: number;
+  createdAt: string;
 }
 
 export default function AIChatPage() {
-  const { activeWallet } = useSelector((state: RootState) => state.wallet);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -41,21 +43,35 @@ export default function AIChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // Load conversations and initialize
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    const loadConversations = () => {
+      try {
+        const saved = localStorage.getItem("ai-chat-conversations");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Ensure all conversations have proper timestamps
+          const fixedConversations = parsed.map((conv) => ({
+            ...conv,
+            timestamp:
+              conv.timestamp || conv.createdAt || new Date().toISOString(),
+            createdAt:
+              conv.createdAt || conv.timestamp || new Date().toISOString(),
+          }));
+          setConversations(fixedConversations);
+        }
+      } catch (error) {
+        console.error("Error loading conversations:", error);
+      }
+    };
 
-  useEffect(() => {
-    // Initialize with welcome message
+    loadConversations();
+
     const timer = setTimeout(() => {
       setInitialLoading(false);
       if (messages.length === 0) {
@@ -63,23 +79,7 @@ export default function AIChatPage() {
           {
             id: "welcome",
             type: "assistant",
-            content: `🤖 **Welcome to BlockPal AI Enhanced!**
-
-I'm your advanced crypto assistant with smart context and persistent memory. I can help you with:
-
-• **Wallet Analysis** - Deep portfolio insights
-• **Transaction Analysis** - Complete breakdown & gas optimization  
-• **Token Research** - Real-time pricing & market data
-• **Smart Contracts** - Generation & security auditing
-• **Market Trends** - Hot tokens & opportunities
-
-**💡 Pro Tips:**
-- I remember our conversation across sessions
-- Use natural references like "the sender" or "that wallet"
-- Ask "help" anytime for feature guide
-- Previous conversations are saved in the sidebar
-
-What would you like to explore today?`,
+            content: `🤖 **Welcome to BlockPal AI!**\n\nI'm your crypto assistant. I can help with analysis, smart contracts, and market insights.\n\nWhat would you like to explore today?`,
             timestamp: new Date(),
           },
         ]);
@@ -89,7 +89,122 @@ What would you like to explore today?`,
     return () => clearTimeout(timer);
   }, []);
 
-  // Enhanced typing animation
+  // Save conversation
+  useEffect(() => {
+    if (messages.length > 0 && sessionId) {
+      const now = new Date().toISOString();
+      const currentConversation: Conversation = {
+        id: sessionId,
+        title:
+          messages.find((m) => m.type === "user")?.content?.slice(0, 50) +
+            "..." || "New Chat",
+        messages: messages,
+        lastMessage:
+          messages[messages.length - 1]?.content?.slice(0, 60) + "...",
+        timestamp: now,
+        messageCount: messages.length,
+        createdAt: now, // Ensure createdAt is always set
+      };
+
+      setConversations((prev) => {
+        const existing = prev.findIndex((conv) => conv.id === sessionId);
+        if (existing >= 0) {
+          // Keep original createdAt but update timestamp
+          const updated = prev.map((conv, i) =>
+            i === existing
+              ? { ...currentConversation, createdAt: conv.createdAt || now }
+              : conv
+          );
+          localStorage.setItem(
+            "ai-chat-conversations",
+            JSON.stringify(updated)
+          );
+          return updated;
+        } else {
+          // New conversation
+          const updated = [currentConversation, ...prev];
+          localStorage.setItem(
+            "ai-chat-conversations",
+            JSON.stringify(updated)
+          );
+          return updated;
+        }
+      });
+    }
+  }, [messages, sessionId]);
+
+  // Auto scroll and close sidebar on outside click
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!sidebarOpen) return;
+
+      const target = event.target as Element;
+      const sidebar = document.querySelector('[data-sidebar="true"]');
+      const hamburger = document.getElementById("hamburger-button");
+
+      if (
+        sidebar &&
+        !sidebar.contains(target) &&
+        hamburger &&
+        !hamburger.contains(target)
+      ) {
+        setSidebarOpen(false);
+      }
+    };
+
+    if (sidebarOpen) {
+      document.addEventListener("mousedown", handleClickOutside, true);
+    }
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside, true);
+  }, [sidebarOpen]);
+
+  const getRelativeTime = (timestamp: string | Date) => {
+    try {
+      let date: Date;
+
+      if (timestamp instanceof Date) {
+        date = timestamp;
+      } else if (typeof timestamp === "string") {
+        // Handle both ISO strings and timestamps
+        date = new Date(timestamp);
+      } else {
+        return "Unknown";
+      }
+
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "Unknown";
+      }
+
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const minutes = Math.floor(diff / (1000 * 60));
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+      if (minutes < 1) return "Just now";
+      if (minutes < 60) return `${minutes}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      if (days < 7) return `${days}d ago`;
+
+      // For older dates, show formatted date
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      console.error("Error formatting time:", error);
+      return "Unknown";
+    }
+  };
+
   const typeMessage = (fullText: string, messageId: string) => {
     return new Promise<void>((resolve) => {
       let currentText = "";
@@ -97,8 +212,7 @@ What would you like to explore today?`,
 
       const typeInterval = setInterval(() => {
         if (currentIndex < fullText.length) {
-          const charsToAdd =
-            Math.random() > 0.3 ? (Math.random() > 0.6 ? 8 : 5) : 3;
+          const charsToAdd = Math.random() > 0.3 ? 8 : 3;
           currentText += fullText.slice(
             currentIndex,
             currentIndex + charsToAdd
@@ -128,7 +242,7 @@ What would you like to explore today?`,
           );
           resolve();
         }
-      }, 8 + Math.random() * 12);
+      }, 12);
     });
   };
 
@@ -146,93 +260,58 @@ What would you like to explore today?`,
     const currentInput = inputMessage;
     setInputMessage("");
     setIsTyping(true);
-    setShowWelcome(false);
+
+    if (!sessionId) setSessionId(Date.now().toString());
 
     // Add processing message
-    const processingMessageId = (Date.now() + 1).toString();
-    const processingMessage: Message = {
-      id: processingMessageId,
-      type: "assistant",
-      content: "",
-      timestamp: new Date(),
-      processing: true,
-      typing: true,
-    };
-
-    setMessages((prev) => [...prev, processingMessage]);
+    const processingId = (Date.now() + 1).toString();
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: processingId,
+        type: "assistant",
+        content: "",
+        timestamp: new Date(),
+        processing: true,
+        typing: true,
+      },
+    ]);
 
     try {
       // Handle special commands
       if (currentInput.toLowerCase().trim() === "clear") {
         setMessages([]);
         setSessionId("");
-        setShowWelcome(true);
         setIsTyping(false);
+        setSidebarOpen(false);
         return;
       }
 
       if (currentInput.toLowerCase().trim() === "help") {
         setMessages((prev) => prev.filter((msg) => !msg.processing));
+        const helpId = (Date.now() + 2).toString();
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: helpId,
+            type: "assistant",
+            content: "",
+            timestamp: new Date(),
+            typing: true,
+          },
+        ]);
 
-        const helpMessageId = (Date.now() + 2).toString();
-        const helpMessage: Message = {
-          id: helpMessageId,
-          type: "assistant",
-          content: "",
-          timestamp: new Date(),
-          typing: true,
-        };
+        const helpText = `🔷 **BlockPal AI Features**\n\n**Analysis:**\n• \`analyze wallet 0x...\` - Portfolio analysis\n• \`check transaction 0x...\` - Transaction details\n• \`token info SYMBOL\` - Price & market data\n\n**Tools:**\n• \`gas prices\` - Current network fees\n• \`trending tokens\` - Hot cryptocurrencies\n• \`clear\` - Reset conversation\n\nReady to help with your crypto needs!`;
 
-        setMessages((prev) => [...prev, helpMessage]);
-
-        const helpText = `🔷 **BlockPal AI - Complete Feature Guide**
-
-**🔍 ANALYSIS COMMANDS:**
-• \`analyze wallet 0x...\` - Complete portfolio analysis with insights
-• \`check transaction 0x...\` - Transaction breakdown with gas analysis
-• \`audit contract 0x...\` - Security analysis & honeypot detection
-• \`token info SYMBOL\` - Price, market data & project insights
-
-**⚡ CREATION & TOOLS:**
-• \`create ERC20 token\` - Generate smart contracts with explanations
-• \`gas prices\` - Current network fees & optimization tips
-• \`trending tokens\` - Hot cryptocurrencies & market trends
-• \`compare TOKEN1 vs TOKEN2\` - Side-by-side analysis
-
-**🧠 SMART FEATURES:**
-• **Context Memory** - I remember addresses & transactions you mention
-• **Natural References** - Say "the sender", "that wallet", "this token"
-• **Session Persistence** - Conversations saved across browser sessions
-• **Entity Tracking** - Automatic tracking of wallets, contracts, tokens
-
-**💡 EXAMPLE CONVERSATIONS:**
-\`\`\`
-You: "analyze wallet 0x742d35Cc6634C0532925a3b844Bc9e7595f2bd6e"
-AI: [Provides complete analysis]
-You: "what about the largest token holder?"
-AI: [Analyzes the largest holder automatically]
-You: "is it safe?"
-AI: [Security assessment of the holder's wallet]
-\`\`\`
-
-**🎯 QUICK COMMANDS:**
-• \`clear\` - Reset conversation
-• \`help\` - Show this guide
-• \`sidebar\` - Toggle conversation history
-
-Ready to dive in? Try any command above!`;
-
-        await typeMessage(helpText, helpMessageId);
+        await typeMessage(helpText, helpId);
         setIsTyping(false);
         return;
       }
 
-      // Call the enhanced AI API
+      // Call AI API
       const response = await fetch("/api/ai-chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: currentInput,
           sessionId: sessionId,
@@ -240,50 +319,43 @@ Ready to dive in? Try any command above!`;
         credentials: "include",
       });
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
 
       const data = await response.json();
+      if (data.sessionId && !sessionId) setSessionId(data.sessionId);
 
-      // Update session ID
-      if (data.sessionId && !sessionId) {
-        setSessionId(data.sessionId);
-      }
-
-      // Remove processing message and add AI response
       setMessages((prev) => prev.filter((msg) => !msg.processing));
+      const aiId = (Date.now() + 2).toString();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: aiId,
+          type: "assistant",
+          content: "",
+          timestamp: new Date(),
+          typing: true,
+        },
+      ]);
 
-      const aiResponseId = (Date.now() + 2).toString();
-      const aiMessage: Message = {
-        id: aiResponseId,
-        type: "assistant",
-        content: "",
-        timestamp: new Date(),
-        typing: true,
-        metadata: data.metadata,
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
-      await typeMessage(data.response, aiResponseId);
+      await typeMessage(data.response, aiId);
     } catch (error) {
-      console.error("AI Chat error:", error);
-
       setMessages((prev) => prev.filter((msg) => !msg.processing));
+      const errorId = (Date.now() + 2).toString();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: errorId,
+          type: "assistant",
+          content: "",
+          timestamp: new Date(),
+          typing: true,
+        },
+      ]);
 
-      const errorMessageId = (Date.now() + 2).toString();
-      const errorMessage: Message = {
-        id: errorMessageId,
-        type: "assistant",
-        content: "",
-        timestamp: new Date(),
-        typing: true,
-      };
-
-      setMessages((prev) => [...prev, errorMessage]);
-
-      const errorText = `❌ I encountered an error: ${error.message}\n\nPlease try again or rephrase your question.`;
-      await typeMessage(errorText, errorMessageId);
+      await typeMessage(
+        `❌ Error: ${error.message}\n\nPlease try again.`,
+        errorId
+      );
     } finally {
       setIsTyping(false);
     }
@@ -312,246 +384,249 @@ Ready to dive in? Try any command above!`;
     }
   };
 
-  const copyCodeBlock = async (code: string, blockId: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopiedItems((prev) => new Set(prev).add(blockId));
-      setTimeout(() => {
-        setCopiedItems((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(blockId);
-          return newSet;
-        });
-      }, 2000);
-    } catch (err) {
-      console.error("Failed to copy code");
+  const handleSessionSelect = (selectedSessionId: string) => {
+    if (selectedSessionId === sessionId) {
+      setSidebarOpen(false);
+      return;
     }
-  };
 
-  const handleSessionSelect = async (selectedSessionId: string) => {
-    try {
-      const response = await fetch(
-        `/api/ai-chat/sessions/${selectedSessionId}`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setSessionId(selectedSessionId);
-        setMessages(data.messages || []);
-        setShowWelcome(false);
-      }
-    } catch (error) {
-      console.error("Error loading session:", error);
+    const conversation = conversations.find(
+      (conv) => conv.id === selectedSessionId
+    );
+    if (conversation) {
+      setSessionId(selectedSessionId);
+      setMessages(conversation.messages || []);
+      setSidebarOpen(false);
     }
   };
 
   const handleNewChat = () => {
-    setMessages([]);
-    setSessionId("");
-    setShowWelcome(true);
-
-    // Add welcome message for new chat
-    setTimeout(() => {
-      setMessages([
-        {
-          id: "welcome-new",
-          type: "assistant",
-          content: `🤖 **New Conversation Started!**
-
-Ready to assist with your crypto needs. What would you like to explore?
-
-💡 **Quick starts:**
-• "analyze wallet 0x..." for portfolio insights
-• "what's trending" for market updates  
-• "help" for complete feature guide`,
-          timestamp: new Date(),
-        },
-      ]);
-    }, 100);
+    setMessages([
+      {
+        id: "welcome-new",
+        type: "assistant",
+        content: `🤖 **New Chat Started!**\n\nReady to help with crypto analysis. What would you like to explore?`,
+        timestamp: new Date(),
+      },
+    ]);
+    setSessionId(Date.now().toString());
+    setSidebarOpen(false);
   };
 
-  const formatMessage = (content: string, messageId: string) => {
-    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
-    const parts = [];
-    let lastIndex = 0;
-    let match;
-    let blockCounter = 0;
-
-    while ((match = codeBlockRegex.exec(content)) !== null) {
-      if (match.index > lastIndex) {
-        const textPart = content.slice(lastIndex, match.index);
-        parts.push({ type: "text", content: textPart });
-      }
-
-      const language = match[1] || "text";
-      const code = match[2];
-      const blockId = `${messageId}-code-${blockCounter++}`;
-
-      parts.push({ type: "code", language, content: code, blockId });
-      lastIndex = match.index + match[0].length;
-    }
-
-    if (lastIndex < content.length) {
-      parts.push({ type: "text", content: content.slice(lastIndex) });
-    }
-
-    if (parts.length === 0) {
-      parts.push({ type: "text", content: content });
-    }
-
-    return parts.map((part, index) => {
-      if (part.type === "code") {
-        return (
-          <div key={index} className="relative my-3">
-            <div className="flex items-center justify-between bg-[#1a1a1a] border border-[#2c2c2c] rounded-t-lg px-3 py-2">
-              <span className="text-xs text-gray-400 font-mono font-medium">
-                {part.language}
-              </span>
-              <button
-                onClick={() => copyCodeBlock(part.content, part.blockId)}
-                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-[#2c2c2c]"
-              >
-                {copiedItems.has(part.blockId) ? (
-                  <>
-                    <Check size={12} />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy size={12} />
-                    Copy
-                  </>
-                )}
-              </button>
-            </div>
-            <pre className="bg-[#1a1a1a] border border-[#2c2c2c] border-t-0 rounded-b-lg p-4 overflow-x-auto">
-              <code className="text-sm font-mono text-gray-200 leading-relaxed">
-                {part.content}
-              </code>
-            </pre>
-          </div>
-        );
-      } else {
-        let formatted = part.content
-          .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-          .replace(/\*(.*?)\*/g, "<em>$1</em>")
-          .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
-          .replace(/\n/g, "<br>");
-
-        return (
-          <div key={index} dangerouslySetInnerHTML={{ __html: formatted }} />
-        );
-      }
+  const deleteConversation = (conversationId: string) => {
+    setConversations((prev) => {
+      const updated = prev.filter((conv) => conv.id !== conversationId);
+      localStorage.setItem("ai-chat-conversations", JSON.stringify(updated));
+      return updated;
     });
+
+    if (conversationId === sessionId) handleNewChat();
   };
 
-  if (initialLoading) {
-    return <SkeletonAIChat />;
-  }
+  const formatMessage = (content: string) => {
+    return content
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
+      .replace(/\n/g, "<br>");
+  };
+
+  if (initialLoading) return <SkeletonAIChat />;
 
   return (
-    <div className="h-full flex bg-[#0F0F0F]">
-      {/* Sidebar */}
-      <ChatSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        activeSessionId={sessionId}
-        onSessionSelect={handleSessionSelect}
-        onNewChat={handleNewChat}
-        currentUser="user" // You can get this from your auth state
-      />
+    <div className="h-full relative bg-[#0F0F0F] flex">
+      {/* Overlay Background - Same as scheduled payments */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-white/10 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col rounded-[12px] lg:rounded-[16px] overflow-hidden">
-        {/* Header */}
-        <div className="p-3 lg:p-4 border-b border-[#2C2C2C] bg-gradient-to-r from-[#1a1a1a] to-[#0F0F0F]">
-          <div className="flex items-center justify-between">
+      {/* Conversation Sidebar - Starts from AIChatPage */}
+      <div
+        data-sidebar="true"
+        className={`relative z-40 transform transition-all duration-300 ease-in-out bg-gradient-to-b from-[#1a1a1a] to-[#141414] border border-[#2C2C2C] rounded-xl ${
+          sidebarOpen ? "w-80 opacity-100" : "w-0 opacity-0 overflow-hidden"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
             <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors lg:hidden"
-              >
-                <Menu size={16} className="text-gray-400" />
-              </button>
-
-              <div className="hidden lg:block">
-                <button
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
-                >
-                  <Menu size={16} className="text-gray-400" />
-                </button>
-              </div>
-
-              <div className="flex items-center space-x-2">
+              <div className="p-2 bg-[#E2AF19]/10 rounded-lg">
                 <Brain className="text-[#E2AF19]" size={20} />
-                <div>
-                  <h1 className="text-lg font-satoshi font-bold text-white">
-                    BlockPal AI
-                  </h1>
-                  {sessionId && (
-                    <p className="text-xs text-gray-400 font-mono">
-                      Session: {sessionId.slice(0, 8)}...
-                    </p>
-                  )}
-                </div>
+              </div>
+              <div>
+                <span className="text-white font-satoshi font-bold text-lg">
+                  Chat History
+                </span>
+                <p className="text-gray-400 text-xs">Your conversations</p>
               </div>
             </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-all"
+            >
+              <X size={18} className="text-gray-400 hover:text-white" />
+            </button>
+          </div>
 
+          {/* New Chat Button */}
+          <div className="p-4 border-b border-[#2C2C2C]">
+            <button
+              onClick={handleNewChat}
+              className="w-full bg-gradient-to-r from-[#E2AF19] to-[#D4A853] text-black p-3 rounded-xl font-satoshi font-medium hover:scale-[1.02] transition-all flex items-center justify-center space-x-2"
+            >
+              <Plus size={16} />
+              <span>New Chat</span>
+            </button>
+          </div>
+
+          {/* Conversations List */}
+          <div className="flex-1 px-4 pb-4 overflow-y-auto">
+            <div className="mb-4">
+              <span className="text-gray-300 text-sm font-satoshi font-medium">
+                Recent ({conversations.length})
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {/* Current Session - Always show if active */}
+              {messages.length > 0 && sessionId && (
+                <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    <span className="text-white text-sm font-medium">
+                      Current Chat
+                    </span>
+                  </div>
+                  <p className="text-gray-400 text-xs line-clamp-2">
+                    {messages
+                      .find((m) => m.type === "user")
+                      ?.content?.slice(0, 60) || "New conversation"}
+                    ...
+                  </p>
+                  <div className="flex items-center space-x-2 mt-2 text-gray-500 text-xs">
+                    <span>{messages.length} messages</span>
+                    <span>•</span>
+                    <span>Active now</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Saved Conversations - Exclude current session */}
+              {conversations
+                .filter((conv) => conv.id !== sessionId)
+                .map((conversation) => (
+                  <div
+                    key={conversation.id}
+                    className="p-3 rounded-xl cursor-pointer group transition-all bg-[#2C2C2C]/20 hover:bg-[#2C2C2C]/40"
+                    onClick={() => handleSessionSelect(conversation.id)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-gray-300 text-sm font-medium line-clamp-1">
+                          {conversation.title || "Untitled Chat"}
+                        </span>
+                        <p className="text-gray-400 text-xs line-clamp-2 mt-1">
+                          {conversation.lastMessage || "No messages"}
+                        </p>
+                        <div className="flex items-center space-x-2 mt-2 text-gray-500 text-xs">
+                          <span>{conversation.messageCount} messages</span>
+                          <span>•</span>
+                          <span>
+                            {getRelativeTime(
+                              conversation.timestamp || conversation.createdAt
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteConversation(conversation.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-all"
+                      >
+                        <X size={12} className="text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+              {/* Empty State */}
+              {conversations.filter((conv) => conv.id !== sessionId).length ===
+                0 &&
+                messages.length === 0 && (
+                  <div className="text-center py-8">
+                    <Brain className="text-gray-500 mx-auto mb-3" size={32} />
+                    <p className="text-gray-500 text-sm">
+                      No conversations yet
+                    </p>
+                    <p className="text-gray-600 text-xs mt-1">
+                      Start chatting to see history
+                    </p>
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="flex-shrink-0 p-4 border-b border-[#2C2C2C]">
+          <div className="flex items-center space-x-3">
+            <button
+              id="hamburger-button"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+            >
+              <Menu size={16} className="text-gray-400" />
+            </button>
             <div className="flex items-center space-x-2">
-              <button
-                onClick={handleNewChat}
-                className="px-3 py-1.5 bg-[#E2AF19] text-black text-sm font-satoshi font-medium rounded-lg hover:bg-[#D4A853] transition-colors"
-              >
-                New Chat
-              </button>
-
-              <button className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors">
-                <MoreVertical size={16} className="text-gray-400" />
-              </button>
+              <Brain className="text-[#E2AF19]" size={20} />
+              <h1 className="text-lg font-satoshi font-bold text-white">
+                BlockPal AI
+              </h1>
             </div>
           </div>
         </div>
 
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-3 lg:px-4 flex flex-col justify-end scrollbar-hide">
-          <div className="space-y-4 py-4">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 min-h-0">
+          <div className="py-4 space-y-4">
             {messages.map((message) => (
               <div key={message.id} className="flex flex-col space-y-2">
                 {message.type === "assistant" ? (
                   <div className="flex flex-col items-start space-y-2">
-                    <div className="max-w-full lg:max-w-4xl bg-black p-3 lg:p-4 rounded-xl border border-[#2C2C2C]">
+                    <div className="max-w-4xl bg-black p-4 rounded-xl border border-[#2C2C2C]">
                       {message.processing && !message.content ? (
                         <div className="flex items-center space-x-2">
                           <RefreshCw
                             size={16}
                             className="text-[#E2AF19] animate-spin"
                           />
-                          <span className="text-[#F9EFD1] text-sm font-satoshi">
-                            🧠 Enhanced AI processing your request...
+                          <span className="text-[#F9EFD1] text-sm">
+                            Processing...
                           </span>
                         </div>
                       ) : (
-                        <div className="text-[#F9EFD1] text-sm leading-relaxed font-satoshi message-content">
-                          {formatMessage(message.content, message.id)}
+                        <div className="text-[#F9EFD1] text-sm leading-relaxed">
+                          <div
+                            dangerouslySetInnerHTML={{
+                              __html: formatMessage(message.content),
+                            }}
+                          />
                           {message.typing && (
-                            <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1"></span>
+                            <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
                           )}
                         </div>
                       )}
                     </div>
-
-                    {message.metadata?.utility && (
-                      <div className="flex items-center space-x-2 text-xs text-gray-500">
-                        <span>Utility:</span>
-                        <span className="bg-[#2C2C2C] px-2 py-1 rounded text-[#E2AF19]">
-                          {message.metadata.utility}
-                        </span>
-                      </div>
-                    )}
 
                     {!message.processing &&
                       !message.typing &&
@@ -560,7 +635,7 @@ Ready to assist with your crypto needs. What would you like to explore?
                           onClick={() =>
                             copyMessage(message.content, message.id)
                           }
-                          className="bg-[#E2AF19] text-black px-3 py-1 rounded-lg text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1.5"
+                          className="bg-[#E2AF19] text-black px-3 py-1 rounded-lg text-xs font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1.5"
                         >
                           {copiedItems.has(message.id) ? (
                             <>
@@ -578,8 +653,8 @@ Ready to assist with your crypto needs. What would you like to explore?
                   </div>
                 ) : (
                   <div className="flex justify-end">
-                    <div className="bg-[#E2AF19] text-black p-3 lg:p-4 max-w-full lg:max-w-2xl rounded-xl">
-                      <p className="text-sm font-satoshi">{message.content}</p>
+                    <div className="bg-[#E2AF19] text-black p-4 max-w-2xl rounded-xl">
+                      <p className="text-sm">{message.content}</p>
                     </div>
                   </div>
                 )}
@@ -589,31 +664,23 @@ Ready to assist with your crypto needs. What would you like to explore?
           </div>
         </div>
 
-        {/* Input Area */}
-        <div className="p-3 lg:p-4 flex-shrink-0">
+        {/* Input */}
+        <div className="flex-shrink-0 p-4 border-t border-[#2C2C2C]">
           <div className="relative">
             <textarea
               ref={inputRef}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask me about crypto analysis, smart contracts, security audits, or market trends..."
-              className="w-full bg-black text-white placeholder-gray-400 resize-none font-satoshi focus:outline-none pr-12 pl-4 py-3 min-h-[52px] max-h-32 text-sm border border-[#2C2C2C] focus:border-[#E2AF19] transition-colors rounded-2xl"
+              placeholder="Ask about crypto analysis, smart contracts, or market trends..."
+              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-12 pl-4 py-3 min-h-[52px] max-h-32 text-sm border border-[#2C2C2C] focus:border-[#E2AF19] transition-colors rounded-2xl"
               rows={1}
               disabled={isTyping}
-              style={{
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-                fontSize:
-                  typeof window !== "undefined" && window.innerWidth < 640
-                    ? "16px"
-                    : undefined,
-              }}
             />
             <button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || isTyping}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 disabled:cursor-not-allowed text-black rounded-full transition-colors w-10 h-10 flex items-center justify-center"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 text-black rounded-full w-10 h-10 flex items-center justify-center transition-colors"
             >
               {isTyping ? (
                 <RefreshCw size={16} className="animate-spin" />
@@ -626,75 +693,61 @@ Ready to assist with your crypto needs. What would you like to explore?
           {isTyping && (
             <div className="flex items-center justify-center mt-2">
               <div className="flex space-x-1 mr-2">
-                <div className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"></div>
-                <div
-                  className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"
-                  style={{ animationDelay: "0.1s" }}
-                ></div>
-                <div
-                  className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                ></div>
+                {[0, 0.1, 0.2].map((delay, i) => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"
+                    style={{ animationDelay: `${delay}s` }}
+                  />
+                ))}
               </div>
-              <span className="text-gray-400 text-xs font-satoshi">
-                Enhanced AI thinking...
-              </span>
+              <span className="text-gray-400 text-xs">AI thinking...</span>
             </div>
           )}
         </div>
       </div>
 
       <style jsx global>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
+        .line-clamp-1 {
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
-
-        textarea::-webkit-scrollbar {
-          display: none;
-        }
-
         .message-content strong {
           font-weight: 700;
           color: #ffffff;
         }
-
         .message-content em {
           font-style: italic;
           color: #e2af19;
         }
-
         .message-content .inline-code {
           background: #2c2c2c;
           color: #e2af19;
           padding: 2px 6px;
           border-radius: 4px;
-          font-family: "Courier New", monospace;
+          font-family: monospace;
           font-size: 0.9em;
         }
-
-        .animate-bounce {
-          animation: bounce 1.4s infinite;
+        ::-webkit-scrollbar {
+          width: 6px;
         }
-
-        @keyframes bounce {
-          0%,
-          80%,
-          100% {
-            transform: translateY(0);
-          }
-          40% {
-            transform: translateY(-6px);
-          }
+        ::-webkit-scrollbar-track {
+          background: #0f0f0f;
         }
-
-        @media (max-width: 640px) {
-          textarea {
-            font-size: 16px !important;
-          }
+        ::-webkit-scrollbar-thumb {
+          background: #2c2c2c;
+          border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #404040;
         }
       `}</style>
     </div>

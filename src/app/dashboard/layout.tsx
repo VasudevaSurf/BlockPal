@@ -1,8 +1,9 @@
-// src/app/dashboard/layout.tsx - UPDATED WITH MODAL BACKDROP SUPPORT
+// src/app/dashboard/layout.tsx - UPDATED WITH CONDITIONAL HEADER RENDERING
 "use client";
 
 import { useSelector } from "react-redux";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { RootState } from "@/store";
 import Sidebar from "@/components/dashboard/Sidebar";
 import WalletSelector from "@/components/dashboard/WalletSelector";
@@ -19,6 +20,10 @@ export default function DashboardLayout({
 }) {
   const { walletSelectorOpen } = useSelector((state: RootState) => state.ui);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Check if we should hide the header (for AI chat page)
+  const shouldHideHeader = pathname === "/dashboard/ai-chat";
 
   return (
     <NavigationLoadingProvider>
@@ -26,22 +31,24 @@ export default function DashboardLayout({
         {/* Navigation Loading Indicator */}
         <NavigationLoadingIndicator />
 
-        {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between p-4 bg-black rounded-[16px] mb-3 border border-[#2C2C2C]">
-          <div className="flex items-center">
-            <img
-              src="/blockName.png"
-              alt="Blockpal"
-              className="h-6 brightness-110"
-            />
+        {/* Mobile Header - Only show when header is not hidden */}
+        {!shouldHideHeader && (
+          <div className="lg:hidden flex items-center justify-between p-4 bg-black rounded-[16px] mb-3 border border-[#2C2C2C]">
+            <div className="flex items-center">
+              <img
+                src="/blockName.png"
+                alt="Blockpal"
+                className="h-6 brightness-110"
+              />
+            </div>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
-          >
-            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
+        )}
 
         {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
@@ -61,20 +68,26 @@ export default function DashboardLayout({
           <Sidebar />
         </div>
 
-        {/* Main Content with Global Header */}
+        {/* Main Content */}
         <main className="flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col">
-          {/* Global Header Container - This stays fixed */}
-          <div className="flex-shrink-0 bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] sm:p-4 lg:p-5">
-            <GlobalDashboardHeader
-              title="Dashboard" // Default title, will be overridden by individual pages
-              subtitle="Welcome back" // Default subtitle
-            >
-              {/* This children prop will be populated by individual pages */}
-            </GlobalDashboardHeader>
-          </div>
+          {/* Conditional Global Header */}
+          {!shouldHideHeader && (
+            <div className="flex-shrink-0 bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] sm:p-4 lg:p-5">
+              <GlobalDashboardHeader
+                title="Dashboard"
+                subtitle="Welcome back"
+              />
+            </div>
+          )}
 
-          {/* Content Area - This changes based on route */}
-          <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
+          {/* Content Area */}
+          <div
+            className={`flex-1 min-h-0 overflow-hidden ${
+              shouldHideHeader ? "p-0" : ""
+            }`}
+          >
+            {children}
+          </div>
         </main>
 
         {/* Global Payment Executor - Floating Button */}
