@@ -1,9 +1,9 @@
-// src/components/dashboard/Sidebar.tsx - FIXED VERSION (No refresh icons during navigation)
+// src/components/dashboard/Sidebar.tsx - UPDATED VERSION (Profile option removed)
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, usePathname } from "next/navigation";
-import { User, ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { RootState } from "@/store";
 import { toggleTheme } from "@/store/slices/uiSlice";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
@@ -45,13 +45,7 @@ const menuItems = [
   },
 ];
 
-const otherItems = [
-  {
-    icon: User,
-    label: "User Profile",
-    href: "/dashboard/profile",
-  },
-];
+// REMOVED: otherItems array (no longer needed since profile is moved to header)
 
 interface SidebarProps {
   onItemClick?: () => void;
@@ -97,83 +91,11 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
     }, 100);
   };
 
-  // FIXED: Proper logout handler with error handling
-  const handleLogout = async (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (isLoading) return;
-
-    try {
-      console.log("🚪 Starting logout process...");
-
-      // Show loading state
-      startLoading();
-
-      // Clear any local storage
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("activeWalletId");
-        localStorage.removeItem("auth-token");
-
-        // Clear any other cached data
-        const keys = Object.keys(localStorage);
-        keys.forEach((key) => {
-          if (
-            key.startsWith("wallet-") ||
-            key.startsWith("token-") ||
-            key.startsWith("blockpal-")
-          ) {
-            localStorage.removeItem(key);
-          }
-        });
-      }
-
-      // Dispatch logout action
-      const result = await dispatch(logoutUser());
-
-      if (logoutUser.fulfilled.match(result)) {
-        console.log("✅ Logout successful");
-      } else if (logoutUser.rejected.match(result)) {
-        console.warn(
-          "⚠️ Logout API failed, but continuing with local cleanup:",
-          result.payload
-        );
-      }
-
-      // Always redirect regardless of API response
-      console.log("🔄 Redirecting to auth page...");
-      router.replace("/auth");
-
-      if (onItemClick) {
-        onItemClick();
-      }
-    } catch (error) {
-      console.error("❌ Logout error:", error);
-
-      // Even if logout fails, clear local state and redirect
-      try {
-        // Manual cleanup
-        dispatch({ type: "auth/setUnauthenticated" });
-        router.replace("/auth");
-
-        if (onItemClick) {
-          onItemClick();
-        }
-      } catch (redirectError) {
-        console.error("❌ Emergency redirect failed:", redirectError);
-        // Force page reload as last resort
-        window.location.href = "/auth";
-      }
-    }
-  };
-
   return (
     <div
       className="relative w-full lg:w-64 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
       style={{ borderRadius: "16px" }}
     >
-      {/* REMOVED: No loading overlay - just disable interactions during navigation */}
-
       {/* Top Gradient Blur */}
       <div
         className="absolute -top-1 lg:-top-3 -left-1 lg:-left-3 -right-1 lg:-right-3 h-24 lg:h-48 pointer-events-none z-10"
@@ -240,7 +162,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                     : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
                 } ${isLoading ? "pointer-events-none" : ""}`}
               >
-                {/* REMOVED: Individual loading spinners - now handled by overlay */}
                 <item.icon
                   size={16}
                   className="mr-3 flex-shrink-0"
@@ -255,80 +176,14 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         </nav>
       </div>
 
-      {/* Others Section - Fixed at bottom */}
+      {/* Bottom Section - Only website link now */}
       <div className="p-2 lg:p-4 flex-shrink-0 relative z-20">
-        {/* Others Section with Lines - Hidden on mobile */}
-        <div className="mb-3 lg:mb-4 hidden lg:block">
-          <div className="flex items-center mb-3">
-            <div className="flex-1 h-px bg-[#DCDCDC]"></div>
-            <span className="px-3 text-xs font-medium text-gray-300 font-satoshi">
-              Others
-            </span>
-            <div className="flex-1 h-px bg-[#DCDCDC]"></div>
-          </div>
-        </div>
-
         <div className="space-y-1 lg:space-y-2">
-          {/* User Profile Link with Logout */}
-          {otherItems.map((item) => {
-            const isActive = pathname === item.href;
-            const isProfileDisabled = !hasWallets;
-
-            return (
-              <div key={item.label} className="w-full flex items-center">
-                {/* Profile Button - Can be disabled */}
-                <button
-                  onClick={(e) =>
-                    !isProfileDisabled && handleNavigation(item.href, e)
-                  }
-                  disabled={isLoading || isProfileDisabled}
-                  className={`flex-1 flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
-                    isActive
-                      ? "bg-[#E2AF19] text-black font-medium"
-                      : isProfileDisabled
-                      ? "text-gray-500 cursor-not-allowed opacity-50"
-                      : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
-                  } ${isLoading ? "pointer-events-none" : ""}`}
-                >
-                  {/* REMOVED: Individual loading spinners - now handled by overlay */}
-                  <item.icon size={16} className="mr-3 flex-shrink-0" />
-                  <span className={isActive ? "font-medium" : ""}>
-                    {item.label}
-                  </span>
-                </button>
-
-                {/* Logout Button - Always enabled and separate */}
-                <button
-                  className="ml-1 flex-shrink-0 p-2 rounded hover:bg-red-900/20 transition-colors disabled:opacity-50"
-                  onClick={handleLogout}
-                  disabled={isLoading}
-                  title="Logout"
-                >
-                  {/* FIXED: Only show spinner for logout action, not general navigation */}
-                  {isLoading && pathname === "/auth" ? (
-                    <RefreshCw
-                      size={14}
-                      className="animate-spin"
-                      color="#E74C3C"
-                    />
-                  ) : (
-                    <LogoutIcon
-                      size={14}
-                      className="hover:opacity-80 transition-opacity"
-                      color="#E74C3C"
-                    />
-                  )}
-                </button>
-              </div>
-            );
-          })}
-
           {/* Go to Website Button */}
           <button
             onClick={() => {
-              // FIXED: Add https:// protocol to the URL
               window.open(
-                "https://blockpal.tech", // ✅ Correct: includes protocol
+                "https://blockpal.tech",
                 "_blank",
                 "noopener,noreferrer"
               );
@@ -343,21 +198,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
               <ExternalLink size={12} className="text-gray-400" />
             </div>
           </button>
-
-          {/* Dark Mode Toggle */}
-          {/* <button
-            onClick={() => dispatch(toggleTheme())}
-            disabled={isLoading}
-            className="w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-gray-300 hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi text-xs lg:text-sm"
-          >
-            <DarkModeIcon size={16} className="mr-3 flex-shrink-0" />
-            <span className="truncate">Dark Mode</span>
-            <div className="ml-auto flex-shrink-0">
-              <div className="w-8 lg:w-10 h-5 lg:h-6 rounded-full relative bg-[#E2AF19]">
-                <div className="w-3 lg:w-4 h-3 lg:h-4 bg-white rounded-full absolute top-1 right-1"></div>
-              </div>
-            </div>
-          </button> */}
         </div>
       </div>
     </div>

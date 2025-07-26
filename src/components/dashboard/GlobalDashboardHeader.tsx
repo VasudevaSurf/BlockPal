@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED VERSION (Letters instead of pattern)
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED VERSION (Profile and Logout icons in header)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import {
   Bell,
-  Settings,
+  User,
   LogOut,
   ChevronDown,
   Radio,
@@ -28,12 +28,11 @@ import {
   getActiveWalletFromDB,
   fetchWalletTokens,
   updateWalletBalance,
-  clearTokens, // Add this import
+  clearTokens,
 } from "@/store/slices/walletSlice";
 import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
 import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
 import NotificationPanel from "@/components/notifications/NotificationPanel";
-import SettingsIcon from "../icons/SettingsIcon";
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -252,8 +251,33 @@ export default function GlobalDashboardHeader({
     }
   }, [isAuthenticated, user, wallets, activeWallet, dispatch]);
 
+  // NEW: Handle profile navigation
+  const handleProfileClick = () => {
+    router.push("/dashboard/profile");
+  };
+
+  // NEW: Handle logout
   const handleLogout = async () => {
     try {
+      // Clear any local storage
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("activeWalletId");
+        localStorage.removeItem("auth-token");
+
+        // Clear any other cached data
+        const keys = Object.keys(localStorage);
+        keys.forEach((key) => {
+          if (
+            key.startsWith("wallet-") ||
+            key.startsWith("token-") ||
+            key.startsWith("blockpal-")
+          ) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+
+      // Dispatch logout action
       await dispatch(logoutUser());
       router.push("/auth");
     } catch (error) {
@@ -262,7 +286,7 @@ export default function GlobalDashboardHeader({
     }
   };
 
-  // FIXED: Enhanced wallet selection with proper data loading
+  // Enhanced wallet selection with proper data loading
   const handleWalletSelect = async (walletId: string) => {
     console.log("🎯 Header - Wallet selected:", walletId);
 
@@ -337,7 +361,7 @@ export default function GlobalDashboardHeader({
     return colors[activeIndex >= 0 ? activeIndex % colors.length : 0];
   };
 
-  // NEW: Generate letters from wallet name (same logic as RealtimeWalletSwitcher)
+  // Generate letters from wallet name
   const getWalletLetters = (walletName: string): string => {
     if (!walletName || typeof walletName !== "string") {
       return "W"; // Default fallback
@@ -427,7 +451,6 @@ export default function GlobalDashboardHeader({
               <div
                 className={`w-5 h-5 lg:w-6 lg:h-6 ${getWalletColor()} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
               >
-                {/* REMOVED: Pattern overlay - now just showing letters */}
                 <span className="text-white text-xs font-bold font-satoshi">
                   {getWalletLetters(activeWalletData.name)}
                 </span>
@@ -494,10 +517,26 @@ export default function GlobalDashboardHeader({
 
               <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
 
-              <button className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full">
-                <SettingsIcon
+              {/* NEW: Profile Icon */}
+              <button
+                onClick={handleProfileClick}
+                className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full"
+                title="User Profile"
+              >
+                <User size={14} className="text-gray-400 lg:w-4 lg:h-4" />
+              </button>
+
+              <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
+
+              {/* NEW: Logout Icon */}
+              <button
+                onClick={handleLogout}
+                className="p-1 lg:p-1.5 transition-colors hover:bg-red-900/20 rounded-full"
+                title="Logout"
+              >
+                <LogOut
                   size={14}
-                  className="text-gray-400 lg:w-4 lg:h-4"
+                  className="text-gray-400 hover:text-red-400 lg:w-4 lg:h-4 transition-colors"
                 />
               </button>
             </div>
@@ -508,12 +547,12 @@ export default function GlobalDashboardHeader({
       {/* Page-specific content below header */}
       {children}
 
-      {/* FIXED: Wallet Switcher Dropdown with enhanced wallet selection */}
+      {/* Wallet Switcher Dropdown */}
       {wallets.length > 0 && (
         <RealtimeWalletSwitcher
           isOpen={walletSwitcherOpen}
           onClose={() => setWalletSwitcherOpen(false)}
-          onWalletSelect={handleWalletSelect} // Pass the enhanced handler
+          onWalletSelect={handleWalletSelect}
           triggerRef={walletButtonRef}
         />
       )}
