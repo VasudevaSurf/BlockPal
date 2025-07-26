@@ -1,4 +1,4 @@
-// src/components/profile/UserProfilePage.tsx - COMPLETE UPDATED VERSION
+// src/components/profile/UserProfilePage.tsx - UPDATED WITH PRIVATE KEY MODAL
 "use client";
 
 import { useState, useEffect } from "react";
@@ -28,7 +28,8 @@ import {
   Settings,
   Lock,
   ChevronDown,
-  QrCode, // Add QrCode import
+  QrCode,
+  Key, // Add Key import for wallet credentials
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { logoutUser } from "@/store/slices/authSlice";
@@ -36,7 +37,8 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import TwoFactorSetupModal from "./TwoFactorSetupModal";
 import ProfilePictureUpload from "./ProfilePictureUpload";
-import UserQRCodeModal from "./UserQRCodeModal"; // Add QR Modal import
+import UserQRCodeModal from "./UserQRCodeModal";
+import PrivateKeyModal from "./PrivateKeyModal"; // Add Private Key Modal import
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 
 interface UserProfile {
@@ -198,7 +200,8 @@ export default function UserProfilePage() {
   const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false); // Add QR modal state
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [showPrivateKeyModal, setShowPrivateKeyModal] = useState(false); // Add Private Key modal state
 
   // 2FA Modal State
   const [show2FAModal, setShow2FAModal] = useState(false);
@@ -445,7 +448,10 @@ export default function UserProfilePage() {
       {(showPasswordModal ||
         showContactModal ||
         show2FAModal ||
-        showQRModal) && <div className="fixed inset-0 z-40 bg-white/10" />}
+        showQRModal ||
+        showPrivateKeyModal) && (
+        <div className="fixed inset-0 z-40 bg-white/10" />
+      )}
 
       <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
         {/* Mobile Layout */}
@@ -655,16 +661,6 @@ export default function UserProfilePage() {
                     <span className="text-white font-satoshi text-sm">
                       2-Factor Authentication
                     </span>
-                    {/* {profile.twoFactorEnabled && (
-                      <div className="text-green-400 text-xs font-satoshi">
-                        ✅ Enabled
-                      </div>
-                    )}
-                    {!profile.twoFactorEnabled && (
-                      <div className="text-gray-400 text-xs font-satoshi">
-                        ❌ Disabled
-                      </div>
-                    )} */}
                   </div>
                 </div>
                 <button
@@ -678,128 +674,31 @@ export default function UserProfilePage() {
                   {profile.twoFactorEnabled ? "Disable" : "Enable"}
                 </button>
               </div>
+
+              {/* NEW: Wallet Credentials Section - Mobile */}
+              {activeWallet && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Key size={14} className="text-gray-400 mr-2" />
+                    <div>
+                      <span className="text-white font-satoshi text-sm">
+                        Wallet Credentials
+                      </span>
+                      {/* <div className="text-gray-400 text-xs font-satoshi">
+                        Private key & recovery phrase
+                      </div> */}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowPrivateKeyModal(true)}
+                    className="bg-[#E2AF19] text-black px-2.5 py-1 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                  >
+                    View
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Notifications - Mobile */}
-          {/* <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
-            <h3 className="text-base font-semibold text-white mb-3 font-satoshi">
-              Notifications
-            </h3>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Smartphone size={14} className="text-gray-400 mr-2" />
-                  <span className="text-white font-satoshi text-sm">
-                    Push Notifications
-                  </span>
-                </div>
-                <button
-                  onClick={() =>
-                    handleNotificationToggle(
-                      "pushNotifications",
-                      !profile.preferences.pushNotifications
-                    )
-                  }
-                  className={`relative w-10 h-5 rounded-full transition-colors ${
-                    profile.preferences.pushNotifications
-                      ? "bg-[#E2AF19]"
-                      : "bg-gray-600"
-                  }`}
-                >
-                  <div
-                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                      profile.preferences.pushNotifications
-                        ? "translate-x-5"
-                        : "translate-x-0.5"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Mail size={14} className="text-gray-400 mr-2" />
-                  <span className="text-white font-satoshi text-sm">
-                    Email Notifications
-                  </span>
-                </div>
-                <button
-                  onClick={() =>
-                    handleNotificationToggle(
-                      "emailNotifications",
-                      !profile.preferences.emailNotifications
-                    )
-                  }
-                  className={`relative w-10 h-5 rounded-full transition-colors ${
-                    profile.preferences.emailNotifications
-                      ? "bg-[#E2AF19]"
-                      : "bg-gray-600"
-                  }`}
-                >
-                  <div
-                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                      profile.preferences.emailNotifications
-                        ? "translate-x-5"
-                        : "translate-x-0.5"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <UserPlus size={14} className="text-gray-400 mr-2" />
-                  <span className="text-white font-satoshi text-sm">
-                    Friend Requests
-                  </span>
-                </div>
-                <div className="relative">
-                  <select
-                    value={profile.preferences.friendRequests}
-                    onChange={(e) =>
-                      handleNotificationToggle("friendRequests", e.target.value)
-                    }
-                    className="appearance-none bg-[#1A1A1A] text-white px-2.5 py-1 pr-6 rounded-lg text-sm font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
-                  >
-                    <option value="everyone">Everyone</option>
-                    <option value="none">No One</option>
-                  </select>
-                  <ChevronDown
-                    size={12}
-                    className="absolute right-1.5 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Globe size={14} className="text-gray-400 mr-2" />
-                  <span className="text-white font-satoshi text-sm">
-                    Currency Display
-                  </span>
-                </div>
-                <div className="relative">
-                  <select
-                    value={profile.preferences.currency}
-                    onChange={(e) =>
-                      handleNotificationToggle("currency", e.target.value)
-                    }
-                    className="appearance-none bg-[#1A1A1A] text-white px-2.5 py-1 pr-6 rounded-lg text-sm font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="INR">INR</option>
-                    <option value="EUR">EUR</option>
-                  </select>
-                  <ChevronDown
-                    size={12}
-                    className="absolute right-1.5 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
-                  />
-                </div>
-              </div>
-            </div>
-          </div> */}
 
           {/* Support & Feedback - Mobile */}
           <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
@@ -1070,16 +969,6 @@ export default function UserProfilePage() {
                       <span className="text-white font-satoshi">
                         2-Factor Authentication
                       </span>
-                      {/* {profile.twoFactorEnabled && (
-                        <div className="text-green-400 text-sm font-satoshi">
-                          Currently Enabled
-                        </div>
-                      )}
-                      {!profile.twoFactorEnabled && (
-                        <div className="text-gray-400 text-sm font-satoshi">
-                          Currently Disabled
-                        </div>
-                      )} */}
                     </div>
                   </div>
                   <button
@@ -1093,131 +982,31 @@ export default function UserProfilePage() {
                     {profile.twoFactorEnabled ? "Disable" : "Enable"}
                   </button>
                 </div>
+
+                {/* NEW: Wallet Credentials Section - Desktop */}
+                {activeWallet && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Key size={18} className="text-gray-400 mr-2" />
+                      <div>
+                        <span className="text-white font-satoshi">
+                          Wallet Credentials
+                        </span>
+                        {/* <div className="text-gray-400 text-sm font-satoshi">
+                          View private key and recovery phrase
+                        </div> */}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowPrivateKeyModal(true)}
+                      className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                    >
+                      View
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Notifications - Desktop */}
-            {/* <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
-              <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
-                Notifications
-              </h3>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Smartphone size={18} className="text-gray-400 mr-2" />
-                    <span className="text-white font-satoshi">
-                      Push Notifications
-                    </span>
-                  </div>
-                  <button
-                    onClick={() =>
-                      handleNotificationToggle(
-                        "pushNotifications",
-                        !profile.preferences.pushNotifications
-                      )
-                    }
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      profile.preferences.pushNotifications
-                        ? "bg-[#E2AF19]"
-                        : "bg-gray-600"
-                    }`}
-                  >
-                    <div
-                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                        profile.preferences.pushNotifications
-                          ? "translate-x-6"
-                          : "translate-x-0.5"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Mail size={18} className="text-gray-400 mr-2" />
-                    <span className="text-white font-satoshi">
-                      Email Notifications
-                    </span>
-                  </div>
-                  <button
-                    onClick={() =>
-                      handleNotificationToggle(
-                        "emailNotifications",
-                        !profile.preferences.emailNotifications
-                      )
-                    }
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      profile.preferences.emailNotifications
-                        ? "bg-[#E2AF19]"
-                        : "bg-gray-600"
-                    }`}
-                  >
-                    <div
-                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                        profile.preferences.emailNotifications
-                          ? "translate-x-6"
-                          : "translate-x-0.5"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <UserPlus size={18} className="text-gray-400 mr-2" />
-                    <span className="text-white font-satoshi">
-                      Friend Requests
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <select
-                      value={profile.preferences.friendRequests}
-                      onChange={(e) =>
-                        handleNotificationToggle(
-                          "friendRequests",
-                          e.target.value
-                        )
-                      }
-                      className="appearance-none bg-[#1A1A1A] text-white px-2.5 py-1.5 pr-6 rounded-lg font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
-                    >
-                      <option value="everyone">Everyone</option>
-                      <option value="none">No One</option>
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-1.5 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Globe size={18} className="text-gray-400 mr-2" />
-                    <span className="text-white font-satoshi">
-                      Currency Display
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <select
-                      value={profile.preferences.currency}
-                      onChange={(e) =>
-                        handleNotificationToggle("currency", e.target.value)
-                      }
-                      className="appearance-none bg-[#1A1A1A] text-white px-2.5 py-1.5 pr-6 rounded-lg font-satoshi border border-[#2C2C2C] focus:border-[#E2AF19] outline-none cursor-pointer"
-                    >
-                      <option value="USD">USD</option>
-                      <option value="INR">INR</option>
-                      <option value="EUR">EUR</option>
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-1.5 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div> */}
 
             {/* Support & Account Actions - Desktop */}
             <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
@@ -1410,6 +1199,27 @@ export default function UserProfilePage() {
         <UserQRCodeModal
           isOpen={showQRModal}
           onClose={() => setShowQRModal(false)}
+        />
+
+        {/* NEW: Private Key Modal */}
+        <PrivateKeyModal
+          isOpen={showPrivateKeyModal}
+          onClose={() => setShowPrivateKeyModal(false)}
+          walletData={
+            activeWallet
+              ? {
+                  id: activeWallet.id,
+                  name: activeWallet.name,
+                  address: activeWallet.address,
+                }
+              : null
+          }
+          userProfile={{
+            email: profile.gmail,
+            displayName: profile.displayName,
+            authProvider: profile.authProvider,
+            hasPassword: profile.hasPassword,
+          }}
         />
 
         <style jsx global>{`
