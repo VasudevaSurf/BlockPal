@@ -653,9 +653,9 @@ export default function UserProfilePage() {
                   <Shield size={14} className="text-gray-400 mr-2" />
                   <div>
                     <span className="text-white font-satoshi text-sm">
-                      Two-Factor Authentication
+                      2-Factor Authentication
                     </span>
-                    {profile.twoFactorEnabled && (
+                    {/* {profile.twoFactorEnabled && (
                       <div className="text-green-400 text-xs font-satoshi">
                         ✅ Enabled
                       </div>
@@ -664,7 +664,7 @@ export default function UserProfilePage() {
                       <div className="text-gray-400 text-xs font-satoshi">
                         ❌ Disabled
                       </div>
-                    )}
+                    )} */}
                   </div>
                 </div>
                 <button
@@ -682,7 +682,7 @@ export default function UserProfilePage() {
           </div>
 
           {/* Notifications - Mobile */}
-          <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
+          {/* <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
             <h3 className="text-base font-semibold text-white mb-3 font-satoshi">
               Notifications
             </h3>
@@ -799,7 +799,7 @@ export default function UserProfilePage() {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Support & Feedback - Mobile */}
           <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
@@ -1068,18 +1068,18 @@ export default function UserProfilePage() {
                     <Shield size={18} className="text-gray-400 mr-2" />
                     <div>
                       <span className="text-white font-satoshi">
-                        Two-Factor Authentication
+                        2-Factor Authentication
                       </span>
-                      {profile.twoFactorEnabled && (
+                      {/* {profile.twoFactorEnabled && (
                         <div className="text-green-400 text-sm font-satoshi">
-                          Currently Enabled ✅
+                          Currently Enabled
                         </div>
                       )}
                       {!profile.twoFactorEnabled && (
                         <div className="text-gray-400 text-sm font-satoshi">
-                          Currently Disabled ❌
+                          Currently Disabled
                         </div>
-                      )}
+                      )} */}
                     </div>
                   </div>
                   <button
@@ -1090,14 +1090,14 @@ export default function UserProfilePage() {
                         : "bg-[#E2AF19] hover:bg-[#D4A853] text-black"
                     }`}
                   >
-                    {profile.twoFactorEnabled ? "Disable 2FA" : "Enable 2FA"}
+                    {profile.twoFactorEnabled ? "Disable" : "Enable"}
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Notifications - Desktop */}
-            <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
+            {/* <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
               <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
                 Notifications
               </h3>
@@ -1217,7 +1217,7 @@ export default function UserProfilePage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* Support & Account Actions - Desktop */}
             <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">

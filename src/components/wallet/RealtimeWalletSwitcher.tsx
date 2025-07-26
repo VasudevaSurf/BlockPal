@@ -1,9 +1,9 @@
-// src/components/wallet/RealtimeWalletSwitcher.tsx - FIXED VERSION
+// src/components/wallet/RealtimeWalletSwitcher.tsx - FIXED VERSION (Skeleton instead of rotating icon)
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import {
   setActiveWallet,
@@ -23,6 +23,30 @@ interface RealtimeWalletSwitcherProps {
   onWalletSelect?: (walletId: string) => void;
   triggerRef?: React.RefObject<HTMLElement>;
 }
+
+// NEW: Skeleton Loader Component
+const WalletSkeleton = () => (
+  <div className="w-full border border-[#6E6E6E] rounded-xl overflow-hidden animate-pulse">
+    <div className="w-full flex items-center p-2.5">
+      {/* Skeleton Wallet Icon */}
+      <div className="w-6 h-6 bg-gray-600 rounded-full flex-shrink-0"></div>
+
+      {/* Divider */}
+      <div className="w-px h-3 bg-[#6E6E6E] mx-2.5 flex-shrink-0"></div>
+
+      {/* Skeleton Wallet Info */}
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="h-3 bg-gray-600 rounded mb-1 w-3/4"></div>
+        <div className="h-2 bg-gray-700 rounded w-1/2"></div>
+      </div>
+
+      {/* Skeleton Active indicator - FIXED: Better centering */}
+      <div className="w-3 h-3 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-2.5 relative">
+        <div className="w-1.5 h-1.5 bg-gray-600 rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>
+      </div>
+    </div>
+  </div>
+);
 
 export default function RealtimeWalletSwitcher({
   isOpen,
@@ -122,9 +146,15 @@ export default function RealtimeWalletSwitcher({
 
   if (!isOpen) return null;
 
-  // FIXED: Enhanced wallet selection with proper data loading
+  // FIXED: Enhanced wallet selection with proper data loading and reduced lag
   const handleSelectWallet = async (walletId: string) => {
     console.log("🎯 RealtimeWalletSwitcher - Wallet selected:", walletId);
+
+    // Prevent double-clicks and already switching
+    if (switchingWallet === walletId) {
+      console.log("⚠️ Already switching to this wallet, ignoring");
+      return;
+    }
 
     // Find the wallet being selected
     const selectedWallet = wallets.find((w) => w.id === walletId);
@@ -133,58 +163,49 @@ export default function RealtimeWalletSwitcher({
       return;
     }
 
-    // Show loading state
+    // Show loading state immediately
     setSwitchingWallet(walletId);
 
     try {
-      // Step 1: Clear existing tokens to show loading state
-      dispatch(clearTokens());
-      console.log("🧹 Cleared existing tokens");
-
-      // Step 2: Set active wallet locally first (immediate UI update)
+      // Step 1: Set active wallet locally first (immediate UI update)
       dispatch(setActiveWallet(walletId));
       console.log("🎯 Set active wallet locally:", selectedWallet.name);
 
-      // Step 3: Sync with database
-      await dispatch(setActiveWalletInDB(walletId));
-      console.log("💾 Synced active wallet with database");
+      // Step 2: Clear existing tokens and start data loading in parallel
+      dispatch(clearTokens());
+      console.log("🧹 Cleared existing tokens");
 
-      // Step 4: Load fresh data for the new wallet
-      console.log("📡 Loading fresh data for wallet:", selectedWallet.address);
-
-      // Load both tokens and balance in parallel
-      const [tokensResult, balanceResult] = await Promise.all([
+      // Step 3: Start all async operations in parallel for better performance
+      const [dbResult, tokensResult, balanceResult] = await Promise.allSettled([
+        dispatch(setActiveWalletInDB(walletId)),
         dispatch(fetchWalletTokens(selectedWallet.address)),
         dispatch(updateWalletBalance(selectedWallet.address)),
       ]);
 
-      // Check if data loading was successful
-      const tokensSuccess =
-        tokensResult.type === "wallet/fetchWalletTokens/fulfilled";
-      const balanceSuccess =
-        balanceResult.type === "wallet/updateWalletBalance/fulfilled";
+      // Log results
+      console.log("💾 Database sync:", dbResult.status);
+      console.log("🪙 Tokens fetch:", tokensResult.status);
+      console.log("💰 Balance update:", balanceResult.status);
 
-      if (tokensSuccess && balanceSuccess) {
-        console.log("✅ Wallet data loaded successfully");
-      } else {
-        console.warn("⚠️ Some wallet data may not have loaded properly", {
-          tokensSuccess,
-          balanceSuccess,
+      // Step 4: Call onWalletSelect callback if provided (also in parallel)
+      if (onWalletSelect) {
+        onWalletSelect(walletId).catch((error) => {
+          console.warn("⚠️ onWalletSelect callback failed:", error);
         });
       }
 
-      // Step 5: Call onWalletSelect callback if provided
-      if (onWalletSelect) {
-        await onWalletSelect(walletId);
-      }
-
-      // Step 6: Close the switcher
+      // Step 5: Close the switcher immediately (don't wait for callback)
       onClose();
+
+      console.log("✅ Wallet switching completed");
     } catch (error) {
       console.error("❌ Failed to switch wallet:", error);
       // Don't close on error, let user try again
     } finally {
-      setSwitchingWallet(null);
+      // Clear switching state after a short delay to prevent flash
+      setTimeout(() => {
+        setSwitchingWallet(null);
+      }, 100);
     }
   };
 
@@ -210,6 +231,29 @@ export default function RealtimeWalletSwitcher({
   const handleWalletModalClose = () => {
     console.log("🎭 Wallet modal closed, keeping switcher open");
     setWalletModalOpen(false);
+  };
+
+  // NEW: Generate letters from wallet name
+  const getWalletLetters = (walletName: string): string => {
+    if (!walletName || typeof walletName !== "string") {
+      return "W"; // Default fallback
+    }
+
+    const words = walletName.trim().split(/\s+/);
+
+    if (words.length >= 2) {
+      // If 2 or more words, take first letter of each of the first two words
+      return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+    } else if (words.length === 1 && words[0].length >= 2) {
+      // If one word with 2+ characters, take first 2 letters
+      return words[0].substring(0, 2).toUpperCase();
+    } else if (words.length === 1 && words[0].length === 1) {
+      // If one word with 1 character, just use that character
+      return words[0].toUpperCase();
+    } else {
+      // Fallback
+      return "W";
+    }
   };
 
   const getWalletColor = (index: number) => {
@@ -246,6 +290,11 @@ export default function RealtimeWalletSwitcher({
               const isActive = activeWallet?.id === wallet.id;
               const isSwitching = switchingWallet === wallet.id;
 
+              // FIXED: Show skeleton when switching instead of rotating icon
+              if (isSwitching) {
+                return <WalletSkeleton key={`${wallet.id}-skeleton`} />;
+              }
+
               return (
                 <div
                   key={wallet.id}
@@ -253,35 +302,22 @@ export default function RealtimeWalletSwitcher({
                 >
                   <button
                     onClick={() => handleSelectWallet(wallet.id)}
-                    disabled={isSwitching}
-                    className={`w-full flex items-center p-2.5 hover:bg-[#1A1A1A] transition-colors text-left relative ${
-                      isSwitching ? "opacity-50 cursor-not-allowed" : ""
+                    disabled={isSwitching || switchingWallet !== null}
+                    className={`w-full flex items-center p-2.5 hover:bg-[#1A1A1A] transition-colors text-left disabled:cursor-not-allowed ${
+                      switchingWallet !== null && !isSwitching
+                        ? "opacity-50"
+                        : ""
                     }`}
                   >
-                    {/* Loading indicator when switching */}
-                    {isSwitching && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
-                        <RefreshCw
-                          size={12}
-                          className="animate-spin text-white"
-                        />
-                      </div>
-                    )}
-
-                    {/* Wallet Icon */}
+                    {/* FIXED: Wallet Icon with Letters */}
                     <div
                       className={`w-6 h-6 ${getWalletColor(
                         index
                       )} rounded-full flex items-center justify-center relative flex-shrink-0`}
                     >
-                      <div
-                        className="absolute inset-0 rounded-full opacity-30"
-                        style={{
-                          backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
-                                         linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
-                          backgroundSize: "4px 4px",
-                        }}
-                      ></div>
+                      <span className="text-white text-xs font-bold font-satoshi">
+                        {getWalletLetters(wallet.name)}
+                      </span>
                     </div>
 
                     {/* Divider */}

@@ -571,7 +571,7 @@ export default function RegisterForm() {
 
           <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3">
             <p className="text-green-400 text-xs font-satoshi text-center">
-              🎉 Your account has been verified and created successfully!
+              Your account has been verified and created successfully!
             </p>
           </div>
         </div>

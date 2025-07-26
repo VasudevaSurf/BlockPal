@@ -481,7 +481,7 @@ export default function ForgotPasswordModal({
 
               <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-2.5">
                 <p className="text-green-400 text-sm font-satoshi text-center">
-                  🎉 You can now log in with your new password!
+                  You can now log in with your new password!
                 </p>
               </div>
 

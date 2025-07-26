@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED VERSION
+// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED VERSION (Letters instead of pattern)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -337,6 +337,29 @@ export default function GlobalDashboardHeader({
     return colors[activeIndex >= 0 ? activeIndex % colors.length : 0];
   };
 
+  // NEW: Generate letters from wallet name (same logic as RealtimeWalletSwitcher)
+  const getWalletLetters = (walletName: string): string => {
+    if (!walletName || typeof walletName !== "string") {
+      return "W"; // Default fallback
+    }
+
+    const words = walletName.trim().split(/\s+/);
+
+    if (words.length >= 2) {
+      // If 2 or more words, take first letter of each of the first two words
+      return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+    } else if (words.length === 1 && words[0].length >= 2) {
+      // If one word with 2+ characters, take first 2 letters
+      return words[0].substring(0, 2).toUpperCase();
+    } else if (words.length === 1 && words[0].length === 1) {
+      // If one word with 1 character, just use that character
+      return words[0].toUpperCase();
+    } else {
+      // Fallback
+      return "W";
+    }
+  };
+
   // Get active wallet display data with real-time information
   const getActiveWalletDisplayData = () => {
     if (realtimeData && isMonitoring) {
@@ -404,14 +427,11 @@ export default function GlobalDashboardHeader({
               <div
                 className={`w-5 h-5 lg:w-6 lg:h-6 ${getWalletColor()} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
               >
-                <div
-                  className="absolute inset-0 rounded-full opacity-30"
-                  style={{
-                    backgroundImage: `linear-gradient(0deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent), 
-                                   linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0.3) 76%, transparent 77%, transparent)`,
-                    backgroundSize: "4px 4px lg:6px 6px",
-                  }}
-                ></div>
+                {/* REMOVED: Pattern overlay - now just showing letters */}
+                <span className="text-white text-xs font-bold font-satoshi">
+                  {getWalletLetters(activeWalletData.name)}
+                </span>
+
                 {/* Real-time pulse indicator */}
                 {isMonitoring && (
                   <div

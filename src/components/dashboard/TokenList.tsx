@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - COMPACT VERSION
+// src/components/dashboard/TokenList.tsx - FIXED VERSION (Skeleton instead of refresh icons)
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -299,11 +299,14 @@ export default function TokenList() {
 
   const displayTokens = tokens;
 
-  // UPDATED: Show skeleton during initial load or when loading and no tokens yet
+  // FIXED: Enhanced skeleton loading conditions to include navigation states
   const shouldShowSkeleton =
     tokenLoadingState.isInitialLoad ||
     (loading && tokens.length === 0) ||
-    (!tokenLoadingState.hasAttemptedLoad && activeWallet?.address);
+    (!tokenLoadingState.hasAttemptedLoad && activeWallet?.address) ||
+    // NEW: Show skeleton when navigating or when tokens are being refreshed
+    isNavigating ||
+    (loading && tokenLoadingState.isInitialLoad);
 
   if (shouldShowSkeleton) {
     console.log("🔄 TokenList - Showing skeleton", {
@@ -312,6 +315,7 @@ export default function TokenList() {
       tokensLength: tokens.length,
       hasAttemptedLoad: tokenLoadingState.hasAttemptedLoad,
       activeWallet: !!activeWallet?.address,
+      isNavigating, // NEW: Log navigation state
     });
     return <SkeletonTokenList />;
   }
@@ -345,7 +349,8 @@ export default function TokenList() {
     displayTokens.length === 0 &&
     tokenLoadingState.hasAttemptedLoad &&
     tokenLoadingState.tokensLoaded &&
-    !loading
+    !loading &&
+    !isNavigating // NEW: Don't show empty state when navigating
   ) {
     return (
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
@@ -365,13 +370,6 @@ export default function TokenList() {
           <p className="text-gray-400 font-satoshi text-xs lg:text-sm mb-3">
             This wallet doesn't have any tokens yet
           </p>
-          {/* <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3 max-w-xs">
-            <p className="text-blue-400 text-xs font-satoshi">
-              💡 <strong>Tip:</strong> Send some tokens to your wallet address:{" "}
-              {activeWallet.address.slice(0, 6)}...
-              {activeWallet.address.slice(-4)}
-            </p>
-          </div> */}
         </div>
       </div>
     );
@@ -394,59 +392,54 @@ export default function TokenList() {
               key={token.id}
               onClick={() => handleTokenClick(token)}
               className={`bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C] cursor-pointer transition-colors ${
-                isNavigating
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+                // REMOVED: isNavigating check since we show skeleton instead
+                "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
               }`}
             >
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center">
-                  {/* Show loading spinner if navigating */}
-                  {isNavigating ? (
-                    <RefreshCw className="w-7 h-7 text-[#E2AF19] animate-spin mr-2.5 flex-shrink-0" />
-                  ) : (
+                  {/* REMOVED: Navigation loading spinner - skeleton handles this now */}
+                  <div
+                    className={`w-8 h-8 ${getTokenBackgroundColor(
+                      token.symbol,
+                      token.contractAddress
+                    )} rounded-full flex items-center justify-center mr-2.5 flex-shrink-0 p-0.5`}
+                  >
+                    {/* UPDATED: Better icon handling with background */}
+                    {isValidImageUrl(token.icon) ? (
+                      <img
+                        src={token.icon}
+                        alt={token.symbol}
+                        className="w-7 h-7 rounded-full"
+                        onError={(e) => {
+                          console.log(
+                            `❌ Image load failed for ${token.symbol}: ${token.icon}`
+                          );
+                          // Fallback to colored circle if image fails
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          const fallback =
+                            target.nextElementSibling as HTMLElement;
+                          if (fallback) {
+                            fallback.classList.remove("hidden");
+                          }
+                        }}
+                      />
+                    ) : null}
+
                     <div
-                      className={`w-8 h-8 ${getTokenBackgroundColor(
+                      className={`w-7 h-7 ${getTokenIcon(
                         token.symbol,
                         token.contractAddress
-                      )} rounded-full flex items-center justify-center mr-2.5 flex-shrink-0 p-0.5`}
+                      )} rounded-full flex items-center justify-center ${
+                        isValidImageUrl(token.icon) ? "hidden" : ""
+                      }`}
                     >
-                      {/* UPDATED: Better icon handling with background */}
-                      {isValidImageUrl(token.icon) ? (
-                        <img
-                          src={token.icon}
-                          alt={token.symbol}
-                          className="w-7 h-7 rounded-full"
-                          onError={(e) => {
-                            console.log(
-                              `❌ Image load failed for ${token.symbol}: ${token.icon}`
-                            );
-                            // Fallback to colored circle if image fails
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = "none";
-                            const fallback =
-                              target.nextElementSibling as HTMLElement;
-                            if (fallback) {
-                              fallback.classList.remove("hidden");
-                            }
-                          }}
-                        />
-                      ) : null}
-
-                      <div
-                        className={`w-7 h-7 ${getTokenIcon(
-                          token.symbol,
-                          token.contractAddress
-                        )} rounded-full flex items-center justify-center ${
-                          isValidImageUrl(token.icon) ? "hidden" : ""
-                        }`}
-                      >
-                        <span className="text-white text-xs font-medium">
-                          {getTokenLetter(token.symbol, token.contractAddress)}
-                        </span>
-                      </div>
+                      <span className="text-white text-xs font-medium">
+                        {getTokenLetter(token.symbol, token.contractAddress)}
+                      </span>
                     </div>
-                  )}
+                  </div>
 
                   <div className="min-w-0">
                     <div className="text-white font-medium font-satoshi text-sm">
@@ -483,58 +476,53 @@ export default function TokenList() {
               key={token.id}
               onClick={() => handleTokenClick(token)}
               className={`flex items-center justify-between p-2.5 rounded-lg transition-colors ${
-                isNavigating
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-[#1A1A1A] cursor-pointer active:bg-[#2A2A2A]"
+                // REMOVED: isNavigating check since we show skeleton instead
+                "hover:bg-[#1A1A1A] cursor-pointer active:bg-[#2A2A2A]"
               }`}
             >
               <div className="flex items-center min-w-0 flex-1">
-                {/* Show loading spinner if navigating */}
-                {isNavigating ? (
-                  <RefreshCw className="w-9 h-9 text-[#E2AF19] animate-spin mr-2.5 flex-shrink-0" />
-                ) : (
+                {/* REMOVED: Navigation loading spinner - skeleton handles this now */}
+                <div
+                  className={`w-10 h-10 ${getTokenBackgroundColor(
+                    token.symbol,
+                    token.contractAddress
+                  )} rounded-full flex items-center justify-center mr-2.5 flex-shrink-0 p-0.5`}
+                >
+                  {/* UPDATED: Better icon handling with background */}
+                  {isValidImageUrl(token.icon) ? (
+                    <img
+                      src={token.icon}
+                      alt={token.symbol}
+                      className="w-9 h-9 rounded-full"
+                      onError={(e) => {
+                        console.log(
+                          `❌ Image load failed for ${token.symbol}: ${token.icon}`
+                        );
+                        // Fallback to colored circle if image fails
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                        const fallback =
+                          target.nextElementSibling as HTMLElement;
+                        if (fallback) {
+                          fallback.classList.remove("hidden");
+                        }
+                      }}
+                    />
+                  ) : null}
+
                   <div
-                    className={`w-10 h-10 ${getTokenBackgroundColor(
+                    className={`w-9 h-9 ${getTokenIcon(
                       token.symbol,
                       token.contractAddress
-                    )} rounded-full flex items-center justify-center mr-2.5 flex-shrink-0 p-0.5`}
+                    )} rounded-full flex items-center justify-center ${
+                      isValidImageUrl(token.icon) ? "hidden" : ""
+                    }`}
                   >
-                    {/* UPDATED: Better icon handling with background */}
-                    {isValidImageUrl(token.icon) ? (
-                      <img
-                        src={token.icon}
-                        alt={token.symbol}
-                        className="w-9 h-9 rounded-full"
-                        onError={(e) => {
-                          console.log(
-                            `❌ Image load failed for ${token.symbol}: ${token.icon}`
-                          );
-                          // Fallback to colored circle if image fails
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = "none";
-                          const fallback =
-                            target.nextElementSibling as HTMLElement;
-                          if (fallback) {
-                            fallback.classList.remove("hidden");
-                          }
-                        }}
-                      />
-                    ) : null}
-
-                    <div
-                      className={`w-9 h-9 ${getTokenIcon(
-                        token.symbol,
-                        token.contractAddress
-                      )} rounded-full flex items-center justify-center ${
-                        isValidImageUrl(token.icon) ? "hidden" : ""
-                      }`}
-                    >
-                      <span className="text-white text-sm font-medium">
-                        {getTokenLetter(token.symbol, token.contractAddress)}
-                      </span>
-                    </div>
+                    <span className="text-white text-sm font-medium">
+                      {getTokenLetter(token.symbol, token.contractAddress)}
+                    </span>
                   </div>
-                )}
+                </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="text-white font-medium font-satoshi text-sm sm:text-sm flex items-center">

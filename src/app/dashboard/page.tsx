@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED VERSION WITH BETTER WALLET SWITCHING
+// src/app/dashboard/page.tsx - FIXED VERSION WITH BETTER WALLET SWITCHING (NOTIFICATIONS DISABLED)
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -21,7 +21,8 @@ import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
 import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
-import RealtimeDashboardNotifications from "@/components/notifications/RealtimeDashboardNotifications";
+// COMMENTED OUT: Remove the real-time dashboard notifications component
+// import RealtimeDashboardNotifications from "@/components/notifications/RealtimeDashboardNotifications";
 import {
   SkeletonWalletBalance,
   SkeletonTokenList,
@@ -104,7 +105,7 @@ export default function DashboardPage() {
     currentWalletAddress: null as string | null,
   });
 
-  // Real-time dashboard hook
+  // Real-time dashboard hook (KEEPING FUNCTIONALITY BUT DISABLING NOTIFICATIONS)
   const {
     data: realtimeData,
     isMonitoring,
@@ -480,7 +481,8 @@ export default function DashboardPage() {
   if (shouldShowSkeleton) {
     return (
       <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
-        <RealtimeDashboardNotifications />
+        {/* COMMENTED OUT: Remove the real-time dashboard notifications */}
+        {/* <RealtimeDashboardNotifications /> */}
 
         {/* Mobile Layout Skeleton */}
         <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0">
@@ -510,7 +512,8 @@ export default function DashboardPage() {
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
-      <RealtimeDashboardNotifications />
+      {/* COMMENTED OUT: Remove the real-time dashboard notifications */}
+      {/* <RealtimeDashboardNotifications /> */}
 
       {/* Main Dashboard Content */}
       {wallets.length > 0 ? (

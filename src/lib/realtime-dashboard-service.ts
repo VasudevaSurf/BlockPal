@@ -1,4 +1,4 @@
-// src/lib/realtime-dashboard-service.ts - Enhanced Real-time dashboard service
+// src/lib/realtime-dashboard-service.ts - Enhanced Real-time dashboard service (NOTIFICATIONS DISABLED)
 import { EventEmitter } from "events";
 
 export interface DashboardData {
@@ -24,6 +24,7 @@ export interface RealtimeDashboardConfig {
   maxRetries: number;
   enableBackgroundRefresh: boolean;
   enableVisibilityDetection: boolean; // Pause when tab is not visible
+  enableNotifications: boolean; // NEW: Control notifications
 }
 
 export class RealtimeDashboardService extends EventEmitter {
@@ -41,6 +42,7 @@ export class RealtimeDashboardService extends EventEmitter {
     maxRetries: 3,
     enableBackgroundRefresh: true,
     enableVisibilityDetection: true,
+    enableNotifications: false, // DISABLED: Turn off notifications by default
   };
 
   constructor(config?: Partial<RealtimeDashboardConfig>) {
@@ -209,27 +211,27 @@ export class RealtimeDashboardService extends EventEmitter {
             : 0,
         });
 
-        // Emit specific change events
-        if (previousData) {
-          if (newDashboardData.totalValue > previousData.totalValue) {
-            this.emit("portfolio_increased", {
-              data: newDashboardData,
-              increase: newDashboardData.totalValue - previousData.totalValue,
-            });
-          } else if (newDashboardData.totalValue < previousData.totalValue) {
-            this.emit("portfolio_decreased", {
-              data: newDashboardData,
-              decrease: previousData.totalValue - newDashboardData.totalValue,
-            });
-          }
-
-          if (newDashboardData.tokens.length !== previousData.tokens.length) {
-            this.emit("token_count_changed", {
-              data: newDashboardData,
-              previousCount: previousData.tokens.length,
-              newCount: newDashboardData.tokens.length,
-            });
-          }
+        // COMMENTED OUT: Disable specific change event notifications
+        // These events are what trigger the pop-up notifications
+        if (this.config.enableNotifications && previousData) {
+          // if (newDashboardData.totalValue > previousData.totalValue) {
+          //   this.emit("portfolio_increased", {
+          //     data: newDashboardData,
+          //     increase: newDashboardData.totalValue - previousData.totalValue,
+          //   });
+          // } else if (newDashboardData.totalValue < previousData.totalValue) {
+          //   this.emit("portfolio_decreased", {
+          //     data: newDashboardData,
+          //     decrease: previousData.totalValue - newDashboardData.totalValue,
+          //   });
+          // }
+          // if (newDashboardData.tokens.length !== previousData.tokens.length) {
+          //   this.emit("token_count_changed", {
+          //     data: newDashboardData,
+          //     previousCount: previousData.tokens.length,
+          //     newCount: newDashboardData.tokens.length,
+          //   });
+          // }
         }
       } else if (!isBackground) {
         console.log("📊 Dashboard data unchanged");
@@ -248,7 +250,8 @@ export class RealtimeDashboardService extends EventEmitter {
         setTimeout(() => this.fetchDashboardData(isBackground), 5000);
       } else {
         console.error("❌ Max retries reached for dashboard fetch");
-        this.emit("fetch_error", { error, retryCount: this.retryCount });
+        // COMMENTED OUT: Disable error notifications too
+        // this.emit("fetch_error", { error, retryCount: this.retryCount });
       }
     }
   }
@@ -337,6 +340,12 @@ export class RealtimeDashboardService extends EventEmitter {
     }
   }
 
+  // Enable/disable notifications
+  enableNotifications(enabled: boolean) {
+    this.config.enableNotifications = enabled;
+    console.log(`🔔 Notifications ${enabled ? "enabled" : "disabled"}`);
+  }
+
   // Check if monitoring is active
   isActive(): boolean {
     return this.isPolling || !!this.backgroundInterval;
@@ -356,6 +365,7 @@ export class RealtimeDashboardService extends EventEmitter {
       dataAge: this.dashboardData
         ? Date.now() - this.dashboardData.lastUpdated.getTime()
         : null,
+      notificationsEnabled: this.config.enableNotifications,
     };
   }
 
@@ -370,11 +380,12 @@ export class RealtimeDashboardService extends EventEmitter {
   }
 }
 
-// Export singleton instance
+// Export singleton instance with notifications disabled
 export const realtimeDashboardService = new RealtimeDashboardService({
   pollInterval: 10000, // 10 seconds - faster for better real-time experience
   backgroundRefreshInterval: 15000, // 15 seconds for background
   enableBackgroundRefresh: true,
   enableVisibilityDetection: true,
   maxRetries: 3,
+  enableNotifications: false, // DISABLED: Turn off all pop-up notifications
 });

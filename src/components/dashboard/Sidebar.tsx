@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - COMPACT VERSION
+// src/components/dashboard/Sidebar.tsx - FIXED VERSION (No refresh icons during navigation)
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -172,6 +172,8 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       className="relative w-full lg:w-64 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
       style={{ borderRadius: "16px" }}
     >
+      {/* REMOVED: No loading overlay - just disable interactions during navigation */}
+
       {/* Top Gradient Blur */}
       <div
         className="absolute -top-1 lg:-top-3 -left-1 lg:-left-3 -right-1 lg:-right-3 h-24 lg:h-48 pointer-events-none z-10"
@@ -216,17 +218,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
             }}
           />
         </div>
-
-        {/* Navigations Section with Lines - Hidden on mobile, shown on lg+ */}
-        {/* <div className="mb-3 lg:mb-4 hidden lg:block">
-          <div className="flex items-center mb-3">
-            <div className="flex-1 h-px bg-[#DCDCDC]"></div>
-            <span className="px-3 text-xs font-medium text-gray-300 font-satoshi">
-              Navigations
-            </span>
-            <div className="flex-1 h-px bg-[#DCDCDC]"></div>
-          </div>
-        </div> */}
       </div>
 
       {/* Navigation Menu */}
@@ -247,20 +238,14 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                     : isDisabled
                     ? "text-gray-500 cursor-not-allowed opacity-50"
                     : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
-                } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                } ${isLoading ? "pointer-events-none" : ""}`}
               >
-                {isLoading && pathname !== item.href ? (
-                  <RefreshCw
-                    size={16}
-                    className="mr-3 flex-shrink-0 animate-spin"
-                  />
-                ) : (
-                  <item.icon
-                    size={16}
-                    className="mr-3 flex-shrink-0"
-                    filled={isActive}
-                  />
-                )}
+                {/* REMOVED: Individual loading spinners - now handled by overlay */}
+                <item.icon
+                  size={16}
+                  className="mr-3 flex-shrink-0"
+                  filled={isActive}
+                />
                 <span className={isActive ? "font-medium" : ""}>
                   {item.label}
                 </span>
@@ -303,16 +288,10 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                       : isProfileDisabled
                       ? "text-gray-500 cursor-not-allowed opacity-50"
                       : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
-                  } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  } ${isLoading ? "pointer-events-none" : ""}`}
                 >
-                  {isLoading && pathname !== item.href ? (
-                    <RefreshCw
-                      size={16}
-                      className="mr-3 flex-shrink-0 animate-spin"
-                    />
-                  ) : (
-                    <item.icon size={16} className="mr-3 flex-shrink-0" />
-                  )}
+                  {/* REMOVED: Individual loading spinners - now handled by overlay */}
+                  <item.icon size={16} className="mr-3 flex-shrink-0" />
                   <span className={isActive ? "font-medium" : ""}>
                     {item.label}
                   </span>
@@ -325,7 +304,8 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                   disabled={isLoading}
                   title="Logout"
                 >
-                  {isLoading ? (
+                  {/* FIXED: Only show spinner for logout action, not general navigation */}
+                  {isLoading && pathname === "/auth" ? (
                     <RefreshCw
                       size={14}
                       className="animate-spin"

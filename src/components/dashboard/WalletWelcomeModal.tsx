@@ -593,7 +593,7 @@ export default function WalletWelcomeModal({
         <span className="text-white text-xl">✓</span>
       </div>
       <h2 className="text-xl font-bold text-white font-mayeka mb-1.5">
-        Wallet Setup Complete! 🎉
+        Wallet Setup Complete!
       </h2>
       <p className="text-gray-400 font-satoshi mb-4">
         Your wallet has been successfully set up and is ready to use.
@@ -628,12 +628,12 @@ export default function WalletWelcomeModal({
               </div>
             )}
           </div>
-          <div className="mt-3 p-2.5 bg-yellow-900/20 border border-yellow-500/50 rounded-lg">
+          {/* <div className="mt-3 p-2.5 bg-yellow-900/20 border border-yellow-500/50 rounded-lg">
             <p className="text-yellow-400 text-xs font-satoshi">
               ⚠️ Save these details in a secure place. You'll need them to
               recover your wallet.
             </p>
-          </div>
+          </div> */}
         </div>
       )}
 
