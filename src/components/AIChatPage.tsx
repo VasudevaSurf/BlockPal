@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx - Concise Version with Fixed Conversation Panel
+// src/components/AIChatPage.tsx - Updated for seamless header integration
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Plus,
+  MessageCircle,
 } from "lucide-react";
 import { RootState } from "@/store";
 import { SkeletonAIChat } from "@/components/ui/Skeleton";
@@ -55,7 +56,6 @@ export default function AIChatPage() {
         const saved = localStorage.getItem("ai-chat-conversations");
         if (saved) {
           const parsed = JSON.parse(saved);
-          // Ensure all conversations have proper timestamps
           const fixedConversations = parsed.map((conv) => ({
             ...conv,
             timestamp:
@@ -103,13 +103,12 @@ export default function AIChatPage() {
           messages[messages.length - 1]?.content?.slice(0, 60) + "...",
         timestamp: now,
         messageCount: messages.length,
-        createdAt: now, // Ensure createdAt is always set
+        createdAt: now,
       };
 
       setConversations((prev) => {
         const existing = prev.findIndex((conv) => conv.id === sessionId);
         if (existing >= 0) {
-          // Keep original createdAt but update timestamp
           const updated = prev.map((conv, i) =>
             i === existing
               ? { ...currentConversation, createdAt: conv.createdAt || now }
@@ -121,7 +120,6 @@ export default function AIChatPage() {
           );
           return updated;
         } else {
-          // New conversation
           const updated = [currentConversation, ...prev];
           localStorage.setItem(
             "ai-chat-conversations",
@@ -146,7 +144,7 @@ export default function AIChatPage() {
 
       const target = event.target as Element;
       const sidebar = document.querySelector('[data-sidebar="true"]');
-      const hamburger = document.getElementById("hamburger-button");
+      const hamburger = document.getElementById("chat-hamburger-button");
 
       if (
         sidebar &&
@@ -172,13 +170,11 @@ export default function AIChatPage() {
       if (timestamp instanceof Date) {
         date = timestamp;
       } else if (typeof timestamp === "string") {
-        // Handle both ISO strings and timestamps
         date = new Date(timestamp);
       } else {
         return "Unknown";
       }
 
-      // Check if date is valid
       if (isNaN(date.getTime())) {
         return "Unknown";
       }
@@ -194,7 +190,6 @@ export default function AIChatPage() {
       if (hours < 24) return `${hours}h ago`;
       if (days < 7) return `${days}d ago`;
 
-      // For older dates, show formatted date
       return date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -263,7 +258,6 @@ export default function AIChatPage() {
 
     if (!sessionId) setSessionId(Date.now().toString());
 
-    // Add processing message
     const processingId = (Date.now() + 1).toString();
     setMessages((prev) => [
       ...prev,
@@ -278,7 +272,6 @@ export default function AIChatPage() {
     ]);
 
     try {
-      // Handle special commands
       if (currentInput.toLowerCase().trim() === "clear") {
         setMessages([]);
         setSessionId("");
@@ -308,7 +301,6 @@ export default function AIChatPage() {
         return;
       }
 
-      // Call AI API
       const response = await fetch("/api/ai-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -435,7 +427,7 @@ export default function AIChatPage() {
 
   return (
     <div className="h-full relative bg-[#0F0F0F] flex">
-      {/* Overlay Background - Same as scheduled payments */}
+      {/* Overlay Background */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-white/10 z-30"
@@ -443,7 +435,7 @@ export default function AIChatPage() {
         />
       )}
 
-      {/* Conversation Sidebar - Starts from AIChatPage */}
+      {/* Conversation Sidebar */}
       <div
         data-sidebar="true"
         className={`relative z-40 transform transition-all duration-300 ease-in-out bg-gradient-to-b from-[#1a1a1a] to-[#141414] border border-[#2C2C2C] rounded-xl ${
@@ -452,11 +444,11 @@ export default function AIChatPage() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="h-full flex flex-col">
-          {/* Header */}
+          {/* Sidebar Header */}
           <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-[#E2AF19]/10 rounded-lg">
-                <Brain className="text-[#E2AF19]" size={20} />
+                <MessageCircle className="text-[#E2AF19]" size={20} />
               </div>
               <div>
                 <span className="text-white font-satoshi font-bold text-lg">
@@ -493,7 +485,7 @@ export default function AIChatPage() {
             </div>
 
             <div className="space-y-2">
-              {/* Current Session - Always show if active */}
+              {/* Current Session */}
               {messages.length > 0 && sessionId && (
                 <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer">
                   <div className="flex items-center space-x-2 mb-1">
@@ -516,7 +508,7 @@ export default function AIChatPage() {
                 </div>
               )}
 
-              {/* Saved Conversations - Exclude current session */}
+              {/* Saved Conversations */}
               {conversations
                 .filter((conv) => conv.id !== sessionId)
                 .map((conversation) => (
@@ -577,23 +569,33 @@ export default function AIChatPage() {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <div className="flex-shrink-0 p-4 border-b border-[#2C2C2C]">
-          <div className="flex items-center space-x-3">
+        {/* Chat Sub-Header - Only for mobile to show history button */}
+        <div className="lg:hidden flex-shrink-0 p-3 border-b border-[#2C2C2C]/30 bg-gradient-to-r from-[#0F0F0F] to-[#1a1a1a]">
+          <div className="flex items-center justify-between">
             <button
-              id="hamburger-button"
+              id="chat-hamburger-button"
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+              className="flex items-center space-x-2 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
             >
-              <Menu size={16} className="text-gray-400" />
+              <MessageCircle size={16} className="text-[#E2AF19]" />
+              <span className="text-white text-sm font-satoshi">
+                Chat History
+              </span>
             </button>
-            <div className="flex items-center space-x-2">
-              <Brain className="text-[#E2AF19]" size={20} />
-              <h1 className="text-lg font-satoshi font-bold text-white">
-                BlockPal AI
-              </h1>
-            </div>
           </div>
+        </div>
+
+        {/* Desktop Chat History Button */}
+        <div className="hidden lg:flex items-center justify-between px-4 border-b border-[#2C2C2C]/30">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="flex items-center space-x-2 p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+          >
+            <MessageCircle size={16} className="text-[#E2AF19]" />
+            <span className="text-white text-sm font-satoshi">
+              Chat History
+            </span>
+          </button>
         </div>
 
         {/* Messages */}

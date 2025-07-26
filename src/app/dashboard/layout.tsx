@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED WITH CONDITIONAL HEADER RENDERING
+// src/app/dashboard/layout.tsx - UPDATED TO ALWAYS SHOW HEADER
 "use client";
 
 import { useSelector } from "react-redux";
@@ -22,8 +22,8 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  // Check if we should hide the header (for AI chat page)
-  const shouldHideHeader = pathname === "/dashboard/ai-chat";
+  // Check if we're on AI chat page for special styling
+  const isAIChatPage = pathname === "/dashboard/ai-chat";
 
   return (
     <NavigationLoadingProvider>
@@ -31,24 +31,30 @@ export default function DashboardLayout({
         {/* Navigation Loading Indicator */}
         <NavigationLoadingIndicator />
 
-        {/* Mobile Header - Only show when header is not hidden */}
-        {!shouldHideHeader && (
-          <div className="lg:hidden flex items-center justify-between p-4 bg-black rounded-[16px] mb-3 border border-[#2C2C2C]">
-            <div className="flex items-center">
-              <img
-                src="/blockName.png"
-                alt="Blockpal"
-                className="h-6 brightness-110"
-              />
-            </div>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
-            >
-              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
+        {/* Mobile Header - Always show */}
+        <div className="lg:hidden flex items-center justify-between p-4 bg-black rounded-[16px] mb-3 border border-[#2C2C2C]">
+          <div className="flex items-center">
+            <img
+              src="/blockName.png"
+              alt="Blockpal"
+              className="h-6 brightness-110"
+            />
+            {isAIChatPage && (
+              <div className="ml-3 flex items-center space-x-2">
+                <div className="w-1 h-4 bg-[#E2AF19] rounded-full"></div>
+                <span className="text-[#E2AF19] text-sm font-satoshi font-medium">
+                  AI Chat
+                </span>
+              </div>
+            )}
           </div>
-        )}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
 
         {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
@@ -70,20 +76,22 @@ export default function DashboardLayout({
 
         {/* Main Content */}
         <main className="flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col">
-          {/* Conditional Global Header */}
-          {!shouldHideHeader && (
-            <div className="flex-shrink-0 bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] sm:p-4 lg:p-5">
-              <GlobalDashboardHeader
-                title="Dashboard"
-                subtitle="Welcome back"
-              />
-            </div>
-          )}
+          {/* Global Header - Always show */}
+          <div className="flex-shrink-0 bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] sm:p-4 lg:p-5">
+            <GlobalDashboardHeader
+              title={isAIChatPage ? "AI Assistant" : "Dashboard"}
+              subtitle={
+                isAIChatPage
+                  ? "Powered by advanced blockchain analysis"
+                  : "Welcome back"
+              }
+            />
+          </div>
 
           {/* Content Area */}
           <div
             className={`flex-1 min-h-0 overflow-hidden ${
-              shouldHideHeader ? "p-0" : ""
+              isAIChatPage ? "p-0 mt-0" : ""
             }`}
           >
             {children}
