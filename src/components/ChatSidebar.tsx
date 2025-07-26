@@ -3,29 +3,29 @@
 
 import { useState, useEffect } from "react";
 import {
-  MessageSquare,
-  Plus,
-  Trash2,
-  Clock,
-  Brain,
-  Search,
   X,
+  Plus,
+  MessageSquare,
+  Clock,
+  Trash2,
+  Search,
+  History,
+  Archive,
 } from "lucide-react";
 
 interface ChatSession {
   id: string;
-  userId: string;
   title: string;
   lastMessage: string;
   lastActivity: Date;
   messageCount: number;
-  isActive?: boolean;
+  createdAt: Date;
 }
 
 interface ChatSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  activeSessionId: string | null;
+  activeSessionId: string;
   onSessionSelect: (sessionId: string) => void;
   onNewChat: () => void;
   currentUser: string;
@@ -41,7 +41,8 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredSessions, setFilteredSessions] = useState<ChatSession[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -49,9 +50,22 @@ export default function ChatSidebar({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filtered = sessions.filter(
+        (session) =>
+          session.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          session.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredSessions(filtered);
+    } else {
+      setFilteredSessions(sessions);
+    }
+  }, [searchQuery, sessions]);
+
   const loadSessions = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const response = await fetch("/api/ai-chat/sessions", {
         credentials: "include",
       });
@@ -59,6 +73,8 @@ export default function ChatSidebar({
       if (response.ok) {
         const data = await response.json();
         setSessions(data.sessions || []);
+      } else {
+        console.error("Failed to load sessions");
       }
     } catch (error) {
       console.error("Error loading sessions:", error);
@@ -67,13 +83,7 @@ export default function ChatSidebar({
     }
   };
 
-  const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!confirm("Are you sure you want to delete this conversation?")) {
-      return;
-    }
-
+  const deleteSession = async (sessionId: string) => {
     try {
       const response = await fetch(`/api/ai-chat/sessions/${sessionId}`, {
         method: "DELETE",
@@ -81,8 +91,9 @@ export default function ChatSidebar({
       });
 
       if (response.ok) {
-        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-        if (activeSessionId === sessionId) {
+        setSessions(sessions.filter((s) => s.id !== sessionId));
+        // If deleting current session, start new chat
+        if (sessionId === activeSessionId) {
           onNewChat();
         }
       }
@@ -91,64 +102,76 @@ export default function ChatSidebar({
     }
   };
 
-  const formatRelativeTime = (date: Date) => {
+  const formatTimeAgo = (date: Date) => {
     const now = new Date();
-    const diffMs = now.getTime() - new Date(date).getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const diffInMs = now.getTime() - new Date(date).getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
     return new Date(date).toLocaleDateString();
   };
 
-  const generateTitle = (lastMessage: string) => {
-    if (!lastMessage) return "New Conversation";
-
-    // Extract meaningful title from first user message
-    const cleaned = lastMessage
-      .replace(/^(hi|hello|hey|analyze|check|tell me about)/i, "")
-      .trim();
-
-    if (cleaned.length > 30) {
-      return cleaned.substring(0, 30) + "...";
-    }
-
-    return cleaned || "New Conversation";
+  const truncateText = (text: string, maxLength: number) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
   };
 
-  const filteredSessions = sessions.filter(
-    (session) =>
-      session.lastMessage.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      generateTitle(session.lastMessage)
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-  );
+  const groupSessionsByTime = (sessions: ChatSession[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const groups = {
+      today: sessions.filter((s) => new Date(s.lastActivity) >= today),
+      yesterday: sessions.filter(
+        (s) =>
+          new Date(s.lastActivity) >= yesterday &&
+          new Date(s.lastActivity) < today
+      ),
+      lastWeek: sessions.filter(
+        (s) =>
+          new Date(s.lastActivity) >= lastWeek &&
+          new Date(s.lastActivity) < yesterday
+      ),
+      older: sessions.filter((s) => new Date(s.lastActivity) < lastWeek),
+    };
+
+    return groups;
+  };
 
   if (!isOpen) return null;
 
+  const groupedSessions = groupSessionsByTime(filteredSessions);
+
   return (
-    <div className="fixed inset-0 z-50 lg:relative lg:inset-auto">
-      {/* Mobile backdrop */}
-      <div className="fixed inset-0 bg-black/50 lg:hidden" onClick={onClose} />
+    <>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+        onClick={onClose}
+      />
 
       {/* Sidebar */}
-      <div className="fixed left-0 top-0 h-full w-80 bg-[#0F0F0F] border-r border-[#2C2C2C] flex flex-col lg:relative lg:w-80">
+      <div
+        className={`fixed top-0 left-0 h-full w-80 bg-[#1a1a1a] border-r border-[#2c2c2c] z-50 transform transition-transform duration-300 ease-in-out ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        } lg:relative lg:translate-x-0`}
+      >
         {/* Header */}
-        <div className="p-4 border-b border-[#2C2C2C]">
+        <div className="p-4 border-b border-[#2c2c2c]">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              <Brain className="text-[#E2AF19]" size={20} />
-              <h2 className="text-lg font-satoshi font-bold text-white">
-                AI Conversations
-              </h2>
-            </div>
+            <h2 className="text-lg font-satoshi font-bold text-white">
+              Chat History
+            </h2>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-[#2C2C2C] rounded lg:hidden"
+              className="p-1 hover:bg-[#2c2c2c] rounded-lg transition-colors lg:hidden"
             >
               <X size={16} className="text-gray-400" />
             </button>
@@ -156,18 +179,15 @@ export default function ChatSidebar({
 
           {/* New Chat Button */}
           <button
-            onClick={() => {
-              onNewChat();
-              onClose();
-            }}
-            className="w-full bg-[#E2AF19] hover:bg-[#D4A853] text-black px-4 py-2 rounded-lg font-satoshi font-medium transition-colors flex items-center justify-center space-x-2"
+            onClick={onNewChat}
+            className="w-full flex items-center justify-center gap-2 p-3 bg-[#E2AF19] text-black rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi font-medium"
           >
             <Plus size={16} />
-            <span>New Conversation</span>
+            New Chat
           </button>
 
           {/* Search */}
-          <div className="relative mt-3">
+          <div className="mt-3 relative">
             <Search
               size={16}
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -175,9 +195,9 @@ export default function ChatSidebar({
             <input
               type="text"
               placeholder="Search conversations..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#1a1a1a] border border-[#2C2C2C] rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#0f0f0f] text-white placeholder-gray-400 pl-10 pr-4 py-2 rounded-lg border border-[#2c2c2c] focus:border-[#E2AF19] focus:outline-none text-sm font-satoshi"
             />
           </div>
         </div>
@@ -185,85 +205,199 @@ export default function ChatSidebar({
         {/* Sessions List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="p-4 space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-[#1a1a1a] rounded-lg p-3 animate-pulse"
-                >
-                  <div className="h-4 bg-[#2C2C2C] rounded mb-2" />
-                  <div className="h-3 bg-[#2C2C2C] rounded w-3/4" />
-                </div>
-              ))}
+            <div className="p-4">
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
+              </div>
             </div>
           ) : filteredSessions.length === 0 ? (
             <div className="p-4 text-center text-gray-400">
-              {searchTerm ? "No conversations found" : "No conversations yet"}
+              <MessageSquare size={24} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-satoshi">
+                {searchQuery
+                  ? "No matching conversations"
+                  : "No conversations yet"}
+              </p>
+              <p className="text-xs mt-1">
+                {searchQuery
+                  ? "Try different keywords"
+                  : "Start a new chat to begin"}
+              </p>
             </div>
           ) : (
-            <div className="p-2 space-y-1">
-              {filteredSessions.map((session) => (
-                <div
-                  key={session.id}
-                  onClick={() => {
-                    onSessionSelect(session.id);
-                    onClose();
-                  }}
-                  className={`group relative p-3 rounded-lg cursor-pointer transition-colors ${
-                    activeSessionId === session.id
-                      ? "bg-[#E2AF19]/10 border border-[#E2AF19]/30"
-                      : "bg-[#1a1a1a] hover:bg-[#2a2a2a] border border-transparent"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <MessageSquare
-                          size={14}
-                          className="text-[#E2AF19] flex-shrink-0"
-                        />
-                        <h3 className="text-sm font-satoshi font-medium text-white truncate">
-                          {generateTitle(session.lastMessage)}
-                        </h3>
-                      </div>
-
-                      <p className="text-xs text-gray-400 truncate mb-2">
-                        {session.lastMessage || "No messages yet"}
-                      </p>
-
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <Clock size={10} />
-                          <span>
-                            {formatRelativeTime(session.lastActivity)}
-                          </span>
-                        </div>
-                        <span>{session.messageCount} messages</span>
-                      </div>
-                    </div>
-
-                    {/* Delete Button */}
-                    <button
-                      onClick={(e) => deleteSession(session.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-all"
-                      title="Delete conversation"
-                    >
-                      <Trash2 size={12} className="text-red-400" />
-                    </button>
-                  </div>
+            <div className="p-2">
+              {/* Today */}
+              {groupedSessions.today.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-xs font-satoshi font-medium text-gray-400 uppercase tracking-wide px-2 mb-2">
+                    Today
+                  </h3>
+                  {groupedSessions.today.map((session) => (
+                    <SessionItem
+                      key={session.id}
+                      session={session}
+                      isActive={session.id === activeSessionId}
+                      onSelect={() => onSessionSelect(session.id)}
+                      onDelete={() => deleteSession(session.id)}
+                    />
+                  ))}
                 </div>
-              ))}
+              )}
+
+              {/* Yesterday */}
+              {groupedSessions.yesterday.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-xs font-satoshi font-medium text-gray-400 uppercase tracking-wide px-2 mb-2">
+                    Yesterday
+                  </h3>
+                  {groupedSessions.yesterday.map((session) => (
+                    <SessionItem
+                      key={session.id}
+                      session={session}
+                      isActive={session.id === activeSessionId}
+                      onSelect={() => onSessionSelect(session.id)}
+                      onDelete={() => deleteSession(session.id)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Last Week */}
+              {groupedSessions.lastWeek.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-xs font-satoshi font-medium text-gray-400 uppercase tracking-wide px-2 mb-2">
+                    Last 7 Days
+                  </h3>
+                  {groupedSessions.lastWeek.map((session) => (
+                    <SessionItem
+                      key={session.id}
+                      session={session}
+                      isActive={session.id === activeSessionId}
+                      onSelect={() => onSessionSelect(session.id)}
+                      onDelete={() => deleteSession(session.id)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Older */}
+              {groupedSessions.older.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-xs font-satoshi font-medium text-gray-400 uppercase tracking-wide px-2 mb-2">
+                    Older
+                  </h3>
+                  {groupedSessions.older.map((session) => (
+                    <SessionItem
+                      key={session.id}
+                      session={session}
+                      isActive={session.id === activeSessionId}
+                      onSelect={() => onSessionSelect(session.id)}
+                      onDelete={() => deleteSession(session.id)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#2C2C2C]">
-          <div className="text-xs text-gray-500 text-center">
-            {sessions.length} conversation{sessions.length !== 1 ? "s" : ""}
+        <div className="p-4 border-t border-[#2c2c2c]">
+          <div className="flex items-center gap-2 text-xs text-gray-400 font-satoshi">
+            <History size={12} />
+            <span>{sessions.length} conversations</span>
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+interface SessionItemProps {
+  session: ChatSession;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}
+
+function SessionItem({
+  session,
+  isActive,
+  onSelect,
+  onDelete,
+}: SessionItemProps) {
+  const [showActions, setShowActions] = useState(false);
+
+  return (
+    <div
+      className={`group relative mb-1 rounded-lg p-3 cursor-pointer transition-all duration-200 ${
+        isActive ? "bg-[#E2AF19] text-black" : "hover:bg-[#2c2c2c] text-white"
+      }`}
+      onClick={onSelect}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <h4
+            className={`text-sm font-satoshi font-medium mb-1 truncate ${
+              isActive ? "text-black" : "text-white"
+            }`}
+          >
+            {session.title}
+          </h4>
+          <p
+            className={`text-xs mb-2 truncate ${
+              isActive ? "text-black opacity-70" : "text-gray-400"
+            }`}
+          >
+            {session.lastMessage}
+          </p>
+          <div className="flex items-center justify-between">
+            <span
+              className={`text-xs ${
+                isActive ? "text-black opacity-60" : "text-gray-500"
+              }`}
+            >
+              {formatTimeAgo(session.lastActivity)}
+            </span>
+            <span
+              className={`text-xs ${
+                isActive ? "text-black opacity-60" : "text-gray-500"
+              }`}
+            >
+              {session.messageCount} msgs
+            </span>
+          </div>
+        </div>
+
+        {/* Delete Button */}
+        {showActions && !isActive && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="ml-2 p-1 hover:bg-red-500 hover:bg-opacity-20 rounded transition-colors"
+          >
+            <Trash2 size={12} className="text-red-400 hover:text-red-300" />
+          </button>
+        )}
+      </div>
     </div>
   );
+
+  function formatTimeAgo(date: Date): string {
+    const now = new Date();
+    const diffInMs = now.getTime() - new Date(date).getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    return new Date(date).toLocaleDateString();
+  }
 }

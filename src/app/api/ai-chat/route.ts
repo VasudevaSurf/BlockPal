@@ -1,4 +1,4 @@
-// src/app/api/ai-chat/route.ts
+// src/app/api/ai-chat/route.ts - COMPLETE ENHANCED IMPLEMENTATION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -38,6 +38,13 @@ const CONFIG = {
     MORALIS: {
       BASE_URL: "https://deep-index.moralis.io/api/v2.2",
       API_KEY: process.env.MORALIS_API_KEY,
+    },
+    DEXSCREENER: {
+      BASE_URL: "https://api.dexscreener.com/latest",
+    },
+    GOPLUS: {
+      BASE_URL: "https://api.gopluslabs.io/api/v1",
+      API_KEY: process.env.GOPLUS_LABS_API_KEY,
     },
   },
 };
@@ -140,9 +147,7 @@ class BlockPalAIService {
       await sessionsCollection.createIndex({ userId: 1 });
       await sessionsCollection.createIndex(
         { lastActivity: 1 },
-        {
-          expireAfterSeconds: CONFIG.SESSION_TIMEOUT_HOURS * 3600,
-        }
+        { expireAfterSeconds: CONFIG.SESSION_TIMEOUT_HOURS * 3600 }
       );
 
       const messagesCollection = this.db.collection(
@@ -152,9 +157,7 @@ class BlockPalAIService {
       await messagesCollection.createIndex({ userId: 1, timestamp: -1 });
       await messagesCollection.createIndex(
         { lastActivity: 1 },
-        {
-          expireAfterSeconds: CONFIG.SESSION_TIMEOUT_HOURS * 3600,
-        }
+        { expireAfterSeconds: CONFIG.SESSION_TIMEOUT_HOURS * 3600 }
       );
 
       const contextCacheCollection = this.db.collection(
@@ -166,9 +169,7 @@ class BlockPalAIService {
       );
       await contextCacheCollection.createIndex(
         { lastUpdated: 1 },
-        {
-          expireAfterSeconds: CONFIG.SESSION_TIMEOUT_HOURS * 3600,
-        }
+        { expireAfterSeconds: CONFIG.SESSION_TIMEOUT_HOURS * 3600 }
       );
     } catch (error) {
       console.log("Index creation skipped (may already exist)");
@@ -179,9 +180,7 @@ class BlockPalAIService {
     try {
       const cached = await this.db
         .collection(CONFIG.COLLECTIONS.CONTEXT_CACHE)
-        .findOne({
-          sessionId: this.sessionId,
-        });
+        .findOne({ sessionId: this.sessionId });
 
       if (cached && cached.summary) {
         this.contextSummary = cached.summary;
@@ -243,6 +242,24 @@ class BlockPalAIService {
     return /^0x[a-fA-F0-9]{40}$/.test(str);
   }
 
+  isLikelyContract(address: string, context: string): boolean {
+    const contractKeywords = [
+      "contract",
+      "deploy",
+      "audit",
+      "security",
+      "verified",
+      "source",
+      "bytecode",
+      "abi",
+      "function",
+      "solidity",
+    ];
+
+    const lowerContext = context.toLowerCase();
+    return contractKeywords.some((keyword) => lowerContext.includes(keyword));
+  }
+
   validateAndIdentifyInput(text: string) {
     const validation = {
       walletAddresses: [] as string[],
@@ -265,7 +282,11 @@ class BlockPalAIService {
     const tokenSymbols = text.match(patterns.tokenSymbol) || [];
 
     for (const address of addresses) {
-      validation.walletAddresses.push(address);
+      if (this.isLikelyContract(address, text)) {
+        validation.contractAddresses.push(address);
+      } else {
+        validation.walletAddresses.push(address);
+      }
     }
 
     validation.transactionHashes = txHashes;
@@ -279,8 +300,18 @@ class BlockPalAIService {
       validation.type = "transaction";
       validation.primary = txHashes[0];
     } else if (addresses.length > 0) {
-      validation.type = "wallet";
-      validation.primary = addresses[0];
+      const lowerText = text.toLowerCase();
+      if (
+        lowerText.includes("contract") ||
+        lowerText.includes("audit") ||
+        lowerText.includes("deploy")
+      ) {
+        validation.type = "contract";
+        validation.primary = validation.contractAddresses[0] || addresses[0];
+      } else {
+        validation.type = "wallet";
+        validation.primary = validation.walletAddresses[0] || addresses[0];
+      }
     } else if (validation.tokens.length > 0) {
       validation.type = "token";
       validation.primary = validation.tokens[0];
@@ -290,324 +321,19 @@ class BlockPalAIService {
   }
 
   // =====================================
-  // Message Storage and Processing
+  // API Integration Methods
   // =====================================
 
-  async saveMessage(role: string, content: string, metadata: any = {}) {
-    try {
-      const message = {
-        userId: this.userId,
-        sessionId: this.sessionId,
-        role,
-        content,
-        timestamp: new Date(),
-        lastActivity: new Date(),
-        metadata: metadata,
-      };
-
-      await this.db.collection(CONFIG.COLLECTIONS.MESSAGES).insertOne(message);
-      await this.updateSessionActivity();
-      await this.updateContextSummary(content, metadata);
-    } catch (error) {
-      console.error("Error saving message:", error);
-    }
-  }
-
-  async updateSessionActivity() {
-    try {
-      await this.db.collection(CONFIG.COLLECTIONS.SESSIONS).updateOne(
-        { sessionId: this.sessionId },
-        {
-          $set: { lastActivity: new Date() },
-          $setOnInsert: {
-            sessionId: this.sessionId,
-            userId: this.userId,
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true }
-      );
-    } catch (error) {
-      console.error("Error updating session activity:", error);
-    }
-  }
-
-  async updateContextSummary(message: string, metadata: any = {}) {
-    if (metadata.utility && metadata.utility !== "general") {
-      this.contextSummary.recentTopics.push({
-        utility: metadata.utility,
-        timestamp: new Date(),
-        summary: this.generateTopicSummary(message, metadata),
-      });
-
-      if (this.contextSummary.recentTopics.length > 5) {
-        this.contextSummary.recentTopics.shift();
-      }
-    }
-
-    if (metadata.walletAddress) {
-      this.addToArtifacts("wallets", metadata.walletAddress);
-    }
-    if (metadata.txHash) {
-      this.addToArtifacts("transactions", metadata.txHash);
-    }
-    if (metadata.tokenInfo) {
-      this.addToArtifacts("tokens", metadata.tokenInfo);
-    }
-    if (metadata.contractAddress) {
-      this.addToArtifacts("contracts", metadata.contractAddress);
-    }
-
-    await this.saveContextSummary();
-  }
-
-  addToArtifacts(type: string, value: string) {
-    const artifacts =
-      this.contextSummary.activeArtifacts[
-        type as keyof typeof this.contextSummary.activeArtifacts
-      ];
-
-    const index = artifacts.indexOf(value);
-    if (index > -1) {
-      artifacts.splice(index, 1);
-    }
-
-    artifacts.push(value);
-
-    if (artifacts.length > 3) {
-      artifacts.shift();
-    }
-  }
-
-  generateTopicSummary(message: string, metadata: any): string {
-    const summaries: { [key: string]: string } = {
-      wallet_analysis: `Analyzed wallet ${this.truncateAddress(
-        metadata.walletAddress
-      )}`,
-      transaction_breakdown: `Examined transaction ${this.truncateAddress(
-        metadata.txHash
-      )}`,
-      token_info: `Looked up token ${metadata.tokenInfo}`,
-      smart_contract: `Worked with smart contract`,
-      contract_audit: `Audited contract ${this.truncateAddress(
-        metadata.contractAddress
-      )}`,
-      gas_analysis: `Checked gas prices and network status`,
-      trending_tokens: `Reviewed trending tokens and market`,
-      default: `Discussed ${metadata.utility || "crypto topics"}`,
+  async getMoralisHeaders() {
+    return {
+      "X-API-Key": CONFIG.APIs.MORALIS.API_KEY!,
+      "Content-Type": "application/json",
     };
-
-    return summaries[metadata.utility] || summaries.default;
   }
-
-  // =====================================
-  // Intent Analysis and Query Processing
-  // =====================================
-
-  async determineIntent(userInput: string): Promise<AiIntentAnalysis> {
-    const validation = this.validateAndIdentifyInput(userInput);
-
-    const systemPrompt = `You are BlockPal AI's advanced intent classifier with entity tracking.
-
-USER INPUT: "${userInput}"
-
-VALIDATION FOUND: ${JSON.stringify(validation)}
-
-AVAILABLE UTILITIES:
-1. crypto_knowledge - Educational crypto/blockchain questions
-2. smart_contract - Generate, analyze, or modify smart contracts
-3. wallet_analysis - Analyze wallet holdings (needs wallet address)
-4. transaction_breakdown - Analyze transaction details (needs tx hash)
-5. token_info - Get token information (needs token identifier)
-6. contract_audit - Security audit of contracts (needs contract address)
-7. trending_tokens - Market trends and sentiment analysis
-8. gas_analysis - Gas fee analysis and optimization
-9. wallet_assistant - Personal portfolio insights (needs wallet address)
-10. blockpal_assistant - Help with BlockPal platform features
-11. general - Other queries
-
-INTENT DETERMINATION RULES:
-- If user mentions wallet address (0x40 chars) → wallet_analysis
-- If user mentions transaction hash (0x64 chars) → transaction_breakdown
-- If user asks about token price/info → token_info
-- If user asks about "trending", "hot tokens", "what's popular" → trending_tokens
-- If user asks about gas prices, fees → gas_analysis
-- If user asks to create/generate contract → smart_contract
-- If user asks about security, audit, honeypot → contract_audit
-- If user asks "what can you do", "help", "features" → blockpal_assistant
-- If user asks general crypto questions → crypto_knowledge
-
-Respond with JSON only:
-{
-  "utility": "utility_name",
-  "data": {
-    "identifier": "exact address/hash to use or null",
-    "type": "wallet|transaction|contract|token",
-    "confidence": "high|medium|low",
-    "specificFocus": "what to focus on"
-  }
-}`;
-
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: CONFIG.OPENAI_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userInput },
-        ],
-        temperature: 0.1,
-        max_tokens: 200,
-        response_format: { type: "json_object" },
-      });
-
-      const intent = JSON.parse(response.choices[0].message.content || "{}");
-
-      // Use validation data if no identifier found
-      if (!intent.data.identifier && validation.primary) {
-        intent.data.identifier = validation.primary;
-        intent.data.type = validation.type;
-      }
-
-      // Auto-detect based on input patterns
-      if (!intent.data.identifier) {
-        const lowerInput = userInput.toLowerCase();
-
-        // Check for common token symbols
-        const tokenSymbols = [
-          "btc",
-          "eth",
-          "usdc",
-          "usdt",
-          "dai",
-          "link",
-          "uni",
-          "aave",
-          "sol",
-          "ada",
-        ];
-        for (const symbol of tokenSymbols) {
-          if (lowerInput.includes(symbol)) {
-            intent.utility = "token_info";
-            intent.data.identifier = symbol.toUpperCase();
-            intent.data.type = "token";
-            break;
-          }
-        }
-
-        // Check for trending requests
-        if (
-          lowerInput.includes("trending") ||
-          lowerInput.includes("hot") ||
-          lowerInput.includes("popular")
-        ) {
-          intent.utility = "trending_tokens";
-        }
-
-        // Check for gas requests
-        if (lowerInput.includes("gas") || lowerInput.includes("fee")) {
-          intent.utility = "gas_analysis";
-        }
-
-        // Check for price requests
-        if (lowerInput.includes("price") && !intent.data.identifier) {
-          intent.utility = "token_info";
-          // Try to extract token from question
-          const priceMatch = lowerInput.match(/price of (\w+)/);
-          if (priceMatch) {
-            intent.data.identifier = priceMatch[1].toUpperCase();
-            intent.data.type = "token";
-          }
-        }
-      }
-
-      return intent;
-    } catch (error) {
-      console.error("Intent determination error:", error);
-      return {
-        utility: "general",
-        data: {
-          identifier: validation.primary,
-          type: validation.type,
-        },
-      };
-    }
-  }
-
-  async processUserQuery(userInput: string): Promise<string> {
-    try {
-      await this.saveMessage("user", userInput);
-      const intent = await this.determineIntent(userInput);
-
-      let response: string;
-      let additionalMetadata: any = {};
-
-      switch (intent.utility) {
-        case "crypto_knowledge":
-          response = await this.handleCryptoKnowledge(userInput);
-          break;
-        case "smart_contract":
-          response = await this.handleSmartContract(userInput);
-          break;
-        case "wallet_analysis":
-          response = await this.handleWalletAnalysis(userInput, intent.data);
-          additionalMetadata.walletAddress = intent.data.identifier;
-          break;
-        case "transaction_breakdown":
-          response = await this.handleTransactionBreakdown(
-            userInput,
-            intent.data
-          );
-          additionalMetadata.txHash = intent.data.identifier;
-          break;
-        case "token_info":
-          response = await this.handleTokenInfo(userInput, intent.data);
-          additionalMetadata.tokenInfo = intent.data.identifier;
-          break;
-        case "contract_audit":
-          response = await this.handleContractAudit(userInput, intent.data);
-          additionalMetadata.contractAddress = intent.data.identifier;
-          break;
-        case "trending_tokens":
-          response = await this.handleTrendingTokens(userInput);
-          break;
-        case "gas_analysis":
-          response = await this.handleGasAnalysis(userInput);
-          break;
-        case "wallet_assistant":
-          response = await this.handleWalletAssistant(userInput, intent.data);
-          break;
-        case "blockpal_assistant":
-          response = await this.handleBlockPalAssistant(userInput);
-          break;
-        default:
-          response = await this.handleGeneralQuery(userInput);
-      }
-
-      await this.saveMessage("assistant", response, {
-        utility: intent.utility,
-        ...additionalMetadata,
-      });
-
-      return response;
-    } catch (error) {
-      console.error("Error processing query:", error);
-      const errorResponse =
-        "I encountered an error processing your request. Please try again.";
-      await this.saveMessage("assistant", errorResponse, { error: true });
-      return errorResponse;
-    }
-  }
-
-  // =====================================
-  // API Integration Methods (from original aichat.js)
-  // =====================================
 
   async getMoralisWalletData(walletAddress: string) {
     try {
-      const headers = {
-        "X-API-Key": CONFIG.APIs.MORALIS.API_KEY!,
-        "Content-Type": "application/json",
-      };
+      const headers = await this.getMoralisHeaders();
 
       let nativeBalance = "0";
       try {
@@ -620,8 +346,10 @@ Respond with JSON only:
         );
         nativeBalance = nativeBalanceResponse.data.balance || "0";
       } catch (error) {
-        console.log("Native balance endpoint failed, using fallback...");
-        nativeBalance = "0";
+        console.log(
+          "Native balance endpoint failed:",
+          error.response?.data || error.message
+        );
       }
 
       let tokens = [];
@@ -649,8 +377,10 @@ Respond with JSON only:
           );
           tokens = altTokenResponse.data || [];
         } catch (altError) {
-          console.log("Both token endpoints failed, using Alchemy fallback...");
-          return await this.getAlchemyWalletData(walletAddress);
+          console.log(
+            "Both token endpoints failed:",
+            altError.response?.data || altError.message
+          );
         }
       }
 
@@ -670,8 +400,10 @@ Respond with JSON only:
         );
         nfts = nftsResponse.data?.result || [];
       } catch (error) {
-        console.log("NFT endpoint failed");
-        nfts = [];
+        console.log(
+          "NFT endpoint failed:",
+          error.response?.data || error.message
+        );
       }
 
       let transactions = [];
@@ -689,7 +421,6 @@ Respond with JSON only:
         transactions = transactionsResponse.data?.result || [];
       } catch (error) {
         console.log("Transaction history endpoint failed");
-        transactions = [];
       }
 
       return {
@@ -699,8 +430,13 @@ Respond with JSON only:
         transactions: transactions,
       };
     } catch (error) {
-      console.error("Moralis API Error:", error.message);
-      console.log("Falling back to Alchemy...");
+      console.error("Moralis API Error:", {
+        status: error.response?.status,
+        message: error.response?.data?.message || error.message,
+        endpoint: error.config?.url,
+      });
+
+      console.log("Falling back to alternative data source...");
       return await this.getAlchemyWalletData(walletAddress);
     }
   }
@@ -851,7 +587,7 @@ Respond with JSON only:
       insights.portfolio.opportunities.push(
         `${stablecoinPercent.toFixed(
           1
-        )}% in stablecoins (${stablecoinValue.toFixed(
+        )}% in stablecoins ($${stablecoinValue.toFixed(
           2
         )}) - could earn 4-8% APY in DeFi`
       );
@@ -930,10 +666,607 @@ Respond with JSON only:
     return insights;
   }
 
+  // =====================================
+  // Message Storage and Processing
+  // =====================================
+
+  async saveMessage(role: string, content: string, metadata: any = {}) {
+    try {
+      const message = {
+        userId: this.userId,
+        sessionId: this.sessionId,
+        role,
+        content,
+        timestamp: new Date(),
+        lastActivity: new Date(),
+        metadata: metadata,
+      };
+
+      await this.db.collection(CONFIG.COLLECTIONS.MESSAGES).insertOne(message);
+      await this.updateSessionActivity();
+      await this.updateContextSummary(content, metadata);
+    } catch (error) {
+      console.error("Error saving message:", error);
+    }
+  }
+
+  async updateSessionActivity() {
+    try {
+      await this.db.collection(CONFIG.COLLECTIONS.SESSIONS).updateOne(
+        { sessionId: this.sessionId },
+        {
+          $set: { lastActivity: new Date() },
+          $setOnInsert: {
+            sessionId: this.sessionId,
+            userId: this.userId,
+            createdAt: new Date(),
+          },
+        },
+        { upsert: true }
+      );
+    } catch (error) {
+      console.error("Error updating session activity:", error);
+    }
+  }
+
+  async updateContextSummary(message: string, metadata: any = {}) {
+    if (metadata.utility && metadata.utility !== "general") {
+      this.contextSummary.recentTopics.push({
+        utility: metadata.utility,
+        timestamp: new Date(),
+        summary: this.generateTopicSummary(message, metadata),
+      });
+
+      if (this.contextSummary.recentTopics.length > 5) {
+        this.contextSummary.recentTopics.shift();
+      }
+    }
+
+    if (metadata.walletAddress) {
+      this.addToArtifacts("wallets", metadata.walletAddress);
+    }
+    if (metadata.txHash) {
+      this.addToArtifacts("transactions", metadata.txHash);
+    }
+    if (metadata.tokenInfo) {
+      this.addToArtifacts("tokens", metadata.tokenInfo);
+    }
+    if (metadata.contractAddress) {
+      this.addToArtifacts("contracts", metadata.contractAddress);
+    }
+
+    await this.saveContextSummary();
+  }
+
+  addToArtifacts(type: string, value: string) {
+    const artifacts =
+      this.contextSummary.activeArtifacts[
+        type as keyof typeof this.contextSummary.activeArtifacts
+      ];
+
+    const index = artifacts.indexOf(value);
+    if (index > -1) {
+      artifacts.splice(index, 1);
+    }
+
+    artifacts.push(value);
+
+    if (artifacts.length > 3) {
+      artifacts.shift();
+    }
+  }
+
+  generateTopicSummary(message: string, metadata: any): string {
+    const summaries: { [key: string]: string } = {
+      wallet_analysis: `Analyzed wallet ${this.truncateAddress(
+        metadata.walletAddress
+      )}`,
+      transaction_breakdown: `Examined transaction ${this.truncateAddress(
+        metadata.txHash
+      )}`,
+      token_info: `Looked up token ${metadata.tokenInfo}`,
+      smart_contract: `Worked with smart contract`,
+      contract_audit: `Audited contract ${this.truncateAddress(
+        metadata.contractAddress
+      )}`,
+      gas_analysis: `Checked gas prices and network status`,
+      trending_tokens: `Reviewed trending tokens and market`,
+      default: `Discussed ${metadata.utility || "crypto topics"}`,
+    };
+
+    return summaries[metadata.utility] || summaries.default;
+  }
+
+  // =====================================
+  // Intent Analysis and Query Processing
+  // =====================================
+
+  async determineIntent(
+    userInput: string,
+    context: any
+  ): Promise<AiIntentAnalysis> {
+    const resolvedReferences = context.resolvedReferences || {};
+    const entityTracking = context.entityTracking;
+    const lastTransaction = entityTracking.lastMentioned.transaction;
+    const lastWallet = entityTracking.lastMentioned.wallet;
+
+    let senderAddress = null;
+    let receiverAddress = null;
+    if (lastTransaction && entityTracking.relationships[lastTransaction]) {
+      senderAddress = entityTracking.relationships[lastTransaction].sender;
+      receiverAddress = entityTracking.relationships[lastTransaction].receiver;
+    }
+
+    const systemPrompt = `You are BlockPal AI's advanced intent classifier with entity tracking.
+
+ENTITY TRACKING STATE:
+- Last mentioned wallet: ${lastWallet || "none"}
+- Last mentioned transaction: ${lastTransaction || "none"}
+- Transaction sender: ${senderAddress || "none"}
+- Transaction receiver: ${receiverAddress || "none"}
+
+RESOLVED REFERENCES:
+${JSON.stringify(resolvedReferences, null, 2)}
+
+USER INPUT: "${userInput}"
+
+CRITICAL RULES FOR REFERENCE RESOLUTION:
+1. "the sender" or "sender wallet" → Use sender address: ${senderAddress}
+2. "the receiver" or "receiver wallet" → Use receiver address: ${receiverAddress}
+3. "that wallet" or "the wallet" → Use last mentioned wallet: ${lastWallet}
+4. "this transaction" → Use last transaction: ${lastTransaction}
+
+BLOCKPAL ASSISTANT DETECTION:
+If user asks any of these, route to blockpal_assistant:
+- "what can you do", "what are your features", "your utilities", "your abilities"
+- "how to use", "how do I use", "tell me about your features"
+- "what utilities", "list utilities", "show features", "your capabilities"
+- "help", "guide me", "I'm new", "what is blockpal"
+
+CURRENT CONTEXT:
+- Validation found: ${JSON.stringify(this.validateAndIdentifyInput(userInput))}
+- Conversation topic: ${context.conversationState?.currentTopic}
+
+AVAILABLE UTILITIES:
+1. crypto_knowledge - Educational crypto/blockchain questions
+2. smart_contract - Generate, analyze, or modify smart contracts
+3. wallet_analysis - Analyze wallet holdings (needs wallet address)
+4. transaction_breakdown - Analyze transaction details (needs tx hash)
+5. token_info - Get token information (needs token identifier)
+6. contract_audit - Security audit of contracts (needs contract address)
+7. trending_tokens - Market trends and sentiment analysis
+8. gas_analysis - Gas fee analysis and optimization
+9. wallet_assistant - Personal portfolio insights (needs wallet address)
+10. blockpal_assistant - Help with BlockPal platform features
+11. general - Other queries
+
+INTENT DETERMINATION RULES:
+- If user asks about "the sender" → wallet_analysis with sender address
+- If user asks about "the receiver" → wallet_analysis with receiver address
+- If user asks about fraud/security → wallet_analysis with focus on security
+- If user asks "what can you do", "your features", "your utilities", "your abilities", "how to use" → blockpal_assistant
+- If user asks "what is BlockPal" or "tell me about BlockPal" → blockpal_assistant
+- Use resolved references over new identifiers when available
+
+Respond with JSON only:
+{
+  "utility": "utility_name",
+  "data": {
+    "identifier": "exact address/hash to use",
+    "type": "wallet|transaction|contract|token",
+    "confidence": "high|medium|low",
+    "resolvedFrom": "reference type used (e.g., 'sender', 'receiver', 'last_wallet')",
+    "specificFocus": "what to focus on (e.g., 'security_check', 'token_list')"
+  }
+}`;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userInput },
+        ],
+        temperature: 0.1,
+        max_tokens: 200,
+        response_format: { type: "json_object" },
+      });
+
+      const intent = JSON.parse(response.choices[0].message.content || "{}");
+
+      if (userInput.toLowerCase().includes("sender") && senderAddress) {
+        intent.data.identifier = senderAddress;
+        intent.data.resolvedFrom = "sender_reference";
+      } else if (
+        userInput.toLowerCase().includes("receiver") &&
+        receiverAddress
+      ) {
+        intent.data.identifier = receiverAddress;
+        intent.data.resolvedFrom = "receiver_reference";
+      }
+
+      return intent;
+    } catch (error) {
+      console.error("Intent determination error:", error.message);
+      return { utility: "general", data: {} };
+    }
+  }
+
+  async buildSmartContext(userInput: string) {
+    const { resolvedInput, resolutions } = this.resolveReferences(userInput);
+    const queryType = this.classifyQueryType(userInput);
+    const validation = this.validateAndIdentifyInput(resolvedInput);
+
+    this.updateConversationState(queryType, validation);
+
+    const recentMessages = await this.getFilteredMessages();
+
+    const compressedContext = {
+      currentRequest: {
+        type: validation.type,
+        primary: validation.primary,
+        allIdentifiers: validation,
+        queryType: queryType,
+        resolutions: resolutions,
+      },
+      entityTracking: this.entityTracking,
+      conversationState: this.conversationState,
+      recentSummary: this.contextSummary,
+      relevantMessages: this.compressMessages(recentMessages, validation),
+      activeArtifacts: this.contextSummary.activeArtifacts,
+      resolvedReferences: resolutions,
+      estimatedTokens: 0,
+    };
+
+    compressedContext.estimatedTokens =
+      this.estimateTokenCount(compressedContext);
+
+    return compressedContext;
+  }
+
+  resolveReferences(userInput: string, context?: any) {
+    let resolved = userInput;
+    const resolutions = {};
+
+    const referencePatterns = [
+      {
+        patterns: ["the sender", "sender wallet", "sender address"],
+        resolver: () => {
+          const lastTx = this.entityTracking.lastMentioned.transaction;
+          return lastTx
+            ? this.entityTracking.relationships[lastTx]?.sender
+            : null;
+        },
+      },
+      {
+        patterns: [
+          "the receiver",
+          "receiver wallet",
+          "receiver address",
+          "recipient",
+        ],
+        resolver: () => {
+          const lastTx = this.entityTracking.lastMentioned.transaction;
+          return lastTx
+            ? this.entityTracking.relationships[lastTx]?.receiver
+            : null;
+        },
+      },
+      {
+        patterns: ["that wallet", "the wallet", "this wallet", "it"],
+        resolver: () => this.entityTracking.lastMentioned.wallet,
+      },
+      {
+        patterns: ["that transaction", "the transaction", "this transaction"],
+        resolver: () => this.entityTracking.lastMentioned.transaction,
+      },
+      {
+        patterns: ["my wallet", "my address"],
+        resolver: () => {
+          const wallets = Object.keys(this.entityTracking.entities).filter(
+            (key) =>
+              this.entityTracking.entities[key].roles.includes(
+                "analyzed_wallet"
+              )
+          );
+          return wallets.length > 0 ? wallets[wallets.length - 1] : null;
+        },
+      },
+    ];
+
+    const inputLower = userInput.toLowerCase();
+    for (const ref of referencePatterns) {
+      for (const pattern of ref.patterns) {
+        if (inputLower.includes(pattern)) {
+          const resolvedValue = ref.resolver();
+          if (resolvedValue) {
+            resolutions[pattern] = resolvedValue;
+          }
+        }
+      }
+    }
+
+    return { resolvedInput: resolved, resolutions };
+  }
+
+  classifyQueryType(query: string) {
+    const patterns = {
+      role_identification: /who is the (sender|receiver|owner|deployer)/i,
+      entity_analysis: /analyze the (sender|receiver|wallet|contract|address)/i,
+      property_query:
+        /what tokens|what is the balance|holdings|how much|list.*tokens/i,
+      comparison: /difference between|compare|versus/i,
+      follow_up: /what about|how about|and the|also check/i,
+      security_query: /fraud|suspicious|scam|fake|security/i,
+      transaction_query: /transaction|transfer|sent|received/i,
+      listing_query: /list|show|display|what are/i,
+    };
+
+    for (const [type, pattern] of Object.entries(patterns)) {
+      if (pattern.test(query)) {
+        this.conversationState.lastQueryType = type;
+        return type;
+      }
+    }
+    return "general";
+  }
+
+  updateConversationState(queryType: string, validation: any) {
+    if (validation.type) {
+      this.conversationState.currentTopic = validation.type + "_analysis";
+    }
+
+    const stageMap = {
+      role_identification: "identifying_roles",
+      entity_analysis: "analyzing_entity",
+      property_query: "querying_properties",
+      security_query: "security_check",
+    };
+
+    this.conversationState.stage = stageMap[queryType] || "general_query";
+    this.conversationState.expectations = this.getExpectedFollowUps(queryType);
+  }
+
+  getExpectedFollowUps(queryType: string): string[] {
+    const expectations = {
+      role_identification: [
+        "user_may_ask_about_sender",
+        "user_may_ask_about_receiver",
+      ],
+      entity_analysis: [
+        "user_may_ask_for_details",
+        "user_may_compare_entities",
+      ],
+      property_query: [
+        "user_may_ask_about_specific_tokens",
+        "user_may_ask_about_value",
+      ],
+      security_query: [
+        "user_may_ask_for_recommendations",
+        "user_may_ask_about_specific_tokens",
+      ],
+    };
+
+    return expectations[queryType] || ["general_follow_up"];
+  }
+
+  async getFilteredMessages() {
+    const messages = await this.db
+      .collection(CONFIG.COLLECTIONS.MESSAGES)
+      .find({
+        sessionId: this.sessionId,
+        content: {
+          $not: {
+            $regex: /^(hi|hello|thanks|thank you|okay|ok|yes|no)$/i,
+          },
+        },
+      })
+      .sort({ timestamp: -1 })
+      .limit(CONFIG.MAX_CONTEXT_MESSAGES)
+      .toArray();
+
+    return messages.reverse();
+  }
+
+  estimateTokenCount(context: any): number {
+    const contextString = JSON.stringify(context);
+    return Math.ceil(contextString.length / 4);
+  }
+
+  compressMessages(messages: any[], currentValidation: any) {
+    const compressed = [];
+
+    const recentMessages = messages.slice(-5);
+    const olderMessages = messages.slice(0, -5);
+
+    for (const msg of recentMessages) {
+      compressed.push({
+        role: msg.role,
+        content: msg.content,
+        metadata: msg.metadata,
+        timestamp: msg.timestamp,
+        priority: "high",
+      });
+    }
+
+    for (const msg of olderMessages) {
+      const isRelevant = this.isMessageRelevant(msg, currentValidation);
+
+      if (isRelevant) {
+        compressed.push({
+          role: msg.role,
+          content:
+            msg.content.substring(0, 100) +
+            (msg.content.length > 100 ? "..." : ""),
+          metadata: msg.metadata,
+          timestamp: msg.timestamp,
+          priority: "low",
+        });
+      }
+    }
+
+    return compressed;
+  }
+
+  isMessageRelevant(message: any, currentValidation: any): boolean {
+    const messageAge =
+      new Date().getTime() - new Date(message.timestamp).getTime();
+    if (messageAge < 5 * 60 * 1000) return true;
+
+    if (currentValidation.primary) {
+      if (message.content.includes(currentValidation.primary)) return true;
+      if (message.metadata?.walletAddress === currentValidation.primary)
+        return true;
+      if (message.metadata?.txHash === currentValidation.primary) return true;
+    }
+
+    if (message.metadata?.utility === currentValidation.type) return true;
+
+    return false;
+  }
+
+  async processUserQuery(userInput: string): Promise<string> {
+    try {
+      await this.saveMessage("user", userInput);
+      const context = await this.buildSmartContext(userInput);
+      const intent = await this.determineIntent(userInput, context);
+
+      let response: string;
+      let additionalMetadata: any = {};
+
+      switch (intent.utility) {
+        case "crypto_knowledge":
+          response = await this.handleCryptoKnowledge(userInput, context);
+          break;
+        case "smart_contract":
+          response = await this.handleSmartContract(userInput, context);
+          return response;
+        case "wallet_analysis":
+          response = await this.handleWalletAnalysis(
+            userInput,
+            intent.data,
+            context
+          );
+          additionalMetadata.walletAddress = intent.data.identifier;
+          break;
+        case "transaction_breakdown":
+          response = await this.handleTransactionBreakdown(
+            userInput,
+            intent.data,
+            context
+          );
+          additionalMetadata.txHash = intent.data.identifier;
+          break;
+        case "token_info":
+          response = await this.handleTokenInfo(
+            userInput,
+            intent.data,
+            context
+          );
+          additionalMetadata.tokenInfo = intent.data.identifier;
+          break;
+        case "contract_audit":
+          response = await this.handleContractAudit(
+            userInput,
+            intent.data,
+            context
+          );
+          additionalMetadata.contractAddress = intent.data.identifier;
+          break;
+        case "trending_tokens":
+          response = await this.handleTrendingTokens(
+            userInput,
+            intent.data,
+            context
+          );
+          break;
+        case "gas_analysis":
+          response = await this.handleGasAnalysis(userInput, context);
+          break;
+        case "wallet_assistant":
+          response = await this.handleWalletAssistant(
+            userInput,
+            intent.data,
+            context
+          );
+          break;
+        case "blockpal_assistant":
+          response = await this.handleBlockPalAssistant(userInput, context);
+          break;
+        default:
+          response = await this.handleGeneralQuery(userInput, context);
+      }
+
+      await this.saveMessage("assistant", response, {
+        utility: intent.utility,
+        entities: this.extractEntitiesFromResponse(response, intent),
+        ...additionalMetadata,
+      });
+
+      return response;
+    } catch (error) {
+      console.error("Error processing query:", error.message);
+      const errorResponse =
+        "I encountered an error processing your request. Please try again.";
+      await this.saveMessage("assistant", errorResponse, { error: true });
+      return errorResponse;
+    }
+  }
+
+  extractEntitiesFromResponse(response: string, intent: any) {
+    const entities = {};
+
+    if (intent.utility === "transaction_breakdown") {
+      const senderMatch =
+        response.match(/\*\*From:\*\*\s*(0x[a-fA-F0-9]{40})/i) ||
+        response.match(/From:\s*(0x[a-fA-F0-9]{40})/i);
+      const receiverMatch =
+        response.match(/\*\*To:\*\*\s*(0x[a-fA-F0-9]{40})/i) ||
+        response.match(/To:\s*(0x[a-fA-F0-9]{40})/i);
+
+      if (senderMatch) {
+        entities[senderMatch[1].toLowerCase()] = {
+          type: "wallet",
+          roles: ["transaction_sender"],
+        };
+      }
+      if (receiverMatch) {
+        entities[receiverMatch[1].toLowerCase()] = {
+          type: "wallet",
+          roles: ["transaction_receiver"],
+        };
+      }
+    }
+
+    return entities;
+  }
+
+  buildEntityContext() {
+    const lastTx = this.entityTracking.lastMentioned.transaction;
+    const context = {
+      currentEntities: {} as any,
+      relationships: {} as any,
+    };
+
+    if (lastTx && this.entityTracking.relationships[lastTx]) {
+      const rel = this.entityTracking.relationships[lastTx];
+      context.relationships[lastTx] = {
+        sender: rel.sender,
+        receiver: rel.receiver,
+        senderRole: "The address that sent the transaction",
+        receiverRole: "The address that received the transaction",
+      };
+      context.currentFocus = `Transaction ${lastTx} from ${rel.sender} to ${rel.receiver}`;
+    }
+
+    return context;
+  }
+
   async generateAnalysisResponse(
     userQuery: string,
     data: any,
-    analysisType: string
+    analysisType: string,
+    contextPrompt?: string
   ): Promise<string> {
     const entityContext = this.buildEntityContext();
 
@@ -941,6 +1274,8 @@ Respond with JSON only:
 
 ENTITY CONTEXT:
 ${JSON.stringify(entityContext, null, 2)}
+
+${contextPrompt || ""}
 
 USER QUESTION: "${userQuery}"
 
@@ -1000,68 +1335,169 @@ RESPONSE GUIDELINES BY QUERY TYPE:
     }
   }
 
-  buildEntityContext() {
-    const lastTx = this.entityTracking.lastMentioned.transaction;
-    const context = {
-      currentEntities: {} as any,
-      relationships: {} as any,
-    };
+  // =====================================
+  // Utility Handlers (Enhanced from aichat.js)
+  // =====================================
 
-    if (lastTx && this.entityTracking.relationships[lastTx]) {
-      const rel = this.entityTracking.relationships[lastTx];
-      context.relationships[lastTx] = {
-        sender: rel.sender,
-        receiver: rel.receiver,
-        senderRole: "The address that sent the transaction",
-        receiverRole: "The address that received the transaction",
-      };
-      context.currentFocus = `Transaction ${lastTx} from ${rel.sender} to ${rel.receiver}`;
-    }
+  async handleCryptoKnowledge(
+    userInput: string,
+    context: any
+  ): Promise<string> {
+    const followUpKeywords = [
+      "explain more",
+      "tell me more",
+      "what about",
+      "how does that work",
+      "can you explain",
+    ];
+    const isFollowUp = followUpKeywords.some((keyword) =>
+      userInput.toLowerCase().includes(keyword)
+    );
 
-    return context;
-  }
+    const systemPrompt = `You are BlockPal AI, a crypto expert assistant. 
 
-  async handleCryptoKnowledge(userInput: string): Promise<string> {
-    const systemPrompt = `You are BlockPal AI, a crypto expert assistant. Provide educational, accurate information about cryptocurrency and blockchain. Be conversational and helpful.`;
+CONTEXT SUMMARY:
+- Recent topics discussed: ${context.recentSummary.recentTopics
+      .map((t: any) => t.summary)
+      .join(", ")}
+- User's session has ${context.relevantMessages.length} relevant messages
+- This appears to be ${isFollowUp ? "a follow-up question" : "a new topic"}
+
+IMPORTANT CONTEXT RULES:
+- If user asks about something you previously generated (like a contract), reference it specifically
+- Maintain continuity with previous explanations
+- Build on prior context when relevant
+
+Provide educational, accurate information about cryptocurrency and blockchain.
+Reference previous explanations when relevant.
+Be conversational and helpful.`;
 
     try {
+      const messages = [{ role: "system", content: systemPrompt }];
+
+      const recentMessages = context.relevantMessages.slice(-5);
+      recentMessages.forEach((msg: any) => {
+        messages.push({
+          role: msg.role,
+          content: msg.content.substring(0, 800),
+        });
+      });
+
+      messages.push({ role: "user", content: userInput });
+
       const response = await this.openai.chat.completions.create({
         model: CONFIG.OPENAI_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userInput },
-        ],
+        messages,
         temperature: 0.7,
         max_tokens: 1000,
       });
 
       return (
         response.choices[0].message.content ||
-        "I'm unable to process your crypto knowledge query at the moment."
+        "I'm unable to process your crypto knowledge query at the moment. Please try again."
       );
     } catch (error) {
       return "I'm unable to process your crypto knowledge query at the moment. Please try again.";
     }
   }
 
-  async handleSmartContract(userInput: string): Promise<string> {
-    const systemPrompt = `You are BlockPal AI's expert smart contract developer. Generate clean, secure, well-commented Solidity code. Include all necessary imports and interfaces. Follow best practices and latest Solidity version.`;
+  async handleSmartContract(userInput: string, context: any): Promise<string> {
+    const recentContracts = context.relevantMessages
+      .filter((msg: any) => msg.metadata?.utility === "smart_contract")
+      .map((msg: any) => ({
+        content: msg.content,
+        timestamp: msg.timestamp,
+        contractType: msg.metadata?.contractType || "unknown",
+      }));
+
+    const referenceKeywords = [
+      "the contract",
+      "that contract",
+      "earlier contract",
+      "previous contract",
+      "you generated",
+      "you created",
+    ];
+    const isReferencingPrevious = referenceKeywords.some((keyword) =>
+      userInput.toLowerCase().includes(keyword)
+    );
+
+    let contextualPrompt = "";
+    if (isReferencingPrevious && recentContracts.length > 0) {
+      const lastContract = recentContracts[recentContracts.length - 1];
+      contextualPrompt = `\n\nIMPORTANT: The user is asking about the contract you previously generated. Reference the specific contract in your response and explain based on that contract's functionality.`;
+    }
+
+    const systemPrompt = `You are BlockPal AI's expert smart contract developer.
+
+CONTEXT AWARENESS:
+- Recent contracts in conversation: ${recentContracts.length}
+- User may be referencing previous work: ${isReferencingPrevious}
+- Active contract artifacts: ${JSON.stringify(
+      context.activeArtifacts.contracts
+    )}
+${contextualPrompt}
+
+INSTRUCTIONS:
+- Generate clean, secure, well-commented Solidity code
+- If user references previous contracts, modify or explain based on that specific contract
+- Track contract types (e.g., "timelock", "erc20", "nft") in your response
+- Include all necessary imports and interfaces
+- Follow best practices and latest Solidity version
+- Explain key features and any modifications made
+- When explaining contracts, use simple real-world examples`;
 
     try {
+      const messages = [{ role: "system", content: systemPrompt }];
+
+      if (recentContracts.length > 0) {
+        recentContracts.slice(-3).forEach((contract: any) => {
+          messages.push({
+            role: "assistant",
+            content: contract.content.substring(0, 1500),
+          });
+        });
+      }
+
+      messages.push({ role: "user", content: userInput });
+
       const response = await this.openai.chat.completions.create({
         model: CONFIG.OPENAI_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userInput },
-        ],
+        messages,
         temperature: 0.3,
         max_tokens: 2500,
       });
 
-      return (
+      const aiResponse =
         response.choices[0].message.content ||
-        "I'm unable to generate your smart contract at the moment."
-      );
+        "I'm unable to generate your smart contract at the moment.";
+
+      let contractType = "general";
+      if (aiResponse.toLowerCase().includes("timelock"))
+        contractType = "timelock";
+      else if (aiResponse.toLowerCase().includes("erc20"))
+        contractType = "erc20";
+      else if (
+        aiResponse.toLowerCase().includes("erc721") ||
+        aiResponse.toLowerCase().includes("nft")
+      )
+        contractType = "nft";
+      else if (aiResponse.toLowerCase().includes("multisig"))
+        contractType = "multisig";
+
+      const contractIdentifier = `contract_${contractType}_${Date.now()}`;
+      this.addToArtifacts("contracts", contractIdentifier);
+
+      await this.saveMessage("assistant", aiResponse, {
+        utility: "smart_contract",
+        contractType: contractType,
+        contractIdentifier: contractIdentifier,
+        isExplanation:
+          userInput.toLowerCase().includes("explain") ||
+          userInput.toLowerCase().includes("how"),
+      });
+
+      return aiResponse;
     } catch (error) {
       return "I'm unable to generate your smart contract at the moment. Please try again.";
     }
@@ -1069,9 +1505,23 @@ RESPONSE GUIDELINES BY QUERY TYPE:
 
   async handleWalletAnalysis(
     userInput: string,
-    intentData: any
+    intentData: any,
+    context: any
   ): Promise<string> {
     let walletAddress = intentData.identifier;
+
+    if (intentData.resolvedFrom) {
+      console.log(
+        `Using resolved reference: ${intentData.resolvedFrom} -> ${walletAddress}`
+      );
+    }
+
+    if (!walletAddress && context.activeArtifacts.wallets.length > 0) {
+      walletAddress =
+        context.activeArtifacts.wallets[
+          context.activeArtifacts.wallets.length - 1
+        ];
+    }
 
     if (!walletAddress) {
       return "Please provide a valid Ethereum wallet address for analysis. Example: 0x1234567890123456789012345678901234567890";
@@ -1181,7 +1631,6 @@ RESPONSE GUIDELINES BY QUERY TYPE:
         analysisTimestamp: new Date().toISOString(),
       };
 
-      // Track this wallet as analyzed
       this.entityTracking.entities[walletAddress.toLowerCase()] = {
         type: "wallet",
         roles: ["analyzed_wallet"],
@@ -1189,10 +1638,24 @@ RESPONSE GUIDELINES BY QUERY TYPE:
       };
       this.entityTracking.lastMentioned.wallet = walletAddress.toLowerCase();
 
+      const contextPrompt = `Context Summary:
+- Previous topics: ${context.recentSummary.recentTopics
+        .map((t: any) => t.summary)
+        .join(", ")}
+- This is ${
+        context.activeArtifacts.wallets.includes(walletAddress)
+          ? "a previously analyzed"
+          : "a new"
+      } wallet
+- User query focus: ${intentData.specificFocus || "general analysis"}
+
+Answer the user's specific question about this wallet analysis.`;
+
       return await this.generateAnalysisResponse(
         userInput,
         walletData,
-        "wallet_analysis"
+        "wallet_analysis",
+        contextPrompt
       );
     } catch (error) {
       console.error("Wallet analysis error:", error);
@@ -1203,45 +1666,206 @@ RESPONSE GUIDELINES BY QUERY TYPE:
 
   async handleTransactionBreakdown(
     userInput: string,
-    intentData: any
+    intentData: any,
+    context: any
   ): Promise<string> {
-    if (!intentData.identifier) {
+    let txHash = intentData.identifier;
+
+    if (!txHash) {
+      txHash =
+        this.entityTracking.lastMentioned.transaction ||
+        context.activeArtifacts.transactions[
+          context.activeArtifacts.transactions.length - 1
+        ];
+    }
+
+    if (!txHash) {
       return "Please provide a valid Ethereum transaction hash for analysis. Example: 0xa1b2c3d4...";
     }
 
     try {
-      console.log(`Analyzing transaction ${intentData.identifier}...`);
+      console.log(`Analyzing transaction ${txHash}...`);
 
-      const analysisPrompt = `Analyze this Ethereum transaction: ${intentData.identifier}
+      const moralisData = await this.getMoralisTransactionData(txHash);
+      const ethPrice = await this.getETHPrice();
 
-Provide details about:
-- Transaction parties (sender/receiver)
-- Value transferred
-- Gas costs and efficiency
-- Transaction status and confirmations
-- Any smart contract interactions
+      const tx = moralisData.transaction;
+      const valueETH = parseFloat(tx.value) / 1e18;
+      const valueUSD = valueETH * (ethPrice.ethereum?.usd || 2000);
+      const gasUsed = parseInt(tx.gas || 0);
+      const gasPrice = parseFloat(tx.gas_price) / 1e9;
+      const txFeeETH = (gasUsed * parseFloat(tx.gas_price)) / 1e18;
+      const txFeeUSD = txFeeETH * (ethPrice.ethereum?.usd || 2000);
 
-Format the response clearly with transaction details.`;
+      if (tx.from_address && tx.to_address) {
+        this.entityTracking.relationships[txHash] = {
+          type: "transaction",
+          sender: tx.from_address.toLowerCase(),
+          receiver: tx.to_address.toLowerCase(),
+          timestamp: new Date().toISOString(),
+        };
 
-      const response = await this.openai.chat.completions.create({
-        model: CONFIG.OPENAI_MODEL,
-        messages: [{ role: "user", content: analysisPrompt }],
-        temperature: 0.3,
-        max_tokens: 1500,
-      });
+        this.entityTracking.aliases["the sender"] =
+          tx.from_address.toLowerCase();
+        this.entityTracking.aliases["the receiver"] =
+          tx.to_address.toLowerCase();
+        this.entityTracking.aliases["sender wallet"] =
+          tx.from_address.toLowerCase();
+        this.entityTracking.aliases["receiver wallet"] =
+          tx.to_address.toLowerCase();
 
-      return (
-        response.choices[0].message.content ||
-        "I encountered an error analyzing this transaction."
+        this.entityTracking.entities[tx.from_address.toLowerCase()] = {
+          type: "wallet",
+          roles: ["transaction_sender"],
+          lastMentioned: new Date().toISOString(),
+        };
+        this.entityTracking.entities[tx.to_address.toLowerCase()] = {
+          type: "wallet",
+          roles: ["transaction_receiver"],
+          lastMentioned: new Date().toISOString(),
+        };
+      }
+
+      let txType = "ETH Transfer";
+      if (tx.input && tx.input !== "0x") {
+        txType = "Smart Contract Interaction";
+        if (!tx.to_address) {
+          txType = "Contract Deployment";
+        }
+      }
+
+      const events = moralisData.decodedLogs
+        .map((log: any) => log.eventName)
+        .join(", ");
+
+      const transactionData = {
+        hash: txHash,
+        status: {
+          confirmed: tx.block_hash ? true : false,
+          success: tx.receipt_status === "1",
+          blockNumber: tx.block_number,
+          confirmations: tx.block_number ? "Confirmed" : "Pending",
+        },
+        parties: {
+          from: tx.from_address,
+          to: tx.to_address || "Contract Creation",
+          value: {
+            eth: valueETH,
+            usd: valueUSD,
+          },
+        },
+        gas: {
+          gasUsed: gasUsed,
+          gasPrice: gasPrice,
+          txFee: {
+            eth: txFeeETH,
+            usd: txFeeUSD,
+          },
+        },
+        details: {
+          type: txType,
+          method: tx.method_label || "Unknown",
+          events: events || "None",
+          timestamp: tx.block_timestamp,
+          nonce: tx.nonce,
+        },
+        logs: moralisData.logs.length,
+        decodedEvents: moralisData.decodedLogs,
+      };
+
+      const contextPrompt = `Context Summary:
+- This transaction is now being tracked
+- Sender: ${tx.from_address}
+- Receiver: ${tx.to_address}
+- User can now reference "the sender" or "the receiver"
+
+Answer the user's specific question about this transaction.`;
+
+      return await this.generateAnalysisResponse(
+        userInput,
+        transactionData,
+        "transaction_analysis",
+        contextPrompt
       );
     } catch (error) {
-      console.error("Transaction analysis error:", error);
-      return "I encountered an error analyzing this transaction. Please verify the hash and try again.";
+      console.error("Transaction analysis error:", error.message);
+      return "I encountered an error analyzing this transaction. Please verify the transaction hash.";
     }
   }
 
-  async handleTokenInfo(userInput: string, intentData: any): Promise<string> {
+  async getMoralisTransactionData(txHash: string) {
+    try {
+      const headers = await this.getMoralisHeaders();
+
+      const response = await axios.get(
+        `${CONFIG.APIs.MORALIS.BASE_URL}/transaction/${txHash}`,
+        {
+          headers,
+          params: { chain: "eth" },
+        }
+      );
+
+      let logs = [];
+      try {
+        const logsResponse = await axios.get(
+          `${CONFIG.APIs.MORALIS.BASE_URL}/transaction/${txHash}/logs`,
+          {
+            headers,
+            params: { chain: "eth" },
+          }
+        );
+        logs = logsResponse.data?.result || [];
+      } catch (logError) {
+        console.log("No logs available for transaction");
+      }
+
+      return {
+        transaction: response.data,
+        logs: logs,
+        decodedLogs: this.decodeTransactionLogs(logs),
+      };
+    } catch (error) {
+      console.error("Moralis transaction data error:", error.message);
+      throw error;
+    }
+  }
+
+  decodeTransactionLogs(logs: any[]) {
+    const eventSignatures = {
+      "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef":
+        "Transfer",
+      "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925":
+        "Approval",
+      "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c":
+        "Deposit",
+      "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65":
+        "Withdrawal",
+    };
+
+    return logs.map((log: any) => {
+      const eventName = eventSignatures[log.topic0] || "Unknown Event";
+      return {
+        eventName,
+        address: log.address,
+        data: log.data,
+        topics: log.topics,
+      };
+    });
+  }
+
+  async handleTokenInfo(
+    userInput: string,
+    intentData: any,
+    context: any
+  ): Promise<string> {
     let tokenIdentifier = intentData.identifier;
+
+    if (!tokenIdentifier && context.activeArtifacts.tokens.length > 0) {
+      tokenIdentifier =
+        context.activeArtifacts.tokens[
+          context.activeArtifacts.tokens.length - 1
+        ];
+    }
 
     if (!tokenIdentifier) {
       return "Please specify a token by name (Bitcoin), symbol (BTC), or contract address.";
@@ -1309,7 +1933,6 @@ Format the response clearly with transaction details.`;
 - Different variations of the name`;
       }
 
-      // Track this token
       this.entityTracking.entities[cleanIdentifier.toLowerCase()] = {
         type: "token",
         roles: ["analyzed_token"],
@@ -1317,10 +1940,20 @@ Format the response clearly with transaction details.`;
       };
       this.entityTracking.lastMentioned.token = cleanIdentifier.toLowerCase();
 
+      const contextPrompt = `Context Summary:
+- Previous topics: ${context.recentSummary.recentTopics
+        .map((t: any) => t.summary)
+        .join(", ")}
+- User asked about: ${tokenIdentifier}
+- Data source: ${tokenData.source}
+
+Provide comprehensive token information. If data is from blockchain, mention that full market data is limited.`;
+
       return await this.generateAnalysisResponse(
         userInput,
         tokenData,
-        "token_information"
+        "token_information",
+        contextPrompt
       );
     } catch (error) {
       console.error("Token info error:", error.message);
@@ -1463,10 +2096,7 @@ Format the response clearly with transaction details.`;
 
   async getMoralisTokenData(tokenAddress: string) {
     try {
-      const headers = {
-        "X-API-Key": CONFIG.APIs.MORALIS.API_KEY!,
-        "Content-Type": "application/json",
-      };
+      const headers = await this.getMoralisHeaders();
 
       const response = await axios.get(
         `${CONFIG.APIs.MORALIS.BASE_URL}/erc20/metadata`,
@@ -1505,56 +2135,220 @@ Format the response clearly with transaction details.`;
 
   async handleContractAudit(
     userInput: string,
-    intentData: any
+    intentData: any,
+    context: any
   ): Promise<string> {
-    if (!intentData.identifier) {
+    let contractAddress = intentData.identifier;
+
+    if (!contractAddress && context.activeArtifacts.contracts.length > 0) {
+      contractAddress =
+        context.activeArtifacts.contracts[
+          context.activeArtifacts.contracts.length - 1
+        ];
+    }
+
+    if (!contractAddress) {
       return "Please provide a valid contract address for security auditing.";
     }
 
     try {
-      const analysisPrompt = `Perform a security audit analysis for smart contract: ${intentData.identifier}
+      const [moralisData, goPlusData, etherscanData] = await Promise.all([
+        this.getMoralisTokenData(contractAddress).catch(() => null),
+        this.getContractSecurity(contractAddress),
+        this.getBasicContractInfo(contractAddress),
+      ]);
 
-Analyze:
-- Contract verification status
-- Security vulnerabilities and risks
-- Access controls and ownership
-- Potential honeypot indicators
-- Best practices compliance
+      this.entityTracking.entities[contractAddress.toLowerCase()] = {
+        type: "contract",
+        roles: ["audited_contract"],
+        lastMentioned: new Date().toISOString(),
+      };
+      this.entityTracking.lastMentioned.contract =
+        contractAddress.toLowerCase();
 
-Provide a comprehensive security report with risk assessment.`;
+      const auditData = {
+        address: contractAddress,
+        verification: etherscanData,
+        tokenInfo: moralisData?.metadata || null,
+        security: {
+          goPlus: goPlusData,
+          riskAssessment: this.assessContractRisk(goPlusData),
+        },
+        recommendations: this.generateSecurityRecommendations(
+          goPlusData,
+          etherscanData
+        ),
+      };
 
-      const response = await this.openai.chat.completions.create({
-        model: CONFIG.OPENAI_MODEL,
-        messages: [{ role: "user", content: analysisPrompt }],
-        temperature: 0.3,
-        max_tokens: 1500,
-      });
+      const contextPrompt = `Context Summary:
+- Previous audits: ${context.activeArtifacts.contracts.length}
+- Provide security analysis and recommendations
+- Focus on ${intentData.specificFocus || "general security"}`;
 
-      return (
-        response.choices[0].message.content ||
-        "I encountered an error auditing this contract."
+      return await this.generateAnalysisResponse(
+        userInput,
+        auditData,
+        "contract_audit",
+        contextPrompt
       );
     } catch (error) {
-      console.error("Contract audit error:", error);
-      return "I encountered an error auditing this contract. Please verify the address.";
+      console.error("Contract audit error:", error.message);
+      return "I encountered an error auditing this contract.";
     }
   }
 
-  async handleTrendingTokens(userInput: string): Promise<string> {
+  async getContractSecurity(contractAddress: string) {
+    try {
+      const response = await axios.get(
+        `${CONFIG.APIs.GOPLUS.BASE_URL}/token_security/1`,
+        {
+          params: {
+            contract_addresses: contractAddress,
+          },
+          headers: {
+            "X-API-KEY": CONFIG.APIs.GOPLUS.API_KEY,
+          },
+        }
+      );
+
+      return response.data.result?.[contractAddress.toLowerCase()];
+    } catch (error) {
+      console.error("GoPlus security check error:", error.message);
+      return null;
+    }
+  }
+
+  async getBasicContractInfo(contractAddress: string) {
+    try {
+      const response = await axios.get(CONFIG.APIs.ETHERSCAN.BASE_URL!, {
+        params: {
+          module: "contract",
+          action: "getsourcecode",
+          address: contractAddress,
+          apikey: CONFIG.APIs.ETHERSCAN.API_KEY,
+        },
+      });
+
+      const contractInfo = response.data.result[0];
+      return {
+        is_verified: contractInfo?.SourceCode !== "",
+        contract_name: contractInfo?.ContractName,
+        compiler_version: contractInfo?.CompilerVersion,
+        optimization_used: contractInfo?.OptimizationUsed === "1",
+        source_code_available: !!contractInfo?.SourceCode,
+        abi_available: !!contractInfo?.ABI,
+        proxy_contract: contractInfo?.Proxy === "1",
+      };
+    } catch (error) {
+      return {
+        is_verified: false,
+        error: error.message,
+      };
+    }
+  }
+
+  assessContractRisk(securityData: any) {
+    if (!securityData)
+      return { level: "unknown", reasons: ["No security data available"] };
+
+    const risks = [];
+    let riskLevel = "low";
+
+    if (securityData.is_honeypot === "1") {
+      risks.push("Potential honeypot detected");
+      riskLevel = "critical";
+    }
+
+    if (securityData.is_mintable === "1") {
+      risks.push("Token supply can be increased");
+      if (riskLevel === "low") riskLevel = "medium";
+    }
+
+    if (securityData.can_take_back_ownership === "1") {
+      risks.push("Ownership can be reclaimed");
+      if (riskLevel === "low") riskLevel = "medium";
+    }
+
+    if (securityData.is_blacklisted === "1") {
+      risks.push("Contract is blacklisted");
+      riskLevel = "high";
+    }
+
+    return {
+      level: riskLevel,
+      reasons: risks.length > 0 ? risks : ["No major risks detected"],
+      total_issues: risks.length,
+    };
+  }
+
+  generateSecurityRecommendations(
+    securityData: any,
+    contractInfo: any
+  ): string[] {
+    const recommendations = [];
+
+    if (!contractInfo.is_verified) {
+      recommendations.push(
+        "Contract is not verified - request source code verification"
+      );
+    }
+
+    if (securityData?.is_mintable === "1") {
+      recommendations.push(
+        "Token supply can be increased - ensure proper access controls"
+      );
+    }
+
+    if (securityData?.is_honeypot === "1") {
+      recommendations.push(
+        "CRITICAL: Potential honeypot detected - avoid interaction"
+      );
+    }
+
+    if (securityData?.can_take_back_ownership === "1") {
+      recommendations.push(
+        "Ownership can be reclaimed - verify renounced ownership claims"
+      );
+    }
+
+    return recommendations.length > 0
+      ? recommendations
+      : ["No critical issues detected"];
+  }
+
+  async handleTrendingTokens(
+    userInput: string,
+    intentData: any,
+    context: any
+  ): Promise<string> {
     try {
       const trendingData = await this.getCompleteTrendingData();
 
-      // Track trending analysis in context
       this.contextSummary.recentTopics.push({
         utility: "trending_tokens",
         timestamp: new Date(),
         summary: "Reviewed trending tokens and market trends",
       });
 
+      const contextPrompt = `Context Summary:
+- Previous market discussions: ${
+        context.recentSummary.recentTopics.filter(
+          (t: any) => t.utility === "trending_tokens"
+        ).length
+      }
+- User interest: ${
+        userInput.toLowerCase().includes("gain")
+          ? "top gainers"
+          : "general trends"
+      }
+- Provide current market trends and insights
+- Focus on actionable information`;
+
       return await this.generateAnalysisResponse(
         userInput,
         trendingData,
-        "trending_analysis"
+        "trending_analysis",
+        contextPrompt
       );
     } catch (error) {
       console.error("Trending tokens error:", error.message);
@@ -1588,21 +2382,35 @@ Provide a comprehensive security report with risk assessment.`;
     }
   }
 
-  async handleGasAnalysis(userInput: string): Promise<string> {
+  async handleGasAnalysis(userInput: string, context: any): Promise<string> {
     try {
       const gasData = await this.getCompleteGasData();
 
-      // Track gas analysis in context
       this.contextSummary.recentTopics.push({
         utility: "gas_analysis",
         timestamp: new Date(),
         summary: "Checked gas prices and network status",
       });
 
+      const contextPrompt = `Context Summary:
+- User may be planning transactions
+- Previous gas checks: ${
+        context.recentSummary.recentTopics.filter(
+          (t: any) => t.utility === "gas_analysis"
+        ).length
+      }
+- Provide gas optimization advice
+- Focus on: ${
+        userInput.toLowerCase().includes("optimize")
+          ? "optimization strategies"
+          : "current prices"
+      }`;
+
       return await this.generateAnalysisResponse(
         userInput,
         gasData,
-        "gas_analysis"
+        "gas_analysis",
+        contextPrompt
       );
     } catch (error) {
       console.error("Gas analysis error:", error.message);
@@ -1737,43 +2545,85 @@ Provide a comprehensive security report with risk assessment.`;
 
   async handleWalletAssistant(
     userInput: string,
-    intentData: any
+    intentData: any,
+    context: any
   ): Promise<string> {
-    if (!intentData.identifier) {
+    let walletAddress = intentData.identifier;
+
+    if (!walletAddress && context.activeArtifacts.wallets.length > 0) {
+      walletAddress =
+        context.activeArtifacts.wallets[
+          context.activeArtifacts.wallets.length - 1
+        ];
+    }
+
+    if (!walletAddress) {
       return "Please provide your wallet address for personalized portfolio analysis.";
     }
 
     try {
-      const analysisPrompt = `Provide personalized portfolio insights for wallet: ${intentData.identifier}
+      const walletData = await this.getMoralisWalletData(walletAddress);
+      const insights = await this.generatePersonalizedInsights(
+        walletData,
+        context
+      );
 
-Include:
-- Portfolio diversification analysis
-- Risk assessment
-- Yield opportunities
-- Rebalancing suggestions
-- DeFi strategies
-
-Format as actionable investment guidance.`;
-
-      const response = await this.openai.chat.completions.create({
-        model: CONFIG.OPENAI_MODEL,
-        messages: [{ role: "user", content: analysisPrompt }],
-        temperature: 0.4,
-        max_tokens: 1500,
-      });
-
-      return (
-        response.choices[0].message.content ||
-        "I encountered an error analyzing your portfolio."
+      return await this.generateAnalysisResponse(
+        userInput,
+        insights,
+        "wallet_assistant",
+        "Provide personalized portfolio advice and insights"
       );
     } catch (error) {
-      console.error("Wallet assistant error:", error);
+      console.error("Wallet assistant error:", error.message);
       return "I encountered an error accessing your wallet data.";
     }
   }
 
-  async handleBlockPalAssistant(userInput: string): Promise<string> {
+  async generatePersonalizedInsights(walletData: any, context: any) {
+    const ethBalance = parseFloat(walletData.native.balance) / 1e18;
+    const tokenCount = walletData.tokens.length;
+    const nftCount = walletData.nfts.length;
+    const txCount = walletData.transactions.length;
+
+    const insights = {
+      portfolio: {
+        diversification:
+          tokenCount > 5 ? "Well diversified" : "Consider diversifying",
+        activity: txCount > 10 ? "Active trader" : "Low activity",
+        nftHoldings: nftCount > 0 ? `Holds ${nftCount} NFTs` : "No NFTs",
+      },
+      recommendations: [],
+    };
+
+    if (ethBalance < 0.1) {
+      insights.recommendations.push(
+        "Low ETH balance - consider topping up for gas fees"
+      );
+    }
+
+    if (tokenCount === 0) {
+      insights.recommendations.push(
+        "No tokens detected - explore DeFi opportunities"
+      );
+    }
+
+    return insights;
+  }
+
+  async handleBlockPalAssistant(
+    userInput: string,
+    context: any
+  ): Promise<string> {
     const systemPrompt = `You are the BlockPal AI assistant explaining our platform's utilities.
+
+CONTEXT AWARENESS:
+- User has used these features: ${context.recentSummary.recentTopics
+      .map((t: any) => t.utility)
+      .join(", ")}
+- Session duration: ${Math.floor(
+      (new Date().getTime() - new Date().getTime()) / 60000
+    )} minutes
 
 AVAILABLE UTILITIES TO EXPLAIN:
 
@@ -1839,16 +2689,122 @@ Focus on WHAT the user can do with clear examples!`;
     }
   }
 
-  async handleGeneralQuery(userInput: string): Promise<string> {
-    const systemPrompt = `You are BlockPal AI assistant. Provide helpful crypto-related responses. Suggest specific utilities when appropriate. Be conversational and context-aware.`;
+  async handleGeneralQuery(userInput: string, context: any): Promise<string> {
+    const historyKeywords = [
+      "first question",
+      "what did i ask",
+      "previous question",
+      "earlier question",
+      "what we talked about",
+      "conversation history",
+      "what did we discuss",
+      "my first message",
+      "what i asked before",
+      "recap",
+      "summary of conversation",
+    ];
+
+    const isAskingAboutHistory = historyKeywords.some((keyword) =>
+      userInput.toLowerCase().includes(keyword)
+    );
+
+    if (isAskingAboutHistory) {
+      const messages = context.relevantMessages || [];
+      const userMessages = messages.filter((msg: any) => msg.role === "user");
+
+      if (userMessages.length > 0) {
+        const firstQuestion = userMessages[0];
+        const recentQuestions = userMessages.slice(-3);
+
+        let response = "";
+
+        if (userInput.toLowerCase().includes("first")) {
+          response = `Your first question was: "${firstQuestion.content}"`;
+
+          if (firstQuestion.metadata?.validation?.type) {
+            response += `\n\nYou asked me to analyze `;
+            switch (firstQuestion.metadata.validation.type) {
+              case "transaction":
+                response += `a transaction (${firstQuestion.metadata.validation.primary})`;
+                break;
+              case "wallet":
+                response += `a wallet address`;
+                break;
+              case "token":
+                response += `information about a token`;
+                break;
+              default:
+                response += `something related to ${firstQuestion.metadata.validation.type}`;
+            }
+          }
+        } else if (
+          userInput.toLowerCase().includes("previous") ||
+          userInput.toLowerCase().includes("last")
+        ) {
+          const lastQuestion = userMessages[userMessages.length - 2];
+          if (lastQuestion) {
+            response = `Your previous question was: "${lastQuestion.content}"`;
+          } else {
+            response = "This is only your second question in our conversation.";
+          }
+        } else if (
+          userInput.toLowerCase().includes("summary") ||
+          userInput.toLowerCase().includes("recap")
+        ) {
+          response = `Here's a summary of our conversation:\n\n`;
+          response += `You've asked ${userMessages.length} questions so far:\n`;
+          userMessages.forEach((msg: any, index: number) => {
+            response += `${index + 1}. "${msg.content}"\n`;
+          });
+
+          if (context.recentSummary.recentTopics.length > 0) {
+            response += `\nTopics we've covered:\n`;
+            context.recentSummary.recentTopics.forEach((topic: any) => {
+              response += `- ${topic.summary}\n`;
+            });
+          }
+        } else {
+          response = `In our conversation, you've asked about:\n`;
+          recentQuestions.forEach((msg: any, index: number) => {
+            response += `${index + 1}. "${msg.content}"\n`;
+          });
+        }
+
+        return response;
+      } else {
+        return "We haven't had any previous conversations yet. This appears to be your first message!";
+      }
+    }
+
+    const systemPrompt = `You are BlockPal AI assistant. 
+
+CONTEXT AWARENESS:
+- Active artifacts: ${JSON.stringify(context.activeArtifacts)}
+- Recent topics: ${context.recentSummary.recentTopics
+      .map((t: any) => t.summary)
+      .join(", ")}
+- Conversation messages: ${context.relevantMessages.length}
+
+Provide helpful crypto-related responses.
+Suggest specific utilities when appropriate.
+Be conversational and context-aware.`;
 
     try {
+      const messages = [{ role: "system", content: systemPrompt }];
+
+      const recentMessages = context.relevantMessages.slice(-5);
+      recentMessages.forEach((msg: any) => {
+        messages.push({
+          role: msg.role,
+          content: msg.content,
+        });
+      });
+
+      messages.push({ role: "user", content: userInput });
+
       const response = await this.openai.chat.completions.create({
         model: CONFIG.OPENAI_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userInput },
-        ],
+        messages,
         temperature: 0.6,
         max_tokens: 800,
       });
@@ -1934,7 +2890,6 @@ export async function GET(request: NextRequest) {
     const { db } = await connectToDatabase();
     const userId = decoded.userId || decoded.username;
 
-    // Get session
     const session = await db.collection("ai_chat_sessions").findOne({
       sessionId: sessionId,
       userId: userId,
@@ -1944,14 +2899,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
-    // Get messages for this session
     const messages = await db
       .collection("ai_chat_messages")
       .find({ sessionId: sessionId })
       .sort({ timestamp: 1 })
       .toArray();
 
-    const formattedMessages = messages.map((msg) => ({
+    const formattedMessages = messages.map((msg: any) => ({
       id: msg._id.toString(),
       type: msg.role,
       content: msg.content,
