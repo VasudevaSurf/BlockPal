@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - FIXED VERSION (Skeleton instead of refresh icons)
+// src/components/dashboard/TokenList.tsx - FIXED VERSION (Enhanced Image Loading Management)
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -11,103 +11,39 @@ import WalletRefreshButton from "@/components/wallet/WalletRefreshButton";
 import { RefreshCw } from "lucide-react";
 import { SkeletonTokenList } from "@/components/ui/Skeleton";
 
-export default function TokenList() {
-  const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
-  const { tokens, activeWallet, loading } = useSelector(
-    (state: RootState) => state.wallet
-  );
-  const { isLoading: isNavigating, startLoading } = useNavigationLoading();
+// Enhanced Image Loading Component
+const TokenImage = ({
+  src,
+  alt,
+  symbol,
+  contractAddress,
+  onLoad,
+  className = "",
+}: {
+  src?: string | null;
+  alt: string;
+  symbol: string;
+  contractAddress?: string;
+  onLoad?: () => void;
+  className?: string;
+}) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-  // Enhanced loading state management
-  const [tokenLoadingState, setTokenLoadingState] = useState({
-    isInitialLoad: true,
-    hasAttemptedLoad: false,
-    tokensLoaded: false,
-  });
-
-  // Use ref to prevent duplicate API calls
-  const tokensLoaded = useRef<string | null>(null);
-
-  useEffect(() => {
-    console.log("🪙 TokenList - Effect triggered", {
-      activeWalletAddress: activeWallet?.address,
-      tokensLoadedFor: tokensLoaded.current,
-      tokensLength: tokens.length,
-      loading,
-      shouldFetch:
-        activeWallet?.address && tokensLoaded.current !== activeWallet.address,
-    });
-
-    // Only fetch tokens if we have an active wallet and haven't already loaded tokens for this wallet
-    if (
-      activeWallet?.address &&
-      tokensLoaded.current !== activeWallet.address
-    ) {
-      console.log(
-        "📡 TokenList - Fetching tokens for wallet:",
-        activeWallet.address
-      );
-
-      tokensLoaded.current = activeWallet.address;
-      setTokenLoadingState((prev) => ({
-        ...prev,
-        hasAttemptedLoad: true,
-        isInitialLoad: true,
-      }));
-
-      dispatch(fetchWalletTokens(activeWallet.address)).then(() => {
-        setTokenLoadingState((prev) => ({
-          ...prev,
-          tokensLoaded: true,
-          isInitialLoad: false,
-        }));
-      });
-    } else if (tokens.length > 0 && !tokenLoadingState.tokensLoaded) {
-      // If we already have tokens, mark as loaded
-      setTokenLoadingState((prev) => ({
-        ...prev,
-        tokensLoaded: true,
-        isInitialLoad: false,
-        hasAttemptedLoad: true,
-      }));
+  // Better icon URL validation
+  const isValidImageUrl = (url: string | null | undefined): boolean => {
+    if (!url || url === "null" || url === "undefined" || url === "") {
+      return false;
     }
-  }, [
-    activeWallet?.address,
-    dispatch,
-    tokens.length,
-    tokenLoadingState.tokensLoaded,
-  ]);
-
-  // Reset loading state when active wallet changes
-  useEffect(() => {
-    if (
-      activeWallet?.address &&
-      tokensLoaded.current !== activeWallet.address
-    ) {
-      setTokenLoadingState({
-        isInitialLoad: true,
-        hasAttemptedLoad: false,
-        tokensLoaded: false,
-      });
-    }
-  }, [activeWallet?.address]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 6,
-    }).format(value);
+    return (
+      url.startsWith("http") &&
+      (url.includes("coingecko") ||
+        url.includes("coinbase") ||
+        url.includes("cdn"))
+    );
   };
 
-  const formatPercentage = (value: number) => {
-    const sign = value >= 0 ? "+" : "";
-    return `${sign}${value.toFixed(2)}%`;
-  };
-
-  // UPDATED: Enhanced token background colors
+  // Enhanced token background colors
   const getTokenBackgroundColor = (
     symbol: string,
     contractAddress?: string
@@ -143,7 +79,7 @@ export default function TokenList() {
     );
   };
 
-  // UPDATED: Enhanced icon colors
+  // Enhanced icon colors
   const getTokenIcon = (symbol: string, contractAddress?: string) => {
     const colors: Record<string, string> = {
       ETH: "bg-blue-500",
@@ -174,7 +110,7 @@ export default function TokenList() {
     return colors[symbol] || "bg-gray-500";
   };
 
-  // FIXED: Proper ETH symbol handling
+  // Enhanced token letters
   const getTokenLetter = (symbol: string, contractAddress?: string) => {
     const letters: Record<string, string> = {
       ETH: "Ξ",
@@ -205,22 +141,252 @@ export default function TokenList() {
     return letters[symbol] || symbol.charAt(0);
   };
 
-  // FIXED: Better icon URL validation
-  const isValidImageUrl = (url: string | null | undefined): boolean => {
-    if (!url || url === "null" || url === "undefined" || url === "") {
-      return false;
+  const handleImageLoad = () => {
+    setIsLoading(false);
+    setHasError(false);
+    if (onLoad) {
+      onLoad();
     }
-    return (
-      url.startsWith("http") &&
-      (url.includes("coingecko") ||
-        url.includes("coinbase") ||
-        url.includes("cdn"))
-    );
+  };
+
+  const handleImageError = () => {
+    setIsLoading(false);
+    setHasError(true);
+    if (onLoad) {
+      onLoad();
+    }
+  };
+
+  const shouldShowImage = isValidImageUrl(src) && !hasError;
+
+  return (
+    <div className={`relative ${className}`}>
+      {/* Background container with gradient */}
+      <div
+        className={`w-full h-full ${getTokenBackgroundColor(
+          symbol,
+          contractAddress
+        )} rounded-full flex items-center justify-center p-0.5`}
+      >
+        {/* Show skeleton while loading and we expect an image */}
+        {isLoading && shouldShowImage && (
+          <div className="w-full h-full bg-gray-600 animate-pulse rounded-full" />
+        )}
+
+        {/* Show real image when loaded */}
+        {shouldShowImage && (
+          <img
+            src={src}
+            alt={alt}
+            className={`w-full h-full rounded-full object-cover ${
+              isLoading ? "opacity-0 absolute" : "opacity-100"
+            }`}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+            loading="lazy"
+          />
+        )}
+
+        {/* Show fallback icon when no valid image or error occurred and not loading */}
+        {(!shouldShowImage || hasError) && !isLoading && (
+          <div
+            className={`w-full h-full ${getTokenIcon(
+              symbol,
+              contractAddress
+            )} rounded-full flex items-center justify-center`}
+          >
+            <span className="text-white text-xs font-medium">
+              {getTokenLetter(symbol, contractAddress)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default function TokenList() {
+  const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+  const { tokens, activeWallet, loading } = useSelector(
+    (state: RootState) => state.wallet
+  );
+  const { isLoading: isNavigating, startLoading } = useNavigationLoading();
+
+  // Enhanced loading state management
+  const [tokenLoadingState, setTokenLoadingState] = useState({
+    isInitialLoad: true,
+    hasAttemptedLoad: false,
+    tokensLoaded: false,
+    imagesLoaded: false, // NEW: Track image loading
+  });
+
+  // Track image loading completion
+  const [imageLoadingStates, setImageLoadingStates] = useState<
+    Record<string, boolean>
+  >({});
+  const [allImagesLoaded, setAllImagesLoaded] = useState(false);
+
+  // Use ref to prevent duplicate API calls
+  const tokensLoaded = useRef<string | null>(null);
+
+  useEffect(() => {
+    console.log("🪙 TokenList - Effect triggered", {
+      activeWalletAddress: activeWallet?.address,
+      tokensLoadedFor: tokensLoaded.current,
+      tokensLength: tokens.length,
+      loading,
+      shouldFetch:
+        activeWallet?.address && tokensLoaded.current !== activeWallet.address,
+    });
+
+    // Only fetch tokens if we have an active wallet and haven't already loaded tokens for this wallet
+    if (
+      activeWallet?.address &&
+      tokensLoaded.current !== activeWallet.address
+    ) {
+      console.log(
+        "📡 TokenList - Fetching tokens for wallet:",
+        activeWallet.address
+      );
+
+      tokensLoaded.current = activeWallet.address;
+      setTokenLoadingState((prev) => ({
+        ...prev,
+        hasAttemptedLoad: true,
+        isInitialLoad: true,
+        imagesLoaded: false, // Reset image loading state
+      }));
+
+      // Reset image loading states
+      setImageLoadingStates({});
+      setAllImagesLoaded(false);
+
+      dispatch(fetchWalletTokens(activeWallet.address)).then(() => {
+        setTokenLoadingState((prev) => ({
+          ...prev,
+          tokensLoaded: true,
+          isInitialLoad: false,
+        }));
+      });
+    } else if (tokens.length > 0 && !tokenLoadingState.tokensLoaded) {
+      // If we already have tokens, mark as loaded
+      setTokenLoadingState((prev) => ({
+        ...prev,
+        tokensLoaded: true,
+        isInitialLoad: false,
+        hasAttemptedLoad: true,
+      }));
+    }
+  }, [
+    activeWallet?.address,
+    dispatch,
+    tokens.length,
+    tokenLoadingState.tokensLoaded,
+  ]);
+
+  // Reset loading state when active wallet changes
+  useEffect(() => {
+    if (
+      activeWallet?.address &&
+      tokensLoaded.current !== activeWallet.address
+    ) {
+      setTokenLoadingState({
+        isInitialLoad: true,
+        hasAttemptedLoad: false,
+        tokensLoaded: false,
+        imagesLoaded: false,
+      });
+      setImageLoadingStates({});
+      setAllImagesLoaded(false);
+    }
+  }, [activeWallet?.address]);
+
+  // NEW: Track when all images are loaded
+  useEffect(() => {
+    if (tokens.length > 0 && tokenLoadingState.tokensLoaded) {
+      const totalTokens = tokens.length;
+      const loadedImages =
+        Object.values(imageLoadingStates).filter(Boolean).length;
+
+      console.log(`🖼️ Image loading progress: ${loadedImages}/${totalTokens}`);
+
+      if (loadedImages === totalTokens) {
+        setAllImagesLoaded(true);
+        setTokenLoadingState((prev) => ({ ...prev, imagesLoaded: true }));
+        console.log("✅ All token images loaded - navigation enabled");
+      }
+    }
+  }, [imageLoadingStates, tokens.length, tokenLoadingState.tokensLoaded]);
+
+  // NEW: Initialize image loading states when tokens are available
+  useEffect(() => {
+    if (tokens.length > 0 && tokenLoadingState.tokensLoaded) {
+      // Initialize all tokens as not loaded, but allow immediate display
+      const initialStates: Record<string, boolean> = {};
+      tokens.forEach((token) => {
+        if (!(token.id in imageLoadingStates)) {
+          initialStates[token.id] = false;
+        }
+      });
+
+      if (Object.keys(initialStates).length > 0) {
+        setImageLoadingStates((prev) => ({ ...prev, ...initialStates }));
+      }
+
+      // Set a timeout to enable navigation after a reasonable time even if some images fail
+      setTimeout(() => {
+        if (!allImagesLoaded) {
+          console.log("⏰ Enabling navigation after timeout");
+          setAllImagesLoaded(true);
+          setTokenLoadingState((prev) => ({ ...prev, imagesLoaded: true }));
+        }
+      }, 3000); // 3 second timeout
+    }
+  }, [tokens.length, tokenLoadingState.tokensLoaded]);
+
+  // NEW: Handle individual image load completion
+  const handleImageLoad = (tokenId: string) => {
+    setImageLoadingStates((prev) => ({
+      ...prev,
+      [tokenId]: true,
+    }));
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    }).format(value);
+  };
+
+  const formatPercentage = (value: number) => {
+    const sign = value >= 0 ? "+" : "";
+    return `${sign}${value.toFixed(2)}%`;
   };
 
   const handleTokenClick = (token: any) => {
-    // Prevent navigation if already navigating
+    // SIMPLIFIED: Only prevent navigation if already navigating
+    // Allow navigation even if some images are still loading (with timeout fallback)
     if (isNavigating) {
+      console.log("🚫 Navigation blocked - already navigating");
+      return;
+    }
+
+    // Only block if images are actively loading and we haven't hit the timeout
+    const isImageLoadingBlocked =
+      !allImagesLoaded &&
+      tokens.length > 0 &&
+      Object.keys(imageLoadingStates).length > 0 &&
+      Object.values(imageLoadingStates).every((loaded) => !loaded);
+
+    if (isImageLoadingBlocked) {
+      console.log("🚫 Navigation blocked - images still loading", {
+        allImagesLoaded,
+        imageStates: imageLoadingStates,
+      });
       return;
     }
 
@@ -239,7 +405,7 @@ export default function TokenList() {
       return;
     }
 
-    // FIXED: Better ETH/native token detection
+    // Better ETH/native token detection
     let routeContractAddress: string;
     if (
       token.contractAddress === "native" ||
@@ -299,14 +465,14 @@ export default function TokenList() {
 
   const displayTokens = tokens;
 
-  // FIXED: Enhanced skeleton loading conditions to include navigation states
+  // FIXED: Only show skeleton for major loading states, not image loading
   const shouldShowSkeleton =
     tokenLoadingState.isInitialLoad ||
     (loading && tokens.length === 0) ||
     (!tokenLoadingState.hasAttemptedLoad && activeWallet?.address) ||
-    // NEW: Show skeleton when navigating or when tokens are being refreshed
     isNavigating ||
     (loading && tokenLoadingState.isInitialLoad);
+  // REMOVED: Don't show skeleton while images load - show tokens with skeleton images instead
 
   if (shouldShowSkeleton) {
     console.log("🔄 TokenList - Showing skeleton", {
@@ -315,7 +481,7 @@ export default function TokenList() {
       tokensLength: tokens.length,
       hasAttemptedLoad: tokenLoadingState.hasAttemptedLoad,
       activeWallet: !!activeWallet?.address,
-      isNavigating, // NEW: Log navigation state
+      isNavigating,
     });
     return <SkeletonTokenList />;
   }
@@ -344,13 +510,13 @@ export default function TokenList() {
     );
   }
 
-  // UPDATED: Only show "no tokens" if we've attempted to load and confirmed no tokens
+  // Only show "no tokens" if we've attempted to load and confirmed no tokens
   if (
     displayTokens.length === 0 &&
     tokenLoadingState.hasAttemptedLoad &&
     tokenLoadingState.tokensLoaded &&
     !loading &&
-    !isNavigating // NEW: Don't show empty state when navigating
+    !isNavigating
   ) {
     return (
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
@@ -391,55 +557,23 @@ export default function TokenList() {
             <div
               key={token.id}
               onClick={() => handleTokenClick(token)}
-              className={`bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C] cursor-pointer transition-colors ${
-                // REMOVED: isNavigating check since we show skeleton instead
-                "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+              className={`bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C] transition-colors ${
+                isNavigating
+                  ? "cursor-wait opacity-70"
+                  : "cursor-pointer hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
               }`}
             >
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center">
-                  {/* REMOVED: Navigation loading spinner - skeleton handles this now */}
-                  <div
-                    className={`w-8 h-8 ${getTokenBackgroundColor(
-                      token.symbol,
-                      token.contractAddress
-                    )} rounded-full flex items-center justify-center mr-2.5 flex-shrink-0 p-0.5`}
-                  >
-                    {/* UPDATED: Better icon handling with background */}
-                    {isValidImageUrl(token.icon) ? (
-                      <img
-                        src={token.icon}
-                        alt={token.symbol}
-                        className="w-7 h-7 rounded-full"
-                        onError={(e) => {
-                          console.log(
-                            `❌ Image load failed for ${token.symbol}: ${token.icon}`
-                          );
-                          // Fallback to colored circle if image fails
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = "none";
-                          const fallback =
-                            target.nextElementSibling as HTMLElement;
-                          if (fallback) {
-                            fallback.classList.remove("hidden");
-                          }
-                        }}
-                      />
-                    ) : null}
-
-                    <div
-                      className={`w-7 h-7 ${getTokenIcon(
-                        token.symbol,
-                        token.contractAddress
-                      )} rounded-full flex items-center justify-center ${
-                        isValidImageUrl(token.icon) ? "hidden" : ""
-                      }`}
-                    >
-                      <span className="text-white text-xs font-medium">
-                        {getTokenLetter(token.symbol, token.contractAddress)}
-                      </span>
-                    </div>
-                  </div>
+                  {/* ENHANCED: Use new TokenImage component */}
+                  <TokenImage
+                    src={token.icon}
+                    alt={token.symbol}
+                    symbol={token.symbol}
+                    contractAddress={token.contractAddress}
+                    onLoad={() => handleImageLoad(token.id)}
+                    className="w-8 h-8 mr-2.5 flex-shrink-0"
+                  />
 
                   <div className="min-w-0">
                     <div className="text-white font-medium font-satoshi text-sm">
@@ -476,53 +610,21 @@ export default function TokenList() {
               key={token.id}
               onClick={() => handleTokenClick(token)}
               className={`flex items-center justify-between p-2.5 rounded-lg transition-colors ${
-                // REMOVED: isNavigating check since we show skeleton instead
-                "hover:bg-[#1A1A1A] cursor-pointer active:bg-[#2A2A2A]"
+                isNavigating
+                  ? "cursor-wait opacity-70"
+                  : "cursor-pointer hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
               }`}
             >
               <div className="flex items-center min-w-0 flex-1">
-                {/* REMOVED: Navigation loading spinner - skeleton handles this now */}
-                <div
-                  className={`w-10 h-10 ${getTokenBackgroundColor(
-                    token.symbol,
-                    token.contractAddress
-                  )} rounded-full flex items-center justify-center mr-2.5 flex-shrink-0 p-0.5`}
-                >
-                  {/* UPDATED: Better icon handling with background */}
-                  {isValidImageUrl(token.icon) ? (
-                    <img
-                      src={token.icon}
-                      alt={token.symbol}
-                      className="w-9 h-9 rounded-full"
-                      onError={(e) => {
-                        console.log(
-                          `❌ Image load failed for ${token.symbol}: ${token.icon}`
-                        );
-                        // Fallback to colored circle if image fails
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = "none";
-                        const fallback =
-                          target.nextElementSibling as HTMLElement;
-                        if (fallback) {
-                          fallback.classList.remove("hidden");
-                        }
-                      }}
-                    />
-                  ) : null}
-
-                  <div
-                    className={`w-9 h-9 ${getTokenIcon(
-                      token.symbol,
-                      token.contractAddress
-                    )} rounded-full flex items-center justify-center ${
-                      isValidImageUrl(token.icon) ? "hidden" : ""
-                    }`}
-                  >
-                    <span className="text-white text-sm font-medium">
-                      {getTokenLetter(token.symbol, token.contractAddress)}
-                    </span>
-                  </div>
-                </div>
+                {/* ENHANCED: Use new TokenImage component */}
+                <TokenImage
+                  src={token.icon}
+                  alt={token.symbol}
+                  symbol={token.symbol}
+                  contractAddress={token.contractAddress}
+                  onLoad={() => handleImageLoad(token.id)}
+                  className="w-10 h-10 mr-2.5 flex-shrink-0"
+                />
 
                 <div className="min-w-0 flex-1">
                   <div className="text-white font-medium font-satoshi text-sm sm:text-sm flex items-center">
