@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - FIXED: Prevent self friend/fund requests
+// src/components/FriendsPage.tsx - UPDATED: Added default tokens for fund requests
 "use client";
 
 import { useState, useEffect } from "react";
@@ -75,6 +75,28 @@ interface FundRequest {
   fulfilledBy?: string;
 }
 
+// ADDED: Default tokens that users can request even if they don't have them
+const DEFAULT_TOKENS = [
+  {
+    id: "ethereum",
+    symbol: "ETH",
+    name: "Ethereum",
+    contractAddress: "native",
+    decimals: 18,
+    icon: "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
+    isDefault: true,
+  },
+  {
+    id: "tether",
+    symbol: "USDT",
+    name: "Tether USD",
+    contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    decimals: 6,
+    icon: "https://coin-images.coingecko.com/coins/images/325/large/Tether.png",
+    isDefault: true,
+  },
+];
+
 // Helper function to parse user-friendly error messages
 const parseErrorMessage = (error: string): string => {
   if (error.includes("insufficient funds")) {
@@ -148,6 +170,70 @@ export default function FriendsPage() {
   // Track copied state for clipboard actions
   const [copied, setCopied] = useState<string | null>(null);
 
+  // ADDED: Combine user tokens with default tokens for fund request dropdown
+  const getAvailableTokens = () => {
+    const combinedTokens = [...DEFAULT_TOKENS];
+
+    // Add user's tokens that aren't already in defaults
+    tokens.forEach((token) => {
+      const exists = DEFAULT_TOKENS.some(
+        (defaultToken) =>
+          defaultToken.symbol.toLowerCase() === token.symbol.toLowerCase()
+      );
+
+      if (!exists) {
+        combinedTokens.push({
+          id: token.id || token.symbol.toLowerCase(),
+          symbol: token.symbol,
+          name: token.name,
+          contractAddress: token.contractAddress,
+          decimals: token.decimals,
+          icon: token.icon,
+          isDefault: false,
+        });
+      }
+    });
+
+    // Sort tokens: User's tokens first, then popular/default tokens
+    return combinedTokens.sort((a, b) => {
+      // If user has this token, prioritize it
+      const userHasA = tokens.some(
+        (t) => t.symbol.toLowerCase() === a.symbol.toLowerCase()
+      );
+      const userHasB = tokens.some(
+        (t) => t.symbol.toLowerCase() === b.symbol.toLowerCase()
+      );
+
+      if (userHasA && !userHasB) return -1;
+      if (!userHasA && userHasB) return 1;
+
+      // Among tokens user has, sort by balance (if available)
+      if (userHasA && userHasB) {
+        const tokenA = tokens.find(
+          (t) => t.symbol.toLowerCase() === a.symbol.toLowerCase()
+        );
+        const tokenB = tokens.find(
+          (t) => t.symbol.toLowerCase() === b.symbol.toLowerCase()
+        );
+
+        const balanceA = parseFloat(tokenA?.balanceFormatted || "0");
+        const balanceB = parseFloat(tokenB?.balanceFormatted || "0");
+
+        return balanceB - balanceA; // Higher balance first
+      }
+
+      // Among default tokens, maintain the predefined order
+      if (a.isDefault && b.isDefault) {
+        return (
+          DEFAULT_TOKENS.findIndex((t) => t.symbol === a.symbol) -
+          DEFAULT_TOKENS.findIndex((t) => t.symbol === b.symbol)
+        );
+      }
+
+      return 0;
+    });
+  };
+
   // Copy to clipboard helper
   const copyToClipboard = (value: string, key: string) => {
     if (!value) return;
@@ -173,7 +259,6 @@ export default function FriendsPage() {
       USDT: "bg-green-500",
       USDC: "bg-blue-600",
       YAI: "bg-yellow-500",
-      LINK: "bg-blue-700",
     };
 
     if (
@@ -202,7 +287,6 @@ export default function FriendsPage() {
       USDT: "₮",
       USDC: "$",
       YAI: "Ÿ",
-      LINK: "⛓",
     };
 
     if (
@@ -233,6 +317,13 @@ export default function FriendsPage() {
     const symbol = token?.symbol || "ETH";
     const contractAddress = token?.contractAddress;
     const imageUrl = token?.icon;
+
+    // Check if user actually has this token
+    const userToken = tokens.find(
+      (t) => t.symbol.toLowerCase() === symbol.toLowerCase()
+    );
+    const hasBalance =
+      userToken && parseFloat(userToken.balanceFormatted || "0") > 0;
 
     return (
       <div className="flex items-center justify-between w-full">
@@ -266,7 +357,19 @@ export default function FriendsPage() {
             </span>
           </div>
 
-          <span className="text-white font-satoshi">{symbol}</span>
+          <div className="flex items-center">
+            <span className="text-white font-satoshi mr-1">{symbol}</span>
+            {userToken && hasBalance && (
+              <span className="text-green-400 text-xs font-satoshi">
+                ({userToken.balanceFormatted})
+              </span>
+            )}
+            {!userToken && token.isDefault && (
+              <span className="text-gray-400 text-xs font-satoshi">
+                (Popular)
+              </span>
+            )}
+          </div>
         </div>
 
         {isSelected && (
@@ -578,11 +681,13 @@ export default function FriendsPage() {
 
     setSelectedFriend(friend);
     setShowFundRequestModal(true);
-    // Set default to ETH or first available token with image
+
+    // UPDATED: Set default to ETH or first available token
+    const availableTokens = getAvailableTokens();
     const defaultToken =
-      tokens.find((token) => token.symbol === "ETH") ||
-      tokens.find((token) => isValidImageUrl(token.icon)) ||
-      tokens[0];
+      availableTokens.find((token) => token.symbol === "ETH") ||
+      availableTokens[0];
+
     setFundRequestData({
       tokenSymbol: defaultToken?.symbol || "ETH",
       amount: "",
@@ -632,7 +737,7 @@ export default function FriendsPage() {
         setShowFundRequestModal(false);
         setSelectedFriend(null);
         setFundRequestData({
-          tokenSymbol: tokens.length > 0 ? tokens[0].symbol : "ETH",
+          tokenSymbol: getAvailableTokens()[0]?.symbol || "ETH",
           amount: "",
           message: "",
         });
@@ -812,7 +917,6 @@ export default function FriendsPage() {
                   }`}
                 >
                   Friends
-                  {/* ({friends.length}) */}
                 </button>
                 <button
                   onClick={() => setActiveTab("Requests")}
@@ -823,7 +927,6 @@ export default function FriendsPage() {
                   }`}
                 >
                   Requests
-                  {/* ({friendRequests.length}) */}
                 </button>
                 <button
                   onClick={() => setActiveTab("FundRequests")}
@@ -834,7 +937,6 @@ export default function FriendsPage() {
                   }`}
                 >
                   Fund Requests
-                  {/* ({fundRequests.length}) */}
                 </button>
               </div>
 
@@ -1089,7 +1191,7 @@ export default function FriendsPage() {
                       const statusInfo = getFundRequestStatusInfo(request);
                       return (
                         <div key={request._id}>
-                          {/* Mobile Card Layout */}
+                          {/* Fund request cards remain the same... */}
                           <div className="block lg:hidden">
                             <div
                               className={`bg-[#0F0F0F] rounded-lg p-3 mb-2 border border-[#2C2C2C] transition-all ${
@@ -1314,7 +1416,7 @@ export default function FriendsPage() {
           </div>
         </div>
 
-        {/* Fund Request Modal */}
+        {/* Fund Request Modal - UPDATED with default tokens */}
         {showFundRequestModal && selectedFriend && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
@@ -1360,7 +1462,7 @@ export default function FriendsPage() {
               </div>
 
               <div className="space-y-3">
-                {/* Token Dropdown */}
+                {/* UPDATED: Token Dropdown with default tokens */}
                 <div className="relative" data-token-dropdown>
                   <button
                     type="button"
@@ -1368,36 +1470,53 @@ export default function FriendsPage() {
                     className="w-full bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 text-white font-satoshi text-left flex items-center justify-between hover:border-[#E2AF19] transition-colors focus:outline-none focus:border-[#E2AF19]"
                   >
                     {(() => {
-                      const selectedToken = tokens.find(
-                        (t) => t.symbol === fundRequestData.tokenSymbol
-                      ) || {
-                        symbol: "ETH",
-                        icon: null,
-                        contractAddress: "native",
-                      };
+                      const availableTokens = getAvailableTokens();
+                      const selectedToken =
+                        availableTokens.find(
+                          (t) => t.symbol === fundRequestData.tokenSymbol
+                        ) || availableTokens[0];
                       return renderTokenOption(selectedToken, true);
                     })()}
                   </button>
 
                   {showTokenDropdown && (
-                    <div className="absolute top-full left-0 right-0 z-[60] mt-1.5 bg-black border border-[#2C2C2C] rounded-lg shadow-2xl max-h-48 overflow-y-auto scrollbar-hide">
-                      {/* Token Options */}
-                      {tokens.map((token) => (
-                        <button
-                          key={token.id}
-                          type="button"
-                          onClick={() => {
-                            setFundRequestData({
-                              ...fundRequestData,
-                              tokenSymbol: token.symbol,
-                            });
-                            setShowTokenDropdown(false);
-                          }}
-                          className="w-full flex items-center px-2.5 py-2.5 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
-                        >
-                          {renderTokenOption(token)}
-                        </button>
-                      ))}
+                    <div className="absolute top-full left-0 right-0 z-[60] mt-1.5 bg-black border border-[#2C2C2C] rounded-lg shadow-2xl max-h-64 overflow-y-auto scrollbar-hide">
+                      {/* UPDATED: Show default tokens + user tokens */}
+                      {getAvailableTokens().map((token, index) => {
+                        const userToken = tokens.find(
+                          (t) =>
+                            t.symbol.toLowerCase() ===
+                            token.symbol.toLowerCase()
+                        );
+                        const hasBalance =
+                          userToken &&
+                          parseFloat(userToken.balanceFormatted || "0") > 0;
+
+                        return (
+                          <button
+                            key={`${token.symbol}-${index}`}
+                            type="button"
+                            onClick={() => {
+                              setFundRequestData({
+                                ...fundRequestData,
+                                tokenSymbol: token.symbol,
+                              });
+                              setShowTokenDropdown(false);
+                            }}
+                            className="w-full flex items-center px-2.5 py-2.5 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
+                          >
+                            {renderTokenOption(token)}
+                          </button>
+                        );
+                      })}
+
+                      {/* Info footer */}
+                      <div className="px-2.5 py-2 border-t border-[#2C2C2C] bg-[#0F0F0F]">
+                        <p className="text-gray-500 text-xs font-satoshi">
+                          💡 You can request ETH or USDT, even if you don't
+                          currently hold them
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1447,7 +1566,7 @@ export default function FriendsPage() {
           </div>
         )}
 
-        {/* Fund Request Detail Modal */}
+        {/* Rest of the modals remain the same... */}
         {selectedFundRequest && (
           <FundRequestModal
             isOpen={!!selectedFundRequest}
@@ -1468,7 +1587,6 @@ export default function FriendsPage() {
         {showRemoveConfirmation && friendToRemove && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-sm p-4">
-              {/* Header with back button */}
               <div className="flex items-center mb-4">
                 <button
                   onClick={() => {
@@ -1485,7 +1603,6 @@ export default function FriendsPage() {
                 <div className="w-4"></div>
               </div>
 
-              {/* Content */}
               <div className="text-center mb-4">
                 <p className="text-gray-300 font-satoshi text-sm mb-1">
                   Are you sure you want to delete
@@ -1495,7 +1612,6 @@ export default function FriendsPage() {
                 </p>
               </div>
 
-              {/* Buttons */}
               <div className="flex gap-2">
                 <button
                   onClick={() => {

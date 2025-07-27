@@ -1,4 +1,4 @@
-// src/components/friends/FundRequestModal.tsx - COMPACT VERSION
+// src/components/friends/FundRequestModal.tsx - FIXED VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -303,6 +303,7 @@ export default function FundRequestModal({
       setRequesterInfo(null);
       setCurrentStatus(fundRequest.status);
       setShowTokenDropdown(false);
+      setLoading(false); // FIXED: Reset loading state
 
       fetchCurrentStatus();
 
@@ -469,16 +470,28 @@ export default function FundRequestModal({
       return;
     }
 
-    if (
-      parseFloat(tokenInfo.balanceFormatted) < parseFloat(fundRequest.amount)
-    ) {
-      setError(`Insufficient ${fundRequest.tokenSymbol} balance`);
+    // FIXED: Better balance checking with proper error handling
+    const userBalance = parseFloat(tokenInfo.balanceFormatted || "0");
+    const requestedAmount = parseFloat(fundRequest.amount || "0");
+
+    console.log(
+      `🔍 Balance check: User has ${userBalance} ${fundRequest.tokenSymbol}, requesting ${requestedAmount}`
+    );
+
+    if (userBalance < requestedAmount) {
+      const errorMsg = `Insufficient ${fundRequest.tokenSymbol} balance. You have ${userBalance} ${fundRequest.tokenSymbol} but need ${requestedAmount} ${fundRequest.tokenSymbol}.`;
+      setError(errorMsg);
+      setStep("error"); // FIXED: Set step to error instead of staying in sending
+      setLoading(false); // FIXED: Reset loading state
       return;
     }
 
     try {
       setLoading(true);
+      setError(""); // Clear any previous errors
       setStep("sending");
+
+      console.log("🚀 Starting transfer with Enhanced API...");
 
       const transferResponse = await fetch("/api/transfer/simple", {
         method: "POST",
@@ -503,8 +516,10 @@ export default function FundRequestModal({
       });
 
       const transferData = await transferResponse.json();
+      console.log("📡 Transfer API response:", transferData);
 
       if (transferData.success && transferData.result) {
+        console.log("✅ Transfer successful, updating fund request status...");
         setTransferResult(transferData.result);
         setStep("success");
 
@@ -533,11 +548,19 @@ export default function FundRequestModal({
           }
         }
       } else {
-        setError(parseErrorMessage(transferData.error || "Transfer failed"));
+        console.error("❌ Transfer failed:", transferData.error);
+        const errorMsg = parseErrorMessage(
+          transferData.error || "Transfer failed"
+        );
+        setError(errorMsg);
         setStep("error");
       }
     } catch (error: any) {
-      setError(parseErrorMessage(error.message || "Failed to fulfill request"));
+      console.error("❌ Transfer exception:", error);
+      const errorMsg = parseErrorMessage(
+        error.message || "Failed to fulfill request"
+      );
+      setError(errorMsg);
       setStep("error");
     } finally {
       setLoading(false);
@@ -590,7 +613,8 @@ export default function FundRequestModal({
   const tokenInfo = getTokenInfo();
   const hasInsufficientBalance =
     tokenInfo &&
-    parseFloat(tokenInfo.balanceFormatted) < parseFloat(fundRequest.amount);
+    parseFloat(tokenInfo.balanceFormatted || "0") <
+      parseFloat(fundRequest.amount || "0");
   const requesterWalletAddress =
     fundRequest.requesterWalletAddress || requesterInfo?.walletAddress;
 
@@ -609,14 +633,14 @@ export default function FundRequestModal({
               </div>
               <div>
                 <h3 className="text-base font-semibold text-white font-satoshi">
-                  Fund Request {step === "sending"}
+                  Fund Request {step === "sending" && "- Processing"}
                 </h3>
                 <p className="text-gray-400 text-xs font-satoshi">
                   {step === "review" && !canTakeAction && "Already processed"}
                   {step === "review" &&
                     canTakeAction &&
                     "Review request details"}
-                  {step === "sending" && ""}
+                  {step === "sending" && "Processing your transfer..."}
                   {step === "success" && "Transfer completed!"}
                   {step === "error" && "Transfer failed"}
                   {step === "completed" && "Request completed"}
@@ -632,6 +656,57 @@ export default function FundRequestModal({
           </div>
 
           <div className="p-4">
+            {/* Error state for insufficient funds - FIXED */}
+            {step === "error" && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <AlertTriangle size={24} className="text-red-400" />
+                  </div>
+                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
+                    Transfer Failed
+                  </h4>
+                  <p className="text-gray-400 text-xs font-satoshi mb-3">
+                    Unable to complete the fund request.
+                  </p>
+                  {error && (
+                    <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-3">
+                      <div className="flex items-start">
+                        <AlertTriangle
+                          size={14}
+                          className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
+                        />
+                        <p className="text-red-400 text-xs font-satoshi text-left">
+                          {error}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={onClose}
+                    className="flex-1"
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setStep("review");
+                      setError("");
+                      setLoading(false);
+                    }}
+                    className="flex-1"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Rest of the existing modal content stays the same... */}
             {(step === "completed" || isProcessed) && (
               <div className="space-y-4">
                 {(() => {
@@ -657,6 +732,7 @@ export default function FundRequestModal({
                   );
                 })()}
 
+                {/* Request details */}
                 <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -766,7 +842,7 @@ export default function FundRequestModal({
                         <span className="text-gray-400 text-xs font-satoshi">
                           Message:
                         </span>
-                        <p className="text-white text-xs font-satoshi mt-0.5">
+                        <p className="text-white text-xs font-satoshi mt-0.5 bg-[#1A1A1A] p-2 rounded border border-[#2C2C2C]">
                           "{fundRequest.message}"
                         </p>
                       </div>
@@ -795,10 +871,11 @@ export default function FundRequestModal({
                       </span>
                     </div>
 
+                    {/* Transfer details section */}
                     <div className="bg-[#1A1A1A] rounded-lg p-2.5 border border-[#2C2C2C]">
                       <div className="text-xs font-satoshi mb-1.5">
                         <span className="text-[#E2AF19] font-medium">
-                          Transfer Details (Enhanced API):
+                          Transfer Details:
                         </span>
                       </div>
 
@@ -878,6 +955,7 @@ export default function FundRequestModal({
                   </div>
                 </div>
 
+                {/* Balance check section */}
                 {tokenInfo && (
                   <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
                     <div className="flex justify-between items-center mb-1.5">
@@ -888,7 +966,8 @@ export default function FundRequestModal({
                         </span>
                       </div>
                       <span className="text-white font-semibold font-satoshi">
-                        {tokenInfo.balanceFormatted} {fundRequest.tokenSymbol}
+                        {tokenInfo.balanceFormatted || "0"}{" "}
+                        {fundRequest.tokenSymbol}
                       </span>
                     </div>
 
@@ -899,12 +978,20 @@ export default function FundRequestModal({
                             size={14}
                             className="text-red-400 mr-1.5 mt-0.5 flex-shrink-0"
                           />
-                          <p className="text-red-400 text-xs font-satoshi">
-                            Insufficient balance. You need{" "}
-                            {parseFloat(fundRequest.amount) -
-                              parseFloat(tokenInfo.balanceFormatted)}{" "}
-                            more {fundRequest.tokenSymbol}.
-                          </p>
+                          <div>
+                            <p className="text-red-400 text-xs font-satoshi font-medium mb-1">
+                              Insufficient Balance
+                            </p>
+                            <p className="text-red-400 text-xs font-satoshi">
+                              You need{" "}
+                              {parseFloat(fundRequest.amount) -
+                                parseFloat(
+                                  tokenInfo.balanceFormatted || "0"
+                                )}{" "}
+                              more {fundRequest.tokenSymbol} to fulfill this
+                              request.
+                            </p>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -918,10 +1005,15 @@ export default function FundRequestModal({
                         size={14}
                         className="text-yellow-400 mr-1.5 mt-0.5 flex-shrink-0"
                       />
-                      <p className="text-yellow-400 text-xs font-satoshi">
-                        You don't have any {fundRequest.tokenSymbol} in your
-                        wallet.
-                      </p>
+                      <div>
+                        <p className="text-yellow-400 text-xs font-satoshi font-medium mb-1">
+                          Token Not Found
+                        </p>
+                        <p className="text-yellow-400 text-xs font-satoshi">
+                          You don't have any {fundRequest.tokenSymbol} in your
+                          wallet.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -944,7 +1036,15 @@ export default function FundRequestModal({
 
                 {error && (
                   <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2.5">
-                    <p className="text-red-400 text-xs font-satoshi">{error}</p>
+                    <div className="flex items-start">
+                      <AlertTriangle
+                        size={14}
+                        className="text-red-400 mr-1.5 mt-0.5 flex-shrink-0"
+                      />
+                      <p className="text-red-400 text-xs font-satoshi">
+                        {error}
+                      </p>
+                    </div>
                   </div>
                 )}
 
@@ -955,7 +1055,11 @@ export default function FundRequestModal({
                     disabled={loading || !canTakeAction}
                     className="flex-1"
                   >
-                    {!canTakeAction ? "Cannot Decline" : "Decline"}
+                    {loading
+                      ? "Processing..."
+                      : !canTakeAction
+                      ? "Cannot Decline"
+                      : "Decline"}
                   </Button>
                   <Button
                     onClick={handleFulfill}
@@ -976,6 +1080,8 @@ export default function FundRequestModal({
                       ? "Loading..."
                       : !canTakeAction
                       ? "Cannot Send"
+                      : hasInsufficientBalance
+                      ? "Insufficient Balance"
                       : `Send ${fundRequest.tokenSymbol}`}
                   </Button>
                 </div>
@@ -1022,15 +1128,17 @@ export default function FundRequestModal({
               <div className="text-center py-6">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#E2AF19] mx-auto mb-3"></div>
                 <h4 className="text-white font-semibold font-satoshi mb-1.5">
-                  Processing Enhanced Transfer
+                  Processing Transfer
                 </h4>
                 <div className="flex items-center justify-center mb-1.5">
-                  {/* {renderTokenIcon(tokenInfo, "small")} */}
                   <p className="text-gray-400 text-xs font-satoshi">
                     Sending {fundRequest.amount} {fundRequest.tokenSymbol} to @
-                    {fundRequest.requesterUsername} using Enhanced API...
+                    {fundRequest.requesterUsername}...
                   </p>
                 </div>
+                <p className="text-gray-500 text-xs font-satoshi">
+                  Please wait while we process your transaction
+                </p>
               </div>
             )}
 
@@ -1041,7 +1149,7 @@ export default function FundRequestModal({
                     <CheckCircle size={24} className="text-green-400" />
                   </div>
                   <h4 className="text-white font-semibold font-satoshi mb-1.5">
-                    Enhanced Transfer Successful!
+                    Transfer Successful!
                   </h4>
                   <div className="flex items-center justify-center mb-1.5">
                     {renderTokenIcon(tokenInfo, "small")}
@@ -1057,12 +1165,11 @@ export default function FundRequestModal({
                   <div className="flex items-center mb-1.5">
                     <Zap size={14} className="text-green-400 mr-1.5" />
                     <span className="text-green-400 text-xs font-satoshi font-medium">
-                      Enhanced API Transfer Completed
+                      Transfer Completed
                     </span>
                   </div>
                   <p className="text-green-400 text-xs font-satoshi">
-                    This transaction used our optimized API for better gas
-                    efficiency and reliability.
+                    The fund request has been fulfilled successfully.
                   </p>
                 </div>
 
@@ -1112,17 +1219,6 @@ export default function FundRequestModal({
                         </span>
                       </div>
                     )}
-
-                    {transferResult.actualGasCost && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Gas Cost (ETH):
-                        </span>
-                        <span className="text-white text-xs font-satoshi">
-                          {transferResult.actualGasCost.actualCostETH} ETH
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -1147,49 +1243,6 @@ export default function FundRequestModal({
                   )}
                   <Button onClick={onClose} className="flex-1">
                     Done
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {step === "error" && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <AlertTriangle size={24} className="text-red-400" />
-                  </div>
-                  <h4 className="text-white font-semibold font-satoshi mb-1.5">
-                    Enhanced Transfer Failed
-                  </h4>
-                  <p className="text-gray-400 text-xs font-satoshi mb-3">
-                    We couldn't complete your transfer using the Enhanced API.
-                    Please try again.
-                  </p>
-                  {error && (
-                    <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2.5 mb-3">
-                      <p className="text-red-400 text-xs font-satoshi">
-                        {error}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={onClose}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setStep("review");
-                      setError("");
-                    }}
-                    className="flex-1"
-                  >
-                    Try Again
                   </Button>
                 </div>
               </div>
