@@ -1,5 +1,5 @@
-// src/hooks/usePaymentAcknowledgments.ts - ONLY SHOW LATEST ACKNOWLEDGMENT
-import { useState, useEffect, useCallback } from "react";
+// src/hooks/usePaymentAcknowledgments.ts - FIXED VERSION WITH 8 SECOND MINIMUM DISPLAY
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export interface PaymentAcknowledgment {
   id: string;
@@ -13,6 +13,9 @@ export interface PaymentAcknowledgment {
   transactionHash?: string;
   errorReason?: string;
   type: "success" | "error" | "warning";
+  // Add display timing fields
+  displayedAt?: number;
+  minimumDisplayUntil?: number;
 }
 
 export function usePaymentAcknowledgments() {
@@ -22,13 +25,27 @@ export function usePaymentAcknowledgments() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
-  // Track the last shown acknowledgment to prevent showing old ones
-  const [lastShownAckId, setLastShownAckId] = useState<string>(() => {
+  // Track acknowledgments with their display timing
+  const displayTimingRef = useRef<
+    Map<
+      string,
+      {
+        displayedAt: number;
+        minimumDisplayUntil: number;
+        acknowledged: boolean;
+      }
+    >
+  >(new Map());
+
+  // Track the last fetched acknowledgment to prevent showing old ones
+  const [lastFetchedAckId, setLastFetchedAckId] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("lastShownAcknowledgmentId") || "";
+      return localStorage.getItem("lastFetchedAcknowledgmentId") || "";
     }
     return "";
   });
+
+  const MINIMUM_DISPLAY_TIME = 8000; // 8 seconds minimum display time
 
   const fetchAcknowledgments = useCallback(async () => {
     try {
@@ -59,31 +76,101 @@ export function usePaymentAcknowledgments() {
         })),
       });
 
-      // ONLY show if this is a NEW acknowledgment (different from last shown)
+      const now = Date.now();
+
       if (newAcknowledgments.length > 0) {
         const latestAck = newAcknowledgments[0];
 
-        // Check if this is a new acknowledgment we haven't shown before
-        if (latestAck.scheduleId !== lastShownAckId) {
+        // Check if this is a completely new acknowledgment
+        if (latestAck.scheduleId !== lastFetchedAckId) {
           console.log("🆕 NEW acknowledgment detected:", latestAck.scheduleId);
-          setAcknowledgments([latestAck]); // Only show the latest one
 
-          // Update the last shown ID
-          setLastShownAckId(latestAck.scheduleId);
+          // Set up timing for the new acknowledgment
+          const displayTiming = {
+            displayedAt: now,
+            minimumDisplayUntil: now + MINIMUM_DISPLAY_TIME,
+            acknowledged: false,
+          };
+
+          displayTimingRef.current.set(latestAck.scheduleId, displayTiming);
+
+          // Add timing info to the acknowledgment
+          const enhancedAck = {
+            ...latestAck,
+            displayedAt: now,
+            minimumDisplayUntil: now + MINIMUM_DISPLAY_TIME,
+          };
+
+          setAcknowledgments([enhancedAck]);
+
+          // Update the last fetched ID
+          setLastFetchedAckId(latestAck.scheduleId);
           if (typeof window !== "undefined") {
             localStorage.setItem(
-              "lastShownAcknowledgmentId",
+              "lastFetchedAcknowledgmentId",
               latestAck.scheduleId
             );
           }
+
+          console.log(
+            `⏰ Acknowledgment will be displayed until: ${new Date(
+              now + MINIMUM_DISPLAY_TIME
+            ).toLocaleTimeString()}`
+          );
         } else {
-          console.log("🔄 Same acknowledgment as before, not showing again");
-          // Don't show the same acknowledgment again
-          setAcknowledgments([]);
+          // Same acknowledgment - check if we should still display it
+          const timing = displayTimingRef.current.get(latestAck.scheduleId);
+
+          if (timing && !timing.acknowledged) {
+            if (now < timing.minimumDisplayUntil) {
+              console.log(
+                `⏳ Still within minimum display time for: ${
+                  latestAck.scheduleId
+                } (${Math.round(
+                  (timing.minimumDisplayUntil - now) / 1000
+                )}s remaining)`
+              );
+
+              // Keep showing the acknowledgment with timing info
+              const enhancedAck = {
+                ...latestAck,
+                displayedAt: timing.displayedAt,
+                minimumDisplayUntil: timing.minimumDisplayUntil,
+              };
+
+              setAcknowledgments([enhancedAck]);
+            } else {
+              console.log(
+                `✅ Minimum display time completed for: ${latestAck.scheduleId}, auto-hiding`
+              );
+              setAcknowledgments([]);
+              displayTimingRef.current.delete(latestAck.scheduleId);
+            }
+          } else {
+            console.log("🔄 Acknowledgment already processed or acknowledged");
+            setAcknowledgments([]);
+          }
         }
       } else {
-        console.log("📭 No new acknowledgments to show");
-        setAcknowledgments([]);
+        console.log("📭 No acknowledgments from server");
+
+        // Check if we have any acknowledgments that should still be displayed
+        const currentAcks = acknowledgments.filter((ack) => {
+          const timing = displayTimingRef.current.get(ack.scheduleId);
+          if (
+            timing &&
+            !timing.acknowledged &&
+            now < timing.minimumDisplayUntil
+          ) {
+            console.log(`⏳ Keeping acknowledgment visible: ${ack.scheduleId}`);
+            return true;
+          }
+          return false;
+        });
+
+        if (currentAcks.length !== acknowledgments.length) {
+          setAcknowledgments(currentAcks);
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -91,11 +178,18 @@ export function usePaymentAcknowledgments() {
     } finally {
       setLoading(false);
     }
-  }, [lastShownAckId]);
+  }, [lastFetchedAckId, acknowledgments]);
 
   const acknowledgePayment = useCallback(async (scheduleId: string) => {
     try {
       console.log(`🔔 Acknowledging payment: ${scheduleId}`);
+
+      // Mark as acknowledged in timing ref
+      const timing = displayTimingRef.current.get(scheduleId);
+      if (timing) {
+        timing.acknowledged = true;
+        console.log(`✅ Marked as acknowledged: ${scheduleId}`);
+      }
 
       const response = await fetch("/api/scheduled-payments/acknowledgments", {
         method: "POST",
@@ -113,16 +207,26 @@ export function usePaymentAcknowledgments() {
         throw new Error("Failed to acknowledge payment");
       }
 
-      // Remove from local state
+      // Remove from local state immediately
       setAcknowledgments((prev) =>
         prev.filter((ack) => ack.scheduleId !== scheduleId)
       );
 
-      console.log(`✅ Payment acknowledged: ${scheduleId}`);
+      // Clean up timing ref
+      displayTimingRef.current.delete(scheduleId);
+
+      console.log(`✅ Payment acknowledged and removed: ${scheduleId}`);
       return true;
     } catch (err: any) {
       setError(err.message);
       console.error("❌ Error acknowledging payment:", err);
+
+      // Reset acknowledged flag on error
+      const timing = displayTimingRef.current.get(scheduleId);
+      if (timing) {
+        timing.acknowledged = false;
+      }
+
       return false;
     }
   }, []);
@@ -140,6 +244,48 @@ export function usePaymentAcknowledgments() {
     console.log("✅ All acknowledgments dismissed");
   }, [acknowledgments, acknowledgePayment]);
 
+  // Auto-hide acknowledgments after minimum display time
+  useEffect(() => {
+    if (acknowledgments.length === 0) return;
+
+    const timeouts: NodeJS.Timeout[] = [];
+
+    acknowledgments.forEach((ack) => {
+      if (ack.minimumDisplayUntil) {
+        const timeUntilHide = ack.minimumDisplayUntil - Date.now();
+
+        if (timeUntilHide > 0) {
+          console.log(
+            `⏰ Setting auto-hide timer for ${ack.scheduleId}: ${Math.round(
+              timeUntilHide / 1000
+            )}s`
+          );
+
+          const timeout = setTimeout(() => {
+            const timing = displayTimingRef.current.get(ack.scheduleId);
+            if (timing && !timing.acknowledged) {
+              console.log(
+                `🕒 Auto-hiding acknowledgment after minimum display time: ${ack.scheduleId}`
+              );
+
+              setAcknowledgments((prev) =>
+                prev.filter((a) => a.scheduleId !== ack.scheduleId)
+              );
+
+              displayTimingRef.current.delete(ack.scheduleId);
+            }
+          }, timeUntilHide);
+
+          timeouts.push(timeout);
+        }
+      }
+    });
+
+    return () => {
+      timeouts.forEach((timeout) => clearTimeout(timeout));
+    };
+  }, [acknowledgments]);
+
   // Trigger immediate check function
   const triggerImmediateCheck = useCallback(() => {
     console.log("⚡ Triggering immediate acknowledgment check...");
@@ -156,23 +302,24 @@ export function usePaymentAcknowledgments() {
     }, 2000);
   }, [fetchAcknowledgments]);
 
-  // Reset last shown ID when user explicitly wants to see new acknowledgments
+  // Reset last fetched ID when user explicitly wants to see new acknowledgments
   const resetLastShown = useCallback(() => {
-    console.log("🔄 Resetting last shown acknowledgment ID");
-    setLastShownAckId("");
+    console.log("🔄 Resetting last fetched acknowledgment ID");
+    setLastFetchedAckId("");
+    displayTimingRef.current.clear();
     if (typeof window !== "undefined") {
-      localStorage.removeItem("lastShownAcknowledgmentId");
+      localStorage.removeItem("lastFetchedAcknowledgmentId");
     }
   }, []);
 
   useEffect(() => {
     fetchAcknowledgments();
 
-    // Poll every 10 seconds for new acknowledgments
+    // Poll every 15 seconds (increased from 10 to reduce flickering)
     const interval = setInterval(() => {
-      console.log("🔄 Polling for NEW acknowledgments...");
+      console.log("🔄 Polling for acknowledgments...");
       fetchAcknowledgments();
-    }, 10000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [fetchAcknowledgments]);
@@ -181,10 +328,9 @@ export function usePaymentAcknowledgments() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log(
-          "👁️ Tab became visible, checking for NEW acknowledgments..."
-        );
-        fetchAcknowledgments();
+        console.log("👁️ Tab became visible, checking for acknowledgments...");
+        // Small delay to prevent immediate hiding
+        setTimeout(fetchAcknowledgments, 500);
       }
     };
 
