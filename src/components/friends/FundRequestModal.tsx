@@ -606,20 +606,17 @@ export default function FundRequestModal({
             <div className="flex items-center">
               <div className="flex items-center mr-2.5">
                 <DollarSign size={20} className="text-[#E2AF19] mr-1.5" />
-                {step === "sending" && (
-                  <Zap size={14} className="text-green-400 animate-pulse" />
-                )}
               </div>
               <div>
                 <h3 className="text-base font-semibold text-white font-satoshi">
-                  Fund Request {step === "sending" && "(Enhanced API)"}
+                  Fund Request {step === "sending"}
                 </h3>
                 <p className="text-gray-400 text-xs font-satoshi">
                   {step === "review" && !canTakeAction && "Already processed"}
                   {step === "review" &&
                     canTakeAction &&
                     "Review request details"}
-                  {step === "sending" && "Processing with enhanced API..."}
+                  {step === "sending" && ""}
                   {step === "success" && "Transfer completed!"}
                   {step === "error" && "Transfer failed"}
                   {step === "completed" && "Request completed"}
@@ -1028,7 +1025,7 @@ export default function FundRequestModal({
                   Processing Enhanced Transfer
                 </h4>
                 <div className="flex items-center justify-center mb-1.5">
-                  {renderTokenIcon(tokenInfo, "small")}
+                  {/* {renderTokenIcon(tokenInfo, "small")} */}
                   <p className="text-gray-400 text-xs font-satoshi">
                     Sending {fundRequest.amount} {fundRequest.tokenSymbol} to @
                     {fundRequest.requesterUsername} using Enhanced API...

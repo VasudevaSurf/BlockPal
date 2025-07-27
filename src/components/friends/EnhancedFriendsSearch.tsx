@@ -454,7 +454,7 @@ export default function EnhancedFriendsSearch({
                             <span className="text-white font-satoshi text-xs truncate">
                               {suggestion.displayName || suggestion.username}
                             </span>
-                            {relationshipDisplay.icon}
+                            {/* {relationshipDisplay.icon} */}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className="text-gray-400 font-satoshi text-xs truncate">
@@ -463,7 +463,7 @@ export default function EnhancedFriendsSearch({
                             <span
                               className={`text-xs font-satoshi ${relationshipDisplay.color}`}
                             >
-                              {relationshipDisplay.label}
+                              {/* {relationshipDisplay.label} */}
                             </span>
                           </div>
                         </div>
