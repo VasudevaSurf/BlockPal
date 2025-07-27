@@ -1,4 +1,4 @@
-// src/app/api/scheduled-payments/due/route.ts - FIXED VERSION
+// src/app/api/scheduled-payments/due/route.ts - SECURITY FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -19,25 +19,49 @@ export async function GET(request: NextRequest) {
     const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
 
     console.log(
-      "🔍 Enhanced Smart Contract executor checking for due payments at:",
+      `🔍 Enhanced Smart Contract executor checking for due payments for user: ${decoded.username} at:`,
       now.toISOString()
     );
 
-    // FIXED: Much more lenient query - start with just active payments
+    // 🚨 CRITICAL SECURITY FIX: Get user's wallet addresses first
+    const userWallets = await db
+      .collection("wallets")
+      .find({ username: decoded.username })
+      .toArray();
+
+    const userWalletAddresses = userWallets.map((w) => w.walletAddress);
+
+    if (userWalletAddresses.length === 0) {
+      console.log(`⚠️ No wallets found for user: ${decoded.username}`);
+      return NextResponse.json({
+        success: true,
+        scheduledPayments: [],
+        count: 0,
+        message: "No wallets found for user",
+      });
+    }
+
+    console.log(
+      `🔐 User ${decoded.username} has ${userWalletAddresses.length} wallets`
+    );
+
+    // 🚨 CRITICAL SECURITY FIX: Filter by username AND wallet addresses
     const duePayments = await db
       .collection("schedules")
       .find({
+        // 🚨 CRITICAL: Always filter by username first
+        username: decoded.username,
+
+        // 🚨 CRITICAL: Only include user's own wallets
+        walletAddress: { $in: userWalletAddresses },
+
         // Must be active
         status: "active",
-
-        // FIXED: Don't require smartContractEnabled flag for now
-        // We'll set it programmatically if missing
 
         // Must be due for execution (expanded time window)
         $or: [
           { nextExecutionAt: { $lte: fiveMinutesFromNow } },
           { scheduledFor: { $lte: fiveMinutesFromNow } },
-          // Also include payments that should have been executed but weren't
           { nextExecutionAt: { $lte: now } },
           { scheduledFor: { $lte: now } },
         ],
@@ -73,20 +97,37 @@ export async function GET(request: NextRequest) {
         ],
       })
       .sort({ nextExecutionAt: 1, scheduledFor: 1 })
-      .limit(50) // Increased limit
+      .limit(50)
       .toArray();
 
     console.log(
-      `📊 Enhanced: Found ${duePayments.length} payments that passed initial filtering`
+      `📊 Enhanced: Found ${duePayments.length} payments for user ${decoded.username} that passed initial filtering`
     );
 
+    // 🚨 SECURITY VALIDATION: Double-check ownership for each payment
     const safeDuePayments = [];
 
     for (const payment of duePayments) {
       let skipPayment = false;
       const skipReasons = [];
 
-      // Enhanced validation for smart contract execution
+      // 🚨 CRITICAL: Verify payment belongs to the authenticated user
+      if (payment.username !== decoded.username) {
+        console.error(
+          `🚨 SECURITY BREACH ATTEMPT: Payment ${payment.scheduleId} belongs to ${payment.username} but accessed by ${decoded.username}`
+        );
+        skipReasons.push(`unauthorized access attempt`);
+        skipPayment = true;
+      }
+
+      // 🚨 CRITICAL: Verify wallet belongs to the user
+      if (!userWalletAddresses.includes(payment.walletAddress)) {
+        console.error(
+          `🚨 SECURITY BREACH ATTEMPT: Wallet ${payment.walletAddress} does not belong to user ${decoded.username}`
+        );
+        skipReasons.push(`unauthorized wallet access`);
+        skipPayment = true;
+      }
 
       // Skip non-active payments
       if (payment.status !== "active") {
@@ -94,14 +135,17 @@ export async function GET(request: NextRequest) {
         skipPayment = true;
       }
 
-      // FIXED: Set enhanced API flags if missing
+      // Set enhanced API flags if missing
       if (!payment.smartContractEnabled) {
         console.log(
           `🔧 Setting smartContractEnabled for payment ${payment.scheduleId}`
         );
         // Update the database to set the flag
         await db.collection("schedules").updateOne(
-          { _id: payment._id },
+          {
+            _id: payment._id,
+            username: decoded.username, // 🚨 CRITICAL: Always include username filter
+          },
           {
             $set: {
               smartContractEnabled: true,
@@ -132,7 +176,7 @@ export async function GET(request: NextRequest) {
       // Contract address validation for ERC20 tokens
       if (payment.tokenSymbol !== "ETH") {
         if (!payment.contractAddress || payment.contractAddress === "") {
-          // FIXED: Auto-set known contract addresses
+          // Auto-set known contract addresses
           const knownContracts = {
             USDT: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
             USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -146,12 +190,13 @@ export async function GET(request: NextRequest) {
             console.log(
               `🔧 Setting contract address for ${payment.tokenSymbol}: ${correctAddress}`
             );
-            await db
-              .collection("schedules")
-              .updateOne(
-                { _id: payment._id },
-                { $set: { contractAddress: correctAddress } }
-              );
+            await db.collection("schedules").updateOne(
+              {
+                _id: payment._id,
+                username: decoded.username, // 🚨 CRITICAL: Always include username filter
+              },
+              { $set: { contractAddress: correctAddress } }
+            );
             payment.contractAddress = correctAddress;
           } else {
             skipReasons.push("missing contract address for ERC20 token");
@@ -159,20 +204,21 @@ export async function GET(request: NextRequest) {
           }
         }
       } else {
-        // FIXED: Set native for ETH tokens if missing
+        // Set native for ETH tokens if missing
         if (!payment.contractAddress || payment.contractAddress === "") {
           console.log(`🔧 Setting native contract address for ETH`);
-          await db
-            .collection("schedules")
-            .updateOne(
-              { _id: payment._id },
-              { $set: { contractAddress: "native" } }
-            );
+          await db.collection("schedules").updateOne(
+            {
+              _id: payment._id,
+              username: decoded.username, // 🚨 CRITICAL: Always include username filter
+            },
+            { $set: { contractAddress: "native" } }
+          );
           payment.contractAddress = "native";
         }
       }
 
-      // FIXED: Amount validation with string conversion
+      // Amount validation with string conversion
       if (!payment.amount) {
         skipReasons.push("missing amount");
         skipPayment = true;
@@ -185,9 +231,13 @@ export async function GET(request: NextRequest) {
           amountValue = payment.amount;
           // Convert to string in database
           const amountStr = payment.amount.toString();
-          await db
-            .collection("schedules")
-            .updateOne({ _id: payment._id }, { $set: { amount: amountStr } });
+          await db.collection("schedules").updateOne(
+            {
+              _id: payment._id,
+              username: decoded.username, // 🚨 CRITICAL: Always include username filter
+            },
+            { $set: { amount: amountStr } }
+          );
           payment.amount = amountStr;
           console.log(
             `🔧 Converted amount to string for ${payment.scheduleId}: ${amountStr}`
@@ -231,7 +281,7 @@ export async function GET(request: NextRequest) {
         skipPayment = true;
       } else {
         const timeDiff = executionTime.getTime() - now.getTime();
-        // FIXED: More lenient timing - allow payments up to 10 minutes early
+        // More lenient timing - allow payments up to 10 minutes early
         if (timeDiff > 10 * 60 * 1000) {
           skipReasons.push(
             `not yet due (${Math.round(timeDiff / 60000)} minutes early)`
@@ -274,8 +324,8 @@ export async function GET(request: NextRequest) {
 
       if (skipPayment) {
         console.log(
-          `⏩ Enhanced: Skipping payment ${
-            payment.scheduleId
+          `⏩ Enhanced: Skipping payment ${payment.scheduleId} for user ${
+            decoded.username
           }: ${skipReasons.join(", ")}`
         );
         continue;
@@ -285,7 +335,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(
-      `📊 Enhanced: After safety checks: ${safeDuePayments.length} payments ready for execution`
+      `📊 Enhanced: After security checks: ${safeDuePayments.length} payments ready for user ${decoded.username}`
     );
 
     // Transform payments with smart contract specific information
@@ -293,13 +343,13 @@ export async function GET(request: NextRequest) {
       const transformed = {
         id: payment._id.toString(),
         scheduleId: payment.scheduleId,
-        username: payment.username,
+        username: payment.username, // Include for verification
         walletAddress: payment.walletAddress,
         tokenSymbol: payment.tokenSymbol,
         tokenName: payment.tokenName,
         contractAddress: payment.contractAddress,
         recipient: payment.recipient,
-        amount: payment.amount, // Should now be a string
+        amount: payment.amount,
         frequency: payment.frequency || "once",
         status: payment.status,
         scheduledFor: payment.scheduledFor,
@@ -320,9 +370,8 @@ export async function GET(request: NextRequest) {
         processingBy: payment.processingBy,
         processingStarted: payment.processingStarted,
         updatedAt: payment.updatedAt,
-        useEnhancedAPI: payment.useEnhancedAPI || true, // Default to true
-        // Smart contract specific fields
-        smartContractEnabled: payment.smartContractEnabled || true, // Default to true
+        useEnhancedAPI: payment.useEnhancedAPI || true,
+        smartContractEnabled: payment.smartContractEnabled || true,
         smartContractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
         gasOptimization: true,
         taxHandling: "automatic_0.5_percent",
@@ -334,23 +383,21 @@ export async function GET(request: NextRequest) {
       const minutesUntil = Math.round(timeUntil / 60000);
 
       console.log(
-        `✅ Enhanced: Ready for smart contract execution: ${
-          transformed.scheduleId
-        } - ${transformed.amount} ${
+        `✅ Enhanced: Ready for smart contract execution for user ${
+          decoded.username
+        }: ${transformed.scheduleId} - ${transformed.amount} ${
           transformed.tokenSymbol
         } to ${transformed.recipient.slice(0, 10)}... (due: ${new Date(
           transformed.nextExecution
         ).toISOString()}, in: ${minutesUntil}m, execCount: ${
           transformed.executionCount
-        }/${
-          transformed.maxExecutions
-        }, contract: ${transformed.smartContractAddress.slice(0, 10)}...)`
+        }/${transformed.maxExecutions})`
       );
 
       return transformed;
     });
 
-    // Remove duplicates
+    // Remove duplicates (should not happen with proper user filtering)
     const uniquePayments = transformedPayments.filter(
       (payment, index, self) =>
         index === self.findIndex((p) => p.scheduleId === payment.scheduleId)
@@ -360,12 +407,12 @@ export async function GET(request: NextRequest) {
       console.warn(
         `⚠️ Enhanced: Removed ${
           transformedPayments.length - uniquePayments.length
-        } duplicate smart contract payments`
+        } duplicate payments for user ${decoded.username}`
       );
     }
 
     console.log(
-      `🎯 Enhanced: Final result: ${uniquePayments.length} unique smart contract payments ready for execution`
+      `🎯 Enhanced: Final result for user ${decoded.username}: ${uniquePayments.length} unique smart contract payments ready for execution`
     );
 
     return NextResponse.json({
@@ -373,23 +420,21 @@ export async function GET(request: NextRequest) {
       scheduledPayments: uniquePayments,
       count: uniquePayments.length,
       timestamp: now.toISOString(),
+      userId: decoded.username, // Include for verification
       smartContractEnabled: true,
       contractAddress: "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
       supportedTokens: ["ETH", "USDT", "USDC", "DAI", "LINK", "UNI"],
       enhancedAPI: true,
-      autoFixed: {
-        smartContractFlags: "Set for missing payments",
-        contractAddresses: "Auto-set for known tokens",
-        amountConversions: "Converted numbers to strings",
-        lenientTiming: "Expanded time window for due payments",
-      },
+      securityFixed: true,
+      userWalletCount: userWalletAddresses.length,
       debug: {
         totalFound: duePayments.length,
         afterSafetyChecks: safeDuePayments.length,
         afterDeduplication: uniquePayments.length,
-        safetyCheckTime: new Date().toISOString(),
-        smartContractCompatible: true,
-        autoFixApplied: true,
+        securityValidated: true,
+        userWallets: userWalletAddresses.map(
+          (addr) => addr.slice(0, 10) + "..."
+        ),
       },
     });
   } catch (error) {
