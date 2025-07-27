@@ -604,23 +604,67 @@ export class EnhancedWebScheduledPaymentExecutor {
     errorCategory: string = "unknown"
   ) {
     try {
-      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "mark_failed",
-          executorId: this.executorId,
-          error: error,
-          enhancedAPI: enhancedAPI,
-          errorCategory: errorCategory,
-          stringAmountHandling: true,
-        }),
-        credentials: "include",
-      });
+      console.log(
+        `❌ [Enhanced-${this.executorId}] Marking schedule as failed: ${scheduleId}`
+      );
+
+      // Try the new dedicated mark-failed endpoint first
+      const response = await fetch(
+        `/api/scheduled-payments/${scheduleId}/mark-failed`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            error: error,
+            executorId: this.executorId,
+            enhancedAPI: enhancedAPI,
+            errorCategory: errorCategory,
+            stringAmountHandling: true,
+          }),
+          credentials: "include",
+        }
+      );
 
       if (response.ok) {
+        const data = await response.json();
         console.log(
-          `✅ [Enhanced-${this.executorId}] Schedule marked as failed with enhanced API flag and error category: ${errorCategory}`
+          `✅ [Enhanced-${this.executorId}] Schedule marked as failed successfully:`,
+          data
+        );
+        return;
+      }
+
+      // Fallback to the old PATCH method
+      console.log(
+        `⚠️ [Enhanced-${this.executorId}] Mark-failed endpoint failed, trying PATCH fallback...`
+      );
+
+      const fallbackResponse = await fetch(
+        `/api/scheduled-payments/${scheduleId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "mark_failed",
+            executorId: this.executorId,
+            error: error,
+            enhancedAPI: enhancedAPI,
+            errorCategory: errorCategory,
+            stringAmountHandling: true,
+          }),
+          credentials: "include",
+        }
+      );
+
+      if (fallbackResponse.ok) {
+        console.log(
+          `✅ [Enhanced-${this.executorId}] Schedule marked as failed with fallback method`
+        );
+      } else {
+        const errorData = await fallbackResponse.json();
+        console.error(
+          `❌ [Enhanced-${this.executorId}] Failed to mark schedule as failed:`,
+          errorData
         );
       }
     } catch (error) {

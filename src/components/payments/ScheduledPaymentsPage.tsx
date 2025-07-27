@@ -33,6 +33,7 @@ import UsernameInput from "@/components/ui/UsernameInput";
 import { UserSuggestion } from "@/hooks/useUsernameSearch";
 import { SkeletonScheduledPayments } from "@/components/ui/Skeleton";
 import { DateTimePicker } from "@/components/ui/DateTimePicker";
+import { usePaymentAcknowledgments } from "@/hooks/usePaymentAcknowledgments";
 
 interface ScheduledPayment {
   id: string;
@@ -296,6 +297,8 @@ export default function ScheduledPaymentsPage() {
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
   const [isTimezoneDropdownOpen, setIsTimezoneDropdownOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
+  const { checkForNewPaymentAcknowledgments, triggerImmediateCheck } =
+    usePaymentAcknowledgments();
 
   // State management
   const [scheduledPayments, setScheduledPayments] = useState<
@@ -495,187 +498,74 @@ export default function ScheduledPaymentsPage() {
   };
 
   // Handle update payment - Since the API doesn't support update, we'll cancel and recreate
-  const handleUpdatePayment = async () => {
-    if (!editingPayment) return;
+  // Complete handleUpdatePayment method for ScheduledPaymentsPage.tsx
 
-    try {
-      setUpdating(true);
-      setError("");
+const handleUpdatePayment = async () => {
+  if (!editingPayment) return;
 
-      // Validate form
-      if (!editFormData.amount || !editFormData.date || !editFormData.time) {
-        setError("Please fill in all required fields");
-        return;
-      }
+  try {
+    setUpdating(true);
+    setError("");
 
-      const scheduledDateTime = new Date(
-        `${editFormData.date}T${editFormData.time}`
-      );
-      if (scheduledDateTime <= new Date()) {
-        setError("Scheduled time must be in the future");
-        return;
-      }
+    // Validate form
+    if (!editFormData.amount || !editFormData.date || !editFormData.time) {
+      setError("Please fill in all required fields");
+      return;
+    }
 
-      // Find the original token info from the tokens array to get proper contract address and decimals
-      const originalToken = tokens.find(
-        (t) =>
-          t.symbol === editingPayment.tokenSymbol ||
-          t.contractAddress === editingPayment.contractAddress ||
-          t.id === editingPayment.contractAddress
-      );
+    const scheduledDateTime = new Date(
+      `${editFormData.date}T${editFormData.time}`
+    );
+    if (scheduledDateTime <= new Date()) {
+      setError("Scheduled time must be in the future");
+      return;
+    }
 
-      // Construct proper tokenInfo object
-      const tokenInfo = originalToken
-        ? {
-            name: originalToken.name,
-            symbol: originalToken.symbol,
-            contractAddress: originalToken.contractAddress || originalToken.id,
-            decimals: originalToken.decimals || 18,
-            isETH: originalToken.symbol === "ETH",
-            balance: originalToken.balance,
-            price: originalToken.price,
-            icon: originalToken.icon,
-          }
-        : {
-            // Fallback if token not found in current tokens array
-            name: editingPayment.tokenName,
-            symbol: editingPayment.tokenSymbol,
-            contractAddress: editingPayment.contractAddress,
-            decimals: 18, // Default fallback
-            isETH: editingPayment.tokenSymbol === "ETH",
-          };
+    // Find the original token info from the tokens array to get proper contract address and decimals
+    const originalToken = tokens.find(
+      (t) =>
+        t.symbol === editingPayment.tokenSymbol ||
+        t.contractAddress === editingPayment.contractAddress ||
+        t.id === editingPayment.contractAddress
+    );
 
-      console.log("🔍 Token info for update:", {
-        originalTokenFound: !!originalToken,
-        tokenInfo,
-        editingPayment: {
-          tokenSymbol: editingPayment.tokenSymbol,
-          contractAddress: editingPayment.contractAddress,
-        },
-      });
-
-      // Since update isn't supported, we'll need to cancel and recreate
-      // First cancel the existing payment
-      const cancelResponse = await fetch(
-        `/api/scheduled-payments/${editingPayment.scheduleId}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: "cancel",
-            status: "cancelled",
-          }),
-          credentials: "include",
+    // Construct proper tokenInfo object
+    const tokenInfo = originalToken
+      ? {
+          name: originalToken.name,
+          symbol: originalToken.symbol,
+          contractAddress: originalToken.contractAddress || originalToken.id,
+          decimals: originalToken.decimals || 18,
+          isETH: originalToken.symbol === "ETH",
+          balance: originalToken.balance,
+          price: originalToken.price,
+          icon: originalToken.icon,
         }
-      );
+      : {
+          // Fallback if token not found in current tokens array
+          name: editingPayment.tokenName,
+          symbol: editingPayment.tokenSymbol,
+          contractAddress: editingPayment.contractAddress,
+          decimals: 18, // Default fallback
+          isETH: editingPayment.tokenSymbol === "ETH",
+        };
 
-      if (!cancelResponse.ok) {
-        const cancelError = await cancelResponse.json();
-        throw new Error(
-          cancelError.error || "Failed to cancel existing payment"
-        );
-      }
+    console.log("🔍 Token info for update:", {
+      originalTokenFound: !!originalToken,
+      tokenInfo,
+      editingPayment: {
+        tokenSymbol: editingPayment.tokenSymbol,
+        contractAddress: editingPayment.contractAddress,
+      },
+    });
 
-      // Create new payment with updated details
-      const frequency = editRecurringEnabled ? editFormData.frequency : "once";
-
-      const createBody = {
-        action: "create",
-        tokenInfo: tokenInfo, // Use the properly constructed tokenInfo
-        fromAddress: editingPayment.walletAddress,
-        recipient: editingPayment.recipient,
-        amount: editFormData.amount,
-        scheduledFor: scheduledDateTime.toISOString(),
-        frequency,
-        timezone: editSelectedTimezone.tz,
-        description: editFormData.description,
-      };
-
-      console.log(
-        "📡 Sending recreate request with proper token info:",
-        createBody
-      );
-
-      const createResponse = await fetch("/api/scheduled-payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(createBody),
-        credentials: "include",
-      });
-
-      if (!createResponse.ok) {
-        const errorData = await createResponse.json();
-        console.error("❌ Create failed:", errorData);
-
-        // If creation failed, we should try to restore the cancelled payment
-        // But since that's complex, we'll just show the error
-        throw new Error(errorData.error || "Failed to create updated payment");
-      }
-
-      const createResult = await createResponse.json();
-      console.log("✅ Payment updated successfully (recreated):", createResult);
-
-      setShowEditModal(false);
-      setEditingPayment(null);
-      setIsEditing(false);
-      fetchScheduledPayments();
-    } catch (error: any) {
-      console.error("❌ Error updating payment:", error);
-      setError("Failed to update payment: " + error.message);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const handleDeletePayment = async (scheduleId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this scheduled payment? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        console.log("✅ Payment deleted successfully");
-        fetchScheduledPayments();
-      } else {
-        setError(data.error || "Failed to delete payment");
-      }
-    } catch (error: any) {
-      console.error("❌ Error deleting payment:", error);
-      setError("Failed to delete payment");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCancelPayment = async (scheduleId: string) => {
-    if (!confirm("Are you sure you want to cancel this scheduled payment?")) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
+    // Since update isn't supported, we'll need to cancel and recreate
+    // First cancel the existing payment
+    console.log(`🗑️ Cancelling existing payment: ${editingPayment.scheduleId}`);
+    
+    const cancelResponse = await fetch(
+      `/api/scheduled-payments/${editingPayment.scheduleId}`,
+      {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -685,23 +575,180 @@ export default function ScheduledPaymentsPage() {
           status: "cancelled",
         }),
         credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        console.log("✅ Payment cancelled successfully");
-        fetchScheduledPayments();
-      } else {
-        setError(data.error || "Failed to cancel payment");
       }
-    } catch (error: any) {
-      console.error("❌ Error cancelling payment:", error);
-      setError("Failed to cancel payment");
-    } finally {
-      setLoading(false);
+    );
+
+    if (!cancelResponse.ok) {
+      const cancelError = await cancelResponse.json();
+      throw new Error(
+        cancelError.error || "Failed to cancel existing payment"
+      );
     }
-  };
+
+    console.log("✅ Existing payment cancelled successfully");
+
+    // Create new payment with updated details
+    const frequency = editRecurringEnabled ? editFormData.frequency : "once";
+
+    const createBody = {
+      action: "create",
+      tokenInfo: tokenInfo, // Use the properly constructed tokenInfo
+      fromAddress: editingPayment.walletAddress,
+      recipient: editingPayment.recipient,
+      amount: editFormData.amount,
+      scheduledFor: scheduledDateTime.toISOString(),
+      frequency,
+      timezone: editSelectedTimezone.tz,
+      description: editFormData.description,
+    };
+
+    console.log(
+      "📡 Sending recreate request with proper token info:",
+      createBody
+    );
+
+    const createResponse = await fetch("/api/scheduled-payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(createBody),
+      credentials: "include",
+    });
+
+    if (!createResponse.ok) {
+      const errorData = await createResponse.json();
+      console.error("❌ Create failed:", errorData);
+
+      // If creation failed, we should try to restore the cancelled payment
+      // But since that's complex, we'll just show the error
+      throw new Error(errorData.error || "Failed to create updated payment");
+    }
+
+    const createResult = await createResponse.json();
+    console.log("✅ Payment updated successfully (recreated):", createResult);
+
+    // Close modal and reset state
+    setShowEditModal(false);
+    setEditingPayment(null);
+    setIsEditing(false);
+
+    // TRIGGER IMMEDIATE ACKNOWLEDGMENT CHECK FOR UPDATES
+    console.log("🔔 Triggering acknowledgment check for payment update...");
+    checkForNewPaymentAcknowledgments();
+    
+    // Also trigger a delayed check in case there are any status changes
+    setTimeout(() => {
+      console.log("🔔 Secondary acknowledgment check for payment update...");
+      triggerImmediateCheck();
+    }, 3000);
+
+    // Refresh the payments list
+    fetchScheduledPayments();
+
+    // Show success message (optional)
+    console.log("✅ Payment update completed successfully");
+
+  } catch (error: any) {
+    console.error("❌ Error updating payment:", error);
+    setError("Failed to update payment: " + error.message);
+    
+    // Check for acknowledgments even on error
+    console.log("🔔 Triggering acknowledgment check for payment update error...");
+    triggerImmediateCheck();
+  } finally {
+    setUpdating(false);
+  }
+};
+
+  const handleDeletePayment = async (scheduleId: string) => {
+  if (!confirm("Are you sure you want to delete this scheduled payment? This action cannot be undone.")) {
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      console.log("✅ Payment deleted successfully");
+      
+      // TRIGGER ACKNOWLEDGMENT CHECK
+      triggerImmediateCheck();
+      
+      fetchScheduledPayments();
+    } else {
+      setError(data.error || "Failed to delete payment");
+      
+      // Check for acknowledgments on error
+      triggerImmediateCheck();
+    }
+  } catch (error: any) {
+    console.error("❌ Error deleting payment:", error);
+    setError("Failed to delete payment");
+    
+    // Check for acknowledgments on error  
+    triggerImmediateCheck();
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Update the handleCancelPayment function (around line 440)
+const handleCancelPayment = async (scheduleId: string) => {
+  if (!confirm("Are you sure you want to cancel this scheduled payment?")) {
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "cancel",
+        status: "cancelled",
+      }),
+      credentials: "include",
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      console.log("✅ Payment cancelled successfully");
+      
+      // TRIGGER ACKNOWLEDGMENT CHECK
+      triggerImmediateCheck();
+      
+      fetchScheduledPayments();
+    } else {
+      setError(data.error || "Failed to cancel payment");
+      
+      // Check for acknowledgments on error
+      triggerImmediateCheck();
+    }
+  } catch (error: any) {
+    console.error("❌ Error cancelling payment:", error);
+    setError("Failed to cancel payment");
+    
+    // Check for acknowledgments on error
+    triggerImmediateCheck();
+  } finally {
+    setLoading(false);
+  }
+};
 
   const openExplorer = (payment: ScheduledPayment) => {
     if (payment.lastTransactionHash) {
@@ -853,81 +900,92 @@ export default function ScheduledPaymentsPage() {
   };
 
   const handleCreateScheduledPayment = async () => {
-    console.log("🚀 Creating smart contract scheduled payment...");
+  console.log("🚀 Creating smart contract scheduled payment...");
 
-    if (!preview || !activeWallet?.address) return;
+  if (!preview || !activeWallet?.address) return;
 
-    setCreating(true);
-    setError("");
+  setCreating(true);
+  setError("");
 
-    try {
-      const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
-      const frequency = recurringEnabled ? recurringFrequency : "once";
+  try {
+    const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
+    const frequency = recurringEnabled ? recurringFrequency : "once";
 
-      // Use selected user's wallet address if available
-      const recipientAddress = selectedUser
-        ? selectedUser.walletAddress
-        : formData.recipient;
+    // Use selected user's wallet address if available
+    const recipientAddress = selectedUser
+      ? selectedUser.walletAddress
+      : formData.recipient;
 
-      const createBody = {
-        action: "create",
-        tokenInfo: selectedToken,
-        fromAddress: activeWallet.address,
-        recipient: recipientAddress,
-        amount: formData.amount,
-        scheduledFor: scheduledDateTime.toISOString(),
-        frequency,
-        timezone: selectedTimezone.tz,
-        description: formData.description,
-      };
+    const createBody = {
+      action: "create",
+      tokenInfo: selectedToken,
+      fromAddress: activeWallet.address,
+      recipient: recipientAddress,
+      amount: formData.amount,
+      scheduledFor: scheduledDateTime.toISOString(),
+      frequency,
+      timezone: selectedTimezone.tz,
+      description: formData.description,
+    };
 
-      console.log("📡 Sending smart contract create request:", {
-        ...createBody,
-        selectedUser: selectedUser
-          ? `@${selectedUser.username}`
-          : "Direct address",
-      });
+    console.log("📡 Sending smart contract create request:", {
+      ...createBody,
+      selectedUser: selectedUser
+        ? `@${selectedUser.username}`
+        : "Direct address",
+    });
 
-      const response = await fetch("/api/scheduled-payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(createBody),
-        credentials: "include",
-      });
+    const response = await fetch("/api/scheduled-payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(createBody),
+      credentials: "include",
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create scheduled payment");
-      }
-
-      setResult(data);
-      setShowResult(true);
-      setShowPreview(false);
-
-      // Reset form
-      setFormData({
-        recipient: "",
-        amount: "",
-        date: "",
-        time: "",
-        description: "",
-      });
-      setSelectedUser(null);
-      setRecurringEnabled(false);
-
-      console.log("✅ Smart contract scheduled payment created successfully");
-
-      fetchScheduledPayments();
-    } catch (err: any) {
-      console.error("❌ Create error:", err);
-      setError(err.message || "Failed to create scheduled payment");
-    } finally {
-      setCreating(false);
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to create scheduled payment");
     }
-  };
+
+    setResult(data);
+    setShowResult(true);
+    setShowPreview(false);
+
+    // Reset form
+    setFormData({
+      recipient: "",
+      amount: "",
+      date: "",
+      time: "",
+      description: "",
+    });
+    setSelectedUser(null);
+    setRecurringEnabled(false);
+
+    console.log("✅ Smart contract scheduled payment created successfully");
+
+    // TRIGGER IMMEDIATE ACKNOWLEDGMENT CHECK
+    checkForNewPaymentAcknowledgments();
+    
+    // Also trigger a second check after 5 seconds in case payment fails quickly
+    setTimeout(() => {
+      triggerImmediateCheck();
+    }, 5000);
+
+    fetchScheduledPayments();
+  } catch (err: any) {
+    console.error("❌ Create error:", err);
+    setError(err.message || "Failed to create scheduled payment");
+    
+    // Check for acknowledgments even on error
+    triggerImmediateCheck();
+  } finally {
+    setCreating(false);
+  }
+};
 
   const copyToClipboard = async (text: string, type: string) => {
     try {

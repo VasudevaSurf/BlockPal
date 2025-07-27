@@ -183,3 +183,217 @@ export async function POST(
     );
   }
 }
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ scheduleId: string }> }
+) {
+  try {
+    const token = request.cookies.get("auth-token")?.value;
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const resolvedParams = await params;
+    const { scheduleId } = resolvedParams;
+    const body = await request.json();
+    const {
+      action,
+      error: errorMessage,
+      executorId,
+      enhancedAPI,
+      errorCategory,
+    } = body;
+
+    const { db } = await connectToDatabase();
+    const now = new Date();
+
+    if (action === "mark_failed") {
+      console.log(
+        `❌ Enhanced: Marking schedule ${scheduleId} as failed with error: ${errorMessage}`
+      );
+
+      const updateResult = await db.collection("schedules").updateOne(
+        {
+          scheduleId,
+          status: { $ne: "failed" }, // Only update if not already failed
+        },
+        {
+          $set: {
+            status: "failed",
+            failedAt: now,
+            lastError: errorMessage || "Unknown error during execution",
+            updatedAt: now,
+            processingBy: null,
+            processingStarted: null,
+            claimedBy: null,
+            claimedAt: null,
+            nextExecutionAt: null,
+            failedWithSmartContract: enhancedAPI || false,
+            failedBy: executorId || "unknown",
+            errorCategory: errorCategory || "unknown",
+            acknowledged: false, // Add acknowledgment flag
+          },
+        }
+      );
+
+      if (updateResult.matchedCount === 0) {
+        return NextResponse.json(
+          { error: "Schedule not found or already failed" },
+          { status: 404 }
+        );
+      }
+
+      console.log(
+        `✅ Enhanced: Schedule ${scheduleId} marked as failed successfully`
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: "Schedule marked as failed",
+        scheduleId: scheduleId,
+        status: "failed",
+        enhancedAPI: enhancedAPI || false,
+        errorCategory: errorCategory || "unknown",
+      });
+    } else if (action === "update_after_execution") {
+      // Handle successful execution updates
+      const {
+        transactionHash,
+        gasUsed,
+        blockNumber,
+        actualCostETH,
+        actualCostUSD,
+        executedAt,
+        taxPaidETH,
+        contractAddress,
+      } = body;
+
+      console.log(
+        `✅ Enhanced: Updating schedule ${scheduleId} after successful execution`
+      );
+
+      // Find current schedule to determine next status
+      const currentSchedule = await db
+        .collection("schedules")
+        .findOne({ scheduleId });
+
+      if (!currentSchedule) {
+        return NextResponse.json(
+          { error: "Schedule not found" },
+          { status: 404 }
+        );
+      }
+
+      const newExecutionCount = (currentSchedule.executedCount || 0) + 1;
+      let finalStatus = "completed";
+      let nextExecutionAt = null;
+
+      // Calculate next execution for recurring payments
+      if (currentSchedule.frequency && currentSchedule.frequency !== "once") {
+        const nextExecution = calculateNextExecution(
+          new Date(executedAt),
+          currentSchedule.frequency
+        );
+
+        const maxExecutions = currentSchedule.maxExecutions || 999999;
+        if (newExecutionCount < maxExecutions) {
+          finalStatus = "active";
+          nextExecutionAt = nextExecution;
+        }
+      }
+
+      const updateData: any = {
+        status: finalStatus,
+        executedCount: newExecutionCount,
+        lastExecutionAt: new Date(executedAt),
+        updatedAt: now,
+        processingBy: null,
+        processingStarted: null,
+        claimedBy: null,
+        claimedAt: null,
+        lastTransactionHash: transactionHash,
+        lastGasUsed: gasUsed || 0,
+        lastBlockNumber: blockNumber || 0,
+        lastActualCostETH: actualCostETH || "0",
+        lastActualCostUSD: actualCostUSD || "0",
+        smartContractExecution: true,
+        contractAddress:
+          contractAddress || "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
+        taxPaidETH: taxPaidETH || "0",
+        enhancedAPI: true,
+        acknowledged: false, // Add acknowledgment flag
+      };
+
+      if (nextExecutionAt) {
+        updateData.nextExecutionAt = nextExecutionAt;
+      } else {
+        updateData.completedAt = new Date(executedAt);
+      }
+
+      const updateResult = await db.collection("schedules").updateOne(
+        {
+          scheduleId,
+          status: { $ne: "failed" },
+        },
+        { $set: updateData }
+      );
+
+      if (updateResult.matchedCount === 0) {
+        return NextResponse.json(
+          { error: "Schedule not found or is failed" },
+          { status: 404 }
+        );
+      }
+
+      console.log(
+        `✅ Enhanced: Schedule ${scheduleId} updated after execution`
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: "Schedule updated after execution",
+        scheduleId: scheduleId,
+        finalStatus: finalStatus,
+        nextExecution: nextExecutionAt,
+        executionCount: newExecutionCount,
+        transactionHash: transactionHash,
+        enhancedAPI: true,
+      });
+    }
+
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+  } catch (error) {
+    console.error("💥 Enhanced: Error in process PATCH:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+function calculateNextExecution(lastExecution: Date, frequency: string): Date {
+  const nextExecution = new Date(lastExecution);
+
+  switch (frequency) {
+    case "daily":
+      nextExecution.setDate(nextExecution.getDate() + 1);
+      break;
+    case "weekly":
+      nextExecution.setDate(nextExecution.getDate() + 7);
+      break;
+    case "monthly":
+      nextExecution.setMonth(nextExecution.getMonth() + 1);
+      break;
+    case "yearly":
+      nextExecution.setFullYear(nextExecution.getFullYear() + 1);
+      break;
+    default:
+      nextExecution.setFullYear(nextExecution.getFullYear() + 100);
+      break;
+  }
+
+  return nextExecution;
+}

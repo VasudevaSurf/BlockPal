@@ -130,6 +130,7 @@ export async function POST(
         contractAddress || "0x9e4f241e8500eef9a1db6906c47401c8a0f04564",
       taxPaidETH: taxPaid || "0",
       enhancedAPI: true,
+      acknowledged: false, // Add acknowledgment flag
     };
 
     if (nextExecutionAt) {

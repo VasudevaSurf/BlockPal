@@ -97,7 +97,8 @@ export async function POST(request: NextRequest) {
           await markPaymentAsFailed(
             db,
             payment,
-            "Wallet or private key not found"
+            "Wallet or private key not found",
+            false // Add acknowledgment flag
           );
 
           executionResults.push({
@@ -121,7 +122,8 @@ export async function POST(request: NextRequest) {
           await markPaymentAsFailed(
             db,
             payment,
-            "Failed to decrypt private key"
+            "Failed to decrypt private key",
+            false // Add acknowledgment flag
           );
 
           executionResults.push({
@@ -161,6 +163,7 @@ export async function POST(request: NextRequest) {
             smartContractExecution: true,
             contractAddress: CONTRACT_CONFIG.address,
             taxPaidETH: executionResult.taxPaidETH || 0,
+            acknowledged: false, // Add acknowledgment flag
           };
 
           // Calculate next execution for recurring payments
@@ -240,7 +243,7 @@ export async function POST(request: NextRequest) {
             executionResult.error
           );
 
-          await markPaymentAsFailed(db, payment, executionResult.error);
+          await markPaymentAsFailed(db, payment, executionResult.error, false); // Add acknowledgment flag
 
           executionResults.push({
             scheduleId: payment.scheduleId,
@@ -256,7 +259,7 @@ export async function POST(request: NextRequest) {
           error
         );
 
-        await markPaymentAsFailed(db, payment, error.message);
+        await markPaymentAsFailed(db, payment, error.message, false); // Add acknowledgment flag
 
         executionResults.push({
           scheduleId: payment.scheduleId,
@@ -639,8 +642,13 @@ function decryptPrivateKey(encryptedData: any): string | null {
   }
 }
 
-// Mark payment as failed
-async function markPaymentAsFailed(db: any, payment: any, error: string) {
+// Mark payment as failed with acknowledgment flag
+async function markPaymentAsFailed(
+  db: any,
+  payment: any,
+  error: string,
+  acknowledged: boolean = false
+) {
   await db.collection("schedules").updateOne(
     {
       _id: payment._id,
@@ -658,6 +666,7 @@ async function markPaymentAsFailed(db: any, payment: any, error: string) {
         claimedAt: null,
         nextExecutionAt: null,
         failedWithSmartContract: true,
+        acknowledged: acknowledged, // Add acknowledgment flag
       },
     }
   );

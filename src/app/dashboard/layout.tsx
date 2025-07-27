@@ -12,6 +12,7 @@ import NavigationLoadingIndicator from "@/components/ui/NavigationLoadingIndicat
 import GlobalDashboardHeader from "@/components/dashboard/GlobalDashboardHeader";
 import { NavigationLoadingProvider } from "@/contexts/NavigationLoadingContext";
 import { Menu, X } from "lucide-react";
+import PaymentAcknowledgments from "@/components/payments/PaymentAcknowledgments";
 
 export default function DashboardLayout({
   children,
@@ -100,6 +101,7 @@ export default function DashboardLayout({
 
         {/* Global Payment Executor - Floating Button */}
         <GlobalPaymentExecutor />
+        <PaymentAcknowledgments />
 
         {walletSelectorOpen && <WalletSelector />}
 
