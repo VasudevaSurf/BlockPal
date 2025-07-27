@@ -1,4 +1,4 @@
-// src/components/transfer/SimpleTransferModal.tsx - FIXED MOBILE LAYOUT
+// src/components/transfer/SimpleTransferModal.tsx - ENHANCED ERROR HANDLING
 "use client";
 
 import { useState, useEffect } from "react";
@@ -14,6 +14,10 @@ import {
   RefreshCw,
   User,
   Contact,
+  AlertCircle,
+  Wifi,
+  Clock,
+  DollarSign,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
@@ -54,6 +58,9 @@ interface TransferPreview {
     estimatedGas: string;
     gasCostETH: string;
     gasCostUSD: string;
+    maxFeePerGas: string;
+    maxPriorityFeePerGas: string;
+    congestionLevel: string;
   };
 }
 
@@ -66,6 +73,14 @@ interface TransactionResult {
   error?: string;
   actualCostETH?: string;
   actualCostUSD?: string;
+}
+
+interface ApiError {
+  success: false;
+  error: string;
+  errorType: string;
+  details?: string;
+  timestamp?: string;
 }
 
 // Custom Profile Icon Component
@@ -91,6 +106,162 @@ const ProfileIcon = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
+// Enhanced Error Display Component
+const ErrorDisplay = ({
+  error,
+  onRetry,
+  onClose,
+}: {
+  error: ApiError | { message: string; type?: string };
+  onRetry?: () => void;
+  onClose?: () => void;
+}) => {
+  const errorInfo =
+    "errorType" in error
+      ? error
+      : { error: error.message, errorType: error.type || "unknown" };
+
+  const getErrorIcon = () => {
+    switch (errorInfo.errorType) {
+      case "insufficient_balance":
+      case "insufficient_funds":
+        return <DollarSign size={20} className="text-yellow-400" />;
+      case "network_error":
+      case "timeout_error":
+        return <Wifi size={20} className="text-blue-400" />;
+      case "gas_error":
+      case "gas_estimation_error":
+        return <Clock size={20} className="text-orange-400" />;
+      case "invalid_address":
+      case "invalid_amount":
+        return <AlertTriangle size={20} className="text-red-400" />;
+      default:
+        return <AlertCircle size={20} className="text-red-400" />;
+    }
+  };
+
+  const getErrorColor = () => {
+    switch (errorInfo.errorType) {
+      case "insufficient_balance":
+      case "insufficient_funds":
+        return "border-yellow-500/50 bg-yellow-900/20";
+      case "network_error":
+      case "timeout_error":
+        return "border-blue-500/50 bg-blue-900/20";
+      case "gas_error":
+      case "gas_estimation_error":
+        return "border-orange-500/50 bg-orange-900/20";
+      default:
+        return "border-red-500/50 bg-red-900/20";
+    }
+  };
+
+  const getErrorTitle = () => {
+    switch (errorInfo.errorType) {
+      case "insufficient_balance":
+      case "insufficient_funds":
+        return "Insufficient Balance";
+      case "network_error":
+      case "timeout_error":
+        return "Connection Issue";
+      case "gas_error":
+      case "gas_estimation_error":
+        return "Network Fee Issue";
+      case "invalid_address":
+        return "Invalid Address";
+      case "invalid_amount":
+        return "Invalid Amount";
+      default:
+        return "Transaction Error";
+    }
+  };
+
+  const getActionButtons = () => {
+    switch (errorInfo.errorType) {
+      case "network_error":
+      case "timeout_error":
+      case "gas_estimation_error":
+        return (
+          <div className="flex gap-2 mt-3">
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="flex-1 bg-[#E2AF19] text-black font-semibold py-2 px-3 rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi text-sm"
+              >
+                Try Again
+              </button>
+            )}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="px-3 py-2 bg-[#2C2C2C] text-white rounded-lg hover:bg-[#3C3C3C] transition-colors font-satoshi text-sm"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        );
+      case "insufficient_balance":
+      case "insufficient_funds":
+        return (
+          <div className="mt-3">
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="w-full bg-[#2C2C2C] text-white font-semibold py-2 rounded-lg hover:bg-[#3C3C3C] transition-colors font-satoshi text-sm"
+              >
+                Close
+              </button>
+            )}
+          </div>
+        );
+      default:
+        return (
+          <div className="flex gap-2 mt-3">
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="flex-1 bg-[#E2AF19] text-black font-semibold py-2 px-3 rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi text-sm"
+              >
+                Try Again
+              </button>
+            )}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="px-3 py-2 bg-[#2C2C2C] text-white rounded-lg hover:bg-[#3C3C3C] transition-colors font-satoshi text-sm"
+              >
+                Close
+              </button>
+            )}
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className={`p-3 rounded-lg border ${getErrorColor()}`}>
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 mt-0.5">{getErrorIcon()}</div>
+        <div className="flex-1 min-w-0">
+          <h4 className="text-white font-semibold font-satoshi text-sm mb-1">
+            {getErrorTitle()}
+          </h4>
+          <p className="text-gray-300 text-xs font-satoshi leading-relaxed mb-1">
+            {errorInfo.error}
+          </p>
+          {errorInfo.details && (
+            <p className="text-gray-400 text-xs font-satoshi leading-relaxed">
+              {errorInfo.details}
+            </p>
+          )}
+          {getActionButtons()}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function SimpleTransferModal({
   isOpen,
   onClose,
@@ -111,6 +282,7 @@ export default function SimpleTransferModal({
   const [transactionResult, setTransactionResult] =
     useState<TransactionResult | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState<ApiError | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState("");
 
@@ -122,7 +294,7 @@ export default function SimpleTransferModal({
     null
   );
 
-  // NEW: Gas estimation state
+  // Gas estimation state
   const [gasEstimation, setGasEstimation] = useState<{
     gasCostUSD: string;
     gasCostETH: string;
@@ -139,6 +311,7 @@ export default function SimpleTransferModal({
       setPreview(null);
       setTransactionResult(null);
       setErrors({});
+      setApiError(null);
       setIsLoading(false);
       setCopied("");
       setSelectedPercentage(null);
@@ -146,6 +319,36 @@ export default function SimpleTransferModal({
       setGasLoading(false);
     }
   }, [isOpen]);
+
+  // Enhanced API error handler
+  const handleApiError = async (response: Response) => {
+    try {
+      const errorData = await response.json();
+
+      // Check if it's our enhanced error format
+      if (errorData.errorType && errorData.error) {
+        setApiError(errorData as ApiError);
+      } else {
+        // Fallback for other error formats
+        setApiError({
+          success: false,
+          error:
+            errorData.error ||
+            `HTTP ${response.status}: ${response.statusText}`,
+          errorType: "api_error",
+          details: errorData.details || "An unexpected error occurred",
+        });
+      }
+    } catch (parseError) {
+      // If we can't parse the error response
+      setApiError({
+        success: false,
+        error: `HTTP ${response.status}: ${response.statusText}`,
+        errorType: "api_error",
+        details: "Unable to get error details from server",
+      });
+    }
+  };
 
   // Debounced gas estimation effect
   useEffect(() => {
@@ -238,6 +441,10 @@ export default function SimpleTransferModal({
     if (errors.recipientAddress) {
       setErrors({ ...errors, recipientAddress: "" });
     }
+
+    if (apiError) {
+      setApiError(null);
+    }
   };
 
   // Handle user selection from dropdown
@@ -256,6 +463,9 @@ export default function SimpleTransferModal({
     if (errors.amount) {
       setErrors({ ...errors, amount: "" });
     }
+    if (apiError) {
+      setApiError(null);
+    }
   };
 
   // Handle amount change
@@ -264,6 +474,9 @@ export default function SimpleTransferModal({
     setSelectedPercentage(null);
     if (errors.amount) {
       setErrors({ ...errors, amount: "" });
+    }
+    if (apiError) {
+      setApiError(null);
     }
   };
 
@@ -330,6 +543,7 @@ export default function SimpleTransferModal({
 
     setIsLoading(true);
     setErrors({});
+    setApiError(null);
 
     try {
       const recipientAddress = selectedUser
@@ -371,16 +585,21 @@ export default function SimpleTransferModal({
       console.log("📡 Preview response status:", response.status);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ Preview response error:", errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        await handleApiError(response);
+        return;
       }
 
       const data = await response.json();
       console.log("📡 Preview response data:", data);
 
       if (!data.success) {
-        throw new Error(data.error || "Failed to create preview");
+        setApiError({
+          success: false,
+          error: data.error || "Failed to create preview",
+          errorType: data.errorType || "preview_error",
+          details: data.details,
+        });
+        return;
       }
 
       setPreview(data.preview);
@@ -388,8 +607,12 @@ export default function SimpleTransferModal({
       console.log("✅ Preview created successfully");
     } catch (error: any) {
       console.error("❌ Preview creation error:", error);
-      setErrors({
-        general: error.message || "Failed to create transfer preview",
+      setApiError({
+        success: false,
+        error: "Network error",
+        errorType: "network_error",
+        details:
+          "Unable to connect to the server. Please check your internet connection and try again.",
       });
     } finally {
       setIsLoading(false);
@@ -420,18 +643,27 @@ export default function SimpleTransferModal({
     console.log("🚀 Executing transfer...");
 
     if (!preview || !activeWallet) {
-      setErrors({ general: "Missing preview or wallet information" });
+      setApiError({
+        success: false,
+        error: "Missing preview or wallet information",
+        errorType: "execution_error",
+      });
       return;
     }
 
     if (!walletAddress) {
-      setErrors({ general: "Wallet address not available" });
+      setApiError({
+        success: false,
+        error: "Wallet address not available",
+        errorType: "wallet_error",
+      });
       return;
     }
 
     setStep("processing");
     setIsLoading(true);
     setErrors({});
+    setApiError(null);
 
     try {
       const recipientAddress = selectedUser
@@ -474,16 +706,23 @@ export default function SimpleTransferModal({
       console.log("📡 Execution response status:", response.status);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ Execution response error:", errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        await handleApiError(response);
+        setStep("error");
+        return;
       }
 
       const data = await response.json();
       console.log("📡 Execution response data:", data);
 
       if (!data.success) {
-        throw new Error(data.error || "Transfer execution failed");
+        setApiError({
+          success: false,
+          error: data.error || "Transfer execution failed",
+          errorType: data.errorType || "execution_error",
+          details: data.details,
+        });
+        setStep("error");
+        return;
       }
 
       setTransactionResult(data.result);
@@ -495,9 +734,12 @@ export default function SimpleTransferModal({
       }
     } catch (error: any) {
       console.error("❌ Transfer execution error:", error);
-      setTransactionResult({
+      setApiError({
         success: false,
-        error: error.message || "Transaction failed. Please try again.",
+        error: "Network error",
+        errorType: "network_error",
+        details:
+          "Unable to connect to the server. Please check your internet connection and try again.",
       });
       setStep("error");
     } finally {
@@ -518,6 +760,11 @@ export default function SimpleTransferModal({
   const handleClose = () => {
     setStep("form");
     onClose();
+  };
+
+  const handleRetry = () => {
+    setApiError(null);
+    setStep("form");
   };
 
   const getTokenIcon = (symbol: string) => {
@@ -586,9 +833,18 @@ export default function SimpleTransferModal({
           </div>
           {/* Content */}
           <div className="p-3 sm:p-4 max-h-[calc(90vh-80px)] overflow-y-auto scrollbar-hide">
-            {/* Form Step - FIXED: Responsive mobile layout */}
+            {/* Form Step */}
             {step === "form" && (
               <div className="space-y-4">
+                {/* Enhanced API Error Display */}
+                {apiError && (
+                  <ErrorDisplay
+                    error={apiError}
+                    onRetry={handleRetry}
+                    onClose={handleClose}
+                  />
+                )}
+
                 {/* Recipient Box */}
                 <div className="bg-black border border-[#2C2C2C] rounded-lg p-3">
                   {/* Recipient heading */}
@@ -682,7 +938,7 @@ export default function SimpleTransferModal({
                     </div>
                   </div>
 
-                  {/* Address display below - FIXED: Mobile overflow */}
+                  {/* Address display below */}
                   <div className="text-xs text-gray-400 font-satoshi break-all">
                     {selectedUser
                       ? selectedUser.walletAddress
@@ -700,13 +956,13 @@ export default function SimpleTransferModal({
                   </div>
                 )}
 
-                {/* Asset Box - FIXED: Mobile responsive layout */}
+                {/* Asset Box */}
                 <div className="bg-black border border-[#2C2C2C] rounded-lg p-3">
                   {/* Asset heading with percentage buttons */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-white text-sm font-satoshi">Asset</div>
 
-                    {/* Percentage buttons - FIXED: Better mobile spacing */}
+                    {/* Percentage buttons */}
                     <div className="flex gap-1">
                       <button
                         onClick={() => handlePercentageSelect(25)}
@@ -751,9 +1007,9 @@ export default function SimpleTransferModal({
                     </div>
                   </div>
 
-                  {/* Token row with amount input - FIXED: Mobile responsive */}
+                  {/* Token row with amount input */}
                   <div className="flex items-center justify-between mb-2 gap-2">
-                    {/* Token info - FIXED: Prevent overflow */}
+                    {/* Token info */}
                     <div className="flex items-center min-w-0 flex-shrink">
                       {tokenInfo.priceData?.image ? (
                         <div
@@ -790,13 +1046,13 @@ export default function SimpleTransferModal({
                         </span>
                       </div>
 
-                      {/* FIXED: Token name with proper truncation */}
+                      {/* Token name with proper truncation */}
                       <div className="text-white font-satoshi text-sm truncate">
                         {tokenInfo.name}
                       </div>
                     </div>
 
-                    {/* Amount input - FIXED: Better mobile sizing */}
+                    {/* Amount input */}
                     <div className="flex items-center flex-shrink-0">
                       <input
                         type="text"
@@ -811,7 +1067,7 @@ export default function SimpleTransferModal({
                     </div>
                   </div>
 
-                  {/* Balance row - FIXED: Mobile text sizing */}
+                  {/* Balance row */}
                   <div className="text-gray-400 text-sm font-satoshi">
                     Balance: {parseFloat(tokenInfo.balance).toFixed(4)}
                   </div>
@@ -838,7 +1094,7 @@ export default function SimpleTransferModal({
                   </span>
                 </div>
 
-                {/* Error display */}
+                {/* Error display for general errors */}
                 {errors.general && (
                   <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
                     <p className="text-red-400 text-sm font-satoshi">
@@ -1096,7 +1352,31 @@ export default function SimpleTransferModal({
             )}
 
             {/* Error Step */}
-            {step === "error" && transactionResult && (
+            {step === "error" && apiError && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <X size={24} className="text-white" />
+                  </div>
+                  <h3 className="text-white text-base font-semibold font-satoshi mb-1.5">
+                    Transfer Failed
+                  </h3>
+                </div>
+
+                {/* Enhanced Error Display */}
+                <ErrorDisplay
+                  error={apiError}
+                  onRetry={() => {
+                    setApiError(null);
+                    setStep("form");
+                  }}
+                  onClose={handleClose}
+                />
+              </div>
+            )}
+
+            {/* Legacy Error Step for backwards compatibility */}
+            {step === "error" && transactionResult && !apiError && (
               <div className="space-y-4">
                 <div className="text-center">
                   <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-3">

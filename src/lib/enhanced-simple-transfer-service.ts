@@ -1,4 +1,4 @@
-// src/lib/enhanced-simple-transfer-service.ts - FIXED GAS ESTIMATION
+// src/lib/enhanced-simple-transfer-service.ts - FIXED USER-FRIENDLY ERROR HANDLING
 import { ethers } from "ethers";
 
 const ALCHEMY_API_KEY =
@@ -38,6 +38,131 @@ export interface TransferResult {
   actualCostUSD?: string;
 }
 
+// Enhanced error transformation function
+function transformAlchemyError(error: any): string {
+  const errorMessage = error.message || error.toString() || "";
+  const lowerError = errorMessage.toLowerCase();
+
+  console.log("🔍 Raw Alchemy error:", errorMessage);
+
+  // PRIORITY: Insufficient funds patterns - check these FIRST before gas errors
+  if (lowerError.includes("insufficient funds")) {
+    // Extract actual numbers if available for better context
+    const hasMatch = errorMessage.match(/have (\d+) want (\d+)/);
+    if (hasMatch) {
+      const have = BigInt(hasMatch[1]);
+      const want = BigInt(hasMatch[2]);
+      const haveETH = parseFloat(ethers.formatEther(have.toString())).toFixed(
+        4
+      );
+      const wantETH = parseFloat(ethers.formatEther(want.toString())).toFixed(
+        4
+      );
+
+      return `Insufficient balance. You have ${haveETH} ETH but need ${wantETH} ETH for this transaction including gas fees.`;
+    }
+
+    // Generic insufficient funds messages
+    if (lowerError.includes("gas") || lowerError.includes("value")) {
+      return "Insufficient balance to cover transaction amount and gas fees";
+    }
+    return "Insufficient balance for this transaction";
+  }
+
+  // Check for insufficient balance in different formats
+  if (lowerError.includes("transfer amount exceeds balance")) {
+    return "Insufficient token balance for this transfer";
+  }
+
+  if (
+    lowerError.includes("balance") &&
+    (lowerError.includes("insufficient") || lowerError.includes("not enough"))
+  ) {
+    return "Insufficient balance for this transaction";
+  }
+
+  // ACTUAL Gas-related errors (only for real gas issues, not balance issues)
+  if (
+    lowerError.includes("gas limit exceeded") ||
+    lowerError.includes("out of gas")
+  ) {
+    return "Transaction requires too much gas. Try reducing the amount or try again later.";
+  }
+
+  if (lowerError.includes("gas price") || lowerError.includes("underpriced")) {
+    return "Gas price too low. Please try again.";
+  }
+
+  // Only show gas estimation error for actual estimation failures, not balance issues
+  if (
+    lowerError.includes("gas estimation failed") ||
+    (lowerError.includes("gas") && lowerError.includes("estimation"))
+  ) {
+    return "Unable to estimate transaction fees. Please try again.";
+  }
+
+  // Nonce errors
+  if (lowerError.includes("nonce")) {
+    return "Transaction timing issue. Please try again.";
+  }
+
+  // Network/connection errors
+  if (
+    lowerError.includes("network") ||
+    lowerError.includes("connection") ||
+    lowerError.includes("timeout")
+  ) {
+    return "Network connection issue. Please check your connection and try again.";
+  }
+
+  // Already known transaction
+  if (
+    lowerError.includes("already known") ||
+    lowerError.includes("already pending")
+  ) {
+    return "Transaction already submitted. Please wait for confirmation.";
+  }
+
+  // Replacement transaction
+  if (
+    lowerError.includes("replacement") ||
+    lowerError.includes("underpriced")
+  ) {
+    return "Previous transaction pending. Please wait or increase gas price.";
+  }
+
+  // Invalid transaction
+  if (lowerError.includes("invalid") || lowerError.includes("malformed")) {
+    return "Invalid transaction parameters. Please check your inputs.";
+  }
+
+  // Contract/token errors
+  if (
+    lowerError.includes("revert") ||
+    lowerError.includes("execution reverted")
+  ) {
+    if (lowerError.includes("transfer amount exceeds balance")) {
+      return "Insufficient token balance for this transfer";
+    }
+    if (lowerError.includes("transfer amount exceeds allowance")) {
+      return "Token allowance insufficient. Please approve the token first.";
+    }
+    return "Transaction failed during execution. Please try again.";
+  }
+
+  // Rate limiting
+  if (
+    lowerError.includes("rate limit") ||
+    lowerError.includes("too many requests")
+  ) {
+    return "Service temporarily busy. Please try again in a moment.";
+  }
+
+  // Generic fallback - don't show technical details
+  console.warn("🚨 Unhandled Alchemy error pattern:", errorMessage);
+  return "Transaction failed. Please try again or contact support if the issue persists.";
+}
+
 class MainnetTransferManager {
   private config: any;
   private userWallet: string | null = null;
@@ -69,9 +194,8 @@ class MainnetTransferManager {
         minPriorityFee: "1000000000", // 1 gwei
         maxPriorityFee: "50000000000", // 50 gwei
         transactionTimeout: 300000, // 5 minutes
-        // FIXED: Better gas limits
         ethTransferGas: "21000",
-        erc20TransferGas: "65000", // Increased from default
+        erc20TransferGas: "65000",
         erc20ApprovalGas: "46000",
         gasLimitBuffer: 1.2, // 20% buffer
       },
@@ -105,14 +229,41 @@ class MainnetTransferManager {
       const data = await response.json();
 
       if (data.error) {
-        throw new Error(`Alchemy API error: ${data.error.message}`);
+        // Transform Alchemy API errors into user-friendly messages
+        const userFriendlyError = transformAlchemyError(data.error);
+        throw new Error(userFriendlyError);
       }
 
       return data.result;
     } catch (error: any) {
+      // Transform network/fetch errors
+      if (error.name === "AbortError" || error.message.includes("timeout")) {
+        throw new Error("Request timed out. Please try again.");
+      }
+
+      if (
+        error.message.includes("Failed to fetch") ||
+        error.message.includes("NetworkError")
+      ) {
+        throw new Error(
+          "Network connection issue. Please check your connection and try again."
+        );
+      }
+
+      // If it's already a transformed error, don't transform again
+      if (
+        !error.message.includes("Alchemy API error") &&
+        !error.message.includes("insufficient funds for gas")
+      ) {
+        throw error;
+      }
+
+      // Transform remaining Alchemy errors
+      const userFriendlyError = transformAlchemyError(error);
+
       // CRITICAL: Never retry transaction submissions
       if (method === "eth_sendRawTransaction") {
-        throw new Error(`Transaction submission failed: ${error.message}`);
+        throw new Error(userFriendlyError);
       }
 
       if (allowRetry && retryCount < this.config.maxRetries) {
@@ -125,9 +276,8 @@ class MainnetTransferManager {
         await this.delay(delay);
         return this.makeAlchemyCall(method, params, retryCount + 1, allowRetry);
       }
-      throw new Error(
-        `Alchemy API call failed after ${this.config.maxRetries} retries: ${error.message}`
-      );
+
+      throw new Error(userFriendlyError);
     }
   }
 
@@ -233,7 +383,6 @@ class MainnetTransferManager {
     }
   }
 
-  // FIXED: Better gas estimation with proper limits
   async getOptimizedGasSettings(
     isETH = true,
     tokenAddress?: string,
@@ -250,13 +399,11 @@ class MainnetTransferManager {
       const maxFeePerGas =
         baseFee + priority + (baseFee * BigInt(20)) / BigInt(100);
 
-      // FIXED: Better gas limit estimation
       let estimatedGas: string;
 
       if (isETH) {
         estimatedGas = this.config.gasSettings.ethTransferGas;
       } else {
-        // For ERC20 tokens, use actual estimation or safe default
         estimatedGas = this.config.gasSettings.erc20TransferGas;
 
         if (tokenAddress && recipientAddress && amount && this.userWallet) {
@@ -275,13 +422,11 @@ class MainnetTransferManager {
               },
             ]);
 
-            // FIXED: Apply proper buffer and ensure minimum
             const estimatedGasNumber = parseInt(gasEstimate, 16);
             const bufferedGas = Math.floor(
               estimatedGasNumber * this.config.gasSettings.gasLimitBuffer
             );
 
-            // Ensure minimum gas for ERC20 transfers
             const minERC20Gas = parseInt(
               this.config.gasSettings.erc20TransferGas
             );
@@ -292,7 +437,6 @@ class MainnetTransferManager {
             );
           } catch (error) {
             console.warn("Gas estimation failed, using safe default:", error);
-            // FIXED: Use higher safe default for failed estimations
             estimatedGas = "80000"; // Higher safe default
           }
         }
@@ -335,12 +479,10 @@ class MainnetTransferManager {
     return "Low";
   }
 
-  // FIXED: Higher safe defaults
   getSafeGasDefaults(isETH: boolean) {
     const maxFeePerGas = ethers.parseUnits("50", "gwei").toString();
     const priorityFee = ethers.parseUnits("5", "gwei").toString();
-    // FIXED: Higher safe gas limits
-    const estimatedGas = isETH ? "21000" : "85000"; // Increased ERC20 default
+    const estimatedGas = isETH ? "21000" : "85000";
 
     const gasCostInWei = BigInt(maxFeePerGas) * BigInt(estimatedGas);
     const gasCostInEther = ethers.formatEther(gasCostInWei.toString());
@@ -386,7 +528,6 @@ class MainnetTransferManager {
     }
   }
 
-  // FIXED: Fresh nonce retrieval without caching
   async getFreshNonce() {
     try {
       const nonce = await this.makeAlchemyCall(
@@ -397,11 +538,10 @@ class MainnetTransferManager {
       );
       return { success: true, nonce: parseInt(nonce, 16) };
     } catch (error: any) {
-      return { success: false, error: error.message };
+      return { success: false, error: transformAlchemyError(error) };
     }
   }
 
-  // FIXED: No retry for transaction submissions
   async submitTransaction(signedTransaction: string) {
     try {
       console.log("Submitting transaction (no retries)...");
@@ -413,7 +553,7 @@ class MainnetTransferManager {
       );
       return { success: true, transactionHash: txHash };
     } catch (error: any) {
-      return { success: false, error: error.message };
+      return { success: false, error: transformAlchemyError(error) };
     }
   }
 
@@ -437,7 +577,10 @@ class MainnetTransferManager {
           if (receipt.status === "0x1") {
             return { success: true, receipt };
           } else {
-            return { success: false, error: "Transaction failed (reverted)" };
+            return {
+              success: false,
+              error: "Transaction failed on blockchain",
+            };
           }
         }
 
@@ -469,17 +612,15 @@ class MainnetTransferManager {
       const amountInWei = ethers.parseEther(amount.toString());
       const gasSettings = await this.getOptimizedGasSettings(true);
 
-      // FIXED: Get fresh nonce without retry caching
       const nonceResult = await this.getFreshNonce();
       if (!nonceResult.success) {
-        throw new Error(`Failed to get nonce: ${nonceResult.error}`);
+        throw new Error(nonceResult.error || "Failed to get transaction nonce");
       }
 
-      // FIXED: Use gasLimit instead of gas for better compatibility
       const transaction = {
         to: recipientAddress,
         value: amountInWei.toString(),
-        gasLimit: gasSettings.estimatedGas, // Changed from 'gas' to 'gasLimit'
+        gasLimit: gasSettings.estimatedGas,
         maxFeePerGas: gasSettings.maxFeePerGas,
         maxPriorityFeePerGas: gasSettings.maxPriorityFeePerGas,
         nonce: nonceResult.nonce,
@@ -493,10 +634,9 @@ class MainnetTransferManager {
       const wallet = new ethers.Wallet(this.userPrivateKey);
       const signedTx = await wallet.signTransaction(transaction);
 
-      // FIXED: Use new submitTransaction method with no retries
       const submitResult = await this.submitTransaction(signedTx);
       if (!submitResult.success) {
-        throw new Error(submitResult.error);
+        throw new Error(submitResult.error || "Transaction submission failed");
       }
 
       const txHash = submitResult.transactionHash!;
@@ -516,14 +656,15 @@ class MainnetTransferManager {
       } else {
         return {
           success: false,
-          error: confirmationResult.error,
+          error: confirmationResult.error || "Transaction confirmation failed",
           transactionHash: txHash,
         };
       }
     } catch (error: any) {
+      // Return user-friendly error message
       return {
         success: false,
-        error: error.message,
+        error: transformAlchemyError(error),
       };
     }
   }
@@ -553,7 +694,7 @@ class MainnetTransferManager {
         decimals
       );
 
-      // Check balance - FIXED: No retry for balance check to avoid multiple calls
+      // Check balance
       const balanceData = await this.makeAlchemyCall("eth_call", [
         {
           to: tokenAddress,
@@ -564,7 +705,7 @@ class MainnetTransferManager {
 
       const balance = BigInt(balanceData);
       if (balance < amountInWei) {
-        throw new Error("Insufficient token balance");
+        throw new Error("Insufficient token balance for this transfer");
       }
 
       const gasSettings = await this.getOptimizedGasSettings(
@@ -580,17 +721,15 @@ class MainnetTransferManager {
         amountInWei.toString()
       );
 
-      // FIXED: Get fresh nonce without retry caching
       const nonceResult = await this.getFreshNonce();
       if (!nonceResult.success) {
-        throw new Error(`Failed to get nonce: ${nonceResult.error}`);
+        throw new Error(nonceResult.error || "Failed to get transaction nonce");
       }
 
-      // FIXED: Use gasLimit instead of gas for better compatibility
       const transaction = {
         to: tokenAddress,
         data: transferData,
-        gasLimit: gasSettings.estimatedGas, // Changed from 'gas' to 'gasLimit'
+        gasLimit: gasSettings.estimatedGas,
         maxFeePerGas: gasSettings.maxFeePerGas,
         maxPriorityFeePerGas: gasSettings.maxPriorityFeePerGas,
         nonce: nonceResult.nonce,
@@ -604,10 +743,9 @@ class MainnetTransferManager {
       const wallet = new ethers.Wallet(this.userPrivateKey);
       const signedTx = await wallet.signTransaction(transaction);
 
-      // FIXED: Use new submitTransaction method with no retries
       const submitResult = await this.submitTransaction(signedTx);
       if (!submitResult.success) {
-        throw new Error(submitResult.error);
+        throw new Error(submitResult.error || "Transaction submission failed");
       }
 
       const txHash = submitResult.transactionHash!;
@@ -627,14 +765,15 @@ class MainnetTransferManager {
       } else {
         return {
           success: false,
-          error: confirmationResult.error,
+          error: confirmationResult.error || "Transaction confirmation failed",
           transactionHash: txHash,
         };
       }
     } catch (error: any) {
+      // Return user-friendly error message
       return {
         success: false,
-        error: error.message,
+        error: transformAlchemyError(error),
       };
     }
   }
@@ -667,7 +806,7 @@ class MainnetTransferManager {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message,
+        error: transformAlchemyError(error),
       };
     }
   }
@@ -870,7 +1009,7 @@ export class EnhancedSimpleTransferService {
       console.error("Enhanced transfer execution error:", error);
       return {
         success: false,
-        error: error.message || "Transfer execution failed",
+        error: transformAlchemyError(error),
       };
     }
   }

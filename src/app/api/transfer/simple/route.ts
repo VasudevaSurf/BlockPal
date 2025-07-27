@@ -1,4 +1,4 @@
-// src/app/api/transfer/simple/route.ts
+// src/app/api/transfer/simple/route.ts - ENHANCED ERROR HANDLING
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -30,6 +30,37 @@ function serializeBigInt(obj: any): any {
   }
 
   return obj;
+}
+
+// Enhanced error response helper
+function createErrorResponse(
+  message: string,
+  details?: string,
+  statusCode: number = 400,
+  errorType: string = "validation_error"
+) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: message,
+      errorType: errorType,
+      details: details,
+      timestamp: new Date().toISOString(),
+    },
+    { status: statusCode }
+  );
+}
+
+// Enhanced success response helper
+function createSuccessResponse(data: any, statusCode: number = 200) {
+  return NextResponse.json(
+    {
+      success: true,
+      ...data,
+      timestamp: new Date().toISOString(),
+    },
+    { status: statusCode }
+  );
 }
 
 // Enhanced decryption function
@@ -137,7 +168,12 @@ export async function POST(request: NextRequest) {
     const decoded = verifyToken(token);
 
     if (!decoded) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return createErrorResponse(
+        "Authentication required",
+        "Please log in to continue",
+        401,
+        "auth_error"
+      );
     }
 
     const body = await request.json();
@@ -161,43 +197,115 @@ export async function POST(request: NextRequest) {
     });
 
     // Validate required fields
-    if (!action || !tokenInfo || !recipientAddress || !amount) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing required fields: action, tokenInfo, recipientAddress, amount",
-        },
-        { status: 400 }
+    if (!action) {
+      return createErrorResponse(
+        "Missing action parameter",
+        "Action must be 'preview' or 'execute'"
+      );
+    }
+
+    if (!tokenInfo) {
+      return createErrorResponse(
+        "Missing token information",
+        "Token details are required for this operation"
+      );
+    }
+
+    if (!recipientAddress) {
+      return createErrorResponse(
+        "Missing recipient address",
+        "Please provide a valid recipient address"
+      );
+    }
+
+    if (!amount) {
+      return createErrorResponse(
+        "Missing amount",
+        "Please specify the amount to transfer"
       );
     }
 
     // Validate fromAddress
     if (!fromAddress) {
-      return NextResponse.json(
-        { error: "Missing fromAddress parameter" },
-        { status: 400 }
+      return createErrorResponse(
+        "Missing sender address",
+        "Sender wallet address is required"
       );
     }
 
     // Validate addresses
     if (!enhancedSimpleTransferService.isValidAddress(recipientAddress)) {
-      return NextResponse.json(
-        { error: "Invalid recipient address" },
-        { status: 400 }
+      return createErrorResponse(
+        "Invalid recipient address",
+        "Please check the recipient address format. It should start with '0x' and be 42 characters long.",
+        400,
+        "invalid_address"
       );
     }
 
     if (!enhancedSimpleTransferService.isValidAddress(fromAddress)) {
-      return NextResponse.json(
-        { error: "Invalid sender address" },
-        { status: 400 }
+      return createErrorResponse(
+        "Invalid sender address",
+        "The sender wallet address format is invalid",
+        400,
+        "invalid_address"
       );
     }
 
     // Validate amount
     const amountNumber = parseFloat(amount);
     if (isNaN(amountNumber) || amountNumber <= 0) {
-      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+      return createErrorResponse(
+        "Invalid amount",
+        "Amount must be a positive number greater than 0",
+        400,
+        "invalid_amount"
+      );
+    }
+
+    // Check if user has sufficient balance
+    if (tokenInfo.balance) {
+      const availableBalance = parseFloat(tokenInfo.balance);
+      if (amountNumber > availableBalance) {
+        return createErrorResponse(
+          "Insufficient balance",
+          `You're trying to send ${amountNumber} ${tokenInfo.symbol}, but you only have ${availableBalance} ${tokenInfo.symbol} available.`,
+          400,
+          "insufficient_balance"
+        );
+      }
+
+      // For ETH transfers, also check if user has enough for gas fees
+      if (
+        tokenInfo.contractAddress === "native" ||
+        tokenInfo.symbol === "ETH"
+      ) {
+        // Estimate gas cost (rough estimate: ~$3-5 for ETH transfer)
+        const estimatedGasCostETH = 0.003; // Conservative estimate
+        const totalNeeded = amountNumber + estimatedGasCostETH;
+
+        if (totalNeeded > availableBalance) {
+          const shortfall = (totalNeeded - availableBalance).toFixed(4);
+          return createErrorResponse(
+            "Insufficient balance for transaction and gas fees",
+            `You need approximately ${totalNeeded.toFixed(
+              4
+            )} ETH total (${amountNumber} + ~${estimatedGasCostETH} for gas), but only have ${availableBalance} ETH. You're short by about ${shortfall} ETH.`,
+            400,
+            "insufficient_balance"
+          );
+        }
+      }
+    }
+
+    // Check for self-transfer
+    if (recipientAddress.toLowerCase() === fromAddress.toLowerCase()) {
+      return createErrorResponse(
+        "Cannot send to yourself",
+        "The sender and recipient addresses cannot be the same",
+        400,
+        "self_transfer"
+      );
     }
 
     if (action === "preview") {
@@ -216,18 +324,36 @@ export async function POST(request: NextRequest) {
 
         console.log("✅ Enhanced preview created successfully");
 
-        return NextResponse.json({
-          success: true,
+        return createSuccessResponse({
           preview: serializeBigInt(preview),
         });
       } catch (error: any) {
         console.error("❌ Enhanced preview creation error:", error);
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Failed to create preview: " + error.message,
-          },
-          { status: 500 }
+
+        // Handle specific preview errors
+        if (error.message.includes("insufficient")) {
+          return createErrorResponse(
+            "Insufficient funds",
+            error.message,
+            400,
+            "insufficient_funds"
+          );
+        }
+
+        if (error.message.includes("gas")) {
+          return createErrorResponse(
+            "Gas estimation failed",
+            "Unable to estimate transaction fees. Please try again or contact support.",
+            400,
+            "gas_estimation_error"
+          );
+        }
+
+        return createErrorResponse(
+          "Failed to create transfer preview",
+          error.message || "An error occurred while preparing the transaction",
+          400,
+          "preview_error"
         );
       }
     } else if (action === "execute") {
@@ -246,48 +372,55 @@ export async function POST(request: NextRequest) {
           });
 
           if (!wallet) {
-            return NextResponse.json(
-              {
-                success: false,
-                error: "Wallet not found or access denied",
-              },
-              { status: 404 }
+            return createErrorResponse(
+              "Wallet access denied",
+              "This wallet is not associated with your account or doesn't exist",
+              403,
+              "wallet_access_denied"
             );
           }
 
           if (!wallet.encryptedPrivateKey) {
-            return NextResponse.json(
-              {
-                success: false,
-                error:
-                  "No private key stored for this wallet. Please provide private key manually.",
-              },
-              { status: 400 }
+            return createErrorResponse(
+              "Wallet key not found",
+              "No private key is stored for this wallet. Please import your wallet again or provide the private key manually.",
+              400,
+              "missing_private_key"
             );
           }
 
           // Decrypt the private key
-          executionPrivateKey = decryptPrivateKey(wallet.encryptedPrivateKey);
+          try {
+            executionPrivateKey = decryptPrivateKey(wallet.encryptedPrivateKey);
 
-          // Validate the decrypted private key
-          if (!executionPrivateKey || executionPrivateKey.length < 64) {
-            throw new Error("Decrypted private key appears invalid");
-          }
-
-          console.log(
-            `🔑 Private key retrieved for enhanced transfer from wallet ${fromAddress} by user ${decoded.username}`
-          );
-
-          // Update last used timestamp
-          await db.collection("wallets").updateOne(
-            { _id: wallet._id },
-            {
-              $set: {
-                lastUsedAt: new Date(),
-                lastPrivateKeyAccess: new Date(),
-              },
+            // Validate the decrypted private key
+            if (!executionPrivateKey || executionPrivateKey.length < 64) {
+              throw new Error("Decrypted private key appears invalid");
             }
-          );
+
+            console.log(
+              `🔑 Private key retrieved for enhanced transfer from wallet ${fromAddress} by user ${decoded.username}`
+            );
+
+            // Update last used timestamp
+            await db.collection("wallets").updateOne(
+              { _id: wallet._id },
+              {
+                $set: {
+                  lastUsedAt: new Date(),
+                  lastPrivateKeyAccess: new Date(),
+                },
+              }
+            );
+          } catch (decryptError) {
+            console.error("❌ Private key decryption failed:", decryptError);
+            return createErrorResponse(
+              "Wallet decryption failed",
+              "Unable to access your wallet. Please try importing your wallet again.",
+              500,
+              "decryption_error"
+            );
+          }
         } catch (dbError) {
           console.error(
             "❌ Failed to retrieve private key from database:",
@@ -295,14 +428,11 @@ export async function POST(request: NextRequest) {
           );
 
           if (!privateKey) {
-            return NextResponse.json(
-              {
-                success: false,
-                error:
-                  "Failed to retrieve stored private key. Please provide private key manually.",
-                details: dbError.message,
-              },
-              { status: 500 }
+            return createErrorResponse(
+              "Database error",
+              "Unable to access wallet information. Please try again or provide your private key manually.",
+              500,
+              "database_error"
             );
           }
           executionPrivateKey = privateKey;
@@ -310,12 +440,11 @@ export async function POST(request: NextRequest) {
       }
 
       if (!executionPrivateKey) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Private key required for execution",
-          },
-          { status: 400 }
+        return createErrorResponse(
+          "Private key required",
+          "A private key is required to execute the transaction",
+          400,
+          "missing_private_key"
         );
       }
 
@@ -385,48 +514,98 @@ export async function POST(request: NextRequest) {
             console.error("❌ Error saving transaction:", saveError);
           }
 
-          return NextResponse.json({
-            success: true,
+          return createSuccessResponse({
             result: serializeBigInt(result),
           });
         } else {
           console.error("❌ Enhanced transfer failed:", result.error);
-          return NextResponse.json(
-            {
-              success: false,
-              error: result.error || "Transfer execution failed",
-            },
-            { status: 500 }
+
+          // Handle specific transfer errors with user-friendly messages
+          let userMessage = "Transaction failed";
+          let errorType = "transaction_error";
+
+          if (result.error?.toLowerCase().includes("insufficient")) {
+            userMessage = "Insufficient funds for this transaction";
+            errorType = "insufficient_funds";
+          } else if (result.error?.toLowerCase().includes("gas")) {
+            userMessage = "Transaction failed due to gas issues";
+            errorType = "gas_error";
+          } else if (result.error?.toLowerCase().includes("nonce")) {
+            userMessage = "Transaction timing issue. Please try again.";
+            errorType = "nonce_error";
+          } else if (result.error?.toLowerCase().includes("network")) {
+            userMessage = "Network connection issue. Please try again.";
+            errorType = "network_error";
+          } else if (result.error?.toLowerCase().includes("invalid")) {
+            userMessage = "Invalid transaction parameters";
+            errorType = "invalid_transaction";
+          }
+
+          return createErrorResponse(
+            userMessage,
+            result.error || "Transaction execution failed",
+            400,
+            errorType
           );
         }
       } catch (error: any) {
         console.error("❌ Enhanced transfer execution error:", error);
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Transfer execution failed: " + error.message,
-          },
-          { status: 500 }
+
+        // Handle specific execution errors
+        let userMessage = "Transaction execution failed";
+        let errorType = "execution_error";
+
+        if (error.message?.toLowerCase().includes("insufficient")) {
+          userMessage = "Insufficient funds to complete this transaction";
+          errorType = "insufficient_funds";
+        } else if (error.message?.toLowerCase().includes("private key")) {
+          userMessage = "Wallet access issue. Please try again.";
+          errorType = "wallet_error";
+        } else if (error.message?.toLowerCase().includes("network")) {
+          userMessage =
+            "Network connection issue. Please check your connection and try again.";
+          errorType = "network_error";
+        }
+
+        return createErrorResponse(
+          userMessage,
+          error.message ||
+            "An unexpected error occurred during transaction execution",
+          400,
+          errorType
         );
       }
     } else {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid action. Must be 'preview' or 'execute'",
-        },
-        { status: 400 }
+      return createErrorResponse(
+        "Invalid action",
+        "Action must be either 'preview' or 'execute'",
+        400,
+        "invalid_action"
       );
     }
   } catch (error: any) {
     console.error("💥 Simple transfer API error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Internal server error",
-        details: error.message,
-      },
-      { status: 500 }
+
+    // Handle global errors
+    let userMessage = "Something went wrong";
+    let errorType = "internal_error";
+
+    if (error.message?.toLowerCase().includes("network")) {
+      userMessage = "Network connection issue. Please try again.";
+      errorType = "network_error";
+    } else if (error.message?.toLowerCase().includes("timeout")) {
+      userMessage = "Request timed out. Please try again.";
+      errorType = "timeout_error";
+    } else if (error.message?.toLowerCase().includes("parse")) {
+      userMessage = "Invalid request format";
+      errorType = "parse_error";
+    }
+
+    return createErrorResponse(
+      userMessage,
+      error.message || "An unexpected error occurred",
+      500,
+      errorType
     );
   }
 }
