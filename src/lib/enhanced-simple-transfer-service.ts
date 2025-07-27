@@ -45,43 +45,21 @@ function transformAlchemyError(error: any): string {
 
   console.log("🔍 Raw Alchemy error:", errorMessage);
 
-  // PRIORITY: Insufficient funds patterns - check these FIRST before gas errors
-  if (lowerError.includes("insufficient funds")) {
-    // Extract actual numbers if available for better context
-    const hasMatch = errorMessage.match(/have (\d+) want (\d+)/);
-    if (hasMatch) {
-      const have = BigInt(hasMatch[1]);
-      const want = BigInt(hasMatch[2]);
-      const haveETH = parseFloat(ethers.formatEther(have.toString())).toFixed(
-        4
-      );
-      const wantETH = parseFloat(ethers.formatEther(want.toString())).toFixed(
-        4
-      );
-
-      return `Insufficient balance. You have ${haveETH} ETH but need ${wantETH} ETH for this transaction including gas fees.`;
-    }
-
-    // Generic insufficient funds messages
-    if (lowerError.includes("gas") || lowerError.includes("value")) {
-      return "Insufficient balance to cover transaction amount and gas fees";
-    }
-    return "Insufficient balance for this transaction";
-  }
-
-  // Check for insufficient balance in different formats
-  if (lowerError.includes("transfer amount exceeds balance")) {
-    return "Insufficient token balance for this transfer";
-  }
-
+  // PRIORITY 1: Insufficient balance patterns (check these FIRST)
   if (
-    lowerError.includes("balance") &&
-    (lowerError.includes("insufficient") || lowerError.includes("not enough"))
+    lowerError.includes("insufficient funds") ||
+    lowerError.includes("insufficient balance")
   ) {
+    // Don't mention gas at all - just say insufficient balance
     return "Insufficient balance for this transaction";
   }
 
-  // ACTUAL Gas-related errors (only for real gas issues, not balance issues)
+  // PRIORITY 2: Token-specific balance issues
+  if (lowerError.includes("transfer amount exceeds balance")) {
+    return "Insufficient token balance";
+  }
+
+  // PRIORITY 3: Pure gas issues (only when NOT related to balance)
   if (
     lowerError.includes("gas limit exceeded") ||
     lowerError.includes("out of gas")
@@ -93,12 +71,9 @@ function transformAlchemyError(error: any): string {
     return "Gas price too low. Please try again.";
   }
 
-  // Only show gas estimation error for actual estimation failures, not balance issues
-  if (
-    lowerError.includes("gas estimation failed") ||
-    (lowerError.includes("gas") && lowerError.includes("estimation"))
-  ) {
-    return "Unable to estimate transaction fees. Please try again.";
+  // PRIORITY 4: Gas estimation issues (only when not balance-related)
+  if (lowerError.includes("gas") && !lowerError.includes("insufficient")) {
+    return "Gas estimation failed. Please try again.";
   }
 
   // Nonce errors

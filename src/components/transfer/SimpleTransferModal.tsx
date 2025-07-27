@@ -125,13 +125,13 @@ const ErrorDisplay = ({
     switch (errorInfo.errorType) {
       case "insufficient_balance":
       case "insufficient_funds":
-        return <DollarSign size={20} className="text-yellow-400" />;
+        return <DollarSign size={20} className="text-red-400" />;
       case "network_error":
       case "timeout_error":
-        return <Wifi size={20} className="text-blue-400" />;
+        return <Wifi size={20} className="text-red-400" />;
       case "gas_error":
       case "gas_estimation_error":
-        return <Clock size={20} className="text-orange-400" />;
+        return <Clock size={20} className="text-red-400" />;
       case "invalid_address":
       case "invalid_amount":
         return <AlertTriangle size={20} className="text-red-400" />;
@@ -148,31 +148,8 @@ const ErrorDisplay = ({
       case "network_error":
       case "timeout_error":
         return "border-blue-500/50 bg-blue-900/20";
-      case "gas_error":
-      case "gas_estimation_error":
-        return "border-orange-500/50 bg-orange-900/20";
       default:
         return "border-red-500/50 bg-red-900/20";
-    }
-  };
-
-  const getErrorTitle = () => {
-    switch (errorInfo.errorType) {
-      case "insufficient_balance":
-      case "insufficient_funds":
-        return "Insufficient Balance";
-      case "network_error":
-      case "timeout_error":
-        return "Connection Issue";
-      case "gas_error":
-      case "gas_estimation_error":
-        return "Network Fee Issue";
-      case "invalid_address":
-        return "Invalid Address";
-      case "invalid_amount":
-        return "Invalid Amount";
-      default:
-        return "Transaction Error";
     }
   };
 
@@ -245,13 +222,10 @@ const ErrorDisplay = ({
         <div className="flex-shrink-0 mt-0.5">{getErrorIcon()}</div>
         <div className="flex-1 min-w-0">
           <h4 className="text-white font-semibold font-satoshi text-sm mb-1">
-            {getErrorTitle()}
-          </h4>
-          <p className="text-gray-300 text-xs font-satoshi leading-relaxed mb-1">
             {errorInfo.error}
-          </p>
+          </h4>
           {errorInfo.details && (
-            <p className="text-gray-400 text-xs font-satoshi leading-relaxed">
+            <p className="text-gray-300 text-xs font-satoshi leading-relaxed">
               {errorInfo.details}
             </p>
           )}

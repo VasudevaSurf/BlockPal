@@ -274,28 +274,6 @@ export async function POST(request: NextRequest) {
           "insufficient_balance"
         );
       }
-
-      // For ETH transfers, also check if user has enough for gas fees
-      if (
-        tokenInfo.contractAddress === "native" ||
-        tokenInfo.symbol === "ETH"
-      ) {
-        // Estimate gas cost (rough estimate: ~$3-5 for ETH transfer)
-        const estimatedGasCostETH = 0.003; // Conservative estimate
-        const totalNeeded = amountNumber + estimatedGasCostETH;
-
-        if (totalNeeded > availableBalance) {
-          const shortfall = (totalNeeded - availableBalance).toFixed(4);
-          return createErrorResponse(
-            "Insufficient balance for transaction and gas fees",
-            `You need approximately ${totalNeeded.toFixed(
-              4
-            )} ETH total (${amountNumber} + ~${estimatedGasCostETH} for gas), but only have ${availableBalance} ETH. You're short by about ${shortfall} ETH.`,
-            400,
-            "insufficient_balance"
-          );
-        }
-      }
     }
 
     // Check for self-transfer
