@@ -444,7 +444,36 @@ export default function SimpleTransferModal({
 
   // Handle amount change
   const handleAmountChange = (value: string) => {
-    setFormData({ ...formData, amount: value });
+    // Remove any non-numeric characters except decimal point
+    const cleanedValue = value.replace(/[^0-9.]/g, "");
+
+    // Ensure only one decimal point is allowed
+    const parts = cleanedValue.split(".");
+    let validValue = parts[0];
+    if (parts.length > 1) {
+      validValue += "." + parts[1];
+    }
+
+    // Prevent multiple decimal points
+    if (parts.length > 2) {
+      return; // Don't update if there are multiple decimal points
+    }
+
+    // Prevent starting with decimal point (add 0 prefix)
+    if (validValue.startsWith(".")) {
+      validValue = "0" + validValue;
+    }
+
+    // Limit decimal places to token decimals (usually 18 for ERC20)
+    if (validValue.includes(".")) {
+      const [integer, decimal] = validValue.split(".");
+      const maxDecimals = Math.min(tokenInfo.decimals, 8); // Limit display to 8 decimals max
+      if (decimal.length > maxDecimals) {
+        validValue = integer + "." + decimal.slice(0, maxDecimals);
+      }
+    }
+
+    setFormData({ ...formData, amount: validValue });
     setSelectedPercentage(null);
     if (errors.amount) {
       setErrors({ ...errors, amount: "" });
@@ -485,11 +514,29 @@ export default function SimpleTransferModal({
     if (!formData.amount.trim()) {
       newErrors.amount = "Amount is required";
     } else {
+      // Enhanced amount validation
       const amount = parseFloat(formData.amount);
-      if (isNaN(amount) || amount <= 0) {
-        newErrors.amount = "Invalid amount";
+
+      // Check if it's a valid number
+      if (isNaN(amount)) {
+        newErrors.amount = "Please enter a valid number";
+      } else if (amount <= 0) {
+        newErrors.amount = "Amount must be greater than 0";
       } else if (amount > parseFloat(tokenInfo.balance)) {
         newErrors.amount = `Insufficient balance. Available: ${tokenInfo.balance} ${tokenInfo.symbol}`;
+      } else if (formData.amount.includes(".")) {
+        // Check decimal places don't exceed token decimals
+        const decimalPlaces = formData.amount.split(".")[1]?.length || 0;
+        const maxDecimals = Math.min(tokenInfo.decimals, 8);
+        if (decimalPlaces > maxDecimals) {
+          newErrors.amount = `Maximum ${maxDecimals} decimal places allowed`;
+        }
+      }
+
+      // Check for very small amounts (dust)
+      const minAmount = 1 / Math.pow(10, Math.min(tokenInfo.decimals, 8));
+      if (amount > 0 && amount < minAmount) {
+        newErrors.amount = `Minimum amount is ${minAmount}`;
       }
     }
 
@@ -788,11 +835,9 @@ export default function SimpleTransferModal({
             </h2>
             {/* Token icon in header */}
             <div
-              className={`w-6 h-6 ${getRandomTokenBg(
-                tokenInfo.symbol
-              )} rounded-lg flex items-center justify-center p-0.5`}
+              className={`w-6 h-6 bg-black ounded-lg flex items-center justify-center p-0.5`}
             >
-              {tokenInfo.priceData?.image ? (
+              {/* {tokenInfo.priceData?.image ? (
                 <img
                   src={tokenInfo.priceData.image}
                   alt={tokenInfo.symbol}
@@ -802,7 +847,7 @@ export default function SimpleTransferModal({
                 <span className="text-black text-sm font-bold">
                   {getTokenLetter(tokenInfo.symbol)}
                 </span>
-              )}
+              )} */}
             </div>
           </div>
           {/* Content */}
@@ -913,12 +958,12 @@ export default function SimpleTransferModal({
                   </div>
 
                   {/* Address display below */}
-                  <div className="text-xs text-gray-400 font-satoshi break-all">
+                  {/* <div className="text-xs text-gray-400 font-satoshi break-all">
                     {selectedUser
                       ? selectedUser.walletAddress
                       : formData.recipientAddress ||
                         "0x9e700000000000000000000000000000000000000"}
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* Error for recipient */}
@@ -1030,14 +1075,65 @@ export default function SimpleTransferModal({
                     <div className="flex items-center flex-shrink-0">
                       <input
                         type="text"
+                        inputMode="decimal" // Shows numeric keypad on mobile devices
                         placeholder="0"
                         value={formData.amount}
                         onChange={(e) => handleAmountChange(e.target.value)}
+                        onKeyDown={(e) => {
+                          // Allow: backspace, delete, tab, escape, enter
+                          if (
+                            [8, 9, 27, 13, 46].indexOf(e.keyCode) !== -1 ||
+                            // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z
+                            (e.keyCode === 65 && e.ctrlKey === true) ||
+                            (e.keyCode === 67 && e.ctrlKey === true) ||
+                            (e.keyCode === 86 && e.ctrlKey === true) ||
+                            (e.keyCode === 88 && e.ctrlKey === true) ||
+                            (e.keyCode === 90 && e.ctrlKey === true)
+                          ) {
+                            return;
+                          }
+                          // Ensure that it is a number and stop the keypress
+                          if (
+                            (e.shiftKey || e.keyCode < 48 || e.keyCode > 57) &&
+                            (e.keyCode < 96 || e.keyCode > 105) &&
+                            e.keyCode !== 190 &&
+                            e.keyCode !== 110
+                          ) {
+                            // 190 and 110 are decimal points
+                            e.preventDefault();
+                          }
+                          // Prevent multiple decimal points
+                          if (
+                            (e.keyCode === 190 || e.keyCode === 110) &&
+                            e.target.value.includes(".")
+                          ) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onPaste={(e) => {
+                          // Handle paste events to ensure only numeric content
+                          e.preventDefault();
+                          const paste = (
+                            e.clipboardData || window.clipboardData
+                          ).getData("text");
+                          const numericValue = paste.replace(/[^0-9.]/g, "");
+
+                          // Ensure only one decimal point
+                          const parts = numericValue.split(".");
+                          let validPaste = parts[0];
+                          if (parts.length > 1) {
+                            validPaste += "." + parts[1];
+                          }
+
+                          if (validPaste && !isNaN(Number(validPaste))) {
+                            handleAmountChange(validPaste);
+                          }
+                        }}
                         className="bg-transparent text-white text-base sm:text-xl font-bold font-satoshi placeholder-gray-500 focus:outline-none text-right mr-2 w-12 sm:w-20"
                       />
-                      <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
+                      {/* <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-xs">○</span>
-                      </div>
+                      </div> */}
                     </div>
                   </div>
 
