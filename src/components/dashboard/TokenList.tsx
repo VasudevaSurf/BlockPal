@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - FIXED VERSION (Enhanced Image Loading Management)
+// src/components/dashboard/TokenList.tsx - FIXED VERSION (Dark Grey Background)
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -43,74 +43,17 @@ const TokenImage = ({
     );
   };
 
-  // Enhanced token background colors
-  const getTokenBackgroundColor = (
-    symbol: string,
-    contractAddress?: string
-  ) => {
-    const colors: Record<string, string> = {
-      ETH: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
-      ETHEREUM: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
-      SOL: "bg-gradient-to-br from-purple-500/20 to-purple-600/30",
-      BTC: "bg-gradient-to-br from-orange-500/20 to-orange-600/30",
-      SUI: "bg-gradient-to-br from-cyan-500/20 to-cyan-600/30",
-      XRP: "bg-gradient-to-br from-gray-500/20 to-gray-600/30",
-      ADA: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
-      AVAX: "bg-gradient-to-br from-red-500/20 to-red-600/30",
-      TON: "bg-gradient-to-br from-blue-400/20 to-blue-500/30",
-      DOT: "bg-gradient-to-br from-pink-500/20 to-pink-600/30",
-      USDT: "bg-gradient-to-br from-green-500/20 to-green-600/30",
-      USDC: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
-      YAI: "bg-gradient-to-br from-yellow-500/20 to-yellow-600/30",
-      LINK: "bg-gradient-to-br from-blue-700/20 to-blue-800/30",
-    };
-
-    // Special handling for ETH/native token
-    if (
-      symbol === "ETH" ||
-      contractAddress === "native" ||
-      symbol === "ETHEREUM"
-    ) {
-      return colors.ETH || "bg-gradient-to-br from-blue-500/20 to-blue-600/30";
-    }
-
-    return (
-      colors[symbol] || "bg-gradient-to-br from-gray-500/20 to-gray-600/30"
-    );
+  // Simplified token background - always dark grey
+  const getTokenBackgroundColor = () => {
+    return "bg-gradient-to-br from-gray-600/20 to-gray-700/30";
   };
 
-  // Enhanced icon colors
-  const getTokenIcon = (symbol: string, contractAddress?: string) => {
-    const colors: Record<string, string> = {
-      ETH: "bg-blue-500",
-      ETHEREUM: "bg-blue-500",
-      SOL: "bg-purple-500",
-      BTC: "bg-orange-500",
-      SUI: "bg-cyan-500",
-      XRP: "bg-gray-500",
-      ADA: "bg-blue-600",
-      AVAX: "bg-red-500",
-      TON: "bg-blue-400",
-      DOT: "bg-pink-500",
-      USDT: "bg-green-500",
-      USDC: "bg-blue-600",
-      YAI: "bg-yellow-500",
-      LINK: "bg-blue-700",
-    };
-
-    // Special handling for ETH/native token
-    if (
-      symbol === "ETH" ||
-      contractAddress === "native" ||
-      symbol === "ETHEREUM"
-    ) {
-      return colors.ETH || "bg-blue-500";
-    }
-
-    return colors[symbol] || "bg-gray-500";
+  // Simplified icon colors - always dark grey
+  const getTokenIcon = () => {
+    return "bg-gray-600";
   };
 
-  // Enhanced token letters
+  // Enhanced token letters (keeping the same functionality)
   const getTokenLetter = (symbol: string, contractAddress?: string) => {
     const letters: Record<string, string> = {
       ETH: "Ξ",
@@ -161,12 +104,9 @@ const TokenImage = ({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Background container with gradient */}
+      {/* Background container with dark grey gradient */}
       <div
-        className={`w-full h-full ${getTokenBackgroundColor(
-          symbol,
-          contractAddress
-        )} rounded-full flex items-center justify-center p-0.5`}
+        className={`w-full h-full ${getTokenBackgroundColor()} rounded-full flex items-center justify-center p-0.5`}
       >
         {/* Show skeleton while loading and we expect an image */}
         {isLoading && shouldShowImage && (
@@ -190,10 +130,7 @@ const TokenImage = ({
         {/* Show fallback icon when no valid image or error occurred and not loading */}
         {(!shouldShowImage || hasError) && !isLoading && (
           <div
-            className={`w-full h-full ${getTokenIcon(
-              symbol,
-              contractAddress
-            )} rounded-full flex items-center justify-center`}
+            className={`w-full h-full ${getTokenIcon()} rounded-full flex items-center justify-center`}
           >
             <span className="text-white text-xs font-medium">
               {getTokenLetter(symbol, contractAddress)}

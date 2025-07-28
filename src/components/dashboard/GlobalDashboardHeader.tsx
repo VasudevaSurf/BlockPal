@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED VERSION (Profile and Logout icons in header)
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED VERSION (Dark Grey Wallet Images)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -346,19 +346,9 @@ export default function GlobalDashboardHeader({
     setWalletSwitcherOpen(!walletSwitcherOpen);
   };
 
-  // Get wallet color based on activeWallet index in wallets array
+  // UPDATED: Get wallet color - always use dark grey
   const getWalletColor = () => {
-    const colors = [
-      "bg-gradient-to-br from-blue-400 to-cyan-400",
-      "bg-gradient-to-br from-purple-400 to-pink-400",
-      "bg-gradient-to-br from-green-400 to-emerald-400",
-      "bg-gradient-to-br from-orange-400 to-red-400",
-      "bg-gradient-to-br from-indigo-400 to-purple-400",
-    ];
-
-    if (!activeWallet) return colors[0];
-    const activeIndex = wallets.findIndex((w) => w.id === activeWallet.id);
-    return colors[activeIndex >= 0 ? activeIndex % colors.length : 0];
+    return "bg-gradient-to-br from-gray-600/80 to-gray-700/90";
   };
 
   // Generate letters from wallet name
@@ -456,13 +446,13 @@ export default function GlobalDashboardHeader({
                 </span>
 
                 {/* Real-time pulse indicator */}
-                {isMonitoring && (
+                {/* {isMonitoring && (
                   <div
                     className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-pulse ${
                       isDataStale ? "bg-yellow-400" : "bg-green-400"
                     }`}
                   />
-                )}
+                )} */}
               </div>
 
               <div className="flex-1 min-w-0">

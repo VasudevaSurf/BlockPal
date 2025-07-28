@@ -1,4 +1,4 @@
-// src/components/wallet/RealtimeWalletSwitcher.tsx - ENHANCED WITH INLINE CREDENTIALS
+// src/components/wallet/RealtimeWalletSwitcher.tsx - ENHANCED WITH DARK GREY BACKGROUNDS
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -471,15 +471,9 @@ export default function RealtimeWalletSwitcher({
     }
   };
 
+  // UPDATED: Use dark grey for all wallet colors
   const getWalletColor = (index: number) => {
-    const colors = [
-      "bg-gradient-to-br from-blue-400 to-cyan-400",
-      "bg-gradient-to-br from-purple-400 to-pink-400",
-      "bg-gradient-to-br from-green-400 to-emerald-400",
-      "bg-gradient-to-br from-orange-400 to-red-400",
-      "bg-gradient-to-br from-indigo-400 to-purple-400",
-    ];
-    return colors[index % colors.length];
+    return "bg-gradient-to-br from-gray-600/80 to-gray-700/90";
   };
 
   if (!isOpen) return null;
