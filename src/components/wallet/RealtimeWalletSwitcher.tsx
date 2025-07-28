@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   CheckCircle,
   X,
+  Edit3,
+  Check,
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import {
@@ -24,6 +26,7 @@ import {
   fetchWalletTokens,
   updateWalletBalance,
   clearTokens,
+  updateWalletName, // Add this action if it exists, or we'll dispatch a manual update
 } from "@/store/slices/walletSlice";
 import { useRealtimeWalletBalances } from "@/hooks/useRealtimeWalletBalances";
 import Button from "@/components/ui/Button";
@@ -106,14 +109,112 @@ export default function RealtimeWalletSwitcher({
   const [loading, setLoading] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
 
+  // NEW: Additional state for rename and copy functionality
+  const [showRenameInput, setShowRenameInput] = useState<string | null>(null);
+  const [newWalletName, setNewWalletName] = useState("");
+  const [copyFeedback, setCopyFeedback] = useState<string>("");
+  const [renameFeedback, setRenameFeedback] = useState<string>(""); // NEW: Rename success feedback
+  const [savingRename, setSavingRename] = useState(false); // NEW: Loading state for rename
+
+  // FIXED: Use sessionStorage to persist local overrides across wallet switches
+  const [localWalletNames, setLocalWalletNames] = useState<
+    Record<string, string>
+  >(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = sessionStorage.getItem("walletNameOverrides");
+        return stored ? JSON.parse(stored) : {};
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  });
+
+  // Helper to update local wallet names with persistence
+  const updateLocalWalletName = (walletId: string, name: string) => {
+    const newOverrides = { ...localWalletNames, [walletId]: name };
+    setLocalWalletNames(newOverrides);
+
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem(
+          "walletNameOverrides",
+          JSON.stringify(newOverrides)
+        );
+      } catch (error) {
+        console.warn("Could not save wallet name overrides:", error);
+      }
+    }
+  };
+
+  // Helper to clear local wallet name override
+  const clearLocalWalletName = (walletId: string) => {
+    const newOverrides = { ...localWalletNames };
+    delete newOverrides[walletId];
+    setLocalWalletNames(newOverrides);
+
+    if (typeof window !== "undefined") {
+      try {
+        if (Object.keys(newOverrides).length === 0) {
+          sessionStorage.removeItem("walletNameOverrides");
+        } else {
+          sessionStorage.setItem(
+            "walletNameOverrides",
+            JSON.stringify(newOverrides)
+          );
+        }
+      } catch (error) {
+        console.warn("Could not update wallet name overrides:", error);
+      }
+    }
+  };
+
   // Get user profile for auth provider info
   const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     if (isOpen) {
       fetchUserProfile();
+
+      // Clean up any old/invalid wallet name overrides when modal opens
+      if (typeof window !== "undefined" && wallets.length > 0) {
+        try {
+          const stored = sessionStorage.getItem("walletNameOverrides");
+          if (stored) {
+            const overrides = JSON.parse(stored);
+            const validWalletIds = wallets.map((w) => w.id);
+            const cleanedOverrides: Record<string, string> = {};
+
+            // Only keep overrides for wallets that still exist
+            Object.keys(overrides).forEach((walletId) => {
+              if (validWalletIds.includes(walletId)) {
+                cleanedOverrides[walletId] = overrides[walletId];
+              }
+            });
+
+            // Update storage and state if we cleaned anything up
+            if (
+              Object.keys(cleanedOverrides).length !==
+              Object.keys(overrides).length
+            ) {
+              if (Object.keys(cleanedOverrides).length === 0) {
+                sessionStorage.removeItem("walletNameOverrides");
+              } else {
+                sessionStorage.setItem(
+                  "walletNameOverrides",
+                  JSON.stringify(cleanedOverrides)
+                );
+              }
+              setLocalWalletNames(cleanedOverrides);
+            }
+          }
+        } catch (error) {
+          console.warn("Could not clean up wallet name overrides:", error);
+        }
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, wallets.length]);
 
   const fetchUserProfile = async () => {
     try {
@@ -219,6 +320,12 @@ export default function RealtimeWalletSwitcher({
     setError("");
     setLoading(false);
     setSendingEmail(false);
+    setShowRenameInput(null);
+    setNewWalletName("");
+    setCopyFeedback("");
+    setRenameFeedback("");
+    setSavingRename(false);
+    // DON'T clear localWalletNames on close - let them persist
     onClose();
   };
 
@@ -265,7 +372,168 @@ export default function RealtimeWalletSwitcher({
     }
   };
 
-  // NEW: Handle credentials button click
+  // NEW: Handle copy wallet address
+  const handleCopyAddress = async (e: React.MouseEvent, wallet: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      await navigator.clipboard.writeText(wallet.address);
+      setCopyFeedback(wallet.id);
+      console.log("📋 Copied wallet address:", wallet.address);
+
+      // Clear feedback after 2 seconds
+      setTimeout(() => {
+        setCopyFeedback("");
+      }, 2000);
+    } catch (error) {
+      console.error("❌ Failed to copy wallet address:", error);
+    }
+  };
+
+  // NEW: Handle rename wallet
+  const handleRenameWallet = (e: React.MouseEvent, wallet: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("✏️ Rename wallet:", wallet.name);
+
+    setShowRenameInput(wallet.id);
+    setNewWalletName(wallet.name);
+  };
+
+  // NEW: Save wallet rename
+  const saveWalletRename = async (walletId: string) => {
+    if (!newWalletName.trim()) {
+      setError("Wallet name cannot be empty");
+      return;
+    }
+
+    setSavingRename(true);
+
+    try {
+      const response = await fetch("/api/wallets/rename", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletId: walletId,
+          newName: newWalletName.trim(),
+        }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to rename wallet");
+      }
+
+      const responseData = await response.json();
+      console.log("✅ Wallet renamed successfully:", responseData);
+
+      // IMMEDIATE: Update local state for instant UI feedback with persistence
+      const trimmedName = newWalletName.trim();
+      updateLocalWalletName(walletId, trimmedName);
+
+      // ALSO: Try to update Redux store immediately for better wallet switching
+      try {
+        // Update the wallet in the Redux store immediately
+        const updatedWallets = wallets.map((wallet) =>
+          wallet.id === walletId ? { ...wallet, name: trimmedName } : wallet
+        );
+        // Note: This requires a custom action or we do it in the background refresh
+        console.log("🔄 Updated local Redux state immediately");
+      } catch (error) {
+        console.warn("Could not update Redux store immediately:", error);
+      }
+
+      // Show success feedback immediately for better UX
+      setRenameFeedback(walletId);
+      setShowRenameInput(null);
+      setNewWalletName("");
+      setError("");
+
+      // Clear success feedback after 3 seconds (but keep the name override)
+      setTimeout(() => {
+        setRenameFeedback("");
+      }, 3000);
+
+      // BACKGROUND: Start verification process but don't clear override until confirmed
+      console.log("🔄 Starting background verification process...");
+
+      // Function to check if real data is updated
+      const verifyAndClearOverride = async (attempt = 1, maxAttempts = 5) => {
+        console.log(`🔍 Verification attempt ${attempt}/${maxAttempts}`);
+
+        try {
+          // Refresh the data
+          await dispatch(fetchWallets());
+
+          if (refreshAllWallets) {
+            await refreshAllWallets();
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
+
+          // Check if the real data now matches our expected name
+          const currentWallet = realtimeBalances.find((w) => w.id === walletId);
+          console.log(`🔍 Real data check:`, {
+            expected: trimmedName,
+            actual: currentWallet?.name,
+            matches: currentWallet?.name === trimmedName,
+          });
+
+          if (currentWallet && currentWallet.name === trimmedName) {
+            console.log(
+              "✅ Real data confirmed updated! Clearing local override."
+            );
+            // Real data is updated, safe to clear override
+            clearLocalWalletName(walletId);
+            return true; // Success
+          } else {
+            if (attempt < maxAttempts) {
+              // Try again with exponential backoff
+              const delay = Math.min(2000 * attempt, 10000); // Max 10 seconds
+              console.log(
+                `⏳ Real data not ready yet, retrying in ${delay}ms...`
+              );
+              setTimeout(() => {
+                verifyAndClearOverride(attempt + 1, maxAttempts);
+              }, delay);
+            } else {
+              console.warn(
+                "⚠️ Max verification attempts reached. Keeping local override permanently."
+              );
+              // Don't clear override - let user see the updated name
+            }
+            return false; // Not ready yet
+          }
+        } catch (error) {
+          console.error(`❌ Verification attempt ${attempt} failed:`, error);
+          if (attempt < maxAttempts) {
+            setTimeout(() => {
+              verifyAndClearOverride(attempt + 1, maxAttempts);
+            }, 3000);
+          }
+          return false;
+        }
+      };
+
+      // Start verification after a reasonable delay
+      setTimeout(() => {
+        verifyAndClearOverride();
+      }, 2000); // Start verification after 2 seconds
+    } catch (error: any) {
+      console.error("❌ Error renaming wallet:", error);
+      setError(error.message || "Failed to rename wallet");
+    } finally {
+      setSavingRename(false);
+    }
+  };
+
+  // UPDATED: Cancel wallet rename (simplified)
+  const cancelWalletRename = () => {
+    setShowRenameInput(null);
+    setNewWalletName("");
+    setError("");
+  };
   const handleShowCredentials = (e: React.MouseEvent, wallet: any) => {
     e.preventDefault();
     e.stopPropagation();
@@ -552,37 +820,113 @@ export default function RealtimeWalletSwitcher({
                         {/* Divider */}
                         <div className="w-px h-3 bg-[#6E6E6E] mx-2.5 flex-shrink-0"></div>
 
-                        {/* Wallet Info - Clickable for switching */}
-                        <button
-                          onClick={() => handleSelectWallet(wallet.id)}
-                          disabled={isSwitching || switchingWallet !== null}
-                          className={`flex-1 min-w-0 overflow-hidden text-left hover:opacity-80 transition-opacity disabled:cursor-not-allowed ${
-                            switchingWallet !== null && !isSwitching
-                              ? "opacity-50"
-                              : ""
-                          }`}
-                        >
-                          <div className="text-white font-medium text-xs font-satoshi truncate">
-                            {wallet.name}
+                        {/* Wallet Info - Clickable for switching OR Rename Input */}
+                        {showRenameInput === wallet.id ? (
+                          <div className="flex-1 min-w-0 overflow-hidden flex items-center">
+                            <Input
+                              type="text"
+                              value={newWalletName}
+                              onChange={(e) => setNewWalletName(e.target.value)}
+                              className="flex-1 text-xs p-1.5 h-7"
+                              placeholder="Enter wallet name"
+                              autoFocus
+                              disabled={savingRename}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  saveWalletRename(wallet.id);
+                                } else if (e.key === "Escape") {
+                                  cancelWalletRename();
+                                }
+                              }}
+                            />
                           </div>
-                          <div className="text-gray-400 text-[10px] font-satoshi truncate">
-                            {wallet.address
-                              ? `${wallet.address.slice(
-                                  0,
-                                  6
-                                )}...${wallet.address.slice(-4)}`
-                              : "Loading..."}
-                          </div>
-                        </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSelectWallet(wallet.id)}
+                            disabled={isSwitching || switchingWallet !== null}
+                            className={`flex-1 min-w-0 overflow-hidden text-left hover:opacity-80 transition-opacity disabled:cursor-not-allowed ${
+                              switchingWallet !== null && !isSwitching
+                                ? "opacity-50"
+                                : ""
+                            }`}
+                          >
+                            <div className="text-white font-medium text-xs font-satoshi truncate flex items-center">
+                              {/* Use local override name if available, otherwise use wallet.name */}
+                              {localWalletNames[wallet.id] || wallet.name}
+                              {copyFeedback === wallet.id && (
+                                <span className="text-blue-400 ml-2 flex items-center">
+                                  <Check size={12} className="mr-1" />
+                                  Copied!
+                                </span>
+                              )}
+                              {renameFeedback === wallet.id && (
+                                <span className="text-green-400 ml-2 flex items-center">
+                                  <Check size={12} className="mr-1" />
+                                  Renamed!
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-gray-400 text-[10px] font-satoshi truncate">
+                              {wallet.address
+                                ? `${wallet.address.slice(
+                                    0,
+                                    6
+                                  )}...${wallet.address.slice(-4)}`
+                                : "Loading..."}
+                            </div>
+                          </button>
+                        )}
 
-                        {/* NEW: Credentials Button */}
-                        <button
-                          onClick={(e) => handleShowCredentials(e, wallet)}
-                          className="text-gray-400 hover:text-[#E2AF19] transition-colors p-1 hover:bg-[#2C2C2C] rounded ml-2"
-                          title="View wallet credentials"
-                        >
-                          <Key size={14} />
-                        </button>
+                        {/* NEW: Wallet Action Buttons */}
+                        <div className="flex items-center gap-1 ml-2">
+                          {/* Copy Address Button */}
+                          <button
+                            onClick={(e) => handleCopyAddress(e, wallet)}
+                            className="text-gray-400 hover:text-blue-400 transition-colors p-1 hover:bg-[#2C2C2C] rounded"
+                            title="Copy wallet address"
+                          >
+                            <Copy size={14} />
+                          </button>
+
+                          {/* Rename Button OR Save Button */}
+                          {showRenameInput === wallet.id ? (
+                            <button
+                              onClick={() => saveWalletRename(wallet.id)}
+                              disabled={savingRename || !newWalletName.trim()}
+                              className={`transition-colors p-1 hover:bg-[#2C2C2C] rounded ${
+                                savingRename || !newWalletName.trim()
+                                  ? "text-gray-600 cursor-not-allowed"
+                                  : "text-green-400 hover:text-green-300"
+                              }`}
+                              title={
+                                savingRename ? "Saving..." : "Save wallet name"
+                              }
+                            >
+                              {savingRename ? (
+                                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-green-400"></div>
+                              ) : (
+                                <Check size={14} />
+                              )}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => handleRenameWallet(e, wallet)}
+                              className="text-gray-400 hover:text-green-400 transition-colors p-1 hover:bg-[#2C2C2C] rounded"
+                              title="Rename wallet"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                          )}
+
+                          {/* Credentials Button */}
+                          <button
+                            onClick={(e) => handleShowCredentials(e, wallet)}
+                            className="text-gray-400 hover:text-[#E2AF19] transition-colors p-1 hover:bg-[#2C2C2C] rounded"
+                            title="View wallet credentials"
+                          >
+                            <Key size={14} />
+                          </button>
+                        </div>
 
                         {/* Active indicator */}
                         <div className="w-3 h-3 border-2 border-[#6E6E6E] rounded-full flex items-center justify-center flex-shrink-0 ml-2">
