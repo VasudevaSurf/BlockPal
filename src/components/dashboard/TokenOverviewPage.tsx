@@ -1452,7 +1452,7 @@ export default function TokenOverviewPage() {
               </div>
 
               <div className="bg-[#000000] rounded-[11px] border border-[#2C2C2C] p-3.5 mb-3">
-                <div className="flex items-center gap-1.5 mb-3.5">
+                {/* <div className="flex items-center gap-1.5 mb-3.5">
                   <div className="text-white font-satoshi">
                     {walletAddress?.slice(0, 7)}...{walletAddress?.slice(-5)}
                   </div>
@@ -1462,7 +1462,7 @@ export default function TokenOverviewPage() {
                   >
                     <Copy size={13} className="text-gray-400" />
                   </button>
-                </div>
+                </div> */}
 
                 <div className="flex items-center gap-3.5 mb-3.5">
                   <div className="flex-shrink-0">

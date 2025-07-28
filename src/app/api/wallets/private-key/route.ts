@@ -1,13 +1,13 @@
-// src/app/api/wallets/private-key/route.ts - COMPLETELY FIXED VERSION
+// src/app/api/wallets/private-key/route.ts - FIXED TO RETURN MNEMONIC
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
 import crypto from "crypto";
 
-// FIXED: Comprehensive decryption function that handles all formats
-function decryptPrivateKey(encryptedData: any): string {
+// FIXED: Enhanced decryption function that handles both private key and mnemonic
+function decryptCredential(encryptedData: any): string {
   try {
-    console.log("🔓 Attempting to decrypt private key...", {
+    console.log("🔓 Attempting to decrypt credential...", {
       dataType: typeof encryptedData,
       hasEncryptedData: !!encryptedData?.encryptedData,
       algorithm: encryptedData?.algorithm,
@@ -31,11 +31,13 @@ function decryptPrivateKey(encryptedData: any): string {
             "base64"
           ).toString("utf8");
 
-          // Validate if it looks like a private key
-          if (
+          // Validate if it looks like a private key or mnemonic
+          const isPrivateKey =
             decoded.length === 64 ||
-            (decoded.startsWith("0x") && decoded.length === 66)
-          ) {
+            (decoded.startsWith("0x") && decoded.length === 66);
+          const isMnemonic = decoded.split(" ").length >= 12; // Mnemonics typically have 12, 15, 18, 21, or 24 words
+
+          if (isPrivateKey || isMnemonic) {
             console.log("✅ Simple base64 decryption successful");
             return decoded;
           }
@@ -152,7 +154,7 @@ function decryptPrivateKey(encryptedData: any): string {
     throw new Error("All decryption methods failed");
   } catch (error) {
     console.error("💥 Complete decryption failure:", error);
-    throw new Error(`Failed to decrypt wallet credentials: ${error.message}`);
+    throw new Error(`Failed to decrypt credential: ${error.message}`);
   }
 }
 
@@ -208,12 +210,13 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ Wallet found, attempting decryption...", {
       hasEncryptedKey: !!wallet.encryptedPrivateKey,
+      hasEncryptedMnemonic: !!wallet.encryptedMnemonic, // FIXED: Log mnemonic presence
       encryptionType: typeof wallet.encryptedPrivateKey,
     });
 
     try {
       // Decrypt the private key using the improved function
-      const privateKey = decryptPrivateKey(wallet.encryptedPrivateKey);
+      const privateKey = decryptCredential(wallet.encryptedPrivateKey);
 
       // Validate the decrypted private key
       if (!privateKey || privateKey.length < 64) {
@@ -224,6 +227,36 @@ export async function POST(request: NextRequest) {
         "✅ Private key decrypted successfully for wallet:",
         walletAddress.slice(0, 10) + "..."
       );
+
+      // FIXED: Decrypt mnemonic if available
+      let mnemonic = null;
+      if (wallet.encryptedMnemonic) {
+        try {
+          console.log("🔓 Attempting to decrypt mnemonic...");
+          mnemonic = decryptCredential(wallet.encryptedMnemonic);
+
+          // Validate mnemonic (should be 12-24 words)
+          const words = mnemonic.trim().split(/\s+/);
+          if (words.length < 12 || words.length > 24) {
+            console.warn(
+              "⚠️ Decrypted mnemonic has invalid word count:",
+              words.length
+            );
+            mnemonic = null;
+          } else {
+            console.log(
+              "✅ Mnemonic decrypted successfully, word count:",
+              words.length
+            );
+          }
+        } catch (mnemonicError) {
+          console.error("❌ Failed to decrypt mnemonic:", mnemonicError);
+          // Don't fail the whole request if mnemonic decryption fails
+          mnemonic = null;
+        }
+      } else {
+        console.log("ℹ️ No encrypted mnemonic found for this wallet");
+      }
 
       // Update last used timestamp
       await db.collection("wallets").updateOne(
@@ -236,14 +269,24 @@ export async function POST(request: NextRequest) {
         }
       );
 
-      return NextResponse.json({
+      // FIXED: Return both private key and mnemonic
+      const response = {
         success: true,
         privateKey,
         walletAddress,
+        mnemonic, // FIXED: Include mnemonic in response
+      };
+
+      console.log("🎉 Wallet credentials retrieved successfully:", {
+        walletAddress: walletAddress.slice(0, 10) + "...",
+        hasPrivateKey: !!response.privateKey,
+        hasMnemonic: !!response.mnemonic,
       });
+
+      return NextResponse.json(response);
     } catch (decryptError) {
       console.error(
-        `❌ Failed to decrypt private key for wallet ${walletAddress}:`,
+        `❌ Failed to decrypt credentials for wallet ${walletAddress}:`,
         decryptError
       );
       return NextResponse.json(
@@ -264,7 +307,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET endpoint to check if wallet has stored private key
+// GET endpoint to check if wallet has stored private key and mnemonic
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("auth-token")?.value;
@@ -294,7 +337,9 @@ export async function GET(request: NextRequest) {
       {
         projection: {
           encryptedPrivateKey: 1,
+          encryptedMnemonic: 1, // FIXED: Include mnemonic in projection
           hasEncryptedCredentials: 1,
+          hasMnemonic: 1, // FIXED: Include mnemonic flag
           requiresPassword: 1,
         },
       }
@@ -304,13 +349,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
     }
 
+    // FIXED: Return information about both credentials
     return NextResponse.json({
       hasPrivateKey: !!wallet.encryptedPrivateKey,
+      hasMnemonic: !!wallet.encryptedMnemonic, // FIXED: Check for actual mnemonic presence
       hasEncryptedCredentials: wallet.hasEncryptedCredentials || false,
       requiresPassword: wallet.requiresPassword || false,
     });
   } catch (error) {
-    console.error("💥 Check private key error:", error);
+    console.error("💥 Check credentials error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
