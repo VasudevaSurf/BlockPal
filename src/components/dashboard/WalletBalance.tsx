@@ -1,9 +1,9 @@
-// src/components/dashboard/WalletBalance.tsx - ENHANCED VERSION WITH AUTO-REFRESH ON PAGE LOAD
+// src/components/dashboard/WalletBalance.tsx - ENHANCED VERSION WITH COPY FEEDBACK
 "use client";
 
 import { useSelector, useDispatch } from "react-redux";
 import { useEffect, useRef, useState } from "react";
-import { Copy, ChevronDown } from "lucide-react";
+import { Copy, ChevronDown, Check } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { openWalletSelector } from "@/store/slices/uiSlice";
 import {
@@ -24,6 +24,12 @@ export default function WalletBalance() {
     hasAttemptedLoad: false,
     balanceLoaded: false,
     tokensLoaded: false,
+  });
+
+  // Copy feedback state
+  const [copyState, setCopyState] = useState({
+    isCopied: false,
+    isAnimating: false,
   });
 
   // Use ref to prevent duplicate balance updates
@@ -137,6 +143,14 @@ export default function WalletBalance() {
     }
   }, [activeWallet?.address]);
 
+  // Reset copy state when wallet changes
+  useEffect(() => {
+    setCopyState({
+      isCopied: false,
+      isAnimating: false,
+    });
+  }, [activeWallet?.address]);
+
   // ENHANCED: Auto-refresh on page load/mount
   useEffect(() => {
     // Force refresh when component mounts (page reload)
@@ -179,6 +193,14 @@ export default function WalletBalance() {
     try {
       await navigator.clipboard.writeText(text);
       console.log("Address copied to clipboard");
+
+      // Trigger copy feedback animation
+      setCopyState({ isCopied: true, isAnimating: true });
+
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setCopyState({ isCopied: false, isAnimating: false });
+      }, 2000);
     } catch (err) {
       console.error("Failed to copy: ", err);
     }
@@ -248,7 +270,7 @@ export default function WalletBalance() {
           Wallet Balance
         </h2>
 
-        {/* Address and Copy Button - Responsive */}
+        {/* Address and Copy Button - Responsive with feedback */}
         <div className="flex items-center space-x-2">
           <span className="text-gray-400 text-xs sm:text-xs font-satoshi italic font-medium truncate max-w-[120px] sm:max-w-none tracking-wide">
             {activeWallet?.address
@@ -261,10 +283,28 @@ export default function WalletBalance() {
           {activeWallet?.address && (
             <button
               onClick={() => copyToClipboard(activeWallet.address)}
-              className="text-black hover:bg-[#D4A853] transition-colors bg-[#E2AF19] bg-opacity-100 px-2 py-0.5 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0"
+              className={`transition-all duration-300 ease-in-out px-2 py-0.5 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0 ${
+                copyState.isCopied
+                  ? "bg-green-500 text-white scale-105"
+                  : "text-black hover:bg-[#D4A853] bg-[#E2AF19] bg-opacity-100"
+              }`}
+              disabled={copyState.isAnimating}
             >
-              Copy
-              <Copy size={8} className="text-black sm:w-2.5 sm:h-2.5" />
+              <span
+                className={`transition-all duration-200 ${
+                  copyState.isAnimating ? "animate-pulse" : ""
+                }`}
+              >
+                {copyState.isCopied ? "Copied!" : "Copy"}
+              </span>
+              {/* {copyState.isCopied ? (
+                <Check
+                  size={8}
+                  className="text-white sm:w-2.5 sm:h-2.5 animate-bounce"
+                />
+              ) : (
+                <Copy size={8} className="text-black sm:w-2.5 sm:h-2.5" />
+              )} */}
             </button>
           )}
         </div>

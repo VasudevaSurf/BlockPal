@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - UPDATED: Added default tokens for fund requests
+// src/components/FriendsPage.tsx - UPDATED: Simplified no friends state
 "use client";
 
 import { useState, useEffect } from "react";
@@ -27,6 +27,7 @@ import FundRequestModal from "@/components/friends/FundRequestModal";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import EnhancedFriendsSearch from "@/components/friends/EnhancedFriendsSearch";
 import { SkeletonFriendsPage } from "@/components/ui/Skeleton";
+import FriendsIcon from "./icons/FriendsIcon";
 
 interface User {
   _id: string;
@@ -956,9 +957,9 @@ export default function FriendsPage() {
             </div>
 
             {/* Content based on active tab */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide flex flex-col">
               {activeTab === "Friends" && (
-                <div className="space-y-0">
+                <div className="space-y-0 flex-1 flex flex-col">
                   {loading && friends.length === 0 ? (
                     <div className="text-center py-6">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
@@ -967,25 +968,16 @@ export default function FriendsPage() {
                       </p>
                     </div>
                   ) : friends.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
+                    <div className="flex-1 flex flex-col items-center justify-center text-center">
                       <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
-                        <DollarSign
+                        <FriendsIcon
                           size={18}
                           className="text-gray-400 lg:w-5 lg:h-5"
                         />
                       </div>
-                      <h3 className="text-white text-sm lg:text-base font-satoshi mb-2">
-                        No friends yet
-                      </h3>
-                      <p className="text-gray-400 font-satoshi text-sm mb-3">
+                      <p className="text-gray-400 font-satoshi text-sm">
                         Search for friends using the search box above
                       </p>
-                      <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3 max-w-sm">
-                        <p className="text-blue-400 text-sm font-satoshi">
-                          💡 <strong>Tip:</strong> You can search by username or
-                          paste a wallet address to send a friend request!
-                        </p>
-                      </div>
                     </div>
                   ) : (
                     friends.map((friend, index) => (
@@ -1073,7 +1065,7 @@ export default function FriendsPage() {
               )}
 
               {activeTab === "Requests" && (
-                <div className="space-y-2">
+                <div className="space-y-2 flex-1 flex flex-col">
                   {loading && friendRequests.length === 0 ? (
                     <div className="text-center py-6">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
@@ -1082,7 +1074,7 @@ export default function FriendsPage() {
                       </p>
                     </div>
                   ) : friendRequests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
+                    <div className="flex-1 flex flex-col items-center justify-center text-center">
                       <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
                         <Bell
                           size={18}
@@ -1163,7 +1155,7 @@ export default function FriendsPage() {
               )}
 
               {activeTab === "FundRequests" && (
-                <div className="space-y-0">
+                <div className="space-y-0 flex-1 flex flex-col">
                   {loading && fundRequests.length === 0 ? (
                     <div className="text-center py-6">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
@@ -1172,7 +1164,7 @@ export default function FriendsPage() {
                       </p>
                     </div>
                   ) : fundRequests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
+                    <div className="flex-1 flex flex-col items-center justify-center text-center">
                       <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
                         <DollarSign
                           size={18}

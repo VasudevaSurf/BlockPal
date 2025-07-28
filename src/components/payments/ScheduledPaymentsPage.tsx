@@ -60,6 +60,8 @@ interface ScheduledPayment {
   gasCostUSD?: string;
   smartContract?: boolean;
   enhancedAPI?: boolean;
+  lastError?: string; // Add this for failure reasons
+  failedAt?: string; // Add this for failure timestamp
 }
 
 interface CreatePaymentData {
@@ -268,6 +270,7 @@ const TokenIcon = ({
   );
 };
 
+// UPDATED: UTC as default timezone
 const timezones = [
   { idx: 1, name: "UTC (Coordinated Universal Time)", tz: "UTC" },
   { idx: 2, name: "IST (India Standard Time)", tz: "Asia/Kolkata" },
@@ -292,8 +295,8 @@ export default function ScheduledPaymentsPage() {
   const [selectedToken, setSelectedToken] = useState<any>(null);
   const [recurringEnabled, setRecurringEnabled] = useState(false);
   const [recurringFrequency, setRecurringFrequency] = useState("weekly");
-  const [selectedTimezone, setSelectedTimezone] = useState(timezones[1]);
-  const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
+  const [selectedTimezone, setSelectedTimezone] = useState(timezones[0]); // CHANGED: Default to UTC (index 0)
+  const [activeTab, setActiveTab] = useState<"active" | "history">("active"); // CHANGED: "completed" to "history"
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
   const [isTimezoneDropdownOpen, setIsTimezoneDropdownOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
@@ -328,7 +331,7 @@ export default function ScheduledPaymentsPage() {
   });
   const [editRecurringEnabled, setEditRecurringEnabled] = useState(false);
   const [editSelectedTimezone, setEditSelectedTimezone] = useState(
-    timezones[1]
+    timezones[0] // CHANGED: Default to UTC
   );
   const [updating, setUpdating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -417,19 +420,61 @@ export default function ScheduledPaymentsPage() {
 
     try {
       setLoading(true);
-      const response = await fetch(
-        `/api/scheduled-payments?status=${activeTab}&walletAddress=${activeWallet.address}`,
-        {
-          credentials: "include",
+
+      if (activeTab === "active") {
+        // For active tab, fetch only active payments
+        const response = await fetch(
+          `/api/scheduled-payments?status=active&walletAddress=${activeWallet.address}`,
+          {
+            credentials: "include",
+          }
+        );
+
+        const data = await response.json();
+
+        if (response.ok) {
+          setScheduledPayments(data.scheduledPayments || []);
+        } else {
+          setError(data.error || "Failed to fetch scheduled payments");
         }
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setScheduledPayments(data.scheduledPayments || []);
       } else {
-        setError(data.error || "Failed to fetch scheduled payments");
+        // For history tab, fetch ALL payments and filter client-side
+        console.log("🔍 Fetching history (all payments) for filtering...");
+
+        const response = await fetch(
+          `/api/scheduled-payments?status=all&walletAddress=${activeWallet.address}`,
+          {
+            credentials: "include",
+          }
+        );
+
+        const data = await response.json();
+
+        if (response.ok) {
+          const allPayments = data.scheduledPayments || [];
+          console.log("📊 All payments received:", allPayments.length);
+
+          // Filter for completed and failed payments
+          const historyPayments = allPayments.filter(
+            (payment: ScheduledPayment) =>
+              payment.status === "completed" || payment.status === "failed"
+          );
+
+          console.log("📋 History payments filtered:", {
+            total: allPayments.length,
+            completed: allPayments.filter(
+              (p: ScheduledPayment) => p.status === "completed"
+            ).length,
+            failed: allPayments.filter(
+              (p: ScheduledPayment) => p.status === "failed"
+            ).length,
+            historyTotal: historyPayments.length,
+          });
+
+          setScheduledPayments(historyPayments);
+        } else {
+          setError(data.error || "Failed to fetch scheduled payments");
+        }
       }
     } catch (error: any) {
       setError("Failed to fetch scheduled payments");
@@ -476,7 +521,11 @@ export default function ScheduledPaymentsPage() {
       payment.nextExecution || payment.scheduledFor
     );
     const dateStr = scheduledDate.toISOString().split("T")[0];
-    const timeStr = scheduledDate.toTimeString().slice(0, 5);
+
+    // FIXED: Ensure 24-hour format (HH:MM)
+    const hours = scheduledDate.getHours().toString().padStart(2, "0");
+    const minutes = scheduledDate.getMinutes().toString().padStart(2, "0");
+    const timeStr = `${hours}:${minutes}`;
 
     setEditFormData({
       amount: payment.amount,
@@ -500,72 +549,233 @@ export default function ScheduledPaymentsPage() {
   // Handle update payment - Since the API doesn't support update, we'll cancel and recreate
   // Complete handleUpdatePayment method for ScheduledPaymentsPage.tsx
 
-const handleUpdatePayment = async () => {
-  if (!editingPayment) return;
+  const handleUpdatePayment = async () => {
+    if (!editingPayment) return;
 
-  try {
-    setUpdating(true);
-    setError("");
+    try {
+      setUpdating(true);
+      setError("");
 
-    // Validate form
-    if (!editFormData.amount || !editFormData.date || !editFormData.time) {
-      setError("Please fill in all required fields");
-      return;
-    }
+      // Validate form
+      if (!editFormData.amount || !editFormData.date || !editFormData.time) {
+        setError("Please fill in all required fields");
+        return;
+      }
 
-    const scheduledDateTime = new Date(
-      `${editFormData.date}T${editFormData.time}`
-    );
-    if (scheduledDateTime <= new Date()) {
-      setError("Scheduled time must be in the future");
-      return;
-    }
+      // FIXED: Properly construct datetime
+      const scheduledDateTime = new Date(
+        `${editFormData.date}T${editFormData.time}:00`
+      );
 
-    // Find the original token info from the tokens array to get proper contract address and decimals
-    const originalToken = tokens.find(
-      (t) =>
-        t.symbol === editingPayment.tokenSymbol ||
-        t.contractAddress === editingPayment.contractAddress ||
-        t.id === editingPayment.contractAddress
-    );
+      if (isNaN(scheduledDateTime.getTime())) {
+        setError("Invalid date or time format");
+        return;
+      }
 
-    // Construct proper tokenInfo object
-    const tokenInfo = originalToken
-      ? {
-          name: originalToken.name,
-          symbol: originalToken.symbol,
-          contractAddress: originalToken.contractAddress || originalToken.id,
-          decimals: originalToken.decimals || 18,
-          isETH: originalToken.symbol === "ETH",
-          balance: originalToken.balance,
-          price: originalToken.price,
-          icon: originalToken.icon,
-        }
-      : {
-          // Fallback if token not found in current tokens array
-          name: editingPayment.tokenName,
-          symbol: editingPayment.tokenSymbol,
+      if (scheduledDateTime <= new Date()) {
+        setError("Scheduled time must be in the future");
+        return;
+      }
+
+      // Find the original token info from the tokens array to get proper contract address and decimals
+      const originalToken = tokens.find(
+        (t) =>
+          t.symbol === editingPayment.tokenSymbol ||
+          t.contractAddress === editingPayment.contractAddress ||
+          t.id === editingPayment.contractAddress
+      );
+
+      // Construct proper tokenInfo object
+      const tokenInfo = originalToken
+        ? {
+            name: originalToken.name,
+            symbol: originalToken.symbol,
+            contractAddress: originalToken.contractAddress || originalToken.id,
+            decimals: originalToken.decimals || 18,
+            isETH: originalToken.symbol === "ETH",
+            balance: originalToken.balance,
+            price: originalToken.price,
+            icon: originalToken.icon,
+          }
+        : {
+            // Fallback if token not found in current tokens array
+            name: editingPayment.tokenName,
+            symbol: editingPayment.tokenSymbol,
+            contractAddress: editingPayment.contractAddress,
+            decimals: 18, // Default fallback
+            isETH: editingPayment.tokenSymbol === "ETH",
+          };
+
+      console.log("🔍 Token info for update:", {
+        originalTokenFound: !!originalToken,
+        tokenInfo,
+        editingPayment: {
+          tokenSymbol: editingPayment.tokenSymbol,
           contractAddress: editingPayment.contractAddress,
-          decimals: 18, // Default fallback
-          isETH: editingPayment.tokenSymbol === "ETH",
-        };
+        },
+      });
 
-    console.log("🔍 Token info for update:", {
-      originalTokenFound: !!originalToken,
-      tokenInfo,
-      editingPayment: {
-        tokenSymbol: editingPayment.tokenSymbol,
-        contractAddress: editingPayment.contractAddress,
-      },
-    });
+      // Since update isn't supported, we'll need to cancel and recreate
+      // First cancel the existing payment
+      console.log(
+        `🗑️ Cancelling existing payment: ${editingPayment.scheduleId}`
+      );
 
-    // Since update isn't supported, we'll need to cancel and recreate
-    // First cancel the existing payment
-    console.log(`🗑️ Cancelling existing payment: ${editingPayment.scheduleId}`);
-    
-    const cancelResponse = await fetch(
-      `/api/scheduled-payments/${editingPayment.scheduleId}`,
-      {
+      const cancelResponse = await fetch(
+        `/api/scheduled-payments/${editingPayment.scheduleId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "cancel",
+            status: "cancelled",
+          }),
+          credentials: "include",
+        }
+      );
+
+      if (!cancelResponse.ok) {
+        const cancelError = await cancelResponse.json();
+        throw new Error(
+          cancelError.error || "Failed to cancel existing payment"
+        );
+      }
+
+      console.log("✅ Existing payment cancelled successfully");
+
+      // Create new payment with updated details
+      const frequency = editRecurringEnabled ? editFormData.frequency : "once";
+
+      const createBody = {
+        action: "create",
+        tokenInfo: tokenInfo, // Use the properly constructed tokenInfo
+        fromAddress: editingPayment.walletAddress,
+        recipient: editingPayment.recipient,
+        amount: editFormData.amount,
+        scheduledFor: scheduledDateTime.toISOString(),
+        frequency,
+        timezone: editSelectedTimezone.tz,
+        description: editFormData.description,
+      };
+
+      console.log(
+        "📡 Sending recreate request with proper token info:",
+        createBody
+      );
+
+      const createResponse = await fetch("/api/scheduled-payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(createBody),
+        credentials: "include",
+      });
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json();
+        console.error("❌ Create failed:", errorData);
+
+        // If creation failed, we should try to restore the cancelled payment
+        // But since that's complex, we'll just show the error
+        throw new Error(errorData.error || "Failed to create updated payment");
+      }
+
+      const createResult = await createResponse.json();
+      console.log("✅ Payment updated successfully (recreated):", createResult);
+
+      // Close modal and reset state
+      setShowEditModal(false);
+      setEditingPayment(null);
+      setIsEditing(false);
+
+      // TRIGGER IMMEDIATE ACKNOWLEDGMENT CHECK FOR UPDATES
+      console.log("🔔 Triggering acknowledgment check for payment update...");
+      checkForNewPaymentAcknowledgments();
+
+      // Also trigger a delayed check in case there are any status changes
+      setTimeout(() => {
+        console.log("🔔 Secondary acknowledgment check for payment update...");
+        triggerImmediateCheck();
+      }, 3000);
+
+      // Refresh the payments list
+      fetchScheduledPayments();
+
+      // Show success message (optional)
+      console.log("✅ Payment update completed successfully");
+    } catch (error: any) {
+      console.error("❌ Error updating payment:", error);
+      setError("Failed to update payment: " + error.message);
+
+      // Check for acknowledgments even on error
+      console.log(
+        "🔔 Triggering acknowledgment check for payment update error..."
+      );
+      triggerImmediateCheck();
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeletePayment = async (scheduleId: string) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this scheduled payment? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("✅ Payment deleted successfully");
+
+        // TRIGGER ACKNOWLEDGMENT CHECK
+        triggerImmediateCheck();
+
+        fetchScheduledPayments();
+      } else {
+        setError(data.error || "Failed to delete payment");
+
+        // Check for acknowledgments on error
+        triggerImmediateCheck();
+      }
+    } catch (error: any) {
+      console.error("❌ Error deleting payment:", error);
+      setError("Failed to delete payment");
+
+      // Check for acknowledgments on error
+      triggerImmediateCheck();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update the handleCancelPayment function (around line 440)
+  const handleCancelPayment = async (scheduleId: string) => {
+    if (!confirm("Are you sure you want to cancel this scheduled payment?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -575,180 +785,33 @@ const handleUpdatePayment = async () => {
           status: "cancelled",
         }),
         credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("✅ Payment cancelled successfully");
+
+        // TRIGGER ACKNOWLEDGMENT CHECK
+        triggerImmediateCheck();
+
+        fetchScheduledPayments();
+      } else {
+        setError(data.error || "Failed to cancel payment");
+
+        // Check for acknowledgments on error
+        triggerImmediateCheck();
       }
-    );
+    } catch (error: any) {
+      console.error("❌ Error cancelling payment:", error);
+      setError("Failed to cancel payment");
 
-    if (!cancelResponse.ok) {
-      const cancelError = await cancelResponse.json();
-      throw new Error(
-        cancelError.error || "Failed to cancel existing payment"
-      );
-    }
-
-    console.log("✅ Existing payment cancelled successfully");
-
-    // Create new payment with updated details
-    const frequency = editRecurringEnabled ? editFormData.frequency : "once";
-
-    const createBody = {
-      action: "create",
-      tokenInfo: tokenInfo, // Use the properly constructed tokenInfo
-      fromAddress: editingPayment.walletAddress,
-      recipient: editingPayment.recipient,
-      amount: editFormData.amount,
-      scheduledFor: scheduledDateTime.toISOString(),
-      frequency,
-      timezone: editSelectedTimezone.tz,
-      description: editFormData.description,
-    };
-
-    console.log(
-      "📡 Sending recreate request with proper token info:",
-      createBody
-    );
-
-    const createResponse = await fetch("/api/scheduled-payments", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(createBody),
-      credentials: "include",
-    });
-
-    if (!createResponse.ok) {
-      const errorData = await createResponse.json();
-      console.error("❌ Create failed:", errorData);
-
-      // If creation failed, we should try to restore the cancelled payment
-      // But since that's complex, we'll just show the error
-      throw new Error(errorData.error || "Failed to create updated payment");
-    }
-
-    const createResult = await createResponse.json();
-    console.log("✅ Payment updated successfully (recreated):", createResult);
-
-    // Close modal and reset state
-    setShowEditModal(false);
-    setEditingPayment(null);
-    setIsEditing(false);
-
-    // TRIGGER IMMEDIATE ACKNOWLEDGMENT CHECK FOR UPDATES
-    console.log("🔔 Triggering acknowledgment check for payment update...");
-    checkForNewPaymentAcknowledgments();
-    
-    // Also trigger a delayed check in case there are any status changes
-    setTimeout(() => {
-      console.log("🔔 Secondary acknowledgment check for payment update...");
-      triggerImmediateCheck();
-    }, 3000);
-
-    // Refresh the payments list
-    fetchScheduledPayments();
-
-    // Show success message (optional)
-    console.log("✅ Payment update completed successfully");
-
-  } catch (error: any) {
-    console.error("❌ Error updating payment:", error);
-    setError("Failed to update payment: " + error.message);
-    
-    // Check for acknowledgments even on error
-    console.log("🔔 Triggering acknowledgment check for payment update error...");
-    triggerImmediateCheck();
-  } finally {
-    setUpdating(false);
-  }
-};
-
-  const handleDeletePayment = async (scheduleId: string) => {
-  if (!confirm("Are you sure you want to delete this scheduled payment? This action cannot be undone.")) {
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      console.log("✅ Payment deleted successfully");
-      
-      // TRIGGER ACKNOWLEDGMENT CHECK
-      triggerImmediateCheck();
-      
-      fetchScheduledPayments();
-    } else {
-      setError(data.error || "Failed to delete payment");
-      
       // Check for acknowledgments on error
       triggerImmediateCheck();
+    } finally {
+      setLoading(false);
     }
-  } catch (error: any) {
-    console.error("❌ Error deleting payment:", error);
-    setError("Failed to delete payment");
-    
-    // Check for acknowledgments on error  
-    triggerImmediateCheck();
-  } finally {
-    setLoading(false);
-  }
-};
-
-// Update the handleCancelPayment function (around line 440)
-const handleCancelPayment = async (scheduleId: string) => {
-  if (!confirm("Are you sure you want to cancel this scheduled payment?")) {
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        action: "cancel",
-        status: "cancelled",
-      }),
-      credentials: "include",
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      console.log("✅ Payment cancelled successfully");
-      
-      // TRIGGER ACKNOWLEDGMENT CHECK
-      triggerImmediateCheck();
-      
-      fetchScheduledPayments();
-    } else {
-      setError(data.error || "Failed to cancel payment");
-      
-      // Check for acknowledgments on error
-      triggerImmediateCheck();
-    }
-  } catch (error: any) {
-    console.error("❌ Error cancelling payment:", error);
-    setError("Failed to cancel payment");
-    
-    // Check for acknowledgments on error
-    triggerImmediateCheck();
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const openExplorer = (payment: ScheduledPayment) => {
     if (payment.lastTransactionHash) {
@@ -826,7 +889,13 @@ const handleCancelPayment = async (scheduleId: string) => {
       return false;
     }
 
-    const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
+    // FIXED: Properly construct datetime for validation
+    const scheduledDateTime = new Date(`${formData.date}T${formData.time}:00`);
+    if (isNaN(scheduledDateTime.getTime())) {
+      setError("Invalid date or time format");
+      return false;
+    }
+
     if (scheduledDateTime <= new Date()) {
       setError("Scheduled time must be in the future");
       return false;
@@ -847,7 +916,10 @@ const handleCancelPayment = async (scheduleId: string) => {
     setError("");
 
     try {
-      const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
+      // FIXED: Properly construct datetime
+      const scheduledDateTime = new Date(
+        `${formData.date}T${formData.time}:00`
+      );
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
       // Use selected user's wallet address if available, otherwise use direct input
@@ -871,6 +943,7 @@ const handleCancelPayment = async (scheduleId: string) => {
         selectedUser: selectedUser
           ? `@${selectedUser.username}`
           : "Direct address",
+        scheduledFor: scheduledDateTime.toISOString(),
       });
 
       const response = await fetch("/api/scheduled-payments", {
@@ -900,92 +973,96 @@ const handleCancelPayment = async (scheduleId: string) => {
   };
 
   const handleCreateScheduledPayment = async () => {
-  console.log("🚀 Creating smart contract scheduled payment...");
+    console.log("🚀 Creating smart contract scheduled payment...");
 
-  if (!preview || !activeWallet?.address) return;
+    if (!preview || !activeWallet?.address) return;
 
-  setCreating(true);
-  setError("");
+    setCreating(true);
+    setError("");
 
-  try {
-    const scheduledDateTime = new Date(`${formData.date}T${formData.time}`);
-    const frequency = recurringEnabled ? recurringFrequency : "once";
+    try {
+      // FIXED: Properly construct datetime
+      const scheduledDateTime = new Date(
+        `${formData.date}T${formData.time}:00`
+      );
+      const frequency = recurringEnabled ? recurringFrequency : "once";
 
-    // Use selected user's wallet address if available
-    const recipientAddress = selectedUser
-      ? selectedUser.walletAddress
-      : formData.recipient;
+      // Use selected user's wallet address if available
+      const recipientAddress = selectedUser
+        ? selectedUser.walletAddress
+        : formData.recipient;
 
-    const createBody = {
-      action: "create",
-      tokenInfo: selectedToken,
-      fromAddress: activeWallet.address,
-      recipient: recipientAddress,
-      amount: formData.amount,
-      scheduledFor: scheduledDateTime.toISOString(),
-      frequency,
-      timezone: selectedTimezone.tz,
-      description: formData.description,
-    };
+      const createBody = {
+        action: "create",
+        tokenInfo: selectedToken,
+        fromAddress: activeWallet.address,
+        recipient: recipientAddress,
+        amount: formData.amount,
+        scheduledFor: scheduledDateTime.toISOString(),
+        frequency,
+        timezone: selectedTimezone.tz,
+        description: formData.description,
+      };
 
-    console.log("📡 Sending smart contract create request:", {
-      ...createBody,
-      selectedUser: selectedUser
-        ? `@${selectedUser.username}`
-        : "Direct address",
-    });
+      console.log("📡 Sending smart contract create request:", {
+        ...createBody,
+        selectedUser: selectedUser
+          ? `@${selectedUser.username}`
+          : "Direct address",
+        scheduledFor: scheduledDateTime.toISOString(),
+      });
 
-    const response = await fetch("/api/scheduled-payments", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(createBody),
-      credentials: "include",
-    });
+      const response = await fetch("/api/scheduled-payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(createBody),
+        credentials: "include",
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to create scheduled payment");
-    }
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create scheduled payment");
+      }
 
-    setResult(data);
-    setShowResult(true);
-    setShowPreview(false);
+      setResult(data);
+      setShowResult(true);
+      setShowPreview(false);
 
-    // Reset form
-    setFormData({
-      recipient: "",
-      amount: "",
-      date: "",
-      time: "",
-      description: "",
-    });
-    setSelectedUser(null);
-    setRecurringEnabled(false);
+      // Reset form
+      setFormData({
+        recipient: "",
+        amount: "",
+        date: "",
+        time: "",
+        description: "",
+      });
+      setSelectedUser(null);
+      setRecurringEnabled(false);
 
-    console.log("✅ Smart contract scheduled payment created successfully");
+      console.log("✅ Smart contract scheduled payment created successfully");
 
-    // TRIGGER IMMEDIATE ACKNOWLEDGMENT CHECK
-    checkForNewPaymentAcknowledgments();
-    
-    // Also trigger a second check after 5 seconds in case payment fails quickly
-    setTimeout(() => {
+      // TRIGGER IMMEDIATE ACKNOWLEDGMENT CHECK
+      checkForNewPaymentAcknowledgments();
+
+      // Also trigger a second check after 5 seconds in case payment fails quickly
+      setTimeout(() => {
+        triggerImmediateCheck();
+      }, 5000);
+
+      fetchScheduledPayments();
+    } catch (err: any) {
+      console.error("❌ Create error:", err);
+      setError(err.message || "Failed to create scheduled payment");
+
+      // Check for acknowledgments even on error
       triggerImmediateCheck();
-    }, 5000);
-
-    fetchScheduledPayments();
-  } catch (err: any) {
-    console.error("❌ Create error:", err);
-    setError(err.message || "Failed to create scheduled payment");
-    
-    // Check for acknowledgments even on error
-    triggerImmediateCheck();
-  } finally {
-    setCreating(false);
-  }
-};
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const copyToClipboard = async (text: string, type: string) => {
     try {
@@ -1023,16 +1100,27 @@ const handleCancelPayment = async (scheduleId: string) => {
     }
   };
 
+  // UPDATED: Mobile action buttons for active tab now include delete
   const renderMobileActionButtons = (payment: ScheduledPayment) => {
     if (activeTab === "active") {
       return (
-        <button
-          onClick={() => handleEditPayment(payment)}
-          className="bg-[#E2AF19] text-black px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
-        >
-          <Edit3 size={10} className="mr-1" />
-          Edit
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => handleEditPayment(payment)}
+            className="bg-[#E2AF19] text-black px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center h-7"
+          >
+            <Edit3 size={10} className="mr-1" />
+            Edit
+          </button>
+          <button
+            onClick={() => handleDeletePayment(payment.scheduleId)}
+            className="bg-red-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:bg-red-700 transition-colors flex items-center h-7"
+            title="Delete Payment"
+          >
+            <Trash2 size={10} className="mr-1" />
+            Delete
+          </button>
+        </div>
       );
     } else {
       return (
@@ -1061,17 +1149,25 @@ const handleCancelPayment = async (scheduleId: string) => {
     }
   };
 
+  // UPDATED: Desktop action buttons for active tab now include delete
   const renderDesktopActionButtons = (payment: ScheduledPayment) => {
     if (activeTab === "active") {
       return (
         <div className="flex items-center justify-center space-x-1">
           <button
             onClick={() => handleEditPayment(payment)}
-            className="bg-[#E2AF19] text-black px-2 gap-1 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center"
+            className="bg-[#E2AF19] text-black px-2 gap-1 py-1 rounded-md text-xs font-satoshi font-medium hover:opacity-90 transition-opacity flex items-center h-7"
             title="Edit Payment"
           >
             Edit
             <Edit3 size={8} />
+          </button>
+          <button
+            onClick={() => handleDeletePayment(payment.scheduleId)}
+            className="bg-red-600 text-white px-2 py-1 rounded-md text-xs font-satoshi font-medium hover:bg-red-700 transition-colors flex items-center h-7"
+            title="Delete Payment"
+          >
+            <Trash2 size={8} />
           </button>
         </div>
       );
@@ -1145,16 +1241,66 @@ const handleCancelPayment = async (scheduleId: string) => {
     );
   };
 
-  const filteredPayments = scheduledPayments.filter(
-    (payment) => payment.status === activeTab
-  );
+  // CHANGED: Filter payments for history tab with debugging
+  const filteredPayments = scheduledPayments.filter((payment) => {
+    if (activeTab === "active") {
+      return payment.status === "active";
+    } else {
+      // History tab shows completed and failed
+      const isHistoryPayment =
+        payment.status === "completed" || payment.status === "failed";
+      if (payment.status === "failed") {
+        console.log("🔍 Found failed payment:", {
+          scheduleId: payment.scheduleId,
+          status: payment.status,
+          failedAt: payment.failedAt,
+          lastError: payment.lastError,
+          isHistoryPayment,
+        });
+      }
+      return isHistoryPayment;
+    }
+  });
+
+  console.log("📊 Filtered payments for", activeTab, ":", {
+    total: scheduledPayments.length,
+    filtered: filteredPayments.length,
+    statuses: scheduledPayments.map((p) => p.status),
+  });
 
   const activeCount = scheduledPayments.filter(
     (payment) => payment.status === "active"
   ).length;
-  const completedCount = scheduledPayments.filter(
-    (payment) => payment.status === "completed"
+  // CHANGED: Count both completed and failed for history
+  const historyCount = scheduledPayments.filter(
+    (payment) => payment.status === "completed" || payment.status === "failed"
   ).length;
+
+  // CHANGED: Helper function to get failure reason
+  const getFailureReason = (payment: ScheduledPayment): string => {
+    if (payment.status !== "failed" || !payment.lastError) {
+      return "";
+    }
+
+    const error = payment.lastError.toLowerCase();
+
+    if (
+      error.includes("insufficient funds") ||
+      error.includes("insufficient balance")
+    ) {
+      return "Insufficient funds";
+    } else if (error.includes("allowance") || error.includes("approval")) {
+      return "Token approval failed";
+    } else if (error.includes("gas")) {
+      return "Gas estimation failed";
+    } else if (error.includes("network")) {
+      return "Network error";
+    } else if (error.includes("deadline")) {
+      return "Transaction deadline exceeded";
+    } else {
+      return "Execution failed";
+    }
+  };
 
   if (initialLoading) {
     return <SkeletonScheduledPayments />;
@@ -1328,7 +1474,7 @@ const handleCancelPayment = async (scheduleId: string) => {
 
               {/* Mobile Layout - Date and Time Row */}
               <div className="xl:hidden space-y-3">
-                {/* Date Time Picker - Full width on mobile */}
+                {/* Date Time Picker - Full width on mobile - CHANGED: Added step="1" for 24-hour format */}
                 <div>
                   <DateTimePicker
                     dateValue={formData.date}
@@ -1341,6 +1487,7 @@ const handleCancelPayment = async (scheduleId: string) => {
                     }
                     placeholder="Select date & time"
                     className="font-satoshi"
+                    timeProps={{ step: "1" }} // Force 24-hour format
                   />
                 </div>
 
@@ -1403,14 +1550,14 @@ const handleCancelPayment = async (scheduleId: string) => {
                     setRecurringEnabled(false);
                     setError("");
                   }}
-                  className="flex-1 px-3 py-2.5 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-xs"
+                  className="flex-1 px-3 py-2.5 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-xs font-medium min-w-[120px]"
                 >
                   Reset
                 </button>
                 <Button
                   onClick={handleCreatePreview}
                   disabled={loading}
-                  className="flex-1 font-satoshi text-xs"
+                  className="flex-1 font-satoshi text-xs font-medium"
                 >
                   {loading ? "Loading..." : "Create Schedule"}
                 </Button>
@@ -1418,7 +1565,7 @@ const handleCancelPayment = async (scheduleId: string) => {
             </div>
           </div>
 
-          {/* Tab Navigation - Mobile */}
+          {/* Tab Navigation - Mobile - CHANGED: Completed to History */}
           <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
@@ -1438,14 +1585,14 @@ const handleCancelPayment = async (scheduleId: string) => {
                   Active
                 </button>
                 <button
-                  onClick={() => setActiveTab("completed")}
+                  onClick={() => setActiveTab("history")}
                   className={`px-2.5 py-1 rounded-md font-satoshi text-xs transition-colors ${
-                    activeTab === "completed"
+                    activeTab === "history"
                       ? "bg-[#E2AF19] text-black font-medium"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  Completed
+                  History
                 </button>
               </div>
             </div>
@@ -1471,8 +1618,18 @@ const handleCancelPayment = async (scheduleId: string) => {
                   <p className="text-gray-400 font-satoshi text-xs mt-1">
                     {activeTab === "active"
                       ? "Create your first scheduled payment to automate your crypto transfers"
-                      : "Completed payments will appear here"}
+                      : "Completed and failed payments will appear here"}
                   </p>
+                  {/* Debug info for development */}
+                  {activeTab === "history" && scheduledPayments.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      Debug: {scheduledPayments.length} total payments,{" "}
+                      {filteredPayments.length} in history
+                      <br />
+                      Statuses:{" "}
+                      {scheduledPayments.map((p) => p.status).join(", ")}
+                    </div>
+                  )}
                 </div>
               ) : (
                 filteredPayments.map((payment) => {
@@ -1547,6 +1704,12 @@ const handleCancelPayment = async (scheduleId: string) => {
                               Completed
                             </span>
                           )}
+                          {/* CHANGED: Added failed status display */}
+                          {payment.status === "failed" && (
+                            <span className="bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-satoshi font-medium">
+                              Failed
+                            </span>
+                          )}
                           {payment.frequency === "once" && (
                             <span className="bg-blue-500 text-white px-1.5 py-0.5 rounded-full text-xs font-satoshi flex items-center">
                               <Clock size={8} className="mr-0.5" />
@@ -1565,6 +1728,21 @@ const handleCancelPayment = async (scheduleId: string) => {
                             </div>
                           )}
                       </div>
+
+                      {/* CHANGED: Display failure reason for failed payments */}
+                      {payment.status === "failed" && (
+                        <div className="mb-2 p-2 bg-red-900/20 border border-red-500/30 rounded-md">
+                          <div className="flex items-center">
+                            <AlertTriangle
+                              size={12}
+                              className="text-red-400 mr-1.5"
+                            />
+                            <span className="text-red-300 text-xs font-satoshi">
+                              {getFailureReason(payment)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Action Buttons */}
                       <div className="flex justify-center space-x-2 pt-2 border-t border-[#2C2C2C]">
@@ -1736,7 +1914,7 @@ const handleCancelPayment = async (scheduleId: string) => {
               </div>
             </div>
 
-            {/* Desktop Layout - Form Row 2 - Date with Time and Recurring Toggle */}
+            {/* Desktop Layout - Form Row 2 - Date with Time and Recurring Toggle - CHANGED: Added timeProps for 24-hour format */}
             <div className="grid grid-cols-12 gap-3 mb-3 items-center">
               {/* Date with Time Input - Takes up 3 columns */}
               <div className="col-span-3">
@@ -1751,6 +1929,7 @@ const handleCancelPayment = async (scheduleId: string) => {
                   }
                   placeholder="Select date & time"
                   className="font-satoshi h-[44px]"
+                  timeProps={{ step: "1" }} // Force 24-hour format
                 />
               </div>
 
@@ -1814,21 +1993,21 @@ const handleCancelPayment = async (scheduleId: string) => {
                   setRecurringEnabled(false);
                   setError("");
                 }}
-                className="px-3 py-1.5 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-xs"
+                className="px-4 py-1.5 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-xs font-medium min-w-[130px]"
               >
                 Reset
               </button>
               <Button
                 onClick={handleCreatePreview}
                 disabled={loading}
-                className="font-satoshi text-xs"
+                className="font-satoshi text-xs font-medium"
               >
                 {loading ? "Loading..." : "Create Schedule"}
               </Button>
             </div>
           </div>
 
-          {/* Transaction History - Desktop */}
+          {/* Transaction History - Desktop - CHANGED: Completed to History */}
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-1 flex flex-col min-h-0">
             {/* Header with Radio Options */}
             <div className="flex items-center justify-between mb-4">
@@ -1860,19 +2039,19 @@ const handleCancelPayment = async (scheduleId: string) => {
                 <div className="flex items-center bg-black border border-[#2C2C2C] rounded-lg px-3 py-2">
                   <input
                     type="radio"
-                    id="completed-radio-desktop"
+                    id="history-radio-desktop"
                     name="payment-status-desktop"
-                    checked={activeTab === "completed"}
-                    onChange={() => setActiveTab("completed")}
+                    checked={activeTab === "history"}
+                    onChange={() => setActiveTab("history")}
                     className="h-3 w-3 mr-1.5"
                     style={{ accentColor: "#E2AF19" }}
                   />
                   <label
-                    htmlFor="completed-radio-desktop"
+                    htmlFor="history-radio-desktop"
                     className="text-white font-satoshi text-xs"
                   >
-                    Completed
-                    {/* ({completedCount}) */}
+                    History
+                    {/* ({historyCount}) */}
                   </label>
                 </div>
               </div>
@@ -1891,7 +2070,7 @@ const handleCancelPayment = async (scheduleId: string) => {
                   Amount
                 </div>
                 <div className="text-gray-400 text-xs font-satoshi text-left">
-                  Next Execution
+                  {activeTab === "active" ? "Next Execution" : "Status"}
                 </div>
                 <div className="text-gray-400 text-xs font-satoshi text-left">
                   Status
@@ -1923,7 +2102,7 @@ const handleCancelPayment = async (scheduleId: string) => {
                   <p className="text-gray-400 font-satoshi text-center text-sm max-w-md">
                     {activeTab === "active"
                       ? "Create your first scheduled payment to automate your crypto transfers"
-                      : "Completed payments will appear here"}
+                      : "Completed and failed payments will appear here"}
                   </p>
                 </div>
               ) : (
@@ -1976,25 +2155,38 @@ const handleCancelPayment = async (scheduleId: string) => {
                           {payment.amount} {payment.tokenSymbol}
                         </div>
 
+                        {/* CHANGED: Show different content based on tab and status */}
                         <div className="text-white font-satoshi text-xs">
-                          {payment.status === "active" &&
-                          payment.nextExecution ? (
-                            <div>
-                              <div className="text-xs">
-                                {formatDateTime(payment.nextExecution)}
+                          {activeTab === "active" ? (
+                            payment.nextExecution ? (
+                              <div>
+                                <div className="text-xs">
+                                  {formatDateTime(payment.nextExecution)}
+                                </div>
+                                <div className="text-yellow-400 text-xs">
+                                  {getTimeUntilExecution(payment.nextExecution)}
+                                </div>
                               </div>
-                              <div className="text-yellow-400 text-xs">
-                                {getTimeUntilExecution(payment.nextExecution)}
-                              </div>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )
+                          ) : // History tab - show failure reason or completion date
+                          payment.status === "failed" ? (
+                            <div className="flex items-center">
+                              <AlertTriangle
+                                size={12}
+                                className="text-red-400 mr-1"
+                              />
+                              <span className="text-red-300 text-xs">
+                                {getFailureReason(payment)}
+                              </span>
                             </div>
-                          ) : payment.status === "completed" ? (
+                          ) : (
                             <div className="text-gray-400 text-xs">
                               {formatDateTime(
                                 payment.lastExecutionAt || payment.scheduledFor
                               )}
                             </div>
-                          ) : (
-                            <span className="text-gray-400">—</span>
                           )}
                         </div>
 
@@ -2007,6 +2199,11 @@ const handleCancelPayment = async (scheduleId: string) => {
                           {payment.status === "completed" && (
                             <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-satoshi font-medium">
                               Completed
+                            </span>
+                          )}
+                          {payment.status === "failed" && (
+                            <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-satoshi font-medium">
+                              Failed
                             </span>
                           )}
                           {payment.status === "cancelled" && (
@@ -2032,7 +2229,7 @@ const handleCancelPayment = async (scheduleId: string) => {
           </div>
         </div>
 
-        {/* Edit Payment Modal */}
+        {/* Edit Payment Modal - REMOVED: Danger Zone section */}
         {showEditModal && editingPayment && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-lg max-h-[90vh] overflow-hidden">
@@ -2050,7 +2247,7 @@ const handleCancelPayment = async (scheduleId: string) => {
                     </div>
                   </div>
                   <p className="text-gray-400 text-xs font-satoshi">
-                    Modify your scheduled payment details or delete it
+                    Modify your scheduled payment details
                   </p>
                 </div>
                 <button
@@ -2132,6 +2329,7 @@ const handleCancelPayment = async (scheduleId: string) => {
                         }
                         placeholder="Select date & time"
                         className="font-satoshi"
+                        timeProps={{ step: "1" }} // Force 24-hour format
                       />
                     </div>
 
@@ -2240,37 +2438,6 @@ const handleCancelPayment = async (scheduleId: string) => {
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Danger Zone */}
-                  <div className="bg-red-900/10 border border-red-500/20 rounded-lg p-3">
-                    <div className="flex items-center mb-2">
-                      <AlertTriangle
-                        size={14}
-                        className="text-red-400 mr-1.5"
-                      />
-                      <span className="text-red-400 font-satoshi text-xs font-semibold">
-                        Danger Zone
-                      </span>
-                    </div>
-                    <p className="text-red-300 text-xs font-satoshi mb-3">
-                      Permanently delete this scheduled payment. This action
-                      cannot be undone.
-                    </p>
-                    <button
-                      onClick={() => {
-                        // Remove the confirm() from here since handleDeletePayment already has it
-                        handleDeletePayment(editingPayment.scheduleId);
-                        setShowEditModal(false);
-                        setEditingPayment(null);
-                        setIsEditing(false);
-                      }}
-                      disabled={loading}
-                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-satoshi text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                    >
-                      <Trash2 size={12} className="mr-1.5" />
-                      {loading ? "Deleting..." : "Delete Payment"}
-                    </button>
                   </div>
                 </div>
               </div>
@@ -2412,49 +2579,6 @@ const handleCancelPayment = async (scheduleId: string) => {
                       </div>
                     </div>
                   </div>
-
-                  {/* Cost Breakdown */}
-                  <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-                    <h3 className="text-white font-semibold font-satoshi mb-3 text-xs">
-                      Cost Breakdown
-                    </h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Estimated Gas:
-                        </span>
-                        <span className="text-white font-satoshi text-xs">
-                          {parseInt(preview.estimatedGas).toLocaleString()} gas
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Gas Cost:
-                        </span>
-                        <span className="text-white font-satoshi text-xs">
-                          {preview.gasCostETH} ETH (${preview.gasCostUSD})
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Smart Contract Tax (0.5%):
-                        </span>
-                        <span className="text-yellow-400 font-satoshi text-xs">
-                          {preview.taxETH} ETH (${preview.taxUSD})
-                        </span>
-                      </div>
-                      <div className="border-t border-[#2C2C2C] pt-1.5">
-                        <div className="flex justify-between">
-                          <span className="text-white font-semibold font-satoshi text-xs">
-                            Total Cost:
-                          </span>
-                          <span className="text-white font-bold font-satoshi text-xs">
-                            {preview.totalCostETH} ETH (${preview.totalCostUSD})
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -2592,6 +2716,20 @@ const handleCancelPayment = async (scheduleId: string) => {
             -ms-overflow-style: none;
           }
           *::-webkit-scrollbar {
+            display: none;
+          }
+
+          /* CHANGED: Force 24-hour time format */
+          input[type="time"] {
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+          }
+
+          input[type="time"]::-webkit-datetime-edit-ampm-field {
+            display: none;
+          }
+
+          input[type="time"]::-webkit-inner-spin-button {
             display: none;
           }
 

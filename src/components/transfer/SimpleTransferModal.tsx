@@ -1208,10 +1208,10 @@ export default function SimpleTransferModal({
                   </h3>
 
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
+                    {/* <div className="flex justify-between">
                       <span className="text-gray-400">Network:</span>
                       <span className="text-white">{preview.network}</span>
-                    </div>
+                    </div> */}
                     <div className="flex justify-between">
                       <span className="text-gray-400">Token:</span>
                       <span className="text-white">
@@ -1264,7 +1264,7 @@ export default function SimpleTransferModal({
                           <span className="text-white">{preview.valueUSD}</span>
                         </div>
                       )}
-                    <div className="flex justify-between">
+                    {/* <div className="flex justify-between">
                       <span className="text-gray-400">Est. Gas:</span>
                       <span className="text-white">
                         {preview.gasEstimation.estimatedGas} gas
@@ -1276,7 +1276,7 @@ export default function SimpleTransferModal({
                         {preview.gasEstimation.gasCostETH} ETH (≈
                         {preview.gasEstimation.gasCostUSD})
                       </span>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
 
@@ -1313,15 +1313,15 @@ export default function SimpleTransferModal({
                   <RefreshCw size={24} className="text-black animate-spin" />
                 </div>
                 <h3 className="text-white text-base font-semibold font-satoshi mb-1.5">
-                  Processing Transaction
+                  Processing...
                 </h3>
                 <p className="text-gray-400 font-satoshi">
-                  Please wait while your transfer is being processed on the
-                  blockchain...
+                  Transaction in progress! Blockchain validation is underway.
+                  This may take a few minutes.
                 </p>
-                <div className="mt-3 text-xs text-gray-500 font-satoshi">
+                {/* <div className="mt-3 text-xs text-gray-500 font-satoshi">
                   This may take a few moments. Do not close this window.
-                </div>
+                </div> */}
               </div>
             )}
 
@@ -1366,7 +1366,7 @@ export default function SimpleTransferModal({
                         </button>
                       </div>
                     </div>
-                    {transactionResult.gasUsed && (
+                    {/* {transactionResult.gasUsed && (
                       <div className="flex justify-between">
                         <span className="text-gray-400">Gas Used:</span>
                         <span className="text-white">
@@ -1391,7 +1391,7 @@ export default function SimpleTransferModal({
                             ` (${transactionResult.actualCostUSD})`}
                         </span>
                       </div>
-                    )}
+                    )} */}
                   </div>
 
                   {copied === "hash" && (
