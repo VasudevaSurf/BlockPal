@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - UPDATED VERSION (Profile option removed)
+// src/components/dashboard/Sidebar.tsx - UPDATED VERSION with new names
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -20,32 +20,65 @@ import { logoutUser } from "@/store/slices/authSlice";
 const menuItems = [
   {
     icon: DashboardIcon,
-    label: "Dashboard",
+    label: "Portfolio",
     href: "/dashboard",
+    comingSoon: false,
   },
   {
     icon: ScheduleIcon,
-    label: "Schedule Payments",
+    label: "LoopX",
     href: "/dashboard/scheduled-payments",
+    comingSoon: false,
   },
   {
     icon: BatchIcon,
-    label: "Batch Payments",
+    label: "Cluster",
     href: "/dashboard/batch-payments",
+    comingSoon: false,
   },
   {
     icon: AIIcon,
-    label: "AI Chat",
+    label: "Lumen AI",
     href: "/dashboard/ai-chat",
+    comingSoon: false,
+  },
+  {
+    icon: DashboardIcon, // You may want to add specific icons for these
+    label: "Hiber",
+    href: "/dashboard/hiber",
+    comingSoon: true,
+  },
+  {
+    icon: DashboardIcon, // You may want to add specific icons for these
+    label: "Cipher",
+    href: "/dashboard/cipher",
+    comingSoon: true,
+  },
+  {
+    icon: DashboardIcon, // You may want to add specific icons for these
+    label: "Anchor",
+    href: "/dashboard/anchor",
+    comingSoon: true,
+  },
+  {
+    icon: DashboardIcon, // You may want to add specific icons for these
+    label: "InfluX",
+    href: "/dashboard/influx",
+    comingSoon: true,
+  },
+  {
+    icon: DashboardIcon, // You may want to add specific icons for these
+    label: "Connect",
+    href: "/dashboard/connect",
+    comingSoon: true,
   },
   {
     icon: FriendsIcon,
     label: "Friends",
     href: "/dashboard/friends",
+    comingSoon: false,
   },
 ];
-
-// REMOVED: otherItems array (no longer needed since profile is moved to header)
 
 interface SidebarProps {
   onItemClick?: () => void;
@@ -62,10 +95,22 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
   // Check if user has wallets
   const hasWallets = wallets && wallets.length > 0;
 
-  const handleNavigation = (href: string, event?: React.MouseEvent) => {
+  const handleNavigation = (
+    href: string,
+    comingSoon: boolean,
+    event?: React.MouseEvent
+  ) => {
     // Prevent navigation if already loading
     if (isLoading) {
       event?.preventDefault();
+      return;
+    }
+
+    // Show coming soon alert for coming soon items
+    if (comingSoon) {
+      event?.preventDefault();
+      alert("Coming Soon!");
+      onItemClick?.();
       return;
     }
 
@@ -147,16 +192,19 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         <nav className="space-y-1 lg:space-y-2 mb-4 lg:mb-6">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
-            const isDisabled = !hasWallets && item.href !== "/dashboard";
+            const isDisabled =
+              (!hasWallets && item.href !== "/dashboard") || item.comingSoon;
 
             return (
               <button
                 key={item.label}
-                onClick={(e) => handleNavigation(item.href, e)}
-                disabled={isLoading || isDisabled}
+                onClick={(e) => handleNavigation(item.href, item.comingSoon, e)}
+                disabled={isLoading}
                 className={`w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
                   isActive
                     ? "bg-[#E2AF19] text-black font-medium"
+                    : item.comingSoon
+                    ? "text-gray-400 hover:bg-[#1C1C1C] cursor-pointer"
                     : isDisabled
                     ? "text-gray-500 cursor-not-allowed opacity-50"
                     : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
@@ -176,10 +224,9 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         </nav>
       </div>
 
-      {/* Bottom Section - Only website link now */}
-      <div className="p-2 lg:p-4 flex-shrink-0 relative z-20">
+      {/* Bottom Section - Go to website */}
+      {/* <div className="p-2 lg:p-4 flex-shrink-0 relative z-20">
         <div className="space-y-1 lg:space-y-2">
-          {/* Go to Website Button */}
           <button
             onClick={() => {
               window.open(
@@ -199,7 +246,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
             </div>
           </button>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

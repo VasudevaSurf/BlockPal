@@ -1534,7 +1534,7 @@ export default function TokenOverviewPage() {
                   </button>
                   <button
                     onClick={() => setQrModalOpen(true)}
-                    className="flex-1 bg-[#E2AF19] text-black py-2 rounded-lg hover:bg-[#E2AF19] transition-colors font-satoshi flex items-center justify-center"
+                    className="flex-1 bg-[#E2AF19] text-black font-semibold py-2 rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi flex items-center justify-center"
                   >
                     Receive
                     <QrCode size={13} className="ml-1.5" />

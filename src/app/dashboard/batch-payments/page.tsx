@@ -1,4 +1,4 @@
-// src/app/dashboard/batch-payments/page.tsx - UPDATED WITH CENTERED TOKEN ICONS
+// src/app/dashboard/batch-payments/page.tsx - UPDATED WITH PROCESSING STEP
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Copy,
   GripHorizontal,
+  Trash2,
 } from "lucide-react";
 import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
@@ -252,6 +253,7 @@ export default function BatchPaymentsPage() {
   const [preview, setPreview] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [processing, setProcessing] = useState(false); // NEW: Processing state
   const [result, setResult] = useState<any>(null);
   const [showResult, setShowResult] = useState(false);
   const [copied, setCopied] = useState<string>("");
@@ -551,6 +553,11 @@ export default function BatchPaymentsPage() {
 
   const executeBatchWithKey = async (privateKey: string) => {
     try {
+      // NEW: Show processing modal and hide preview
+      setShowPreview(false);
+      setProcessing(true);
+      setExecuting(false);
+
       const response = await fetch("/api/transfer/batch", {
         method: "POST",
         headers: {
@@ -571,12 +578,14 @@ export default function BatchPaymentsPage() {
         throw new Error(data.error || "Batch execution failed");
       }
 
+      // NEW: Hide processing modal and show result
+      setProcessing(false);
       setResult(data.result);
       setShowResult(true);
       setBatchPayments([]);
-      setShowPreview(false);
     } catch (err: any) {
-      setShowPreview(false);
+      // NEW: Hide processing modal and show error result
+      setProcessing(false);
       setResult({
         success: false,
         error: parseErrorMessage(err.message || "Transaction failed"),
@@ -1026,6 +1035,7 @@ export default function BatchPaymentsPage() {
           <div className="border-t border-[#2C2C2C] mb-1.5 flex-shrink-0 -mx-2.5"></div>
 
           <div className="bg-[#0F0F0F] rounded-lg mb-1 flex-shrink-0">
+            {/* Updated grid to 4 columns instead of 4 (removed Est. Gas column) */}
             <div className="grid grid-cols-4 gap-1 px-1.5 py-1.5">
               <div className="text-gray-400 text-xs font-satoshi text-left">
                 Username/Address
@@ -1036,8 +1046,12 @@ export default function BatchPaymentsPage() {
               <div className="text-gray-400 text-xs font-satoshi text-left">
                 Amount
               </div>
-              <div className="text-gray-400 text-xs font-satoshi text-left">
+              {/* COMMENTED: Est. Gas column */}
+              {/* <div className="text-gray-400 text-xs font-satoshi text-left">
                 Est. Gas
+              </div> */}
+              <div className="text-gray-400 text-xs font-satoshi text-center">
+                Actions
               </div>
             </div>
           </div>
@@ -1062,6 +1076,7 @@ export default function BatchPaymentsPage() {
 
                   return (
                     <div key={payment.id}>
+                      {/* Updated grid to 4 columns instead of 4 (removed Est. Gas column) */}
                       <div className="grid grid-cols-4 gap-1 items-center py-1.5 px-1.5 hover:bg-[#1A1A1A] rounded-lg transition-colors">
                         <div className="flex items-center min-w-0">
                           <div className="w-3 h-3 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-1 flex items-center justify-center flex-shrink-0 shadow-sm border border-white/10">
@@ -1103,8 +1118,20 @@ export default function BatchPaymentsPage() {
                           {payment.amount} {payment.tokenInfo.symbol}
                         </div>
 
-                        <div className="text-white font-satoshi text-xs">
+                        {/* COMMENTED: Est. Gas column */}
+                        {/* <div className="text-white font-satoshi text-xs">
                           ~ 65,000 gas
+                        </div> */}
+
+                        {/* Added Actions column with individual remove button */}
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={() => removeFromBatch(payment.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-400 transition-colors rounded-md hover:bg-red-500/10 flex items-center justify-center"
+                            title="Remove this payment"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </div>
 
@@ -1248,7 +1275,7 @@ export default function BatchPaymentsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C]">
+                  {/* <div className="bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C]">
                     <h3 className="text-white font-semibold font-satoshi mb-2">
                       Gas Estimation
                     </h3>
@@ -1296,7 +1323,7 @@ export default function BatchPaymentsPage() {
                         </span>
                       </div>
                     </div>
-                  </div>
+                  </div> */}
 
                   <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-2.5">
                     <div className="flex items-start">
@@ -1343,6 +1370,48 @@ export default function BatchPaymentsPage() {
                     )}
                   </Button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* NEW: Processing Modal */}
+      {processing && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/80" />
+
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-2.5">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-sm overflow-hidden">
+              <div className="p-6 text-center">
+                {/* Processing Icon - Animated Checkmark */}
+                <div className="w-16 h-16 mx-auto mb-4 relative">
+                  <div className="w-16 h-16 rounded-full border-4 border-[#2C2C2C] flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded transform rotate-45 relative">
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded animate-pulse"></div>
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-45">
+                        <CheckCircle
+                          size={20}
+                          className="text-white animate-bounce"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Animated rings */}
+                  <div className="absolute inset-0 border-2 border-green-400/30 rounded-full animate-ping"></div>
+                  <div
+                    className="absolute inset-2 border border-blue-400/30 rounded-full animate-ping"
+                    style={{ animationDelay: "0.2s" }}
+                  ></div>
+                </div>
+
+                <h3 className="text-white text-xl font-bold font-mayeka mb-2">
+                  Processing
+                </h3>
+                <p className="text-gray-400 text-sm font-satoshi leading-relaxed">
+                  Transaction in progress! Blockchain validation is underway.
+                  This may take a few minutes.
+                </p>
               </div>
             </div>
           </div>
@@ -1412,12 +1481,12 @@ export default function BatchPaymentsPage() {
                             </button>
                           </div>
                         </div>
-                        <div className="flex justify-between">
+                        {/* <div className="flex justify-between">
                           <span className="text-gray-400">Gas Used:</span>
                           <span className="text-white">
                             {result.gasUsed?.toLocaleString()} gas
                           </span>
-                        </div>
+                        </div> */}
                         <div className="flex justify-between">
                           <span className="text-gray-400">
                             Total Transfers:

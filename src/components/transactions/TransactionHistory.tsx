@@ -1,4 +1,4 @@
-// src/components/transactions/TransactionHistory.tsx - UPDATED WITH VENN DIAGRAM TOKEN ICONS
+// src/components/transactions/TransactionHistory.tsx - FIXED OVERLAPPING ICONS WITH FULL BG COLORS
 "use client";
 
 import { useState, useEffect } from "react";
@@ -525,56 +525,52 @@ export default function TransactionHistory({
                       <div className="flex items-center space-x-2.5">
                         {txInfo.displaySymbol === "MIXED" ? (
                           <div className="w-7 h-7 relative">
-                            {/* Venn diagram display for 2 tokens */}
+                            {/* Venn diagram display with overlapping at right end */}
                             {tx.transfers && tx.transfers.length >= 2 && (
                               <>
-                                {/* First token circle - positioned slightly left */}
-                                <div className="absolute top-0 left-0 w-5 h-5 rounded-full border border-white/20">
-                                  <div
-                                    className={`w-full h-full ${getTokenBackgroundColor(
-                                      tx.transfers[0].tokenSymbol,
-                                      tx.transfers[0].contractAddress
-                                    )} rounded-full flex items-center justify-center border border-white/10`}
-                                  >
-                                    <TokenIcon
-                                      token={{
-                                        symbol: tx.transfers[0].tokenSymbol,
-                                        contractAddress:
-                                          tx.transfers[0].contractAddress,
-                                        icon:
-                                          tx.transfers[0].icon ||
-                                          tx.transfers[0].logoUrl,
-                                      }}
-                                      size="w-3 h-3"
-                                    />
-                                  </div>
+                                {/* First token circle - positioned on the left */}
+                                <div
+                                  className={`absolute top-0 left-0 w-5 h-5 rounded-full ${getTokenBackgroundColor(
+                                    tx.transfers[0].tokenSymbol,
+                                    tx.transfers[0].contractAddress
+                                  )} shadow-lg flex items-center justify-center z-10`}
+                                >
+                                  <TokenIcon
+                                    token={{
+                                      symbol: tx.transfers[0].tokenSymbol,
+                                      contractAddress:
+                                        tx.transfers[0].contractAddress,
+                                      icon:
+                                        tx.transfers[0].icon ||
+                                        tx.transfers[0].logoUrl,
+                                    }}
+                                    size="w-3 h-3"
+                                  />
                                 </div>
 
-                                {/* Second token circle - positioned slightly right, overlapping */}
-                                <div className="absolute top-0 right-0 w-5 h-5 rounded-full border border-white/20">
-                                  <div
-                                    className={`w-full h-full ${getTokenBackgroundColor(
-                                      tx.transfers[1].tokenSymbol,
-                                      tx.transfers[1].contractAddress
-                                    )} rounded-full flex items-center justify-center border border-white/10`}
-                                  >
-                                    <TokenIcon
-                                      token={{
-                                        symbol: tx.transfers[1].tokenSymbol,
-                                        contractAddress:
-                                          tx.transfers[1].contractAddress,
-                                        icon:
-                                          tx.transfers[1].icon ||
-                                          tx.transfers[1].logoUrl,
-                                      }}
-                                      size="w-3 h-3"
-                                    />
-                                  </div>
+                                {/* Second token circle - positioned overlapping more at the right end of first circle */}
+                                <div
+                                  className={`absolute top-0 left-4 w-5 h-5 rounded-full ${getTokenBackgroundColor(
+                                    tx.transfers[1].tokenSymbol,
+                                    tx.transfers[1].contractAddress
+                                  )} shadow-lg flex items-center justify-center z-20`}
+                                >
+                                  <TokenIcon
+                                    token={{
+                                      symbol: tx.transfers[1].tokenSymbol,
+                                      contractAddress:
+                                        tx.transfers[1].contractAddress,
+                                      icon:
+                                        tx.transfers[1].icon ||
+                                        tx.transfers[1].logoUrl,
+                                    }}
+                                    size="w-3 h-3"
+                                  />
                                 </div>
 
                                 {/* Additional tokens indicator */}
                                 {tx.transfers.length > 2 && (
-                                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-black/80 rounded-full border border-white/20 flex items-center justify-center">
+                                  <div className="absolute -bottom-1 right-0 w-3 h-3 bg-gray-800 rounded-full flex items-center justify-center z-30 shadow-lg">
                                     <span className="text-white text-xs font-bold leading-none">
                                       +{tx.transfers.length - 2}
                                     </span>
@@ -629,11 +625,11 @@ export default function TransactionHistory({
 
                     {/* Right Side - Amount & Actions */}
                     <div className="flex items-center space-x-3">
-                      {/* Amount */}
+                      {/* Amount - UPDATED TO HIDE PRICE FOR BATCH TRANSACTIONS */}
                       <div className="text-right">
                         <div className="text-white font-semibold font-satoshi text-sm">
                           {txInfo.isBatch
-                            ? `$${txInfo.displayValue.toFixed(2)}`
+                            ? `` // CHANGED: Show transfer count instead of price
                             : `${txInfo.displayAmount} ${txInfo.displaySymbol}`}
                         </div>
 
