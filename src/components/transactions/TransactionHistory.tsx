@@ -1,4 +1,4 @@
-// src/components/transactions/TransactionHistory.tsx - FIXED OVERLAPPING ICONS WITH FULL BG COLORS
+// src/components/transactions/TransactionHistory.tsx - ENHANCED TO SHOW SENT AND RECEIVED
 "use client";
 
 import { useState, useEffect } from "react";
@@ -23,6 +23,7 @@ interface Transaction {
   transactionHash?: string;
   hash?: string;
   direction?: "sent" | "received";
+  isReceived?: boolean;
   type?: string;
   category?: string;
   tokenSymbol?: string;
@@ -41,6 +42,13 @@ interface Transaction {
   contractAddress?: string;
   senderWallet?: string;
   receiverWallet?: string;
+  otherParty?: string;
+  displayDirection?: string;
+  // Scheduled transaction fields
+  scheduleId?: string;
+  frequency?: string;
+  executionCount?: number;
+  smartContractExecution?: boolean;
   transfers?: Array<{
     recipient: string;
     tokenSymbol: string;
@@ -86,7 +94,6 @@ const getTokenBackgroundColor = (symbol: string, contractAddress?: string) => {
     Sui: "bg-gradient-to-br from-cyan-500/20 to-cyan-600/30",
   };
 
-  // Special handling for ETH/native token
   if (
     symbol === "ETH" ||
     contractAddress === "native" ||
@@ -99,7 +106,6 @@ const getTokenBackgroundColor = (symbol: string, contractAddress?: string) => {
 };
 
 const getTokenIconUrl = (symbol: string, contractAddress?: string) => {
-  // Token icon URLs from CoinGecko or other sources
   const tokenIcons: Record<string, string> = {
     ETH: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
     ETHEREUM:
@@ -124,12 +130,10 @@ const getTokenIconUrl = (symbol: string, contractAddress?: string) => {
     YAI: "https://assets.coingecko.com/coins/images/28969/small/yai.png",
   };
 
-  // First try to get from our registry
   if (tokenIcons[symbol]) {
     return tokenIcons[symbol];
   }
 
-  // For unknown tokens, return null so we show the fallback
   return null;
 };
 
@@ -155,7 +159,6 @@ const TokenIcon = ({
 }) => {
   const [imageError, setImageError] = useState(false);
 
-  // Get icon URL from our registry or transaction data
   const iconUrl =
     getTokenIconUrl(token.symbol, token.contractAddress) ||
     token.icon ||
@@ -300,6 +303,14 @@ export default function TransactionHistory({
 
       await new Promise((resolve) => setTimeout(resolve, 800));
 
+      console.log("🔍 Enhanced: Fetching transactions with filters:", {
+        walletAddress,
+        contractAddress,
+        tokenFilter,
+        transactionTypeFilter,
+        limit,
+      });
+
       let url = "/api/transactions";
       const params = new URLSearchParams();
 
@@ -330,6 +341,11 @@ export default function TransactionHistory({
         const data = await response.json();
         let fetchedTransactions = data.transactions || [];
 
+        console.log(
+          `📊 Enhanced: Received ${fetchedTransactions.length} transactions from API`
+        );
+
+        // Apply client-side filtering if needed
         if (tokenFilter) {
           fetchedTransactions = fetchedTransactions.filter(
             (tx: Transaction) => {
@@ -367,18 +383,31 @@ export default function TransactionHistory({
                 );
               }
 
+              if (transactionTypeFilter === "scheduled") {
+                return (
+                  tx.type === "scheduled_payment" ||
+                  tx.category === "scheduled" ||
+                  tx.scheduleId
+                );
+              }
+
               return tx.type === transactionTypeFilter;
             }
           );
         }
 
-        if (walletAddress) {
-          fetchedTransactions = fetchedTransactions.filter(
-            (tx: Transaction) =>
-              tx.senderWallet?.toLowerCase() === walletAddress.toLowerCase() ||
-              tx.receiverWallet?.toLowerCase() === walletAddress.toLowerCase()
-          );
-        }
+        // Log direction breakdown for debugging
+        const sentCount = fetchedTransactions.filter(
+          (tx: Transaction) =>
+            tx.direction === "sent" || (!tx.isReceived && !tx.direction)
+        ).length;
+        const receivedCount = fetchedTransactions.filter(
+          (tx: Transaction) => tx.direction === "received" || tx.isReceived
+        ).length;
+
+        console.log(
+          `📊 Enhanced: Transaction breakdown - Total: ${fetchedTransactions.length}, Sent: ${sentCount}, Received: ${receivedCount}`
+        );
 
         setTransactions(fetchedTransactions);
       }
@@ -415,8 +444,11 @@ export default function TransactionHistory({
   };
 
   const getTransactionDirection = (tx: Transaction): "sent" | "received" => {
+    // Use the enhanced direction if available
     if (tx.direction) return tx.direction;
+    if (tx.isReceived) return "received";
 
+    // Fallback logic
     if (walletAddress) {
       if (tx.senderWallet?.toLowerCase() === walletAddress.toLowerCase()) {
         return "sent";
@@ -427,7 +459,7 @@ export default function TransactionHistory({
       }
     }
 
-    return "sent";
+    return "sent"; // Default fallback
   };
 
   const toggleExpanded = (txId: string) => {
@@ -438,6 +470,20 @@ export default function TransactionHistory({
       newExpanded.add(txId);
     }
     setExpandedTransactions(newExpanded);
+  };
+
+  const getOtherPartyDisplay = (
+    tx: Transaction,
+    direction: "sent" | "received"
+  ) => {
+    const otherAddress =
+      direction === "sent" ? tx.receiverWallet : tx.senderWallet;
+
+    if (otherAddress) {
+      return `${otherAddress.slice(0, 6)}...${otherAddress.slice(-4)}`;
+    }
+
+    return "Unknown";
   };
 
   if (initialLoading) {
@@ -455,7 +501,7 @@ export default function TransactionHistory({
         <h3 className="text-base font-semibold text-white font-mayeka-demi-bold-demo">
           {title}
         </h3>
-        {/* {showRefresh && (
+        {showRefresh && (
           <button
             onClick={fetchTransactions}
             className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
@@ -463,7 +509,7 @@ export default function TransactionHistory({
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
-        )} */}
+        )}
       </div>
 
       {/* Transaction List */}
@@ -497,6 +543,11 @@ export default function TransactionHistory({
               const txId = tx._id || tx.id || `tx-${index}`;
               const isExpanded = expandedTransactions.has(txId);
 
+              // Enhanced transaction display
+              const isScheduled =
+                tx.type === "scheduled_payment" || tx.scheduleId;
+              const isBatch = txInfo.isBatch;
+
               return (
                 <div
                   key={txId}
@@ -506,7 +557,7 @@ export default function TransactionHistory({
                   <div className="flex items-center justify-between">
                     {/* Left Side - Direction & Token */}
                     <div className="flex items-center space-x-3">
-                      {/* Direction Icon */}
+                      {/* Direction Icon with enhanced styling for received */}
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center ${
                           direction === "sent"
@@ -525,10 +576,8 @@ export default function TransactionHistory({
                       <div className="flex items-center space-x-2.5">
                         {txInfo.displaySymbol === "MIXED" ? (
                           <div className="w-7 h-7 relative">
-                            {/* Venn diagram display with overlapping at right end */}
                             {tx.transfers && tx.transfers.length >= 2 && (
                               <>
-                                {/* First token circle - positioned on the left */}
                                 <div
                                   className={`absolute top-0 left-0 w-5 h-5 rounded-full ${getTokenBackgroundColor(
                                     tx.transfers[0].tokenSymbol,
@@ -540,15 +589,10 @@ export default function TransactionHistory({
                                       symbol: tx.transfers[0].tokenSymbol,
                                       contractAddress:
                                         tx.transfers[0].contractAddress,
-                                      icon:
-                                        tx.transfers[0].icon ||
-                                        tx.transfers[0].logoUrl,
                                     }}
                                     size="w-3 h-3"
                                   />
                                 </div>
-
-                                {/* Second token circle - positioned overlapping more at the right end of first circle */}
                                 <div
                                   className={`absolute top-0 left-4 w-5 h-5 rounded-full ${getTokenBackgroundColor(
                                     tx.transfers[1].tokenSymbol,
@@ -560,15 +604,10 @@ export default function TransactionHistory({
                                       symbol: tx.transfers[1].tokenSymbol,
                                       contractAddress:
                                         tx.transfers[1].contractAddress,
-                                      icon:
-                                        tx.transfers[1].icon ||
-                                        tx.transfers[1].logoUrl,
                                     }}
                                     size="w-3 h-3"
                                   />
                                 </div>
-
-                                {/* Additional tokens indicator */}
                                 {tx.transfers.length > 2 && (
                                   <div className="absolute -bottom-1 right-0 w-3 h-3 bg-gray-800 rounded-full flex items-center justify-center z-30 shadow-lg">
                                     <span className="text-white text-xs font-bold leading-none">
@@ -590,7 +629,6 @@ export default function TransactionHistory({
                               token={{
                                 symbol: txInfo.displaySymbol,
                                 contractAddress: tx.contractAddress,
-                                icon: tx.icon || tx.logoUrl,
                               }}
                               size="w-5 h-5"
                             />
@@ -601,10 +639,15 @@ export default function TransactionHistory({
                           <div className="flex items-center space-x-2">
                             <span className="text-white font-medium font-satoshi text-sm">
                               {direction === "sent" ? "Sent" : "Received"}
+                              {/* {direction === "received" && (
+                                <span className="text-green-400 ml-1">
+                                  from {getOtherPartyDisplay(tx, direction)}
+                                </span>
+                              )} */}
                             </span>
 
                             {/* Transaction Type Badges */}
-                            {tx.type?.includes("scheduled") && (
+                            {isScheduled && (
                               <span className="px-2 py-0.5 bg-purple-500 text-white text-xs rounded-full font-satoshi flex items-center">
                                 <Clock size={10} className="mr-1" />
                                 Scheduled
@@ -625,12 +668,14 @@ export default function TransactionHistory({
 
                     {/* Right Side - Amount & Actions */}
                     <div className="flex items-center space-x-3">
-                      {/* Amount - UPDATED TO HIDE PRICE FOR BATCH TRANSACTIONS */}
+                      {/* Amount */}
                       <div className="text-right">
                         <div className="text-white font-semibold font-satoshi text-sm">
                           {txInfo.isBatch
-                            ? `` // CHANGED: Show transfer count instead of price
-                            : `${txInfo.displayAmount} ${txInfo.displaySymbol}`}
+                            ? `` // Hide amount for batch - show count instead
+                            : `${direction === "received" ? "+" : ""}${
+                                txInfo.displayAmount
+                              } ${txInfo.displaySymbol}`}
                         </div>
 
                         <div className="text-gray-400 text-xs font-satoshi">
@@ -723,7 +768,6 @@ export default function TransactionHistory({
                                   token={{
                                     symbol: transfer.tokenSymbol,
                                     contractAddress: transfer.contractAddress,
-                                    icon: transfer.icon || transfer.logoUrl,
                                   }}
                                   size="w-3 h-3"
                                 />

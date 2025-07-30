@@ -1,4 +1,4 @@
-// src/app/api/transactions/route.ts
+// src/app/api/transactions/route.ts - ENHANCED TO SHOW SENT AND RECEIVED
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { transactionService } from "@/lib/transaction-service";
@@ -19,22 +19,33 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get("offset") || "0");
     const walletAddress = searchParams.get("walletAddress");
 
-    console.log("📡 Fetching transactions for user:", decoded.username, {
-      type,
-      status,
-      limit,
-      offset,
-      walletAddress,
-    });
+    if (!walletAddress) {
+      return NextResponse.json(
+        { error: "Wallet address is required" },
+        { status: 400 }
+      );
+    }
 
-    const result = await transactionService.getUserTransactions(
+    console.log(
+      "📡 Fetching enhanced transactions for user:",
       decoded.username,
+      {
+        type,
+        status,
+        limit,
+        offset,
+        walletAddress,
+      }
+    );
+
+    const result = await transactionService.getEnhancedUserTransactions(
+      decoded.username,
+      walletAddress,
       {
         type: type || undefined,
         status: status || undefined,
         limit,
         offset,
-        walletAddress: walletAddress || undefined,
       }
     );
 
@@ -47,7 +58,7 @@ export async function GET(request: NextRequest) {
       total: result.total,
     });
   } catch (error: any) {
-    console.error("💥 Transactions API error:", error);
+    console.error("💥 Enhanced Transactions API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
