@@ -683,7 +683,7 @@ export default function SwapModal({ isOpen, onClose }: SwapModalProps) {
           logoUrl: t.icon,
           price: t.price,
         }))}
-        title="Select Token to Sell"
+        title="Select Token"
         showBalances={true}
       />
 
@@ -692,7 +692,7 @@ export default function SwapModal({ isOpen, onClose }: SwapModalProps) {
         onClose={() => setBuyTokenSelectorOpen(false)}
         onSelect={handleBuyTokenSelect}
         tokens={[]}
-        title="Select Token to Buy"
+        title="Select Token"
         showBalances={false}
         allowCustomToken={true}
       />

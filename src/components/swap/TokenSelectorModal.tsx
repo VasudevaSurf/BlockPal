@@ -1,4 +1,3 @@
-// src/components/swap/TokenSelectorModal.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -24,6 +23,7 @@ interface TokenSelectorModalProps {
   title: string;
   showBalances: boolean;
   allowCustomToken?: boolean;
+  showCommonTokens?: boolean;
 }
 
 // Common tokens for easy selection
@@ -104,14 +104,21 @@ export default function TokenSelectorModal({
   title,
   showBalances,
   allowCustomToken = false,
+  showCommonTokens = false,
 }: TokenSelectorModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [customToken, setCustomToken] = useState<Token | null>(null);
   const [loadingCustom, setLoadingCustom] = useState(false);
   const [customError, setCustomError] = useState("");
   const [activeTab, setActiveTab] = useState<"my_tokens" | "common">(
-    showBalances ? "my_tokens" : "common"
+    showBalances && !showCommonTokens
+      ? "my_tokens"
+      : showCommonTokens
+      ? "common"
+      : "my_tokens"
   );
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
   // Check if search query is a valid Ethereum address
   const isValidAddress = (address: string): boolean => {
@@ -192,6 +199,44 @@ export default function TokenSelectorModal({
     setCustomError("");
   }, [activeTab]);
 
+  // Reset search when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery("");
+      setCustomToken(null);
+      setCustomError("");
+    } else {
+      // Set initial loading when modal opens
+      setIsInitialLoading(true);
+      // Simulate minimum loading time for better UX
+      setTimeout(() => {
+        setIsInitialLoading(false);
+      }, 300);
+    }
+  }, [isOpen]);
+
+  // Handle image loading
+  const handleImageLoad = (contractAddress: string) => {
+    setLoadedImages((prev) => new Set(prev).add(contractAddress));
+  };
+
+  // Token Item Skeleton
+  const TokenSkeleton = () => (
+    <div className="w-full flex items-center p-4 animate-pulse">
+      <div className="w-10 h-10 bg-gray-700 rounded-full mr-3"></div>
+      <div className="flex-1">
+        <div className="h-4 bg-gray-700 rounded w-16 mb-2"></div>
+        <div className="h-3 bg-gray-700 rounded w-24"></div>
+      </div>
+      {showBalances && (
+        <div className="text-right">
+          <div className="h-4 bg-gray-700 rounded w-20 mb-1"></div>
+          <div className="h-3 bg-gray-700 rounded w-16"></div>
+        </div>
+      )}
+    </div>
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -207,32 +252,6 @@ export default function TokenSelectorModal({
             <X size={18} />
           </button>
         </div>
-
-        {/* Tabs - Only show if we have user tokens */}
-        {showBalances && (
-          <div className="flex border-b border-[#2C2C2C]">
-            <button
-              onClick={() => setActiveTab("my_tokens")}
-              className={`flex-1 px-4 py-3 text-sm font-satoshi transition-colors ${
-                activeTab === "my_tokens"
-                  ? "text-[#E2AF19] border-b-2 border-[#E2AF19]"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              My Tokens
-            </button>
-            <button
-              onClick={() => setActiveTab("common")}
-              className={`flex-1 px-4 py-3 text-sm font-satoshi transition-colors ${
-                activeTab === "common"
-                  ? "text-[#E2AF19] border-b-2 border-[#E2AF19]"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Common
-            </button>
-          </div>
-        )}
 
         {/* Search */}
         <div className="p-4 border-b border-[#2C2C2C]">
@@ -281,17 +300,24 @@ export default function TokenSelectorModal({
               className="flex items-center p-4 rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors cursor-pointer bg-[#0F0F0F]"
             >
               {customToken.logoUrl ? (
-                <img
-                  src={customToken.logoUrl}
-                  alt={customToken.symbol}
-                  className="w-10 h-10 rounded-full mr-3"
-                />
-              ) : (
-                <div className="w-10 h-10 bg-gray-600 rounded-full mr-3 flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">
-                    {customToken.symbol.charAt(0)}
-                  </span>
+                <div className="relative w-10 h-10 mr-3">
+                  {!loadedImages.has(customToken.contractAddress) && (
+                    <div className="absolute inset-0 bg-gray-700 rounded-full animate-pulse"></div>
+                  )}
+                  <img
+                    src={customToken.logoUrl}
+                    alt={customToken.symbol}
+                    className={`w-10 h-10 rounded-full transition-opacity duration-300 ${
+                      loadedImages.has(customToken.contractAddress)
+                        ? "opacity-100"
+                        : "opacity-0"
+                    }`}
+                    onLoad={() => handleImageLoad(customToken.contractAddress)}
+                    onError={() => handleImageLoad(customToken.contractAddress)}
+                  />
                 </div>
+              ) : (
+                <div className="w-10 h-10 bg-gray-700 rounded-full mr-3 animate-pulse"></div>
               )}
               <div className="flex-1">
                 <div className="text-white font-semibold font-satoshi">
@@ -312,82 +338,110 @@ export default function TokenSelectorModal({
         {/* Token List */}
         {!loadingCustom && !customToken && (
           <div className="overflow-y-auto max-h-96 scrollbar-hide">
-            {(activeTab === "my_tokens"
-              ? tokens
-              : activeTab === "common"
-              ? COMMON_TOKENS
-              : filteredTokens
-            )
-              .filter(
-                (token) =>
-                  token.symbol
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase()) ||
-                  token.name.toLowerCase().includes(searchQuery.toLowerCase())
-              )
-              .map((token) => (
-                <button
-                  key={token.contractAddress}
-                  onClick={() => onSelect(token)}
-                  className="w-full flex items-center p-4 hover:bg-[#1A1A1A] transition-colors text-left"
-                >
-                  {token.logoUrl ? (
-                    <img
-                      src={token.logoUrl}
-                      alt={token.symbol}
-                      className="w-10 h-10 rounded-full mr-3"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-gray-600 rounded-full mr-3 flex items-center justify-center">
-                      <span className="text-white text-sm font-bold">
-                        {token.symbol.charAt(0)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <div className="text-white font-semibold font-satoshi">
-                      {token.symbol}
-                    </div>
-                    <div className="text-gray-400 text-sm font-satoshi">
-                      {token.name}
-                    </div>
-                  </div>
-                  {/* Only show balances for user's tokens */}
-                  {showBalances && activeTab === "my_tokens" && (
-                    <div className="text-right">
-                      <div className="text-white font-satoshi">
-                        {token.balance.toFixed(6)}
+            {isInitialLoading ? (
+              // Show skeleton loaders while initial loading
+              <>
+                {[...Array(6)].map((_, index) => (
+                  <TokenSkeleton key={index} />
+                ))}
+              </>
+            ) : (
+              <>
+                {(showCommonTokens
+                  ? activeTab === "my_tokens"
+                    ? tokens
+                    : activeTab === "common"
+                    ? COMMON_TOKENS
+                    : filteredTokens
+                  : filteredTokens
+                )
+                  .filter(
+                    (token) =>
+                      token.symbol
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()) ||
+                      token.name
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase())
+                  )
+                  .map((token) => (
+                    <button
+                      key={token.contractAddress}
+                      onClick={() => onSelect(token)}
+                      className="w-full flex items-center p-4 hover:bg-[#1A1A1A] transition-colors text-left"
+                    >
+                      {token.logoUrl ? (
+                        <div className="relative w-10 h-10 mr-3">
+                          {!loadedImages.has(token.contractAddress) && (
+                            <div className="absolute inset-0 bg-gray-700 rounded-full animate-pulse"></div>
+                          )}
+                          <img
+                            src={token.logoUrl}
+                            alt={token.symbol}
+                            className={`w-10 h-10 rounded-full transition-opacity duration-300 ${
+                              loadedImages.has(token.contractAddress)
+                                ? "opacity-100"
+                                : "opacity-0"
+                            }`}
+                            onLoad={() =>
+                              handleImageLoad(token.contractAddress)
+                            }
+                            onError={() =>
+                              handleImageLoad(token.contractAddress)
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 bg-gray-700 rounded-full mr-3 animate-pulse"></div>
+                      )}
+                      <div className="flex-1">
+                        <div className="text-white font-semibold font-satoshi">
+                          {token.symbol}
+                        </div>
+                        <div className="text-gray-400 text-sm font-satoshi">
+                          {token.name}
+                        </div>
                       </div>
-                      <div className="text-gray-400 text-sm font-satoshi">
-                        ${token.value.toFixed(2)}
-                      </div>
-                    </div>
-                  )}
-                </button>
-              ))}
+                      {/* Only show balances for user's tokens when showBalances is true */}
+                      {showBalances && activeTab === "my_tokens" && (
+                        <div className="text-right">
+                          <div className="text-white font-satoshi">
+                            {token.balance.toFixed(6)}
+                          </div>
+                          <div className="text-gray-400 text-sm font-satoshi">
+                            ${token.value.toFixed(2)}
+                          </div>
+                        </div>
+                      )}
+                    </button>
+                  ))}
 
-            {/* No results message */}
-            {(activeTab === "my_tokens"
-              ? tokens
-              : activeTab === "common"
-              ? COMMON_TOKENS
-              : filteredTokens
-            ).filter(
-              (token) =>
-                token.symbol
-                  .toLowerCase()
-                  .includes(searchQuery.toLowerCase()) ||
-                token.name.toLowerCase().includes(searchQuery.toLowerCase())
-            ).length === 0 &&
-              !isValidAddress(searchQuery) && (
-                <div className="p-8 text-center">
-                  <p className="text-gray-400 font-satoshi">
-                    {searchQuery
-                      ? "No tokens found matching your search"
-                      : "No tokens available"}
-                  </p>
-                </div>
-              )}
+                {/* No results message */}
+                {(showCommonTokens
+                  ? activeTab === "my_tokens"
+                    ? tokens
+                    : activeTab === "common"
+                    ? COMMON_TOKENS
+                    : filteredTokens
+                  : filteredTokens
+                ).filter(
+                  (token) =>
+                    token.symbol
+                      .toLowerCase()
+                      .includes(searchQuery.toLowerCase()) ||
+                    token.name.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length === 0 &&
+                  !isValidAddress(searchQuery) && (
+                    <div className="p-8 text-center">
+                      <p className="text-gray-400 font-satoshi">
+                        {searchQuery
+                          ? "No tokens found matching your search"
+                          : "No tokens available"}
+                      </p>
+                    </div>
+                  )}
+              </>
+            )}
           </div>
         )}
       </div>
