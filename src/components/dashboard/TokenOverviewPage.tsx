@@ -1242,11 +1242,11 @@ export default function TokenOverviewPage() {
                         </span>
                       </div>
                     )}
-                    <div>
+                    <div className="flex flex-row items-center justify-center space-x-2">
                       <h2 className="text-xl font-bold text-white font-mayeka">
                         {tokenInfo.name}
                       </h2>
-                      <p className="text-gray-400 font-satoshi">
+                      <p className="text-gray-400 font-satoshi mt-1">
                         {tokenInfo.symbol}
                       </p>
                     </div>
