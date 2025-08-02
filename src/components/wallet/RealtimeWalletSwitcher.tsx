@@ -845,7 +845,7 @@ Keep this information safe and secure!`;
                       <div className="w-full flex items-center p-2.5">
                         {/* Wallet Icon */}
                         <div
-                          className={`w-6 h-6 ${getWalletColor(
+                          className={`w-7 h-7 ${getWalletColor(
                             index
                           )} rounded-full flex items-center justify-center relative flex-shrink-0`}
                         >
@@ -859,24 +859,22 @@ Keep this information safe and secure!`;
 
                         {/* Wallet Info - Clickable for switching OR Rename Input */}
                         {showRenameInput === wallet.id ? (
-                          <div className="flex-1 min-w-0 overflow-hidden flex items-center">
-                            <Input
-                              type="text"
-                              value={newWalletName}
-                              onChange={(e) => setNewWalletName(e.target.value)}
-                              className="flex-1 text-xs p-1.5 h-7"
-                              placeholder="Enter wallet name"
-                              autoFocus
-                              disabled={savingRename}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  saveWalletRename(wallet.id);
-                                } else if (e.key === "Escape") {
-                                  cancelWalletRename();
-                                }
-                              }}
-                            />
-                          </div>
+                          <Input
+                            type="text"
+                            value={newWalletName}
+                            onChange={(e) => setNewWalletName(e.target.value)}
+                            className="flex-1 text-xs p-1.5 h-7"
+                            placeholder="Enter wallet name"
+                            autoFocus
+                            disabled={savingRename}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                saveWalletRename(wallet.id);
+                              } else if (e.key === "Escape") {
+                                cancelWalletRename();
+                              }
+                            }}
+                          />
                         ) : (
                           <button
                             onClick={() => handleSelectWallet(wallet.id)}
@@ -890,13 +888,13 @@ Keep this information safe and secure!`;
                             <div className="text-white font-medium text-xs font-satoshi truncate flex items-center">
                               {localWalletNames[wallet.id] || wallet.name}
                               {copyFeedback === wallet.id && (
-                                <span className="text-blue-400 ml-2 flex items-center">
+                                <span className="text-[#E2AF19] ml-2 flex items-center">
                                   <Check size={12} className="mr-1" />
                                   Copied!
                                 </span>
                               )}
                               {renameFeedback === wallet.id && (
-                                <span className="text-green-400 ml-2 flex items-center">
+                                <span className="text-[#E2AF19] ml-2 flex items-center">
                                   <Check size={12} className="mr-1" />
                                   Renamed!
                                 </span>
@@ -918,7 +916,7 @@ Keep this information safe and secure!`;
                           {/* Copy Address Button */}
                           <button
                             onClick={(e) => handleCopyAddress(e, wallet)}
-                            className="text-gray-400 hover:text-blue-400 transition-colors p-1 hover:bg-[#2C2C2C] rounded"
+                            className="text-gray-400 hover:text-[#E2AF19] transition-colors p-1 hover:bg-[#2C2C2C] rounded"
                             title="Copy wallet address"
                           >
                             <Copy size={14} />
@@ -932,14 +930,14 @@ Keep this information safe and secure!`;
                               className={`transition-colors p-1 hover:bg-[#2C2C2C] rounded ${
                                 savingRename || !newWalletName.trim()
                                   ? "text-gray-600 cursor-not-allowed"
-                                  : "text-green-400 hover:text-green-300"
+                                  : "text-[#E2AF19] hover:text-[#E2AF19]"
                               }`}
                               title={
                                 savingRename ? "Saving..." : "Save wallet name"
                               }
                             >
                               {savingRename ? (
-                                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-green-400"></div>
+                                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-[#E2AF19]"></div>
                               ) : (
                                 <Check size={14} />
                               )}
@@ -947,7 +945,7 @@ Keep this information safe and secure!`;
                           ) : (
                             <button
                               onClick={(e) => handleRenameWallet(e, wallet)}
-                              className="text-gray-400 hover:text-green-400 transition-colors p-1 hover:bg-[#2C2C2C] rounded"
+                              className="text-gray-400 hover:text-[#E2AF19] transition-colors p-1 hover:bg-[#2C2C2C] rounded"
                               title="Rename wallet"
                             >
                               <Edit3 size={14} />
@@ -1113,9 +1111,9 @@ Keep this information safe and secure!`;
           selectedWalletForCredentials && (
             <div className="p-3 space-y-3">
               <div className="text-center">
-                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <CheckCircle size={20} className="text-green-400" />
-                </div>
+                {/* <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <CheckCircle size={20} className="text-[#E2AF19]" />
+                </div> */}
                 <h4 className="text-white font-semibold font-satoshi text-sm mb-1">
                   {selectedWalletForCredentials.name}
                 </h4>
@@ -1209,11 +1207,11 @@ Keep this information safe and secure!`;
           selectedWalletForCredentials && (
             <div className="p-3 space-y-3 max-h-[350px] overflow-y-auto scrollbar-hide">
               <div className="text-center">
-                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                <div className="w-10 h-10 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-2">
                   {selectedCredentialType === "privateKey" ? (
-                    <Key size={20} className="text-green-400" />
+                    <Key size={20} className="text-[#E2AF19]" />
                   ) : (
-                    <FileText size={20} className="text-green-400" />
+                    <FileText size={20} className="text-[#E2AF19]" />
                   )}
                 </div>
                 <h4 className="text-white font-semibold font-satoshi text-sm mb-1">

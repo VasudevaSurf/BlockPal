@@ -80,7 +80,7 @@ export default function DashboardLayout({
           {/* Global Header - Always show */}
           <div className="flex-shrink-0 bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] sm:p-4 lg:p-5">
             <GlobalDashboardHeader
-              title={isAIChatPage ? "AI Assistant" : "Dashboard"}
+              title={isAIChatPage ? "Lumen AI" : "Dashboard"}
               subtitle={
                 isAIChatPage
                   ? "Powered by advanced blockchain analysis"

@@ -184,9 +184,10 @@ const TokenIconWithBg = ({
 
   return (
     <div
-      className={`${size} ${getRandomTokenBgColor(
-        token.symbol
-      )} rounded-full mr-1.5 flex-shrink-0 relative overflow-hidden shadow-sm border border-white/10 flex items-center justify-center`}
+      className={`${size}
+       ${getRandomTokenBgColor(
+         token.symbol
+       )} rounded-full mr-1.5 flex-shrink-0 relative overflow-hidden shadow-sm border border-white/10 flex items-center justify-center`}
     >
       {hasValidImage ? (
         <img
@@ -206,6 +207,7 @@ const TokenIconWithBg = ({
   );
 };
 
+// UPDATED TokenIcon component - no background for images
 const TokenIcon = ({
   token,
   size = "w-3 h-3",
@@ -222,7 +224,7 @@ const TokenIcon = ({
       <img
         src={token.icon || token.logoUrl}
         alt={token.symbol}
-        className={`${size} rounded-full object-cover`}
+        className={`${size} rounded-full object-cover flex-shrink-0`}
         onError={() => {
           setImageError(true);
         }}
@@ -230,10 +232,18 @@ const TokenIcon = ({
     );
   }
 
+  // Show fallback icon with solid color background
   return (
-    <span className="text-white text-xs font-medium">
-      {getTokenLetter(token.symbol, token.contractAddress)}
-    </span>
+    <div
+      className={`${size} ${getTokenIcon(
+        token.symbol,
+        token.contractAddress
+      )} rounded-full flex items-center justify-center flex-shrink-0`}
+    >
+      <span className="text-white text-xs font-medium">
+        {getTokenLetter(token.symbol, token.contractAddress)}
+      </span>
+    </div>
   );
 };
 
@@ -689,15 +699,8 @@ export default function BatchPaymentsPage() {
                   <div className="flex items-center">
                     {selectedToken && (
                       <>
-                        <div
-                          className={`w-5 h-5 ${getTokenBackgroundColor(
-                            selectedToken.symbol,
-                            selectedToken.contractAddress
-                          )} rounded-full flex items-center justify-center mr-2`}
-                        >
-                          <TokenIcon token={selectedToken} size="w-3 h-3" />
-                        </div>
-                        <span className="text-white font-satoshi text-xs">
+                        <TokenIcon token={selectedToken} size="w-5 h-5" />
+                        <span className="text-white font-satoshi text-xs ml-2">
                           {selectedToken.symbol}
                         </span>
                       </>
@@ -731,15 +734,8 @@ export default function BatchPaymentsPage() {
                           className="w-full flex items-center p-2 hover:bg-[#1A1A1A] transition-colors text-left"
                         >
                           <div className="flex items-center flex-1">
-                            <div
-                              className={`w-6 h-6 ${getTokenBackgroundColor(
-                                token.symbol,
-                                token.contractAddress
-                              )} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
-                            >
-                              <TokenIcon token={token} size="w-4 h-4" />
-                            </div>
-                            <div className="flex-1 ml-1">
+                            <TokenIcon token={token} size="w-6 h-6" />
+                            <div className="flex-1 ml-2">
                               <div className="text-white font-satoshi text-xs">
                                 {token.symbol}
                               </div>
@@ -863,18 +859,11 @@ export default function BatchPaymentsPage() {
                               </div>
                             )}
                           <div className="flex items-center mt-0.5">
-                            <div
-                              className={`w-5 h-5 ${getTokenBackgroundColor(
-                                payment.tokenInfo.symbol,
-                                payment.tokenInfo.contractAddress
-                              )} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
-                            >
-                              <TokenIcon
-                                token={payment.tokenInfo}
-                                size="w-3 h-3"
-                              />
-                            </div>
-                            <span className="text-gray-400 text-xs font-satoshi">
+                            <TokenIcon
+                              token={payment.tokenInfo}
+                              size="w-5 h-5"
+                            />
+                            <span className="text-gray-400 text-xs font-satoshi ml-2">
                               {payment.tokenInfo.symbol}
                             </span>
                           </div>
@@ -939,15 +928,8 @@ export default function BatchPaymentsPage() {
                 <div className="flex items-center min-w-0">
                   {selectedToken && (
                     <>
-                      <div
-                        className={`w-5 h-5 ${getTokenBackgroundColor(
-                          selectedToken.symbol,
-                          selectedToken.contractAddress
-                        )} rounded-full flex items-center justify-center mr-2`}
-                      >
-                        <TokenIcon token={selectedToken} size="w-3 h-3" />
-                      </div>
-                      <span className="text-white font-satoshi text-xs truncate">
+                      <TokenIcon token={selectedToken} size="w-5 h-5" />
+                      <span className="text-white font-satoshi text-xs truncate ml-2">
                         {selectedToken.symbol}
                       </span>
                     </>
@@ -980,15 +962,8 @@ export default function BatchPaymentsPage() {
                         className="w-full flex items-center p-2 hover:bg-[#1A1A1A] transition-colors text-left"
                       >
                         <div className="flex items-center flex-1">
-                          <div
-                            className={`w-6 h-6 ${getTokenBackgroundColor(
-                              token.symbol,
-                              token.contractAddress
-                            )} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
-                          >
-                            <TokenIcon token={token} size="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 min-w-0 ml-1">
+                          <TokenIcon token={token} size="w-6 h-6" />
+                          <div className="flex-1 min-w-0 ml-2">
                             <div className="text-white font-satoshi text-xs truncate">
                               {token.symbol}
                             </div>
@@ -1059,8 +1034,8 @@ export default function BatchPaymentsPage() {
           <div className="overflow-y-auto scrollbar-hide mb-2 flex-1 min-h-0">
             {batchPayments.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
-                <div className="w-8 h-8 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-1.5">
-                  <Plus size={14} className="text-gray-400" />
+                <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-1.5">
+                  <Plus size={20} className="text-gray-400" />
                 </div>
                 <h3 className="text-white text-sm font-satoshi mb-0.5">
                   No payments in batch
@@ -1098,18 +1073,8 @@ export default function BatchPaymentsPage() {
                         </div>
 
                         <div className="flex items-center min-w-0">
-                          <div
-                            className={`w-5 h-5 ${getTokenBackgroundColor(
-                              payment.tokenInfo.symbol,
-                              payment.tokenInfo.contractAddress
-                            )} rounded-full flex items-center justify-center mr-2 flex-shrink-0`}
-                          >
-                            <TokenIcon
-                              token={payment.tokenInfo}
-                              size="w-3 h-3"
-                            />
-                          </div>
-                          <span className="text-white font-satoshi text-xs truncate">
+                          <TokenIcon token={payment.tokenInfo} size="w-5 h-5" />
+                          <span className="text-white font-satoshi text-xs truncate ml-2">
                             {payment.tokenInfo.symbol}
                           </span>
                         </div>
@@ -1384,25 +1349,18 @@ export default function BatchPaymentsPage() {
           <div className="fixed inset-0 flex items-center justify-center z-50 p-2.5">
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-sm overflow-hidden">
               <div className="p-6 text-center">
-                {/* Processing Icon - Animated Checkmark */}
+                {/* Processing Icon - Static Design with E2AF19 theme */}
                 <div className="w-16 h-16 mx-auto mb-4 relative">
                   <div className="w-16 h-16 rounded-full border-4 border-[#2C2C2C] flex items-center justify-center">
-                    <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded transform rotate-45 relative">
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-blue-600 rounded animate-pulse"></div>
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-45">
-                        <CheckCircle
-                          size={20}
-                          className="text-white animate-bounce"
-                        />
+                    <div className="w-8 h-8 bg-[#E2AF19] rounded relative">
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                        <CheckCircle size={20} className="text-black" />
                       </div>
                     </div>
                   </div>
-                  {/* Animated rings */}
-                  <div className="absolute inset-0 border-2 border-green-400/30 rounded-full animate-ping"></div>
-                  <div
-                    className="absolute inset-2 border border-blue-400/30 rounded-full animate-ping"
-                    style={{ animationDelay: "0.2s" }}
-                  ></div>
+                  {/* Static rings */}
+                  <div className="absolute inset-0 border-2 border-[#E2AF19]/30 rounded-full"></div>
+                  <div className="absolute inset-2 border border-[#E2AF19]/20 rounded-full"></div>
                 </div>
 
                 <h3 className="text-white text-xl font-bold font-mayeka mb-2">

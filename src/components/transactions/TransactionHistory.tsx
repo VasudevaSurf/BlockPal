@@ -679,9 +679,11 @@ export default function TransactionHistory({
                         </div>
 
                         <div className="text-gray-400 text-xs font-satoshi">
-                          {tx.timestamp
-                            ? formatDateTime(tx.timestamp)
-                            : tx.date}
+                          {tx.valueUSD
+                            ? `$${tx.valueUSD.toFixed(2)}`
+                            : txInfo.displayValue
+                            ? `$${txInfo.displayValue.toFixed(2)}`
+                            : ""}
                         </div>
                       </div>
 
@@ -792,17 +794,14 @@ export default function TransactionHistory({
                     </div>
                   )}
 
-                  {/* Transaction Hash (always visible but clean) */}
-                  {hash && (
-                    <div className="mt-3 pt-3 border-t border-[#2C2C2C]">
-                      <div className="flex items-center space-x-2">
-                        <Hash size={12} className="text-gray-400" />
-                        <span className="text-gray-400 text-xs font-mono">
-                          {hash.slice(0, 14)}...{hash.slice(-14)}
-                        </span>
-                      </div>
+                  {/* Date/Time at the bottom */}
+                  <div className="mt-3 pt-3 border-t border-[#2C2C2C]">
+                    <div className="flex items-center justify-end">
+                      <span className="text-gray-400 text-xs font-satoshi">
+                        {tx.timestamp ? formatDateTime(tx.timestamp) : tx.date}
+                      </span>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}

@@ -202,7 +202,7 @@ export default function UsernameInput({
               </div>
 
               {/* Active wallet indicator */}
-              <div className="flex items-center text-green-400">
+              <div className="flex items-center text-[#E2AF19]">
                 <Wallet size={12} />
               </div>
             </button>

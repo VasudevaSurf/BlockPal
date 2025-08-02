@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import {
-  ArrowLeft,
   Copy,
   ExternalLink,
   FileText,
@@ -104,15 +103,15 @@ export default function TokenOverviewPage() {
   };
 
   // Auto-clear tooltip after a short delay when not actively hovering
-  useEffect(() => {
-    if (cursorPosition || priceData) {
-      const timer = setTimeout(() => {
-        forceClearTooltip();
-      }, 100); // Clear after 100ms of inactivity
+  // useEffect(() => {
+  //   if (cursorPosition || priceData) {
+  //     const timer = setTimeout(() => {
+  //       forceClearTooltip();
+  //     }, 100); // Clear after 100ms of inactivity
 
-      return () => clearTimeout(timer);
-    }
-  }, [cursorPosition, priceData]);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [cursorPosition, priceData]);
 
   const contractAddress = params.tokenId as string;
   const walletAddress = searchParams.get("wallet") || activeWallet?.address;
@@ -440,22 +439,67 @@ export default function TokenOverviewPage() {
     isMobile = false
   ) => {
     if (!prices || prices.length === 0)
-      return { path: "", points: [], yAxisValues: [], xAxisLabels: [] };
+      return {
+        path: "",
+        areaPath: "",
+        points: [],
+        yAxisValues: [],
+        xAxisLabels: [],
+      };
 
     const minPrice = Math.min(...prices.map((p) => p.price));
     const maxPrice = Math.max(...prices.map((p) => p.price));
     const priceRange = maxPrice - minPrice || 1;
 
-    const paddingRatio = 0.15;
+    // Reduce padding for better alignment
+    const paddingRatio = 0.1;
     const paddedRange = priceRange * (1 + 2 * paddingRatio);
     const paddedMin = minPrice - priceRange * paddingRatio;
     const paddedMax = maxPrice + priceRange * paddingRatio;
 
+    // Calculate nice round numbers for Y-axis
+    const calculateNiceNumber = (range: number, round: boolean): number => {
+      const exponent = Math.floor(Math.log10(range));
+      const fraction = range / Math.pow(10, exponent);
+      let niceFraction;
+
+      if (round) {
+        if (fraction < 1.5) niceFraction = 1;
+        else if (fraction < 3) niceFraction = 2;
+        else if (fraction < 7) niceFraction = 5;
+        else niceFraction = 10;
+      } else {
+        if (fraction <= 1) niceFraction = 1;
+        else if (fraction <= 2) niceFraction = 2;
+        else if (fraction <= 5) niceFraction = 5;
+        else niceFraction = 10;
+      }
+
+      return niceFraction * Math.pow(10, exponent);
+    };
+
+    // Generate nice Y-axis values
+    const tickSpacing = calculateNiceNumber(paddedRange / 4, false);
+    const niceMin = Math.floor(paddedMin / tickSpacing) * tickSpacing;
+    const niceMax = Math.ceil(paddedMax / tickSpacing) * tickSpacing;
+    
     const yAxisValues = [];
-    for (let i = 0; i < 5; i++) {
-      const value = paddedMin + (paddedRange * i) / 4;
-      const y = height - (i * height) / 4;
-      yAxisValues.push({ value, y });
+    let currentValue = niceMin;
+    while (currentValue <= niceMax) {
+      const y = height - ((currentValue - niceMin) / (niceMax - niceMin)) * height;
+      if (y >= 0 && y <= height) {
+        yAxisValues.push({ value: currentValue, y });
+      }
+      currentValue += tickSpacing;
+    }
+
+    // Ensure we have at least 3 and at most 6 Y-axis values
+    if (yAxisValues.length > 6) {
+      // Skip some values to reduce clutter
+      const skipInterval = Math.ceil(yAxisValues.length / 5);
+      const filteredValues = yAxisValues.filter((_, index) => index % skipInterval === 0);
+      yAxisValues.length = 0;
+      yAxisValues.push(...filteredValues);
     }
 
     const xAxisLabels = generateXAxisLabels(
@@ -468,9 +512,10 @@ export default function TokenOverviewPage() {
       width
     );
 
+    // Map points using the same scale as Y-axis
     const points = prices.map((point, index) => {
       const x = (index / (prices.length - 1)) * width;
-      const y = height - ((point.price - paddedMin) / paddedRange) * height;
+      const y = height - ((point.price - niceMin) / (niceMax - niceMin)) * height;
       return {
         x,
         y,
@@ -482,6 +527,8 @@ export default function TokenOverviewPage() {
 
     const pathPoints = points.map((p) => `${p.x},${p.y}`);
     const path = `M ${pathPoints.join(" L ")}`;
+
+    // IMPORTANT: Create the area path that goes down to the bottom of the chart
     const areaPath = `${path} L ${width},${height} L 0,${height} Z`;
 
     return { path, areaPath, points, yAxisValues, xAxisLabels };
@@ -501,74 +548,44 @@ export default function TokenOverviewPage() {
     const svgElement = event.currentTarget;
     const rect = svgElement.getBoundingClientRect();
 
-    // Get EXACT mouse coordinates relative to SVG
-    const clientX = event.clientX;
-    const clientY = event.clientY;
-    const rectLeft = rect.left;
-    const rectTop = rect.top;
-    const rectWidth = rect.width;
-    const rectHeight = rect.height;
-
-    // Calculate mouse position within SVG viewport
-    const mouseX = clientX - rectLeft;
-    const mouseY = clientY - rectTop;
+    // Get mouse coordinates relative to SVG
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
 
     // Convert to SVG coordinate system
     const viewBox = svgElement.viewBox.baseVal;
-    const svgX = (mouseX / rectWidth) * viewBox.width;
-    const svgY = (mouseY / rectHeight) * viewBox.height;
+    const svgX = (mouseX / rect.width) * viewBox.width;
+    const svgY = (mouseY / rect.height) * viewBox.height;
 
-    // Strict boundary check - must be within exact chart area
+    // Check if mouse is within chart bounds
     const isWithinBounds =
-      mouseX >= 0 && mouseX <= rectWidth && mouseY >= 0 && mouseY <= rectHeight;
+      mouseX >= 0 &&
+      mouseX <= rect.width &&
+      mouseY >= 0 &&
+      mouseY <= rect.height;
 
-    if (isWithinBounds) {
-      // Only update cursor position when within bounds
+    if (isWithinBounds && points && points.length > 0) {
+      // Update cursor position
       setCursorPosition({ x: svgX, y: svgY });
 
-      // Calculate price data when within bounds
-      if (points && points.length > 0) {
-        // Find the closest data point for price information
-        const progress = svgX / viewBox.width;
-        const dataIndex = progress * (points.length - 1);
+      // Find the closest data point
+      const progress = Math.max(0, Math.min(1, svgX / viewBox.width));
+      const exactIndex = progress * (points.length - 1);
+      const index = Math.round(exactIndex);
 
-        // Get the two surrounding points
-        const lowerIndex = Math.floor(dataIndex);
-        const upperIndex = Math.ceil(dataIndex);
+      // Get the point at this index
+      const point = points[Math.max(0, Math.min(points.length - 1, index))];
 
-        // Ensure indices are valid
-        const idx1 = Math.max(0, Math.min(points.length - 1, lowerIndex));
-        const idx2 = Math.max(0, Math.min(points.length - 1, upperIndex));
-
-        if (idx1 === idx2) {
-          // Exact point
-          const point = points[idx1];
-          setPriceData({
-            price: point.price,
-            date: point.date,
-            time: point.time,
-            y: point.y,
-          });
-        } else {
-          // Interpolate between points
-          const point1 = points[idx1];
-          const point2 = points[idx2];
-          const t = dataIndex - idx1;
-
-          const interpolatedPrice =
-            point1.price + (point2.price - point1.price) * t;
-          const interpolatedY = point1.y + (point2.y - point1.y) * t;
-
-          setPriceData({
-            price: interpolatedPrice,
-            date: point1.date,
-            time: point1.time,
-            y: interpolatedY,
-          });
-        }
+      if (point) {
+        setPriceData({
+          price: point.price,
+          date: point.date,
+          time: point.time,
+          y: point.y,
+        });
       }
     } else {
-      // Immediately clear everything when mouse moves outside bounds
+      // Clear states when outside bounds
       setCursorPosition(null);
       setPriceData(null);
     }
@@ -639,20 +656,12 @@ export default function TokenOverviewPage() {
     const { path, areaPath, points, yAxisValues, xAxisLabels } =
       generateInteractiveChart(chartData.prices, width, height);
 
+    // Fixed: Use stable gradient ID instead of Date.now()
+    const gradientId = "goldGradient-stable";
+
     return (
       <div className={`relative ${className}`}>
         <div className="relative h-48 mb-3 flex">
-          <div className="w-14 flex flex-col justify-between py-1.5 pr-2">
-            {yAxisValues.map((yAxis, index) => (
-              <div
-                key={index}
-                className="text-xs text-gray-400 font-satoshi text-right"
-              >
-                ${yAxis.value.toFixed(2)}
-              </div>
-            ))}
-          </div>
-
           <div
             className="flex-1 flex flex-col relative"
             onMouseLeave={handleMouseLeave}
@@ -690,130 +699,86 @@ export default function TokenOverviewPage() {
               style={{ overflow: "visible" }}
             >
               <defs>
+                {/* Enhanced yellowish gradient with stronger opacity */}
                 <linearGradient
-                  id="priceGradient"
+                  id={gradientId}
                   x1="0%"
                   y1="0%"
                   x2="0%"
                   y2="100%"
                 >
-                  <stop
-                    offset="0%"
-                    stopColor={
-                      tokenInfo?.priceData?.price_change_percentage_24h >= 0
-                        ? "rgba(34, 197, 94, 0.4)"
-                        : "rgba(239, 68, 68, 0.4)"
-                    }
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor={
-                      tokenInfo?.priceData?.price_change_percentage_24h >= 0
-                        ? "rgba(34, 197, 94, 0.0)"
-                        : "rgba(239, 68, 68, 0.0)"
-                    }
-                  />
+                  <stop offset="0%" stopColor="#FFD700" stopOpacity="0.7" />
+                  <stop offset="20%" stopColor="#FFD700" stopOpacity="0.6" />
+                  <stop offset="40%" stopColor="#FFED4E" stopOpacity="0.5" />
+                  <stop offset="60%" stopColor="#FFED4E" stopOpacity="0.4" />
+                  <stop offset="80%" stopColor="#FFF59D" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#FFF59D" stopOpacity="0.2" />
                 </linearGradient>
               </defs>
 
-              {/* Background */}
-              <rect
-                x="0"
-                y="0"
-                width={width}
-                height={height}
-                fill="transparent"
-              />
+              {/* Dark background for better gradient visibility */}
+              <rect x="0" y="0" width={width} height={height} fill="#000000" />
 
-              {/* Grid lines */}
-              {[0, height / 4, height / 2, (3 * height) / 4, height].map(
-                (y) => (
-                  <line
-                    key={y}
-                    x1="0"
-                    y1={y}
-                    x2={width}
-                    y2={y}
-                    stroke="#2C2C2C"
-                    strokeWidth="0.5"
-                    opacity="0.6"
-                  />
-                )
-              )}
+              {/* Chart area with slightly lighter background */}
+              <rect x="0" y="0" width={width} height={height} fill="#050505" />
 
-              {xAxisLabels.map((label) => (
-                <line
-                  key={label.x}
-                  x1={label.x}
-                  y1="0"
-                  x2={label.x}
-                  y2={height}
-                  stroke="#2C2C2C"
-                  strokeWidth="0.5"
-                  opacity="0.3"
-                />
-              ))}
+              {/* Area fill with golden gradient */}
+              <path d={areaPath} fill={`url(#${gradientId})`} opacity="1" />
 
-              {/* Area fill */}
-              <path d={areaPath} fill="url(#priceGradient)" />
+              {/* Additional gradient overlay for stronger yellowish effect */}
+              <path d={areaPath} fill="#FFD700" opacity="0.08" />
 
-              {/* Price line */}
+              {/* Price line - bright yellow */}
               <path
                 d={path}
                 fill="none"
-                stroke={
-                  tokenInfo?.priceData?.price_change_percentage_24h >= 0
-                    ? "#22C55E"
-                    : "#EF4444"
-                }
+                stroke="#FFD700"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
 
-              {/* Crosshair - ALWAYS follows exact cursor position */}
+              {/* Crosshair */}
               {cursorPosition && (
                 <g>
-                  {/* Vertical crosshair line - exact cursor X */}
                   <line
                     x1={cursorPosition.x}
                     y1={0}
                     x2={cursorPosition.x}
                     y2={height}
-                    stroke="#E2AF19"
+                    stroke="#FFD700"
                     strokeWidth="1.5"
                     strokeDasharray="4,4"
                     opacity="0.9"
                   />
 
-                  {/* Horizontal crosshair line - only when we have price data */}
                   {priceData && (
-                    <line
-                      x1={0}
-                      y1={priceData.y}
-                      x2={width}
-                      y2={priceData.y}
-                      stroke="#E2AF19"
-                      strokeWidth="1.5"
-                      strokeDasharray="4,4"
-                      opacity="0.9"
-                    />
-                  )}
-
-                  {/* Intersection point - only when we have price data */}
-                  {priceData && (
-                    <circle
-                      cx={cursorPosition.x}
-                      cy={priceData.y}
-                      r="5"
-                      fill="#E2AF19"
-                      stroke="#000"
-                      strokeWidth="2"
-                      opacity="1"
-                    />
+                    <>
+                      <line
+                        x1={0}
+                        y1={priceData.y}
+                        x2={width}
+                        y2={priceData.y}
+                        stroke="#FFD700"
+                        strokeWidth="1.5"
+                        strokeDasharray="4,4"
+                        opacity="0.9"
+                      />
+                      <circle
+                        cx={cursorPosition.x}
+                        cy={priceData.y}
+                        r="5"
+                        fill="#FFD700"
+                        stroke="#000"
+                        strokeWidth="2"
+                        opacity="1"
+                      />
+                    </>
                   )}
                 </g>
               )}
+
+              {/* Y-axis labels on the right side */}
             </svg>
 
             {showXAxisLabels && (
@@ -832,6 +797,64 @@ export default function TokenOverviewPage() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Fixed Y-axis labels container - matches SVG height */}
+          {/* Fixed Y-axis labels container - matches SVG height */}
+          {/* Fixed Y-axis labels container - matches SVG height */}
+          <div className="w-10 sm:w-12 md:w-14 relative pl-1 sm:pl-1.5 md:pl-2 h-full">
+            {yAxisValues.map((yAxis, index) => {
+              // Determine decimal places needed to avoid duplicates
+              const roundedValues = yAxisValues.map((v) => v.value.toFixed(2));
+              const hasDuplicates =
+                roundedValues.filter((v, i) => roundedValues.indexOf(v) !== i)
+                  .length > 0;
+
+              // If we have duplicates with 2 decimals, try 3, then 4
+              let decimals = 2;
+              if (hasDuplicates) {
+                const rounded3 = yAxisValues.map((v) => v.value.toFixed(3));
+                const hasDuplicates3 =
+                  rounded3.filter((v, i) => rounded3.indexOf(v) !== i).length >
+                  0;
+                decimals = hasDuplicates3 ? 4 : 3;
+              }
+
+              // Format with appropriate decimal places
+              const formattedValue =
+                yAxis.value < 0.01
+                  ? yAxis.value.toFixed(Math.max(decimals, 4))
+                  : yAxis.value < 0.1
+                  ? yAxis.value.toFixed(Math.max(decimals, 3))
+                  : yAxis.value.toFixed(decimals);
+
+              // Shorten format for mobile - use K/M notation for larger numbers
+              const mobileFormattedValue =
+                yAxis.value >= 1000
+                  ? `${(yAxis.value / 1000).toFixed(1)}K`
+                  : yAxis.value >= 1
+                  ? yAxis.value.toFixed(yAxis.value < 10 ? 1 : 0)
+                  : formattedValue.replace("$", "");
+
+              return (
+                <div
+                  key={index}
+                  className="absolute text-[10px] sm:text-xs text-gray-400 font-satoshi text-left whitespace-nowrap"
+                  style={{
+                    top: `${Math.max(
+                      7,
+                      Math.min(93, (yAxis.y / height) * 100)
+                    )}%`,
+                    transform: "translateY(-50%)",
+                  }}
+                >
+                  <span className="inline sm:hidden">
+                    ${mobileFormattedValue}
+                  </span>
+                  <span className="hidden sm:inline">${formattedValue}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -905,17 +928,9 @@ export default function TokenOverviewPage() {
             onMouseEnter={forceClearTooltip}
           >
             <div className="flex items-center mb-2.5">
-              <button
-                onClick={() => router.back()}
-                className="mr-2.5 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
-              >
-                <ArrowLeft size={17} className="text-white" />
-              </button>
               {tokenInfo.priceData?.image ? (
                 <div
-                  className={`w-7 h-7 ${getRandomTokenBg(
-                    tokenInfo.symbol
-                  )} rounded-full mr-2.5 flex items-center justify-center p-0.5`}
+                  className={`w-7 h-7 rounded-full mr-2.5 flex items-center justify-center p-0.5`}
                 >
                   <img
                     src={tokenInfo.priceData.image}
@@ -953,29 +968,31 @@ export default function TokenOverviewPage() {
             {tokenInfo.priceData && (
               <div className="mb-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-1.5">
-                  <div className="text-xl sm:text-2xl font-bold text-white font-satoshi">
-                    {formatCurrency(tokenInfo.priceData.current_price)}
+                  <div className="flex items-center gap-3">
+                    <div className="text-xl sm:text-2xl font-bold text-white font-satoshi">
+                      {formatCurrency(tokenInfo.priceData.current_price)}
+                    </div>
+                    <div className="flex items-center">
+                      {tokenInfo.priceData.price_change_percentage_24h >= 0 ? (
+                        <TrendingUp size={13} className="text-green-400 mr-1" />
+                      ) : (
+                        <TrendingDown size={13} className="text-red-400 mr-1" />
+                      )}
+                      <span
+                        className={`text-xs font-satoshi ${
+                          tokenInfo.priceData.price_change_percentage_24h >= 0
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {formatPercentage(
+                          tokenInfo.priceData.price_change_percentage_24h
+                        )}{" "}
+                        (24h)
+                      </span>
+                    </div>
                   </div>
                   <TimePeriodButtons className="flex-shrink-0" />
-                </div>
-                <div className="flex items-center">
-                  {tokenInfo.priceData.price_change_percentage_24h >= 0 ? (
-                    <TrendingUp size={13} className="text-green-400 mr-1" />
-                  ) : (
-                    <TrendingDown size={13} className="text-red-400 mr-1" />
-                  )}
-                  <span
-                    className={`text-xs font-satoshi ${
-                      tokenInfo.priceData.price_change_percentage_24h >= 0
-                        ? "text-green-400"
-                        : "text-red-400"
-                    }`}
-                  >
-                    {formatPercentage(
-                      tokenInfo.priceData.price_change_percentage_24h
-                    )}{" "}
-                    (24h)
-                  </span>
                 </div>
               </div>
             )}
@@ -1197,76 +1214,45 @@ export default function TokenOverviewPage() {
           <div className="flex-1 flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto space-y-3 scrollbar-hide">
               <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3.5 flex-shrink-0">
-                <div className="flex items-start justify-between mb-3.5">
-                  <div className="flex flex-col">
-                    <div className="flex items-center mb-2.5">
-                      <button
-                        onClick={() => router.back()}
-                        className="mr-2.5 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                <div className="flex items-center justify-between mb-3.5">
+                  <div className="flex items-center">
+                    {tokenInfo.priceData?.image ? (
+                      <div
+                        className={`w-9 h-9
+                         rounded-full mr-2.5 flex items-center justify-center p-0.5`}
                       >
-                        <ArrowLeft size={17} className="text-white" />
-                      </button>
-                      {tokenInfo.priceData?.image ? (
-                        <div
-                          className={`w-9 h-9 ${getRandomTokenBg(
-                            tokenInfo.symbol
-                          )} rounded-full mr-2.5 flex items-center justify-center p-0.5`}
-                        >
-                          <img
-                            src={tokenInfo.priceData.image}
-                            alt={tokenInfo.symbol}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div
-                          className={`w-9 h-9 ${getTokenIcon(
-                            tokenInfo.symbol
-                          )} rounded-full mr-2.5 flex items-center justify-center`}
-                        >
-                          <span className="text-white text-lg font-bold">
-                            {getTokenLetter(tokenInfo.symbol)}
-                          </span>
-                        </div>
-                      )}
-                      <div>
-                        <h2 className="text-xl font-bold text-white font-mayeka">
-                          {tokenInfo.name}
-                        </h2>
-                        <p className="text-gray-400 font-satoshi">
-                          {tokenInfo.symbol}
-                        </p>
+                        <img
+                          src={tokenInfo.priceData.image}
+                          alt={tokenInfo.symbol}
+                          className="w-full h-full rounded-full object-cover"
+                        />
                       </div>
-                    </div>
-
-                    {tokenInfo.priceData && (
-                      <div className="flex items-center space-x-3.5">
-                        <div className="text-3xl font-bold text-white font-satoshi">
-                          {formatCurrency(tokenInfo.priceData.current_price)}
-                        </div>
-                        <div
-                          className={`text-base font-satoshi flex items-center ${
-                            tokenInfo.priceData.price_change_percentage_24h >= 0
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }`}
-                        >
-                          {tokenInfo.priceData.price_change_percentage_24h >= 0
-                            ? "▲"
-                            : "▼"}{" "}
-                          {formatPercentage(
-                            tokenInfo.priceData.price_change_percentage_24h
-                          )}
-                        </div>
+                    ) : (
+                      <div
+                        className={`w-9 h-9 ${getTokenIcon(
+                          tokenInfo.symbol
+                        )} rounded-full mr-2.5 flex items-center justify-center`}
+                      >
+                        <span className="text-white text-lg font-bold">
+                          {getTokenLetter(tokenInfo.symbol)}
+                        </span>
                       </div>
                     )}
+                    <div>
+                      <h2 className="text-xl font-bold text-white font-mayeka">
+                        {tokenInfo.name}
+                      </h2>
+                      <p className="text-gray-400 font-satoshi">
+                        {tokenInfo.symbol}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="text-right">
                     <div className="text-white text-xs font-satoshi mb-0.5">
                       Contract Address
                     </div>
-                    <div className="flex items-center space-x-1.5 mb-2">
+                    <div className="flex items-center space-x-1.5 mb-2 justify-end">
                       <span className="text-gray-400 text-xs font-satoshi">
                         {tokenInfo.contractAddress === "native"
                           ? "Native Token"
@@ -1289,11 +1275,35 @@ export default function TokenOverviewPage() {
                         </button>
                       )}
                     </div>
-                    <TimePeriodButtons />
                   </div>
                 </div>
 
-                <div className="mb-3.5">
+                {tokenInfo.priceData && (
+                  <div className="flex items-center justify-between mb-3.5">
+                    <div className="flex items-center space-x-3.5">
+                      <div className="text-3xl font-bold text-white font-satoshi">
+                        {formatCurrency(tokenInfo.priceData.current_price)}
+                      </div>
+                      <div
+                        className={`text-base font-satoshi flex items-center ${
+                          tokenInfo.priceData.price_change_percentage_24h >= 0
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {tokenInfo.priceData.price_change_percentage_24h >= 0
+                          ? "▲"
+                          : "▼"}{" "}
+                        {formatPercentage(
+                          tokenInfo.priceData.price_change_percentage_24h
+                        )}
+                      </div>
+                    </div>
+                    <TimePeriodButtons />
+                  </div>
+                )}
+
+                <div className="mb-7">
                   <div className="chart-container">
                     <EnhancedChart
                       width={550}
@@ -1304,7 +1314,7 @@ export default function TokenOverviewPage() {
                 </div>
 
                 {tokenInfo.priceData && (
-                  <div className="flex items-center justify-between w-full text-xs my-3.5">
+                  <div className="flex items-center justify-between w-full text-xs mt-13.5">
                     <div className="bg-[#2C2C2C] px-2.5 py-2 rounded-full">
                       <span className="text-white font-satoshi">FDV</span>
                       <span className="text-gray-400 ml-1.5 font-satoshi">
@@ -1452,25 +1462,9 @@ export default function TokenOverviewPage() {
               </div>
 
               <div className="bg-[#000000] rounded-[11px] border border-[#2C2C2C] p-3.5 mb-3">
-                {/* <div className="flex items-center gap-1.5 mb-3.5">
-                  <div className="text-white font-satoshi">
-                    {walletAddress?.slice(0, 7)}...{walletAddress?.slice(-5)}
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(walletAddress!, "wallet")}
-                    className="hover:text-white transition-colors"
-                  >
-                    <Copy size={13} className="text-gray-400" />
-                  </button>
-                </div> */}
-
                 <div className="flex items-center gap-3.5 mb-3.5">
                   <div className="flex-shrink-0">
-                    <div
-                      className={`${getRandomTokenBg(
-                        tokenInfo.symbol
-                      )} rounded-lg p-1.5 border border-[#2C2C2C]`}
-                    >
+                    <div className={`rounded-lg p-1.5`}>
                       {tokenInfo.priceData?.image ? (
                         <img
                           src={tokenInfo.priceData.image}
@@ -1501,10 +1495,10 @@ export default function TokenOverviewPage() {
 
                   <div className="flex-1">
                     <div className="text-xl font-bold text-white mb-1 font-satoshi">
-                      {formatCurrency(tokenValue)}
+                      {tokenBalance.toFixed(6)} {tokenInfo.symbol}
                     </div>
                     <div className="flex items-center gap-2">
-                      <div
+                      {/* <div
                         className={`font-satoshi ${
                           tokenInfo.priceData?.price_change_percentage_24h >= 0
                             ? "text-green-400"
@@ -1516,9 +1510,9 @@ export default function TokenOverviewPage() {
                               tokenInfo.priceData.price_change_percentage_24h
                             )
                           : "N/A"}
-                      </div>
+                      </div> */}
                       <div className="text-gray-400 font-satoshi">
-                        {tokenBalance.toFixed(6)} {tokenInfo.symbol}
+                        = {formatCurrency(tokenValue.toFixed(2))}
                       </div>
                     </div>
                   </div>

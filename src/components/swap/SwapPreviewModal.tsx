@@ -53,7 +53,29 @@ interface SwapPreviewModalProps {
   sellAmount: string;
   buyAmount: string;
   quote: SwapQuote | null;
+  slippage?: string;
   onConfirm: () => void;
+}
+
+// Gas price fetching function like JS file
+async function getCurrentGasPrices() {
+  try {
+    const response = await fetch("/api/gas-prices"); // You'll need to create this endpoint
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    }
+  } catch (error) {
+    console.log("Failed to fetch gas prices, using defaults");
+  }
+
+  // Realistic fallback values (much lower than before)
+  return {
+    baseFee: 8,
+    safeGasPrice: 10,
+    proposeGasPrice: 12,
+    fastGasPrice: 15,
+  };
 }
 
 export default function SwapPreviewModal({
@@ -64,39 +86,42 @@ export default function SwapPreviewModal({
   sellAmount,
   buyAmount,
   quote,
+  slippage = "3",
   onConfirm,
 }: SwapPreviewModalProps) {
   const { activeWallet } = useSelector((state: RootState) => state.wallet);
 
-  const [slippage, setSlippage] = useState("3");
-  const [gasMode, setGasMode] = useState<"safe" | "medium" | "fast">("fast");
-  const [showPreview, setShowPreview] = useState(false);
+  const gasMode = "fast"; // Always use fast mode
   const [executing, setExecuting] = useState(false);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [currentQuote, setCurrentQuote] = useState(quote);
   const [currentBuyAmount, setCurrentBuyAmount] = useState(buyAmount);
+  const [transactionHash, setTransactionHash] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [gasPrices, setGasPrices] = useState({
+    baseFee: 8,
+    safeGasPrice: 10,
+    proposeGasPrice: 12,
+    fastGasPrice: 15,
+  });
 
-  // Debug log when modal opens
+  // Fetch gas prices when modal opens (like JS file)
   useEffect(() => {
     if (isOpen) {
-      console.log("🔍 SwapPreviewModal opened with props:", {
-        sellToken: sellToken?.symbol,
-        buyToken: buyToken?.symbol,
-        sellAmount,
-        buyAmount,
-        quote: !!quote,
-        isOpen,
+      setIsInitializing(true);
+      getCurrentGasPrices().then((prices) => {
+        setGasPrices(prices);
+        // Small delay to ensure smooth transition
+        setTimeout(() => setIsInitializing(false), 300);
       });
-      setCurrentQuote(quote);
-      setCurrentBuyAmount(buyAmount);
     }
-  }, [isOpen, sellToken, buyToken, sellAmount, buyAmount, quote]);
+  }, [isOpen]);
 
   // Reset states when modal opens
   useEffect(() => {
     if (isOpen) {
-      setShowPreview(false);
       setExecuting(false);
       setError("");
       setRefreshing(false);
@@ -105,14 +130,32 @@ export default function SwapPreviewModal({
     }
   }, [isOpen, quote, buyAmount]);
 
+  // Auto-refresh every 5 seconds
+  useEffect(() => {
+    if (!isOpen || executing) return;
+
+    console.log("🔄 Starting auto-refresh interval (5 seconds)");
+
+    const intervalId = setInterval(() => {
+      console.log(
+        "⏰ Auto-refresh triggered at",
+        new Date().toLocaleTimeString()
+      );
+      handleAutoRefresh();
+    }, 5000); // 5 seconds
+
+    return () => {
+      console.log("🛑 Stopping auto-refresh interval");
+      clearInterval(intervalId);
+    };
+  }, [isOpen, executing, sellToken, buyToken, sellAmount, activeWallet]);
+
   const handleAutoRefresh = async () => {
     if (!sellToken || !buyToken || !activeWallet || executing) return;
 
+    console.log("🔄 Auto-refreshing quote...");
     setRefreshing(true);
     try {
-      console.log("🔄 Auto-refreshing quote...");
-
-      // Convert amount to base units
       const sellAmountInBaseUnits = ethers
         .parseUnits(sellAmount, sellToken.decimals)
         .toString();
@@ -145,11 +188,18 @@ export default function SwapPreviewModal({
         const newBuyAmount = (
           parseFloat(data.quote.buyAmount) / Math.pow(10, buyToken.decimals)
         ).toFixed(6);
+
+        console.log("✅ Quote refreshed successfully");
+        console.log("📊 Old buy amount:", currentBuyAmount);
+        console.log("📊 New buy amount:", newBuyAmount);
+
         setCurrentQuote(data.quote);
         setCurrentBuyAmount(newBuyAmount);
-        console.log("✅ Quote refreshed successfully");
       } else {
-        console.log("⚠️ Failed to refresh quote, using previous values");
+        console.log(
+          "⚠️ Failed to refresh quote:",
+          data.error || "Unknown error"
+        );
       }
     } catch (error) {
       console.error("❌ Auto-refresh failed:", error);
@@ -158,7 +208,7 @@ export default function SwapPreviewModal({
     }
   };
 
-  // Calculate preview values with proper gas and fee calculations
+  // Calculate preview values
   const minimumReceived = currentBuyAmount
     ? (
         (parseFloat(currentBuyAmount) * (100 - parseFloat(slippage))) /
@@ -173,12 +223,13 @@ export default function SwapPreviewModal({
         ).toFixed(6)} ${buyToken?.symbol}`
       : "";
 
-  // Calculate platform fee (0.2% = 20 basis points)
-  const TAX_BPS = 20; // 0.2% = 20 basis points
+  // EXACT SAME TAX CALCULATION AS JS FILE (small amounts)
   let platformFee = "0";
   let platformFeeUSD = "0";
 
   if (currentQuote && sellToken && buyToken) {
+    const TAX_BPS = 20; // 0.2% = 20 basis points
+
     try {
       if (
         sellToken.contractAddress === "native" ||
@@ -189,9 +240,6 @@ export default function SwapPreviewModal({
         const sellAmountBN = ethers.parseEther(sellAmount);
         const taxAmount = (sellAmountBN * BigInt(TAX_BPS)) / BigInt(10000);
         platformFee = ethers.formatEther(taxAmount);
-        platformFeeUSD = (
-          parseFloat(platformFee) * (sellToken.price || 2500)
-        ).toFixed(2);
       } else if (
         buyToken.contractAddress === "native" ||
         buyToken.contractAddress ===
@@ -201,95 +249,94 @@ export default function SwapPreviewModal({
         const buyAmountBN = ethers.parseEther(currentBuyAmount);
         const taxAmount = (buyAmountBN * BigInt(TAX_BPS)) / BigInt(10000);
         platformFee = ethers.formatEther(taxAmount);
-        platformFeeUSD = (
-          parseFloat(platformFee) * (buyToken.price || 2500)
-        ).toFixed(2);
       } else {
-        // Token to Token: estimate tax in ETH (small fixed amount as fallback)
+        // Token to Token: small fixed amount
         platformFee = "0.0001";
-        platformFeeUSD = (parseFloat(platformFee) * 2500).toFixed(2);
       }
+
+      const ethPrice = 2500; // You can make this dynamic
+      platformFeeUSD = (parseFloat(platformFee) * ethPrice).toFixed(2);
     } catch (error) {
-      console.error("Error calculating platform fee:", error);
       platformFee = "0.0001";
       platformFeeUSD = "0.25";
     }
   }
 
-  // Calculate gas cost
+  // REALISTIC GAS CALCULATION LIKE JS FILE
   let gasCost = "0";
   let gasCostUSD = "0";
 
   if (currentQuote) {
     try {
-      // Get gas limit from quote with 30% buffer
+      // Get gas limit from quote with 30% buffer (not 50% like before)
       const transactionData = currentQuote.transaction || {
         gas: currentQuote.gas,
       };
-      const gasLimit =
-        (BigInt(transactionData.gas || currentQuote.gas || "300000") *
-          BigInt(130)) /
-        BigInt(100);
+      const baseGasLimit = BigInt(
+        transactionData.gas || currentQuote.gas || "300000"
+      );
+      const gasLimitWithBuffer = (baseGasLimit * BigInt(130)) / BigInt(100); // 30% buffer
 
-      // Use realistic gas prices based on network conditions
-      let gasPriceGwei = "10"; // Conservative default
+      // Use REALISTIC gas pricing like your JS file
+      let selectedTotalGasPrice;
       switch (gasMode) {
         case "safe":
-          gasPriceGwei = "8";
+          selectedTotalGasPrice = gasPrices.safeGasPrice;
           break;
         case "medium":
-          gasPriceGwei = "12";
+          selectedTotalGasPrice = gasPrices.proposeGasPrice;
           break;
         case "fast":
-          gasPriceGwei = "15";
+          selectedTotalGasPrice = gasPrices.fastGasPrice;
           break;
+        default:
+          selectedTotalGasPrice = gasPrices.fastGasPrice;
       }
 
-      const gasPrice = ethers.parseUnits(gasPriceGwei, "gwei");
-      const totalGasCost = gasLimit * gasPrice;
+      // Convert total gas price to priority fee structure (like JS file)
+      const totalGasPrice = ethers.parseUnits(
+        selectedTotalGasPrice.toString(),
+        "gwei"
+      );
+      const baseFee = ethers.parseUnits(gasPrices.baseFee.toString(), "gwei");
+
+      // Priority fee = total - base (like your JS file)
+      const priorityFee =
+        totalGasPrice > baseFee
+          ? totalGasPrice - baseFee
+          : ethers.parseUnits("1", "gwei");
+
+      // MaxFeePerGas with small buffer (like JS file)
+      const feeMultiplier = 1.1; // Same as JS file
+      const maxFeePerGas =
+        (totalGasPrice * BigInt(Math.floor(feeMultiplier * 100))) / 100n;
+
+      // Calculate actual gas cost
+      const totalGasCost = gasLimitWithBuffer * maxFeePerGas;
       gasCost = ethers.formatEther(totalGasCost);
 
-      // Use ETH price for USD calculation
-      const ethPrice =
-        sellToken?.contractAddress === "native" ||
-        sellToken?.contractAddress ===
-          "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
-          ? sellToken.price
-          : buyToken?.contractAddress === "native" ||
-            buyToken?.contractAddress ===
-              "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
-          ? buyToken.price
-          : 2500;
+      console.log("💰 Realistic gas calculation:", {
+        baseGasLimit: baseGasLimit.toString(),
+        gasLimitWithBuffer: gasLimitWithBuffer.toString(),
+        selectedTotalGasPrice: selectedTotalGasPrice + " gwei",
+        baseFee: gasPrices.baseFee + " gwei",
+        priorityFee: ethers.formatUnits(priorityFee, "gwei") + " gwei",
+        maxFeePerGas: ethers.formatUnits(maxFeePerGas, "gwei") + " gwei",
+        finalGasCost: gasCost + " ETH",
+      });
+
+      const ethPrice = 2500;
       gasCostUSD = (parseFloat(gasCost) * ethPrice).toFixed(2);
     } catch (error) {
       console.error("Error calculating gas cost:", error);
-      gasCost = "0.002";
-      gasCostUSD = "5.00";
+      gasCost = "0.0005"; // Much smaller fallback
+      gasCostUSD = "1.25";
     }
   }
 
-  const handlePreview = () => {
-    console.log("🔍 Preview button clicked, validation:", {
-      slippage: parseFloat(slippage),
-      slippageValid: parseFloat(slippage) >= 0.1 && parseFloat(slippage) <= 50,
-    });
-
-    if (parseFloat(slippage) < 0.1 || parseFloat(slippage) > 50) {
-      setError("Slippage must be between 0.1% and 50%");
-      return;
-    }
-    setError("");
-    setShowPreview(true);
-    console.log("✅ Moving to preview screen");
-  };
-
   const handleExecuteSwap = async () => {
-    if (!currentQuote || !sellToken || !buyToken || !activeWallet) {
-      console.log("❌ Missing required data for execution");
-      return;
-    }
+    if (!currentQuote || !sellToken || !buyToken || !activeWallet) return;
 
-    console.log("🚀 Executing swap...");
     setExecuting(true);
     setError("");
 
@@ -315,34 +362,127 @@ export default function SwapPreviewModal({
         throw new Error(data.error || "Swap failed");
       }
 
-      // Success - show transaction hash and close
+      // Success - show transaction hash in modal
       console.log("✅ Swap executed successfully:", data.transactionHash);
-      alert(`Swap executed! Transaction: ${data.transactionHash}`);
-      onConfirm();
+      setTransactionHash(data.transactionHash);
+      setShowSuccess(true);
     } catch (error: any) {
-      console.error("❌ Swap execution failed:", error);
       setError(error.message);
     } finally {
       setExecuting(false);
     }
   };
 
-  // Don't render if not open or missing required data
-  if (!isOpen) {
-    console.log("🚫 Modal not rendering - isOpen:", isOpen);
-    return null;
+  if (!isOpen || !sellToken || !buyToken || !currentQuote) return null;
+
+  // Show success modal
+  if (showSuccess) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+        <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md overflow-hidden shadow-2xl">
+          <div className="p-6 text-center">
+            {/* Success animation */}
+            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg
+                className="w-8 h-8 text-green-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+
+            <h3 className="text-xl font-bold text-white font-mayeka mb-2">
+              Swap Successful!
+            </h3>
+
+            <p className="text-gray-400 text-sm font-satoshi mb-4">
+              Your transaction has been submitted to the blockchain
+            </p>
+
+            <div className="bg-[#0F0F0F] rounded-lg p-3 mb-6">
+              <p className="text-gray-400 text-xs font-satoshi mb-1">
+                Transaction Hash
+              </p>
+              <p className="text-white text-xs font-mono break-all">
+                {transactionHash}
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <a
+                href={`https://etherscan.io/tx/${transactionHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 bg-[#E2AF19] hover:bg-[#D4A853] text-black font-semibold py-2 rounded-lg transition-colors font-satoshi text-sm"
+              >
+                View on Etherscan
+              </a>
+              <Button
+                onClick={() => {
+                  setShowSuccess(false);
+                  setTransactionHash("");
+                  onConfirm();
+                }}
+                variant="secondary"
+                className="flex-1"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  if (!sellToken || !buyToken || !currentQuote) {
-    console.log("🚫 Modal not rendering - missing data:", {
-      sellToken: !!sellToken,
-      buyToken: !!buyToken,
-      currentQuote: !!currentQuote,
-    });
-    return null;
-  }
+  // Show executing modal
+  if (executing) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+        <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md overflow-hidden shadow-2xl">
+          <div className="p-6 text-center">
+            {/* Loading animation */}
+            <div className="w-16 h-16 relative mx-auto mb-4">
+              <div className="absolute inset-0 border-4 border-[#2C2C2C] rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-[#E2AF19] rounded-full border-t-transparent animate-spin"></div>
+            </div>
 
-  console.log("✅ Modal rendering with showPreview:", showPreview);
+            <h3 className="text-xl font-bold text-white font-mayeka mb-2">
+              Executing Swap...
+            </h3>
+
+            <p className="text-gray-400 text-sm font-satoshi mb-4">
+              Please wait while we process your transaction
+            </p>
+
+            <div className="bg-[#0F0F0F] rounded-lg p-4 text-left space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Swapping</span>
+                <span className="text-white text-sm">
+                  {sellAmount} {sellToken.symbol} → {buyToken.symbol}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Status</span>
+                <span className="text-[#E2AF19] text-sm">Processing...</span>
+              </div>
+            </div>
+
+            <p className="text-gray-500 text-xs font-satoshi mt-4">
+              Do not close this window
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
@@ -350,7 +490,7 @@ export default function SwapPreviewModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
           <h3 className="text-lg font-bold text-white font-mayeka">
-            {showPreview ? "Swap Preview" : "Swap Settings"}
+            Swap Preview
           </h3>
           <button
             onClick={onClose}
@@ -361,168 +501,122 @@ export default function SwapPreviewModal({
         </div>
 
         <div className="p-6 space-y-6">
-          {!showPreview ? (
-            // Settings Form
-            <>
-              {/* Slippage */}
-              <div>
-                <label className="block text-white font-satoshi mb-2">
-                  Slippage Tolerance %
-                </label>
-                <p className="text-gray-400 text-sm font-satoshi mb-3">
-                  Recommended: 1-5% for mainnet, default: 3%
-                </p>
-                <Input
-                  type="number"
-                  value={slippage}
-                  onChange={(e) => setSlippage(e.target.value)}
-                  placeholder="3"
-                  step="0.1"
-                  min="0.1"
-                  max="50"
-                />
+          {/* Preview Display */}
+          {isInitializing ? (
+            // Skeleton loader
+            <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C]">
+              {/* <div className="text-center text-[#E2AF19] font-bold mb-4 border-b border-[#2C2C2C] pb-2">
+                SWAP PREVIEW
+              </div> */}
+
+              <div className="space-y-2">
+                {[...Array(10)].map((_, index) => (
+                  <div key={index} className="flex justify-between">
+                    <div className="h-4 bg-gray-700 rounded w-24 animate-pulse"></div>
+                    <div className="h-4 bg-gray-700 rounded w-32 animate-pulse"></div>
+                  </div>
+                ))}
               </div>
-
-              {/* Gas Mode */}
-              <div>
-                <label className="block text-white font-satoshi mb-2">
-                  ⛽ Gas Mode Selection
-                </label>
-                <div className="space-y-2">
-                  {[
-                    { value: "safe", label: "Safe (slower, cheaper)" },
-                    { value: "medium", label: "Medium (balanced)" },
-                    { value: "fast", label: "Fast (faster, more expensive)" },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        console.log("🔧 Gas mode selected:", option.value);
-                        setGasMode(option.value as any);
-                      }}
-                      className={`w-full p-3 rounded-lg border text-left transition-colors ${
-                        gasMode === option.value
-                          ? "border-[#E2AF19] bg-[#E2AF19]/10"
-                          : "border-[#2C2C2C] hover:border-[#3C3C3C]"
-                      }`}
-                    >
-                      <span className="text-white font-satoshi">
-                        {option.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {error && (
-                <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-                  <p className="text-red-400 text-sm font-satoshi">{error}</p>
-                </div>
-              )}
-
-              <Button onClick={handlePreview} className="w-full">
-                Preview Swap
-              </Button>
-            </>
+            </div>
           ) : (
-            // Preview Display
-            <>
-              {/* Swap Preview Table */}
-              <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] font-mono text-sm">
-                <div className="flex items-center justify-between mb-4 border-b border-[#2C2C2C] pb-2">
-                  <span className="text-center text-[#E2AF19] font-bold">
-                    🔄 SWAP PREVIEW
+            // Actual preview content
+            <div className="bg-[#0F0F0F] rounded-lg p-4 border border-[#2C2C2C] font-mono text-sm">
+              {/* <div className="text-center text-[#E2AF19] font-bold mb-4 border-b border-[#2C2C2C] pb-2">
+                SWAP PREVIEW
+              </div> */}
+
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">From:</span>
+                  <span className="text-white">{sellToken.symbol}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">To:</span>
+                  <span className="text-white">{buyToken.symbol}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Amount:</span>
+                  <span className="text-white">{sellAmount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Rate:</span>
+                  <span className="text-white text-xs">{rate}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Expected:</span>
+                  <span className="text-white">
+                    {parseFloat(currentBuyAmount).toFixed(6)} {buyToken.symbol}
                   </span>
-                  {refreshing && (
-                    <div className="flex items-center text-yellow-400 text-xs">
-                      <div className="animate-spin rounded-full h-3 w-3 border-b border-yellow-400 mr-1"></div>
-                      Refreshing...
-                    </div>
-                  )}
                 </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Sell Token:</span>
-                    <span className="text-white">{sellToken.symbol}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Buy Token:</span>
-                    <span className="text-white">{buyToken.symbol}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Sell Amount:</span>
-                    <span className="text-white">{sellAmount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Rate:</span>
-                    <span className="text-white text-xs">{rate}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Expected:</span>
-                    <span className="text-white">
-                      {currentBuyAmount} {buyToken.symbol}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Minimum:</span>
-                    <span className="text-white">
-                      {minimumReceived} {buyToken.symbol} ({slippage}% slippage)
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Platform Fee:</span>
-                    <span className="text-white">
-                      {platformFee} ETH (${platformFeeUSD})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Est. Gas Cost:</span>
-                    <span className="text-white">
-                      {gasCost} ETH (~${gasCostUSD})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Gas Mode:</span>
-                    <span className="text-white capitalize">{gasMode}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Route:</span>
-                    <span className="text-white">
-                      {currentQuote.sources?.[0]?.name || "Direct Route"}
-                    </span>
-                  </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Minimum:</span>
+                  <span className="text-white">
+                    {parseFloat(minimumReceived).toFixed(6)} {buyToken.symbol} (
+                    {slippage}% slippage)
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Platform Fee:</span>
+                  <span className="text-white">
+                    {parseFloat(platformFee).toFixed(6)} ETH ($
+                    {platformFeeUSD})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Est. Gas Cost:</span>
+                  <span className="text-white">
+                    {parseFloat(gasCost).toFixed(6)} ETH (~${gasCostUSD})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Gas Mode:</span>
+                  <span className="text-white capitalize">
+                    {gasMode} (
+                    {gasMode === "safe"
+                      ? gasPrices.safeGasPrice
+                      : gasMode === "medium"
+                      ? gasPrices.proposeGasPrice
+                      : gasPrices.fastGasPrice}{" "}
+                    gwei)
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Route:</span>
+                  <span className="text-white">
+                    {currentQuote.sources?.[0]?.name || "Direct Route"}
+                  </span>
                 </div>
               </div>
-
-              {error && (
-                <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-                  <p className="text-red-400 text-sm font-satoshi">{error}</p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => {
-                    console.log("⬅️ Back to settings");
-                    setShowPreview(false);
-                  }}
-                  variant="secondary"
-                  className="flex-1"
-                >
-                  Back
-                </Button>
-                <Button
-                  onClick={handleExecuteSwap}
-                  disabled={executing}
-                  className="flex-1"
-                >
-                  {executing ? "Executing..." : "Confirm Swap"}
-                </Button>
-              </div>
-            </>
+            </div>
           )}
+
+          {error && (
+            <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
+              <p className="text-red-400 text-sm font-satoshi">{error}</p>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <Button
+              onClick={onClose}
+              variant="secondary"
+              className="flex-1"
+              disabled={isInitializing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleExecuteSwap}
+              disabled={executing || isInitializing}
+              className="flex-1"
+            >
+              {executing
+                ? "Executing..."
+                : isInitializing
+                ? "Loading..."
+                : "Confirm Swap"}
+            </Button>
+          </div>
         </div>
       </div>
 

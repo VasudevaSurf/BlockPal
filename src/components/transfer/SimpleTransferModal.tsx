@@ -276,6 +276,19 @@ export default function SimpleTransferModal({
   } | null>(null);
   const [gasLoading, setGasLoading] = useState(false);
 
+  // Calculate USD equivalent value
+  const calculateUSDValue = () => {
+    if (!formData.amount || !tokenInfo.priceData?.current_price) {
+      return null;
+    }
+    const amount = parseFloat(formData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      return null;
+    }
+    const usdValue = amount * tokenInfo.priceData.current_price;
+    return usdValue.toFixed(2);
+  };
+
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
@@ -640,26 +653,6 @@ export default function SimpleTransferModal({
     }
   };
 
-  const getRandomTokenBg = (symbol: string) => {
-    const backgrounds = [
-      "bg-blue-500/20",
-      "bg-purple-500/20",
-      "bg-green-500/20",
-      "bg-yellow-500/20",
-      "bg-red-500/20",
-      "bg-cyan-500/20",
-      "bg-pink-500/20",
-      "bg-orange-500/20",
-      "bg-indigo-500/20",
-      "bg-teal-500/20",
-    ];
-
-    const index =
-      symbol.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) %
-      backgrounds.length;
-    return backgrounds[index];
-  };
-
   const handleExecuteTransfer = async () => {
     console.log("🚀 Executing transfer...");
 
@@ -824,30 +817,22 @@ export default function SimpleTransferModal({
         <div className="bg-black border rounded-[16px] w-full max-w-lg max-h-[90vh] overflow-hidden">
           {/* Header matching the image design */}
           <div className="flex items-center justify-between px-4 py-3">
-            <button
-              onClick={handleClose}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft size={18} />
+            <button className="text-gray-400 hover:text-white transition-colors">
+              {/* <ArrowLeft size={18} /> */}
             </button>
             <h2 className="text-base font-semibold text-white font-mayeka-demi-bold-demo">
               Send
             </h2>
             {/* Token icon in header */}
             <div
-              className={`w-6 h-6 bg-black ounded-lg flex items-center justify-center p-0.5`}
+              className={`w-6 h-6 bg-black rounded-lg flex items-center justify-center p-0.5`}
             >
-              {/* {tokenInfo.priceData?.image ? (
-                <img
-                  src={tokenInfo.priceData.image}
-                  alt={tokenInfo.symbol}
-                  className="w-5 h-5 rounded-md object-cover"
-                />
-              ) : (
-                <span className="text-black text-sm font-bold">
-                  {getTokenLetter(tokenInfo.symbol)}
-                </span>
-              )} */}
+              <button
+                onClick={handleClose}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
             </div>
           </div>
           {/* Content */}
@@ -956,14 +941,6 @@ export default function SimpleTransferModal({
                       <ProfileIcon />
                     </div>
                   </div>
-
-                  {/* Address display below */}
-                  {/* <div className="text-xs text-gray-400 font-satoshi break-all">
-                    {selectedUser
-                      ? selectedUser.walletAddress
-                      : formData.recipientAddress ||
-                        "0x9e700000000000000000000000000000000000000"}
-                  </div> */}
                 </div>
 
                 {/* Error for recipient */}
@@ -1027,15 +1004,11 @@ export default function SimpleTransferModal({
                   </div>
 
                   {/* Token row with amount input */}
-                  <div className="flex items-center justify-between mb-2 gap-2">
+                  <div className="flex items-center gap-3 mb-2">
                     {/* Token info */}
-                    <div className="flex items-center min-w-0 flex-shrink">
+                    <div className="flex items-center min-w-0 flex-shrink-0">
                       {tokenInfo.priceData?.image ? (
-                        <div
-                          className={`w-8 h-8 ${getRandomTokenBg(
-                            tokenInfo.symbol
-                          )} rounded-full mr-2 p-0.5 flex items-center justify-center flex-shrink-0`}
-                        >
+                        <div className="w-8 h-8 rounded-full mr-2 p-0.5 flex items-center justify-center flex-shrink-0">
                           <img
                             src={tokenInfo.priceData.image}
                             alt={tokenInfo.symbol}
@@ -1066,13 +1039,13 @@ export default function SimpleTransferModal({
                       </div>
 
                       {/* Token name with proper truncation */}
-                      <div className="text-white font-satoshi text-sm truncate">
+                      <div className="text-white font-satoshi text-sm">
                         {tokenInfo.name}
                       </div>
                     </div>
 
-                    {/* Amount input */}
-                    <div className="flex items-center flex-shrink-0">
+                    {/* Amount input - flexible width */}
+                    <div className="flex-1 flex justify-end">
                       <input
                         type="text"
                         inputMode="decimal" // Shows numeric keypad on mobile devices
@@ -1129,17 +1102,25 @@ export default function SimpleTransferModal({
                             handleAmountChange(validPaste);
                           }
                         }}
-                        className="bg-transparent text-white text-base sm:text-xl font-bold font-satoshi placeholder-gray-500 focus:outline-none text-right mr-2 w-12 sm:w-20"
+                        className="bg-transparent text-white text-base sm:text-xl font-bold font-satoshi placeholder-gray-500 focus:outline-none text-right w-full min-w-0"
+                        style={{ minWidth: "60px" }}
                       />
-                      {/* <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
-                        <span className="text-white text-xs">○</span>
-                      </div> */}
                     </div>
                   </div>
 
-                  {/* Balance row */}
-                  <div className="text-gray-400 text-sm font-satoshi">
-                    Balance: {parseFloat(tokenInfo.balance).toFixed(4)}
+                  {/* USD equivalent and Balance row */}
+                  <div className="space-y-1">
+                    {/* USD equivalent value */}
+                    {calculateUSDValue() && (
+                      <div className="text-gray-400 text-xs font-satoshi text-right">
+                        ≈ ${calculateUSDValue()} USD
+                      </div>
+                    )}
+
+                    {/* Balance row */}
+                    <div className="text-gray-400 text-sm font-satoshi">
+                      Balance: {parseFloat(tokenInfo.balance).toFixed(4)}
+                    </div>
                   </div>
                 </div>
 
@@ -1184,17 +1165,7 @@ export default function SimpleTransferModal({
                   }
                   className="w-full bg-[#E2AF19] text-black font-semibold py-3 rounded-lg hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-satoshi"
                 >
-                  {isLoading ? (
-                    <>
-                      <RefreshCw
-                        size={14}
-                        className="inline mr-2 animate-spin"
-                      />
-                      Creating Preview...
-                    </>
-                  ) : (
-                    "Confirm"
-                  )}
+                  {isLoading ? <>Creating Preview...</> : "Confirm"}
                 </button>
               </div>
             )}
@@ -1208,10 +1179,6 @@ export default function SimpleTransferModal({
                   </h3>
 
                   <div className="space-y-2 text-sm">
-                    {/* <div className="flex justify-between">
-                      <span className="text-gray-400">Network:</span>
-                      <span className="text-white">{preview.network}</span>
-                    </div> */}
                     <div className="flex justify-between">
                       <span className="text-gray-400">Token:</span>
                       <span className="text-white">
@@ -1230,14 +1197,14 @@ export default function SimpleTransferModal({
                       <div className="text-right">
                         {selectedUser ? (
                           <div>
-                            <span className="text-green-400 font-medium">
+                            <span className="text-[#E2AF19] font-medium">
                               @{selectedUser.username}
                             </span>
-                            {selectedUser.displayName && (
+                            {/* {selectedUser.displayName && (
                               <div className="text-gray-400 text-xs">
                                 {selectedUser.displayName}
                               </div>
-                            )}
+                            )} */}
                             <div className="text-white text-xs">
                               {selectedUser.walletAddress.slice(0, 8)}...
                               {selectedUser.walletAddress.slice(-6)}
@@ -1264,19 +1231,6 @@ export default function SimpleTransferModal({
                           <span className="text-white">{preview.valueUSD}</span>
                         </div>
                       )}
-                    {/* <div className="flex justify-between">
-                      <span className="text-gray-400">Est. Gas:</span>
-                      <span className="text-white">
-                        {preview.gasEstimation.estimatedGas} gas
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Gas Cost:</span>
-                      <span className="text-white">
-                        {preview.gasEstimation.gasCostETH} ETH (≈
-                        {preview.gasEstimation.gasCostUSD})
-                      </span>
-                    </div> */}
                   </div>
                 </div>
 
@@ -1309,19 +1263,27 @@ export default function SimpleTransferModal({
             {/* Processing Step */}
             {step === "processing" && (
               <div className="text-center py-6">
-                <div className="w-12 h-12 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
-                  <RefreshCw size={24} className="text-black animate-spin" />
+                {/* Processing Icon - Static Design */}
+                <div className="w-16 h-16 mx-auto mb-4 relative">
+                  <div className="w-16 h-16 rounded-full border-4 border-[#2C2C2C] flex items-center justify-center">
+                    <div className="w-8 h-8 bg-[#E2AF19] rounded relative">
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                        <CheckCircle size={20} className="text-black" />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Static rings */}
+                  <div className="absolute inset-0 border-2 border-[#E2AF19]/30 rounded-full"></div>
+                  <div className="absolute inset-2 border border-[#E2AF19]/20 rounded-full"></div>
                 </div>
-                <h3 className="text-white text-base font-semibold font-satoshi mb-1.5">
-                  Processing...
+
+                <h3 className="text-white text-xl font-bold font-mayeka-demi-bold-demo mb-2">
+                  Processing
                 </h3>
-                <p className="text-gray-400 font-satoshi">
+                <p className="text-gray-400 text-sm font-satoshi leading-relaxed">
                   Transaction in progress! Blockchain validation is underway.
                   This may take a few minutes.
                 </p>
-                {/* <div className="mt-3 text-xs text-gray-500 font-satoshi">
-                  This may take a few moments. Do not close this window.
-                </div> */}
               </div>
             )}
 
@@ -1366,32 +1328,6 @@ export default function SimpleTransferModal({
                         </button>
                       </div>
                     </div>
-                    {/* {transactionResult.gasUsed && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Gas Used:</span>
-                        <span className="text-white">
-                          {transactionResult.gasUsed?.toLocaleString()} gas
-                        </span>
-                      </div>
-                    )}
-                    {transactionResult.blockNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Block Number:</span>
-                        <span className="text-white">
-                          {transactionResult.blockNumber?.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    {transactionResult.actualCostETH && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Actual Cost:</span>
-                        <span className="text-white">
-                          {transactionResult.actualCostETH} ETH
-                          {transactionResult.actualCostUSD &&
-                            ` (${transactionResult.actualCostUSD})`}
-                        </span>
-                      </div>
-                    )} */}
                   </div>
 
                   {copied === "hash" && (

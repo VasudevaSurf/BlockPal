@@ -285,18 +285,12 @@ export default function WalletBalance() {
               onClick={() => copyToClipboard(activeWallet.address)}
               className={`transition-all duration-300 ease-in-out px-2 py-0.5 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0 ${
                 copyState.isCopied
-                  ? "bg-green-500 text-white scale-105"
+                  ? "bg-[#E2AF19] text-black scale-105"
                   : "text-black hover:bg-[#D4A853] bg-[#E2AF19] bg-opacity-100"
               }`}
               disabled={copyState.isAnimating}
             >
-              <span
-                className={`transition-all duration-200 ${
-                  copyState.isAnimating ? "animate-pulse" : ""
-                }`}
-              >
-                {copyState.isCopied ? "Copied!" : "Copy"}
-              </span>
+              <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
               {/* {copyState.isCopied ? (
                 <Check
                   size={8}

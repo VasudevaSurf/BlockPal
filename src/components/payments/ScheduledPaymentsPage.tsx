@@ -1663,17 +1663,7 @@ export default function ScheduledPaymentsPage() {
                               {payment.recipient.slice(-6)}
                             </div>
                             <div className="flex items-center mt-0.5">
-                              <div
-                                className={`w-3 h-3 ${getTokenBackgroundColor(
-                                  paymentToken.symbol,
-                                  payment.contractAddress
-                                )} rounded-full flex items-center justify-center`}
-                              >
-                                <TokenIcon
-                                  token={paymentToken}
-                                  size="w-2 h-2"
-                                />
-                              </div>
+                              <TokenIcon token={paymentToken} size="w-3 h-3" />
                               <span className="text-gray-400 text-xs font-satoshi ml-1">
                                 {payment.tokenSymbol}
                               </span>
@@ -1786,19 +1776,7 @@ export default function ScheduledPaymentsPage() {
                   <div className="flex items-center">
                     {selectedToken && (
                       <>
-                        <div
-                          className={`w-5 h-5 ${getTokenBackgroundColor(
-                            selectedToken.symbol,
-                            selectedToken.contractAddress
-                          )} rounded-full flex items-center justify-center`}
-                        >
-                          <div className="w-3.5 h-3.5 flex items-center justify-center">
-                            <TokenIcon
-                              token={selectedToken}
-                              size="w-3.5 h-3.5"
-                            />
-                          </div>
-                        </div>
+                        <TokenIcon token={selectedToken} size="w-5 h-5" />
                         <span className="text-white font-satoshi text-xs ml-2">
                           {selectedToken.symbol}
                         </span>
@@ -1834,14 +1812,7 @@ export default function ScheduledPaymentsPage() {
                           className="w-full flex items-center p-2.5 hover:bg-[#1A1A1A] transition-colors text-left"
                         >
                           <div className="flex items-center flex-1">
-                            <div
-                              className={`w-5 h-5 ${getTokenBackgroundColor(
-                                token.symbol,
-                                token.contractAddress
-                              )} rounded-full flex items-center justify-center`}
-                            >
-                              <TokenIcon token={token} size="w-3.5 h-3.5" />
-                            </div>
+                            <TokenIcon token={token} size="w-5 h-5" />
                             <div className="flex-1 ml-2">
                               <div className="text-white font-satoshi text-xs">
                                 {token.symbol}
@@ -1993,7 +1964,7 @@ export default function ScheduledPaymentsPage() {
                   setRecurringEnabled(false);
                   setError("");
                 }}
-                className="px-4 py-1.5 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-xs font-medium min-w-[130px]"
+                className="px-4 py-1.5 bg-[#4B3A08] text-[#E2AF19] rounded-lg font-satoshi hover:opacity-90 transition-opacity text-s font-medium min-w-[130px]"
               >
                 Reset
               </button>
@@ -2135,17 +2106,7 @@ export default function ScheduledPaymentsPage() {
                         </div>
 
                         <div className="flex items-center min-w-0">
-                          <div
-                            className={`w-5 h-5 ${getTokenBackgroundColor(
-                              paymentToken.symbol,
-                              payment.contractAddress
-                            )} rounded-full flex items-center justify-center`}
-                          >
-                            <TokenIcon
-                              token={paymentToken}
-                              size="w-3.5 h-3.5"
-                            />
-                          </div>
+                          <TokenIcon token={paymentToken} size="w-5 h-5" />
                           <span className="text-white font-satoshi text-xs truncate ml-2">
                             {payment.tokenSymbol}
                           </span>

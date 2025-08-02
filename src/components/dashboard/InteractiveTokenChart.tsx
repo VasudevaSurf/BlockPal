@@ -13,7 +13,7 @@ import {
   ZoomOut,
   Move,
   X,
-  RefreshCw,
+  RotateCw,
 } from "lucide-react";
 
 interface PricePoint {
@@ -424,8 +424,9 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
   }
 
   const isPositive = priceChange24h >= 0;
-  const lineColor = isPositive ? "#10B981" : "#EF4444";
-  const gradientId = `enhanced-gradient-${tokenSymbol}`;
+  const lineColor = "#E2AF19"; // Gold color for the main graph
+  // FIXED: Use stable gradient ID instead of Date.now()
+  const gradientId = `enhanced-gradient-${tokenSymbol}-stable`;
 
   return (
     <div className={`relative w-full ${className}`}>
@@ -525,10 +526,9 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
           >
             <defs>
               <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor={lineColor} stopOpacity="0.3" />
-                <stop offset="30%" stopColor={lineColor} stopOpacity="0.15" />
-                <stop offset="70%" stopColor={lineColor} stopOpacity="0.05" />
-                <stop offset="100%" stopColor={lineColor} stopOpacity="0.0" />
+                <stop offset="0%" stopColor="#E2AF19" stopOpacity="0.4" />
+                <stop offset="50%" stopColor="#E2AF19" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#E2AF19" stopOpacity="0.2" />
               </linearGradient>
 
               <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -576,12 +576,13 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               </linearGradient>
             </defs>
 
+            {/* Dark background to make yellow shade visible */}
             <rect
               x="0"
               y="0"
               width={dimensions.width}
               height={dimensions.height}
-              fill="url(#background-gradient)"
+              fill="#0A0A0A"
             />
 
             <rect
@@ -592,6 +593,7 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               fill={`url(#enhanced-grid-${tokenSymbol})`}
             />
 
+            {/* OPTIONAL: Remove these grid lines if you don't want them */}
             {gridData.horizontalLines.map((line, index) => (
               <g key={`h-${index}`}>
                 <line
@@ -640,17 +642,14 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
               </g>
             ))}
 
-            <path
-              d={areaPath}
-              fill={`url(#${gradientId})`}
-              filter="url(#shadow)"
-            />
+            {/* Area fill with golden gradient - ensure it's visible */}
+            <path d={areaPath} fill={`url(#${gradientId})`} opacity="0.8" />
 
             <path
               d={pathData}
               fill="none"
-              stroke={lineColor}
-              strokeWidth={dimensions.width < 500 ? "2.5" : "3"}
+              stroke="#E2AF19"
+              strokeWidth={dimensions.width < 500 ? "3" : "3.5"}
               strokeLinecap="round"
               strokeLinejoin="round"
               filter="url(#glow)"
@@ -677,7 +676,7 @@ const EnhancedInteractiveChart: React.FC<EnhancedChartProps> = ({
                     cx={point.x + padding.left}
                     cy={point.y + padding.top}
                     r={isHovered ? 6 : 3}
-                    fill={lineColor}
+                    fill="#E2AF19"
                     stroke="#000"
                     strokeWidth="1.5"
                     opacity={isHovered ? 1 : 0.7}
@@ -877,7 +876,7 @@ const ChartDemo = () => {
                 className="p-1.5 text-gray-400 hover:text-white transition-colors"
                 disabled={isLoading}
               >
-                <RefreshCw
+                <RotateCw
                   size={14}
                   className={isLoading ? "animate-spin" : ""}
                 />

@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED VERSION (Dark Grey Wallet Images)
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED VERSION with Back Button for Token Overview
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Clock,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
@@ -52,13 +53,13 @@ const getPageTitle = (
       };
     case "/dashboard/scheduled-payments":
       return {
-        title: "Manage Payments",
+        title: "LoopX",
         subtitle:
           "Automated payments with smart contract security and automatic tax handling",
       };
     case "/dashboard/batch-payments":
       return {
-        title: "Batch Payments",
+        title: "Cluster",
         subtitle: "Send multiple payments efficiently in a single transaction",
       };
     case "/dashboard/ai-chat":
@@ -139,6 +140,9 @@ export default function GlobalDashboardHeader({
   const walletsLoaded = useRef(false);
   const activeWalletSynced = useRef(false);
   const notificationsFetched = useRef(false);
+
+  // Check if we're on a token overview page
+  const isTokenOverviewPage = pathname.startsWith("/dashboard/token/");
 
   // Calculate countdown to next update
   useEffect(() => {
@@ -251,12 +255,17 @@ export default function GlobalDashboardHeader({
     }
   }, [isAuthenticated, user, wallets, activeWallet, dispatch]);
 
-  // NEW: Handle profile navigation
+  // Handle back button click
+  const handleBackClick = () => {
+    router.back();
+  };
+
+  // Handle profile navigation
   const handleProfileClick = () => {
     router.push("/dashboard/profile");
   };
 
-  // NEW: Handle logout
+  // Handle logout
   const handleLogout = async () => {
     try {
       // Clear any local storage
@@ -346,7 +355,7 @@ export default function GlobalDashboardHeader({
     setWalletSwitcherOpen(!walletSwitcherOpen);
   };
 
-  // UPDATED: Get wallet color - always use dark grey
+  // Get wallet color - always use dark grey
   const getWalletColor = () => {
     return "bg-gradient-to-br from-gray-600/80 to-gray-700/90";
   };
@@ -424,6 +433,16 @@ export default function GlobalDashboardHeader({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 flex-shrink-0 gap-3 sm:gap-0">
         <div>
           <div className="flex items-center">
+            {/* Back button - only show on Token Overview pages */}
+            {isTokenOverviewPage && (
+              <button
+                onClick={handleBackClick}
+                className="mr-2.5 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                title="Go back"
+              >
+                <ArrowLeft size={17} className="text-white" />
+              </button>
+            )}
             <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white font-mayeka">
               {displayTitle}
             </h1>
@@ -439,20 +458,11 @@ export default function GlobalDashboardHeader({
               className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto hover:border-[#E2AF19] transition-colors group"
             >
               <div
-                className={`w-5 h-5 lg:w-6 lg:h-6 ${getWalletColor()} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
+                className={`w-6 h-6 lg:w-7 lg:h-7 ${getWalletColor()} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
               >
                 <span className="text-white text-xs font-bold font-satoshi">
                   {getWalletLetters(activeWalletData.name)}
                 </span>
-
-                {/* Real-time pulse indicator */}
-                {/* {isMonitoring && (
-                  <div
-                    className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-pulse ${
-                      isDataStale ? "bg-yellow-400" : "bg-green-400"
-                    }`}
-                  />
-                )} */}
               </div>
 
               <div className="flex-1 min-w-0">
@@ -507,7 +517,7 @@ export default function GlobalDashboardHeader({
 
               <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
 
-              {/* NEW: Profile Icon */}
+              {/* Profile Icon */}
               <button
                 onClick={handleProfileClick}
                 className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full"
@@ -518,7 +528,7 @@ export default function GlobalDashboardHeader({
 
               <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
 
-              {/* NEW: Logout Icon */}
+              {/* Logout Icon */}
               <button
                 onClick={handleLogout}
                 className="p-1 lg:p-1.5 transition-colors hover:bg-red-900/20 rounded-full"

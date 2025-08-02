@@ -676,7 +676,7 @@ export default function UserProfilePage() {
               </div>
 
               {/* NEW: Wallet Credentials Section - Mobile */}
-              {activeWallet && (
+              {/* {activeWallet && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <Key size={14} className="text-gray-400 mr-2" />
@@ -684,9 +684,9 @@ export default function UserProfilePage() {
                       <span className="text-white font-satoshi text-sm">
                         Wallet Credentials
                       </span>
-                      {/* <div className="text-gray-400 text-xs font-satoshi">
+                      <div className="text-gray-400 text-xs font-satoshi">
                         Private key & recovery phrase
-                      </div> */}
+                      </div>
                     </div>
                   </div>
                   <button
@@ -696,7 +696,7 @@ export default function UserProfilePage() {
                     View
                   </button>
                 </div>
-              )}
+              )} */}
             </div>
           </div>
 
@@ -984,7 +984,7 @@ export default function UserProfilePage() {
                 </div>
 
                 {/* NEW: Wallet Credentials Section - Desktop */}
-                {activeWallet && (
+                {/* {activeWallet && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <Key size={18} className="text-gray-400 mr-2" />
@@ -992,9 +992,9 @@ export default function UserProfilePage() {
                         <span className="text-white font-satoshi">
                           Wallet Credentials
                         </span>
-                        {/* <div className="text-gray-400 text-sm font-satoshi">
+                        <div className="text-gray-400 text-sm font-satoshi">
                           View private key and recovery phrase
-                        </div> */}
+                        </div>
                       </div>
                     </div>
                     <button
@@ -1004,7 +1004,7 @@ export default function UserProfilePage() {
                       View
                     </button>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
 
