@@ -1,8 +1,8 @@
-// src/components/dashboard/WalletBalance.tsx - ENHANCED VERSION WITH COPY FEEDBACK
+// src/components/dashboard/WalletBalance.tsx - FIXED VERSION
 "use client";
 
 import { useSelector, useDispatch } from "react-redux";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Copy, ChevronDown, Check } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { openWalletSelector } from "@/store/slices/uiSlice";
@@ -36,7 +36,10 @@ export default function WalletBalance() {
   const balanceLoaded = useRef<string | null>(null);
   const tokensLoaded = useRef<string | null>(null);
 
-  // ENHANCED: Combined effect for balance and tokens loading
+  // FIX: Track if we're currently refreshing to prevent double calculations
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Combined effect for balance and tokens loading
   useEffect(() => {
     console.log("💰 WalletBalance - Effect triggered", {
       activeWalletAddress: activeWallet?.address,
@@ -127,7 +130,7 @@ export default function WalletBalance() {
     balanceLoadingState.tokensLoaded,
   ]);
 
-  // ENHANCED: Reset loading state when active wallet changes
+  // Reset loading state when active wallet changes
   useEffect(() => {
     if (
       activeWallet?.address &&
@@ -151,7 +154,7 @@ export default function WalletBalance() {
     });
   }, [activeWallet?.address]);
 
-  // ENHANCED: Auto-refresh on page load/mount
+  // Auto-refresh on page load/mount
   useEffect(() => {
     // Force refresh when component mounts (page reload)
     const handlePageLoad = () => {
@@ -180,6 +183,42 @@ export default function WalletBalance() {
       return () => window.removeEventListener("load", handlePageLoad);
     }
   }, [activeWallet?.address]);
+
+  // FIX: Listen for refresh events to prevent double calculation during refresh
+  useEffect(() => {
+    const handleRefreshStart = () => {
+      console.log("🔄 Refresh started - preventing double calculation");
+      setIsRefreshing(true);
+    };
+
+    const handleRefreshComplete = () => {
+      console.log("✅ Refresh completed - allowing normal calculation");
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 500); // Small delay to ensure data is updated
+    };
+
+    const handleWalletUpdated = () => {
+      console.log("💰 Wallet updated event received");
+      // Force recalculation after wallet update
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 100);
+    };
+
+    window.addEventListener("walletRefreshStart", handleRefreshStart);
+    window.addEventListener("walletRefreshComplete", handleRefreshComplete);
+    window.addEventListener("walletUpdated", handleWalletUpdated);
+
+    return () => {
+      window.removeEventListener("walletRefreshStart", handleRefreshStart);
+      window.removeEventListener(
+        "walletRefreshComplete",
+        handleRefreshComplete
+      );
+      window.removeEventListener("walletUpdated", handleWalletUpdated);
+    };
+  }, []);
 
   const formatBalance = (balance: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -210,14 +249,11 @@ export default function WalletBalance() {
     dispatch(openWalletSelector());
   };
 
-  // ENHANCED: Better skeleton loading conditions
+  // Better skeleton loading conditions - don't show during auto-refresh
   const shouldShowSkeleton =
     balanceLoadingState.isInitialLoad ||
     (loading && !activeWallet) ||
-    (!balanceLoadingState.hasAttemptedLoad && activeWallet?.address) ||
-    (activeWallet?.address &&
-      !balanceLoadingState.balanceLoaded &&
-      !balanceLoadingState.tokensLoaded);
+    (!balanceLoadingState.hasAttemptedLoad && activeWallet?.address);
 
   if (shouldShowSkeleton) {
     console.log("🔄 WalletBalance - Showing skeleton", {
@@ -231,28 +267,75 @@ export default function WalletBalance() {
     return <SkeletonWalletBalance />;
   }
 
-  // ENHANCED: Calculate display balance from tokens if available
+  // FIX: Calculate display balance from tokens if available, with deduplication
   const calculateTotalFromTokens = () => {
     if (tokens && tokens.length > 0) {
-      return tokens.reduce((sum, token) => sum + (token.value || 0), 0);
+      // Create a map to track unique tokens and prevent duplicates
+      const uniqueTokens = new Map();
+
+      tokens.forEach((token) => {
+        // Create a unique key for each token
+        const key =
+          token.contractAddress === "native" || !token.contractAddress
+            ? `${token.symbol}_native`
+            : `${token.symbol}_${token.contractAddress}`;
+
+        // Only add if not already in map
+        if (!uniqueTokens.has(key)) {
+          uniqueTokens.set(key, token);
+        }
+      });
+
+      // Calculate total from unique tokens
+      const total = Array.from(uniqueTokens.values()).reduce(
+        (sum, token) => sum + (token.value || 0),
+        0
+      );
+
+      console.log("💰 Calculated total from unique tokens:", {
+        tokenCount: tokens.length,
+        uniqueTokenCount: uniqueTokens.size,
+        total,
+        isRefreshing,
+      });
+
+      return total;
     }
     return 0;
   };
 
+  // FIX: Use calculated total or totalBalance, but not both
   const tokensTotalValue = calculateTotalFromTokens();
   const displayBalance =
-    tokensTotalValue > 0
-      ? tokensTotalValue
-      : totalBalance || activeWallet?.balance || 0;
+    tokensTotalValue > 0 ? tokensTotalValue : totalBalance || 0;
 
-  // ENHANCED: Calculate 24h change from tokens
+  // FIX: Calculate 24h change from unique tokens
   const calculate24hChange = () => {
     if (tokens && tokens.length > 0) {
-      const totalChange = tokens.reduce((sum, token) => {
-        const tokenChange = token.change24h || 0;
-        const tokenChangeValue = (token.value * tokenChange) / 100;
-        return sum + tokenChangeValue;
-      }, 0);
+      // Create a map to track unique tokens
+      const uniqueTokens = new Map();
+
+      tokens.forEach((token) => {
+        const key =
+          token.contractAddress === "native" || !token.contractAddress
+            ? `${token.symbol}_native`
+            : `${token.symbol}_${token.contractAddress}`;
+
+        if (!uniqueTokens.has(key)) {
+          uniqueTokens.set(key, token);
+        }
+      });
+
+      // Calculate change from unique tokens
+      const totalChange = Array.from(uniqueTokens.values()).reduce(
+        (sum, token) => {
+          const tokenChange = token.change24h || 0;
+          const tokenChangeValue = (token.value * tokenChange) / 100;
+          return sum + tokenChangeValue;
+        },
+        0
+      );
+
       return totalChange;
     }
     return 0;
@@ -291,14 +374,6 @@ export default function WalletBalance() {
               disabled={copyState.isAnimating}
             >
               <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
-              {/* {copyState.isCopied ? (
-                <Check
-                  size={8}
-                  className="text-white sm:w-2.5 sm:h-2.5 animate-bounce"
-                />
-              ) : (
-                <Copy size={8} className="text-black sm:w-2.5 sm:h-2.5" />
-              )} */}
             </button>
           )}
         </div>
@@ -346,15 +421,6 @@ export default function WalletBalance() {
           </>
         )}
       </div>
-
-      {/* Debug info (remove in production) */}
-      {/* {process.env.NODE_ENV === "development" && (
-        <div className="mt-2 text-xs text-gray-500 font-mono">
-          Debug: Balance={displayBalance.toFixed(2)}, Tokens={tokens.length},
-          Change24h={change24h.toFixed(2)}, Loaded=
-          {balanceLoadingState.balanceLoaded ? "Y" : "N"}
-        </div>
-      )} */}
     </div>
   );
 }
