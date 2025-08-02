@@ -579,10 +579,7 @@ export default function TransactionHistory({
                             {tx.transfers && tx.transfers.length >= 2 && (
                               <>
                                 <div
-                                  className={`absolute top-0 left-0 w-5 h-5 rounded-full ${getTokenBackgroundColor(
-                                    tx.transfers[0].tokenSymbol,
-                                    tx.transfers[0].contractAddress
-                                  )} shadow-lg flex items-center justify-center z-10`}
+                                  className={`absolute top-0 left-0 w-5 h-5 rounded-fullshadow-lg flex items-center justify-center z-10`}
                                 >
                                   <TokenIcon
                                     token={{
@@ -594,10 +591,7 @@ export default function TransactionHistory({
                                   />
                                 </div>
                                 <div
-                                  className={`absolute top-0 left-4 w-5 h-5 rounded-full ${getTokenBackgroundColor(
-                                    tx.transfers[1].tokenSymbol,
-                                    tx.transfers[1].contractAddress
-                                  )} shadow-lg flex items-center justify-center z-20`}
+                                  className={`absolute top-0 left-4 w-5 h-5 rounded-full shadow-lg flex items-center justify-center z-20`}
                                 >
                                   <TokenIcon
                                     token={{
@@ -620,10 +614,7 @@ export default function TransactionHistory({
                           </div>
                         ) : (
                           <div
-                            className={`w-7 h-7 ${getTokenBackgroundColor(
-                              txInfo.displaySymbol,
-                              tx.contractAddress
-                            )} rounded-full flex items-center justify-center`}
+                            className={`w-7 h-7  rounded-full flex items-center justify-center`}
                           >
                             <TokenIcon
                               token={{
@@ -761,10 +752,7 @@ export default function TransactionHistory({
                           >
                             <div className="flex items-center space-x-3">
                               <div
-                                className={`w-5 h-5 ${getTokenBackgroundColor(
-                                  transfer.tokenSymbol,
-                                  transfer.contractAddress
-                                )} rounded-full flex items-center justify-center`}
+                                className={`w-5 h-5  rounded-full flex items-center justify-center`}
                               >
                                 <TokenIcon
                                   token={{

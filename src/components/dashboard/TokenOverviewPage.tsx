@@ -102,17 +102,6 @@ export default function TokenOverviewPage() {
     setPriceData(null);
   };
 
-  // Auto-clear tooltip after a short delay when not actively hovering
-  // useEffect(() => {
-  //   if (cursorPosition || priceData) {
-  //     const timer = setTimeout(() => {
-  //       forceClearTooltip();
-  //     }, 100); // Clear after 100ms of inactivity
-
-  //     return () => clearTimeout(timer);
-  //   }
-  // }, [cursorPosition, priceData]);
-
   const contractAddress = params.tokenId as string;
   const walletAddress = searchParams.get("wallet") || activeWallet?.address;
 
@@ -432,6 +421,104 @@ export default function TokenOverviewPage() {
     return `${sign}${value.toFixed(2)}%`;
   };
 
+  // Improved Y-axis generation following the 7-step strategy
+  const generateYAxisValues = (
+    prices,
+    height,
+    chartMin,
+    chartMax,
+    paddedRange
+  ) => {
+    if (!prices || prices.length === 0) return [];
+
+    // Step 1: Find the actual price range
+    const minPrice = Math.min(...prices.map((p) => p.price));
+    const maxPrice = Math.max(...prices.map((p) => p.price));
+    const priceRange = maxPrice - minPrice || 1;
+
+    // Step 2: Decide how many horizontal lines to show (5 is optimal)
+    const targetLines = 5;
+
+    // Step 3: Calculate a nice "step" between each price line
+    const calculateNiceStep = (range, targetSteps) => {
+      const rawStep = range / (targetSteps - 1);
+
+      // Find the magnitude (power of 10)
+      const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+
+      // Normalize to get a number between 1-10
+      const normalized = rawStep / magnitude;
+
+      // Choose nice round numbers: 1, 2, 5, or 10
+      let niceNormalized;
+      if (normalized <= 1) niceNormalized = 1;
+      else if (normalized <= 2) niceNormalized = 2;
+      else if (normalized <= 5) niceNormalized = 5;
+      else niceNormalized = 10;
+
+      return niceNormalized * magnitude;
+    };
+
+    const step = calculateNiceStep(priceRange, targetLines);
+
+    // Step 4: Pick a starting price for the top line (round up maxPrice to nearest step)
+    const topPrice = Math.ceil(maxPrice / step) * step;
+
+    // Step 5: Create the list of price labels by subtracting the step
+    const yAxisValues = [];
+    let currentPrice = topPrice;
+
+    // Generate labels from top to bottom
+    while (currentPrice >= minPrice - step) {
+      // Step 6 & 7: Calculate Y position and add to array
+      const normalizedValue = (currentPrice - chartMin) / paddedRange;
+      const y = height - normalizedValue * height;
+
+      // Only include values that are within reasonable chart bounds
+      if (y >= -10 && y <= height + 10) {
+        yAxisValues.push({
+          value: currentPrice,
+          y: Math.max(0, Math.min(height, y)), // Clamp to chart bounds
+        });
+      }
+
+      currentPrice -= step;
+    }
+
+    return yAxisValues;
+  };
+
+  // Improved formatting function for Y-axis labels
+  const formatYAxisValue = (value) => {
+    // Handle very small values (crypto tokens)
+    if (Math.abs(value) < 0.001) {
+      return value.toFixed(6).replace(/\.?0+$/, "");
+    }
+    // Small values
+    else if (Math.abs(value) < 1) {
+      return value.toFixed(4).replace(/\.?0+$/, "");
+    }
+    // Medium values - show appropriate decimals
+    else if (Math.abs(value) < 100) {
+      // For values like 1.5, 2.0, 45.25 etc
+      const decimals = value % 1 === 0 ? 0 : 2;
+      return value.toFixed(decimals);
+    }
+    // Larger values - minimal decimals
+    else if (Math.abs(value) < 10000) {
+      const decimals = value % 1 === 0 ? 0 : 1;
+      return value.toFixed(decimals);
+    }
+    // Very large values - use K/M notation
+    else if (Math.abs(value) >= 1000000) {
+      return `${(value / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
+    } else if (Math.abs(value) >= 1000) {
+      return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}K`;
+    }
+
+    return Math.round(value).toLocaleString();
+  };
+
   const generateInteractiveChart = (
     prices: Array<{ price: number; date: string; time: string }>,
     width = 600,
@@ -451,56 +538,20 @@ export default function TokenOverviewPage() {
     const maxPrice = Math.max(...prices.map((p) => p.price));
     const priceRange = maxPrice - minPrice || 1;
 
-    // Reduce padding for better alignment
-    const paddingRatio = 0.1;
-    const paddedRange = priceRange * (1 + 2 * paddingRatio);
-    const paddedMin = minPrice - priceRange * paddingRatio;
-    const paddedMax = maxPrice + priceRange * paddingRatio;
+    // Add padding to prevent chart from touching edges
+    const paddingPercent = 0.05; // 5% padding on top and bottom
+    const paddedRange = priceRange * (1 + 2 * paddingPercent);
+    const chartMin = minPrice - priceRange * paddingPercent;
+    const chartMax = maxPrice + priceRange * paddingPercent;
 
-    // Calculate nice round numbers for Y-axis
-    const calculateNiceNumber = (range: number, round: boolean): number => {
-      const exponent = Math.floor(Math.log10(range));
-      const fraction = range / Math.pow(10, exponent);
-      let niceFraction;
-
-      if (round) {
-        if (fraction < 1.5) niceFraction = 1;
-        else if (fraction < 3) niceFraction = 2;
-        else if (fraction < 7) niceFraction = 5;
-        else niceFraction = 10;
-      } else {
-        if (fraction <= 1) niceFraction = 1;
-        else if (fraction <= 2) niceFraction = 2;
-        else if (fraction <= 5) niceFraction = 5;
-        else niceFraction = 10;
-      }
-
-      return niceFraction * Math.pow(10, exponent);
-    };
-
-    // Generate nice Y-axis values
-    const tickSpacing = calculateNiceNumber(paddedRange / 4, false);
-    const niceMin = Math.floor(paddedMin / tickSpacing) * tickSpacing;
-    const niceMax = Math.ceil(paddedMax / tickSpacing) * tickSpacing;
-    
-    const yAxisValues = [];
-    let currentValue = niceMin;
-    while (currentValue <= niceMax) {
-      const y = height - ((currentValue - niceMin) / (niceMax - niceMin)) * height;
-      if (y >= 0 && y <= height) {
-        yAxisValues.push({ value: currentValue, y });
-      }
-      currentValue += tickSpacing;
-    }
-
-    // Ensure we have at least 3 and at most 6 Y-axis values
-    if (yAxisValues.length > 6) {
-      // Skip some values to reduce clutter
-      const skipInterval = Math.ceil(yAxisValues.length / 5);
-      const filteredValues = yAxisValues.filter((_, index) => index % skipInterval === 0);
-      yAxisValues.length = 0;
-      yAxisValues.push(...filteredValues);
-    }
+    // Use the improved Y-axis generation
+    const yAxisValues = generateYAxisValues(
+      prices,
+      height,
+      chartMin,
+      chartMax,
+      paddedRange
+    );
 
     const xAxisLabels = generateXAxisLabels(
       prices.map((p, i) => ({
@@ -512,10 +563,13 @@ export default function TokenOverviewPage() {
       width
     );
 
-    // Map points using the same scale as Y-axis
+    // Map chart points using the same coordinate system as Y-axis
     const points = prices.map((point, index) => {
       const x = (index / (prices.length - 1)) * width;
-      const y = height - ((point.price - niceMin) / (niceMax - niceMin)) * height;
+      // Use the same transformation as Y-axis calculation
+      const normalizedValue = (point.price - chartMin) / paddedRange;
+      const y = height - normalizedValue * height;
+
       return {
         x,
         y,
@@ -527,8 +581,6 @@ export default function TokenOverviewPage() {
 
     const pathPoints = points.map((p) => `${p.x},${p.y}`);
     const path = `M ${pathPoints.join(" L ")}`;
-
-    // IMPORTANT: Create the area path that goes down to the bottom of the chart
     const areaPath = `${path} L ${width},${height} L 0,${height} Z`;
 
     return { path, areaPath, points, yAxisValues, xAxisLabels };
@@ -656,7 +708,6 @@ export default function TokenOverviewPage() {
     const { path, areaPath, points, yAxisValues, xAxisLabels } =
       generateInteractiveChart(chartData.prices, width, height);
 
-    // Fixed: Use stable gradient ID instead of Date.now()
     const gradientId = "goldGradient-stable";
 
     return (
@@ -666,7 +717,7 @@ export default function TokenOverviewPage() {
             className="flex-1 flex flex-col relative"
             onMouseLeave={handleMouseLeave}
           >
-            {/* Price Tooltip - only when we have BOTH price data AND cursor position */}
+            {/* Price Tooltip */}
             {priceData && cursorPosition && (
               <div
                 className="absolute bg-black bg-opacity-95 border border-[#2C2C2C] rounded-lg p-2 z-20 pointer-events-none shadow-lg"
@@ -699,7 +750,6 @@ export default function TokenOverviewPage() {
               style={{ overflow: "visible" }}
             >
               <defs>
-                {/* Enhanced yellowish gradient with stronger opacity */}
                 <linearGradient
                   id={gradientId}
                   x1="0%"
@@ -716,19 +766,10 @@ export default function TokenOverviewPage() {
                 </linearGradient>
               </defs>
 
-              {/* Dark background for better gradient visibility */}
               <rect x="0" y="0" width={width} height={height} fill="#000000" />
-
-              {/* Chart area with slightly lighter background */}
               <rect x="0" y="0" width={width} height={height} fill="#050505" />
-
-              {/* Area fill with golden gradient */}
               <path d={areaPath} fill={`url(#${gradientId})`} opacity="1" />
-
-              {/* Additional gradient overlay for stronger yellowish effect */}
               <path d={areaPath} fill="#FFD700" opacity="0.08" />
-
-              {/* Price line - bright yellow */}
               <path
                 d={path}
                 fill="none"
@@ -777,8 +818,6 @@ export default function TokenOverviewPage() {
                   )}
                 </g>
               )}
-
-              {/* Y-axis labels on the right side */}
             </svg>
 
             {showXAxisLabels && (
@@ -799,59 +838,24 @@ export default function TokenOverviewPage() {
             )}
           </div>
 
-          {/* Fixed Y-axis labels container - matches SVG height */}
-          {/* Fixed Y-axis labels container - matches SVG height */}
-          {/* Fixed Y-axis labels container - matches SVG height */}
-          <div className="w-10 sm:w-12 md:w-14 relative pl-1 sm:pl-1.5 md:pl-2 h-full">
+          {/* Fixed Y-axis labels container */}
+          <div
+            className="w-10 sm:w-12 md:w-14 relative pl-1 sm:pl-1.5 md:pl-2 flex-shrink-0"
+            style={{ height: `${height}px` }}
+          >
             {yAxisValues.map((yAxis, index) => {
-              // Determine decimal places needed to avoid duplicates
-              const roundedValues = yAxisValues.map((v) => v.value.toFixed(2));
-              const hasDuplicates =
-                roundedValues.filter((v, i) => roundedValues.indexOf(v) !== i)
-                  .length > 0;
-
-              // If we have duplicates with 2 decimals, try 3, then 4
-              let decimals = 2;
-              if (hasDuplicates) {
-                const rounded3 = yAxisValues.map((v) => v.value.toFixed(3));
-                const hasDuplicates3 =
-                  rounded3.filter((v, i) => rounded3.indexOf(v) !== i).length >
-                  0;
-                decimals = hasDuplicates3 ? 4 : 3;
-              }
-
-              // Format with appropriate decimal places
-              const formattedValue =
-                yAxis.value < 0.01
-                  ? yAxis.value.toFixed(Math.max(decimals, 4))
-                  : yAxis.value < 0.1
-                  ? yAxis.value.toFixed(Math.max(decimals, 3))
-                  : yAxis.value.toFixed(decimals);
-
-              // Shorten format for mobile - use K/M notation for larger numbers
-              const mobileFormattedValue =
-                yAxis.value >= 1000
-                  ? `${(yAxis.value / 1000).toFixed(1)}K`
-                  : yAxis.value >= 1
-                  ? yAxis.value.toFixed(yAxis.value < 10 ? 1 : 0)
-                  : formattedValue.replace("$", "");
+              const formattedValue = formatYAxisValue(yAxis.value);
 
               return (
                 <div
                   key={index}
                   className="absolute text-[10px] sm:text-xs text-gray-400 font-satoshi text-left whitespace-nowrap"
                   style={{
-                    top: `${Math.max(
-                      7,
-                      Math.min(93, (yAxis.y / height) * 100)
-                    )}%`,
+                    top: `${yAxis.y}px`,
                     transform: "translateY(-50%)",
                   }}
                 >
-                  <span className="inline sm:hidden">
-                    ${mobileFormattedValue}
-                  </span>
-                  <span className="hidden sm:inline">${formattedValue}</span>
+                  ${formattedValue}
                 </div>
               );
             })}
@@ -1498,19 +1502,6 @@ export default function TokenOverviewPage() {
                       {tokenBalance.toFixed(6)} {tokenInfo.symbol}
                     </div>
                     <div className="flex items-center gap-2">
-                      {/* <div
-                        className={`font-satoshi ${
-                          tokenInfo.priceData?.price_change_percentage_24h >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {tokenInfo.priceData
-                          ? formatPercentage(
-                              tokenInfo.priceData.price_change_percentage_24h
-                            )
-                          : "N/A"}
-                      </div> */}
                       <div className="text-gray-400 font-satoshi">
                         = {formatCurrency(tokenValue.toFixed(2))}
                       </div>
