@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED VERSION WITH BETTER WALLET SWITCHING (NOTIFICATIONS DISABLED)
+// src/app/dashboard/page.tsx - ENHANCED VERSION WITH WIDER SWAP SECTION
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -13,7 +13,7 @@ import {
   getActiveWalletFromDB,
   fetchWalletTokens,
   updateWalletBalance,
-  clearTokens, // Add this import
+  clearTokens,
 } from "@/store/slices/walletSlice";
 import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
 import WalletBalance from "@/components/dashboard/WalletBalance";
@@ -21,8 +21,6 @@ import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
 import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
-// COMMENTED OUT: Remove the real-time dashboard notifications component
-// import RealtimeDashboardNotifications from "@/components/notifications/RealtimeDashboardNotifications";
 import {
   SkeletonWalletBalance,
   SkeletonTokenList,
@@ -86,7 +84,7 @@ export default function DashboardPage() {
     hasActiveWallet: false,
     hasTokens: false,
     hasBalance: false,
-    showWelletModal: false,
+    showWelcomeModal: false,
     initialLoadComplete: false,
     dataRefreshed: false,
   });
@@ -481,9 +479,6 @@ export default function DashboardPage() {
   if (shouldShowSkeleton) {
     return (
       <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
-        {/* COMMENTED OUT: Remove the real-time dashboard notifications */}
-        {/* <RealtimeDashboardNotifications /> */}
-
         {/* Mobile Layout Skeleton */}
         <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0">
           <SkeletonWalletBalance />
@@ -491,13 +486,13 @@ export default function DashboardPage() {
           <SkeletonSwapSection />
         </div>
 
-        {/* Desktop Layout Skeleton */}
+        {/* Desktop Layout Skeleton - ENHANCED with slightly wider SwapSection */}
         <div className="hidden xl:flex gap-4 flex-1 min-h-0">
-          <div className="flex-1 flex flex-col gap-4 min-w-0">
+          <div className="flex-1 flex flex-col gap-4 min-w-0 max-w-[68%]">
             <SkeletonWalletBalance />
             <SkeletonTokenList />
           </div>
-          <div className="w-[320px] flex-shrink-0 h-full">
+          <div className="w-[32%] min-w-[360px] max-w-[440px] flex-shrink-0 h-full">
             <SkeletonSwapSection />
           </div>
         </div>
@@ -512,13 +507,10 @@ export default function DashboardPage() {
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
-      {/* COMMENTED OUT: Remove the real-time dashboard notifications */}
-      {/* <RealtimeDashboardNotifications /> */}
-
       {/* Main Dashboard Content */}
       {wallets.length > 0 ? (
         <div className="flex flex-col xl:flex-row gap-3 lg:gap-4 flex-1 min-h-0">
-          {/* Mobile Layout */}
+          {/* Mobile Layout - unchanged */}
           <div className="flex xl:hidden flex-col gap-3 lg:gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
             <div className="flex-shrink-0">
               <WalletBalance />
@@ -531,8 +523,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Desktop Layout */}
-          <div className="hidden xl:flex flex-1 flex-col gap-4 min-w-0">
+          {/* Desktop Layout - ENHANCED with slightly wider SwapSection */}
+          <div className="hidden xl:flex flex-1 flex-col gap-4 min-w-0 max-w-[68%]">
             <div className="flex-shrink-0">
               <WalletBalance />
             </div>
@@ -541,7 +533,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="hidden xl:block w-[320px] 2xl:w-[380px] flex-shrink-0 h-full">
+          {/* ENHANCED: Slightly wider SwapSection with fine-tuned sizing */}
+          <div className="hidden xl:block w-[32%] min-w-[360px] max-w-[440px] flex-shrink-0 h-full">
             <SwapSection />
           </div>
         </div>

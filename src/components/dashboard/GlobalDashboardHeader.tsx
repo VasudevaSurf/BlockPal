@@ -144,6 +144,23 @@ export default function GlobalDashboardHeader({
   // Check if we're on a token overview page
   const isTokenOverviewPage = pathname.startsWith("/dashboard/token/");
 
+  // Function to truncate wallet name to show only first 2 words
+  const truncateWalletName = (name: string): string => {
+    if (!name || typeof name !== "string") {
+      return "Loading...";
+    }
+
+    const words = name.trim().split(/\s+/);
+
+    // If 2 or fewer words, return as is
+    if (words.length <= 2) {
+      return name;
+    }
+
+    // If more than 2 words, return first 2 words + "..."
+    return words.slice(0, 2).join(" ") + "...";
+  };
+
   // Calculate countdown to next update
   useEffect(() => {
     if (!isMonitoring || !lastUpdated) return;
@@ -455,7 +472,8 @@ export default function GlobalDashboardHeader({
             <button
               ref={walletButtonRef}
               onClick={handleWalletButtonClick}
-              className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto hover:border-[#E2AF19] transition-colors group"
+              className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] hover:border-[#E2AF19] transition-colors group"
+              title={activeWalletData.name} // Show full name on hover
             >
               <div
                 className={`w-6 h-6 lg:w-7 lg:h-7 ${getWalletColor()} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
@@ -467,7 +485,7 @@ export default function GlobalDashboardHeader({
 
               <div className="flex-1 min-w-0">
                 <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors block">
-                  {activeWalletData.name}
+                  {truncateWalletName(activeWalletData.name)}
                 </span>
               </div>
 
@@ -477,8 +495,8 @@ export default function GlobalDashboardHeader({
                 {activeWalletData.address
                   ? `${activeWalletData.address.slice(
                       0,
-                      8
-                    )}...${activeWalletData.address.slice(-6)}`
+                      6
+                    )}...${activeWalletData.address.slice(-4)}`
                   : "Loading..."}
               </span>
 

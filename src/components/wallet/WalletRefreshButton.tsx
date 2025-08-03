@@ -1,4 +1,4 @@
-// src/components/wallet/WalletRefreshButton.tsx - FIXED VERSION
+// src/components/wallet/WalletRefreshButton.tsx - HIDDEN UI VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -15,6 +15,7 @@ interface WalletRefreshButtonProps {
   onRefreshComplete?: () => void;
   autoRefreshInterval?: number; // in milliseconds
   showLastUpdated?: boolean;
+  isHidden?: boolean; // NEW: Flag to hide the UI while keeping functionality
 }
 
 export default function WalletRefreshButton({
@@ -22,6 +23,7 @@ export default function WalletRefreshButton({
   onRefreshComplete,
   autoRefreshInterval = 10000, // 10 seconds default
   showLastUpdated = true,
+  isHidden = false, // NEW: Default to showing UI
 }: WalletRefreshButtonProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { activeWallet, loading } = useSelector(
@@ -166,9 +168,9 @@ export default function WalletRefreshButton({
     }
   }, [activeWallet?.address]);
 
-  // Update seconds since last refresh
+  // Update seconds since last refresh (only if showLastUpdated is true)
   useEffect(() => {
-    if (lastRefreshTime && showLastUpdated) {
+    if (lastRefreshTime && showLastUpdated && !isHidden) {
       // Calculate initial seconds
       const initialSeconds = Math.floor(
         (Date.now() - lastRefreshTime.getTime()) / 1000
@@ -189,7 +191,7 @@ export default function WalletRefreshButton({
         }
       };
     }
-  }, [lastRefreshTime, showLastUpdated]);
+  }, [lastRefreshTime, showLastUpdated, isHidden]);
 
   // Handle visibility change (tab switching)
   useEffect(() => {
@@ -233,6 +235,13 @@ export default function WalletRefreshButton({
   }, [activeWallet?.address]);
 
   if (!activeWallet) return null;
+
+  // NEW: Return null if component is set to hidden
+  if (isHidden) {
+    // Component is hidden but all functionality remains active
+    // Auto-refresh, event listeners, etc. still work in the background
+    return null;
+  }
 
   return (
     <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - FIXED VERSION with Persistent Token Images
+// src/components/dashboard/TokenList.tsx - FIXED VERSION with Hidden Refresh UI
 "use client";
 import React from "react";
 import { useRouter } from "next/navigation";
@@ -580,9 +580,11 @@ export default function TokenList() {
           <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
             Token Holdings (0)
           </h2>
+          {/* Hidden refresh button - keeps background functionality */}
           <WalletRefreshButton
             autoRefreshInterval={10000}
-            showLastUpdated={true}
+            showLastUpdated={false}
+            isHidden={true}
           />
         </div>
         <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
@@ -614,9 +616,11 @@ export default function TokenList() {
           <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
             Token Holdings (0)
           </h2>
+          {/* Hidden refresh button - keeps background functionality */}
           <WalletRefreshButton
             autoRefreshInterval={10000}
-            showLastUpdated={true}
+            showLastUpdated={false}
+            isHidden={true}
           />
         </div>
         <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
@@ -640,9 +644,11 @@ export default function TokenList() {
         <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
           Token Holdings ({displayTokens.length})
         </h2>
+        {/* Hidden refresh button - keeps background functionality */}
         <WalletRefreshButton
           autoRefreshInterval={10000}
-          showLastUpdated={true}
+          showLastUpdated={false}
+          isHidden={true}
         />
       </div>
 

@@ -178,11 +178,34 @@ export default function TokenSelectorModal({
     }
   }, [searchQuery, allowCustomToken]);
 
-  // Combine user tokens with common tokens and filter
-  const allTokens = showBalances ? tokens : [...tokens, ...COMMON_TOKENS];
+  // Create a unified token list with proper deduplication
+  const getTokenList = () => {
+    // Always deduplicate, even for user tokens, as the input might have duplicates
+    const tokenMap = new Map<string, Token>();
+
+    // Add user tokens first (they take priority)
+    tokens.forEach((token) => {
+      const key = (token.contractAddress || "native").toLowerCase();
+      if (!tokenMap.has(key)) {
+        tokenMap.set(key, token);
+      }
+    });
+
+    // If not showing balances, also add common tokens
+    if (!showBalances) {
+      COMMON_TOKENS.forEach((token) => {
+        const key = token.contractAddress.toLowerCase();
+        if (!tokenMap.has(key)) {
+          tokenMap.set(key, token);
+        }
+      });
+    }
+
+    return Array.from(tokenMap.values());
+  };
 
   // Filter tokens based on search query (excluding custom token detection)
-  const filteredTokens = allTokens.filter((token) => {
+  const filteredTokens = getTokenList().filter((token) => {
     // Don't show tokens if we're searching for a contract address
     if (isValidAddress(searchQuery)) return false;
 
@@ -342,95 +365,61 @@ export default function TokenSelectorModal({
               // Show skeleton loaders while initial loading
               <>
                 {[...Array(6)].map((_, index) => (
-                  <TokenSkeleton key={index} />
+                  <TokenSkeleton key={`skeleton-${index}`} />
                 ))}
               </>
             ) : (
               <>
-                {(showCommonTokens
-                  ? activeTab === "my_tokens"
-                    ? tokens
-                    : activeTab === "common"
-                    ? COMMON_TOKENS
-                    : filteredTokens
-                  : filteredTokens
-                )
-                  .filter(
-                    (token) =>
-                      token.symbol
-                        .toLowerCase()
-                        .includes(searchQuery.toLowerCase()) ||
-                      token.name
-                        .toLowerCase()
-                        .includes(searchQuery.toLowerCase())
-                  )
-                  .map((token) => (
-                    <button
-                      key={token.contractAddress}
-                      onClick={() => onSelect(token)}
-                      className="w-full flex items-center p-4 hover:bg-[#1A1A1A] transition-colors text-left"
-                    >
-                      {token.logoUrl ? (
-                        <div className="relative w-10 h-10 mr-3">
-                          {!loadedImages.has(token.contractAddress) && (
-                            <div className="absolute inset-0 bg-gray-700 rounded-full animate-pulse"></div>
-                          )}
-                          <img
-                            src={token.logoUrl}
-                            alt={token.symbol}
-                            className={`w-10 h-10 rounded-full transition-opacity duration-300 ${
-                              loadedImages.has(token.contractAddress)
-                                ? "opacity-100"
-                                : "opacity-0"
-                            }`}
-                            onLoad={() =>
-                              handleImageLoad(token.contractAddress)
-                            }
-                            onError={() =>
-                              handleImageLoad(token.contractAddress)
-                            }
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-10 h-10 bg-gray-700 rounded-full mr-3 animate-pulse"></div>
-                      )}
-                      <div className="flex-1">
-                        <div className="text-white font-semibold font-satoshi">
-                          {token.symbol}
+                {filteredTokens.map((token) => (
+                  <button
+                    key={`token-${token.contractAddress}`}
+                    onClick={() => onSelect(token)}
+                    className="w-full flex items-center p-4 hover:bg-[#1A1A1A] transition-colors text-left"
+                  >
+                    {token.logoUrl ? (
+                      <div className="relative w-10 h-10 mr-3">
+                        {!loadedImages.has(token.contractAddress) && (
+                          <div className="absolute inset-0 bg-gray-700 rounded-full animate-pulse"></div>
+                        )}
+                        <img
+                          src={token.logoUrl}
+                          alt={token.symbol}
+                          className={`w-10 h-10 rounded-full transition-opacity duration-300 ${
+                            loadedImages.has(token.contractAddress)
+                              ? "opacity-100"
+                              : "opacity-0"
+                          }`}
+                          onLoad={() => handleImageLoad(token.contractAddress)}
+                          onError={() => handleImageLoad(token.contractAddress)}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 bg-gray-700 rounded-full mr-3 animate-pulse"></div>
+                    )}
+                    <div className="flex-1">
+                      <div className="text-white font-semibold font-satoshi">
+                        {token.symbol}
+                      </div>
+                      <div className="text-gray-400 text-sm font-satoshi">
+                        {token.name}
+                      </div>
+                    </div>
+                    {/* Only show balances for user's tokens when showBalances is true */}
+                    {showBalances && (
+                      <div className="text-right">
+                        <div className="text-white font-satoshi">
+                          {token.balance.toFixed(6)}
                         </div>
                         <div className="text-gray-400 text-sm font-satoshi">
-                          {token.name}
+                          ${token.value.toFixed(2)}
                         </div>
                       </div>
-                      {/* Only show balances for user's tokens when showBalances is true */}
-                      {showBalances && activeTab === "my_tokens" && (
-                        <div className="text-right">
-                          <div className="text-white font-satoshi">
-                            {token.balance.toFixed(6)}
-                          </div>
-                          <div className="text-gray-400 text-sm font-satoshi">
-                            ${token.value.toFixed(2)}
-                          </div>
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                    )}
+                  </button>
+                ))}
 
                 {/* No results message */}
-                {(showCommonTokens
-                  ? activeTab === "my_tokens"
-                    ? tokens
-                    : activeTab === "common"
-                    ? COMMON_TOKENS
-                    : filteredTokens
-                  : filteredTokens
-                ).filter(
-                  (token) =>
-                    token.symbol
-                      .toLowerCase()
-                      .includes(searchQuery.toLowerCase()) ||
-                    token.name.toLowerCase().includes(searchQuery.toLowerCase())
-                ).length === 0 &&
+                {filteredTokens.length === 0 &&
                   !isValidAddress(searchQuery) && (
                     <div className="p-8 text-center">
                       <p className="text-gray-400 font-satoshi">

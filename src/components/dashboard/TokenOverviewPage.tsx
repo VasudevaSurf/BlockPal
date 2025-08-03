@@ -1206,6 +1206,7 @@ export default function TokenOverviewPage() {
                 showFilter={false}
                 compact={true}
                 className="min-h-0"
+                isTokenOverview={true}
               />
             </div>
           </div>
@@ -1455,7 +1456,7 @@ export default function TokenOverviewPage() {
           </div>
 
           <div
-            className="w-[355px] flex-shrink-0 h-full"
+            className="w-[390px] flex-shrink-0 h-full"
             onMouseEnter={forceClearTooltip}
           >
             <div className="bg-black rounded-[14px] border border-[#2C2C2C] h-full flex flex-col p-3">
@@ -1537,6 +1538,7 @@ export default function TokenOverviewPage() {
                     showFilter={false}
                     compact={true}
                     className="flex-1 min-h-0"
+                    isTokenOverview={true}
                   />
                 </div>
               </div>
