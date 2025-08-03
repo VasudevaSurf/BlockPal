@@ -1,4 +1,7 @@
-// src/components/dashboard/TokenList.tsx - FIXED VERSION with Hidden Refresh UI
+// Now I need to create a simple update for the GlobalDashboardHeader to emit wallet switching events.
+// This will be handled in the next step by updating the existing header component.
+
+// Enhanced wallet// src/components/dashboard/TokenList.tsx - ENHANCED VERSION with better image loading
 "use client";
 import React from "react";
 import { useRouter } from "next/navigation";
@@ -55,7 +58,7 @@ const saveImageCache = (cache: Map<string, string>) => {
 // Global image cache that persists across sessions
 const imageCache = loadImageCache();
 
-// Enhanced Image Loading Component with persistent caching
+// ENHANCED: Token Image Component with dark grey background instead of letters
 const TokenImage = ({
   src,
   alt,
@@ -126,46 +129,6 @@ const TokenImage = ({
     }
   }, [src, cacheKey, symbol]);
 
-  // Simplified token background
-  const getTokenBackgroundColor = () => {
-    return "bg-gradient-to-br from-gray-600/20 to-gray-700/30";
-  };
-
-  // Simplified icon colors
-  const getTokenIcon = () => {
-    return "bg-gray-600";
-  };
-
-  // Token letters
-  const getTokenLetter = (symbol: string, contractAddress?: string) => {
-    const letters: Record<string, string> = {
-      ETH: "Ξ",
-      ETHEREUM: "Ξ",
-      SOL: "◎",
-      BTC: "₿",
-      SUI: "~",
-      XRP: "✕",
-      ADA: "₳",
-      AVAX: "A",
-      TON: "T",
-      DOT: "●",
-      USDT: "₮",
-      USDC: "$",
-      YAI: "Ÿ",
-      LINK: "⛓",
-    };
-
-    if (
-      symbol === "ETH" ||
-      contractAddress === "native" ||
-      symbol === "ETHEREUM"
-    ) {
-      return letters.ETH || "Ξ";
-    }
-
-    return letters[symbol] || symbol.charAt(0);
-  };
-
   const handleImageLoad = () => {
     console.log(`✅ Image loaded successfully for ${symbol}: ${imageSrc}`);
     setIsLoading(false);
@@ -201,33 +164,29 @@ const TokenImage = ({
 
   return (
     <div className={`relative ${className}`}>
+      {/* CHANGED: Dark grey background instead of letters */}
       <div
-        className={`w-full h-full ${getTokenBackgroundColor()} rounded-full flex items-center justify-center p-0.5`}
+        className={`w-full h-full rounded-full flex items-center justify-center transition-opacity duration-200 ${
+          shouldShowImage && !isLoading ? "opacity-0" : "opacity-100"
+        }`}
+        style={{ backgroundColor: "#4A4A4A" }} // Dark grey background
       >
-        <div
-          className={`w-full h-full ${getTokenIcon()} rounded-full flex items-center justify-center ${
-            shouldShowImage && !isLoading ? "opacity-0" : "opacity-100"
-          } transition-opacity duration-200`}
-        >
-          <span className="text-white text-xs font-medium">
-            {getTokenLetter(symbol, contractAddress)}
-          </span>
-        </div>
-
-        {imageSrc && imageSrc !== "error" && (
-          <img
-            ref={imgRef}
-            src={imageSrc}
-            alt={alt}
-            className={`w-full h-full rounded-full object-cover absolute inset-0 ${
-              isLoading || hasError ? "opacity-0" : "opacity-100"
-            } transition-opacity duration-200`}
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-            loading="lazy"
-          />
-        )}
+        {/* Removed the letters/icon concept completely */}
       </div>
+
+      {imageSrc && imageSrc !== "error" && (
+        <img
+          ref={imgRef}
+          src={imageSrc}
+          alt={alt}
+          className={`w-full h-full rounded-full object-cover absolute inset-0 ${
+            isLoading || hasError ? "opacity-0" : "opacity-100"
+          } transition-opacity duration-200`}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          loading="lazy"
+        />
+      )}
     </div>
   );
 };
@@ -246,6 +205,7 @@ export default function TokenList() {
     hasAttemptedLoad: false,
     tokensLoaded: false,
     imagesLoaded: false,
+    hasRealData: false, // NEW: Track if we have actual data
   });
 
   // Track image loading completion
@@ -254,8 +214,47 @@ export default function TokenList() {
   >({});
   const [allImagesLoaded, setAllImagesLoaded] = useState(false);
 
-  // Use ref to prevent duplicate API calls
+  // NEW: Track wallet switching
+  const [isWalletSwitching, setIsWalletSwitching] = useState(false);
+  const previousWalletId = useRef<string | null>(null);
+
+  // Use refs to prevent duplicate API calls
   const tokensLoaded = useRef<string | null>(null);
+
+  // Listen for wallet switching events
+  useEffect(() => {
+    const handleWalletSwitchStart = () => {
+      console.log("🔄 TokenList - Wallet switch started");
+      setIsWalletSwitching(true);
+      setTokenLoadingState({
+        isInitialLoad: true,
+        hasAttemptedLoad: false,
+        tokensLoaded: false,
+        imagesLoaded: false,
+        hasRealData: false,
+      });
+      setImageLoadingStates({});
+      setAllImagesLoaded(false);
+    };
+
+    const handleWalletSwitchComplete = () => {
+      console.log("✅ TokenList - Wallet switch completed");
+      setTimeout(() => {
+        setIsWalletSwitching(false);
+      }, 500);
+    };
+
+    window.addEventListener("walletSwitchStart", handleWalletSwitchStart);
+    window.addEventListener("walletSwitchComplete", handleWalletSwitchComplete);
+
+    return () => {
+      window.removeEventListener("walletSwitchStart", handleWalletSwitchStart);
+      window.removeEventListener(
+        "walletSwitchComplete",
+        handleWalletSwitchComplete
+      );
+    };
+  }, []);
 
   // Process tokens to include cached images
   const processedTokens = React.useMemo(() => {
@@ -310,6 +309,7 @@ export default function TokenList() {
         hasAttemptedLoad: true,
         isInitialLoad: true,
         imagesLoaded: false,
+        hasRealData: false, // Reset real data flag
       }));
 
       // Reset image loading states but don't clear cache
@@ -321,6 +321,7 @@ export default function TokenList() {
           ...prev,
           tokensLoaded: true,
           isInitialLoad: false,
+          hasRealData: true, // Mark as having real data
         }));
       });
     } else if (tokens.length > 0 && !tokenLoadingState.tokensLoaded) {
@@ -330,6 +331,7 @@ export default function TokenList() {
         tokensLoaded: true,
         isInitialLoad: false,
         hasAttemptedLoad: true,
+        hasRealData: true,
       }));
     }
   }, [
@@ -350,6 +352,7 @@ export default function TokenList() {
         hasAttemptedLoad: false,
         tokensLoaded: false,
         imagesLoaded: false,
+        hasRealData: false,
       });
       // Don't clear image cache on wallet switch
       setImageLoadingStates({});
@@ -412,7 +415,7 @@ export default function TokenList() {
           setAllImagesLoaded(true);
           setTokenLoadingState((prev) => ({ ...prev, imagesLoaded: true }));
         }
-      }, 1500); // Reduced to 1.5 seconds for better UX
+      }, 1000); // Reduced to 1 second for better UX
 
       return () => clearTimeout(timeout);
     }
@@ -554,20 +557,24 @@ export default function TokenList() {
     }
   }, [processedTokens, displayTokens]);
 
-  // Only show skeleton for major loading states, not during auto-refresh
+  // ENHANCED: Better skeleton conditions including wallet switching
   const shouldShowSkeleton =
+    isWalletSwitching || // NEW: Show skeleton during wallet switching
     tokenLoadingState.isInitialLoad ||
     (loading && tokens.length === 0) ||
     (!tokenLoadingState.hasAttemptedLoad && activeWallet?.address) ||
+    !tokenLoadingState.hasRealData || // NEW: Show skeleton until we have real data
     isNavigating;
 
   if (shouldShowSkeleton) {
     console.log("🔄 TokenList - Showing skeleton", {
+      isWalletSwitching,
       isInitialLoad: tokenLoadingState.isInitialLoad,
       loading,
       tokensLength: tokens.length,
       hasAttemptedLoad: tokenLoadingState.hasAttemptedLoad,
       activeWallet: !!activeWallet?.address,
+      hasRealData: tokenLoadingState.hasRealData,
       isNavigating,
     });
     return <SkeletonTokenList />;
@@ -607,6 +614,7 @@ export default function TokenList() {
     displayTokens.length === 0 &&
     tokenLoadingState.hasAttemptedLoad &&
     tokenLoadingState.tokensLoaded &&
+    tokenLoadingState.hasRealData &&
     !loading &&
     !isNavigating
   ) {
