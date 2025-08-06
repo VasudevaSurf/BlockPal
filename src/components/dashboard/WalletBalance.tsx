@@ -1,8 +1,8 @@
-// src/components/dashboard/WalletBalance.tsx - FIXED VERSION
+// src/components/dashboard/WalletBalance.tsx - SIMPLE STABLE FIX
 "use client";
 
 import { useSelector, useDispatch } from "react-redux";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy, ChevronDown, Check } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { openWalletSelector } from "@/store/slices/uiSlice";
@@ -18,13 +18,10 @@ export default function WalletBalance() {
     (state: RootState) => state.wallet
   );
 
-  // Enhanced loading state management
-  const [balanceLoadingState, setBalanceLoadingState] = useState({
-    isInitialLoad: true,
-    hasAttemptedLoad: false,
-    balanceLoaded: false,
-    tokensLoaded: false,
-  });
+  // Simple loading state management
+  const [isWalletSwitching, setIsWalletSwitching] = useState(false);
+  const [hasInitialData, setHasInitialData] = useState(false);
+  const [hasRealBalance, setHasRealBalance] = useState(false); // NEW: Track if we have real balance data
 
   // Copy feedback state
   const [copyState, setCopyState] = useState({
@@ -32,119 +29,117 @@ export default function WalletBalance() {
     isAnimating: false,
   });
 
-  // Use ref to prevent duplicate balance updates
-  const balanceLoaded = useRef<string | null>(null);
-  const tokensLoaded = useRef<string | null>(null);
+  // Track wallet changes and page loads
+  const previousWalletAddress = useRef<string | null>(null);
+  const switchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dataLoadedForWallet = useRef<string | null>(null);
+  const isInitialPageLoad = useRef<boolean>(true); // NEW: Track initial page load
 
-  // FIX: Track if we're currently refreshing to prevent double calculations
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Combined effect for balance and tokens loading
+  // Detect wallet switching
   useEffect(() => {
-    console.log("💰 WalletBalance - Effect triggered", {
-      activeWalletAddress: activeWallet?.address,
-      balanceLoadedFor: balanceLoaded.current,
-      tokensLoadedFor: tokensLoaded.current,
-      totalBalance,
-      tokensCount: tokens.length,
-      loading,
-      shouldUpdate:
-        activeWallet?.address &&
-        (balanceLoaded.current !== activeWallet.address ||
-          tokensLoaded.current !== activeWallet.address),
-    });
+    const currentWalletAddress = activeWallet?.address;
+    const prevAddress = previousWalletAddress.current;
 
-    // Only update if we have an active wallet and haven't loaded data for this wallet
-    if (activeWallet?.address) {
-      const needsBalanceUpdate = balanceLoaded.current !== activeWallet.address;
-      const needsTokensUpdate = tokensLoaded.current !== activeWallet.address;
+    // If wallet changed, IMMEDIATELY start switching state
+    if (
+      prevAddress &&
+      currentWalletAddress &&
+      prevAddress !== currentWalletAddress
+    ) {
+      console.log(
+        "💰 WalletBalance - Wallet switching detected - IMMEDIATE skeleton"
+      );
 
-      if (needsBalanceUpdate || needsTokensUpdate) {
-        console.log(
-          "📡 WalletBalance - Loading data for wallet:",
-          activeWallet.address,
-          { needsBalanceUpdate, needsTokensUpdate }
-        );
+      // IMMEDIATELY set switching state and clear data
+      setIsWalletSwitching(true);
+      setHasInitialData(false);
+      setHasRealBalance(false); // Reset real balance flag
+      dataLoadedForWallet.current = null;
 
-        setBalanceLoadingState((prev) => ({
-          ...prev,
-          hasAttemptedLoad: true,
-          isInitialLoad: true,
-        }));
-
-        // Load both balance and tokens
-        const loadPromises: Promise<any>[] = [];
-
-        if (needsBalanceUpdate) {
-          balanceLoaded.current = activeWallet.address;
-          loadPromises.push(
-            dispatch(updateWalletBalance(activeWallet.address)).then(() => {
-              setBalanceLoadingState((prev) => ({
-                ...prev,
-                balanceLoaded: true,
-              }));
-            })
-          );
-        }
-
-        if (needsTokensUpdate) {
-          tokensLoaded.current = activeWallet.address;
-          loadPromises.push(
-            dispatch(fetchWalletTokens(activeWallet.address)).then(() => {
-              setBalanceLoadingState((prev) => ({
-                ...prev,
-                tokensLoaded: true,
-              }));
-            })
-          );
-        }
-
-        // Wait for all loading to complete
-        Promise.all(loadPromises).then(() => {
-          setBalanceLoadingState((prev) => ({
-            ...prev,
-            isInitialLoad: false,
-          }));
-        });
-      } else if (
-        (totalBalance > 0 || tokens.length > 0) &&
-        (!balanceLoadingState.balanceLoaded ||
-          !balanceLoadingState.tokensLoaded)
-      ) {
-        // If we already have data, mark as loaded
-        setBalanceLoadingState((prev) => ({
-          ...prev,
-          balanceLoaded: totalBalance > 0 || prev.balanceLoaded,
-          tokensLoaded: tokens.length > 0 || prev.tokensLoaded,
-          isInitialLoad: false,
-          hasAttemptedLoad: true,
-        }));
+      // Clear any existing timeout
+      if (switchingTimeoutRef.current) {
+        clearTimeout(switchingTimeoutRef.current);
       }
-    }
-  }, [
-    activeWallet?.address,
-    dispatch,
-    totalBalance,
-    tokens.length,
-    balanceLoadingState.balanceLoaded,
-    balanceLoadingState.tokensLoaded,
-  ]);
 
-  // Reset loading state when active wallet changes
+      // Minimum switching time to prevent flickering (3 seconds for stability)
+      switchingTimeoutRef.current = setTimeout(() => {
+        console.log("💰 WalletBalance - Ending switching state after timeout");
+        setIsWalletSwitching(false);
+      }, 3000); // Increased to 3 seconds for more stability
+    }
+
+    // Always update the previous wallet reference
+    previousWalletAddress.current = currentWalletAddress;
+  }, [activeWallet?.address]);
+
+  // Load data for current wallet
   useEffect(() => {
     if (
       activeWallet?.address &&
-      (balanceLoaded.current !== activeWallet.address ||
-        tokensLoaded.current !== activeWallet.address)
+      dataLoadedForWallet.current !== activeWallet.address
     ) {
-      setBalanceLoadingState({
-        isInitialLoad: true,
-        hasAttemptedLoad: false,
-        balanceLoaded: false,
-        tokensLoaded: false,
-      });
+      console.log(
+        "💰 WalletBalance - Loading data for wallet:",
+        activeWallet.address
+      );
+
+      dataLoadedForWallet.current = activeWallet.address;
+      isInitialPageLoad.current = false; // Mark that we've started loading
+
+      // Load balance and tokens
+      Promise.all([
+        dispatch(updateWalletBalance(activeWallet.address)),
+        dispatch(fetchWalletTokens(activeWallet.address)),
+      ])
+        .then(() => {
+          console.log("💰 WalletBalance - Data loaded successfully");
+
+          // Only set initial data if we're not switching or if enough time has passed
+          setTimeout(() => {
+            setHasInitialData(true);
+            setHasRealBalance(true); // Mark that we have real balance data
+          }, 100); // Small delay to ensure data is stable
+
+          // Don't end switching state here - let the timeout handle it
+        })
+        .catch((error) => {
+          console.error("💰 WalletBalance - Error loading data:", error);
+          // Still mark as having data even if there's an error
+          setTimeout(() => {
+            setHasInitialData(true);
+            setHasRealBalance(true); // Mark that we attempted to get real data
+          }, 100);
+        });
     }
-  }, [activeWallet?.address]);
+  }, [activeWallet?.address, dispatch]);
+
+  // Mark data as loaded when we have tokens or balance (but only if it's meaningful data)
+  useEffect(() => {
+    if (activeWallet?.address && !hasInitialData) {
+      // Check if we have meaningful data (tokens with value or actual balance > 0)
+      const hasMeaningfulTokens =
+        tokens.length > 0 && tokens.some((token) => token.value > 0);
+      const hasMeaningfulBalance = totalBalance > 0;
+
+      if (hasMeaningfulTokens || hasMeaningfulBalance) {
+        console.log(
+          "💰 WalletBalance - Meaningful data detected, marking as loaded"
+        );
+        setHasInitialData(true);
+        setHasRealBalance(true);
+      } else if (tokens.length === 0 && totalBalance === 0 && hasRealBalance) {
+        // If we've already attempted to load and got 0, that's still valid data
+        console.log("💰 WalletBalance - Zero balance confirmed as real data");
+        setHasInitialData(true);
+      }
+    }
+  }, [
+    tokens,
+    totalBalance,
+    activeWallet?.address,
+    hasInitialData,
+    hasRealBalance,
+  ]);
 
   // Reset copy state when wallet changes
   useEffect(() => {
@@ -154,69 +149,12 @@ export default function WalletBalance() {
     });
   }, [activeWallet?.address]);
 
-  // Auto-refresh on page load/mount
+  // Cleanup timeout on unmount
   useEffect(() => {
-    // Force refresh when component mounts (page reload)
-    const handlePageLoad = () => {
-      if (activeWallet?.address) {
-        console.log("🔄 Page loaded - forcing wallet data refresh");
-
-        // Reset refs to force reload
-        balanceLoaded.current = null;
-        tokensLoaded.current = null;
-
-        // Reset state to trigger loading
-        setBalanceLoadingState({
-          isInitialLoad: true,
-          hasAttemptedLoad: false,
-          balanceLoaded: false,
-          tokensLoaded: false,
-        });
-      }
-    };
-
-    // Check if this is a page load/reload
-    if (document.readyState === "complete") {
-      handlePageLoad();
-    } else {
-      window.addEventListener("load", handlePageLoad);
-      return () => window.removeEventListener("load", handlePageLoad);
-    }
-  }, [activeWallet?.address]);
-
-  // FIX: Listen for refresh events to prevent double calculation during refresh
-  useEffect(() => {
-    const handleRefreshStart = () => {
-      console.log("🔄 Refresh started - preventing double calculation");
-      setIsRefreshing(true);
-    };
-
-    const handleRefreshComplete = () => {
-      console.log("✅ Refresh completed - allowing normal calculation");
-      setTimeout(() => {
-        setIsRefreshing(false);
-      }, 500); // Small delay to ensure data is updated
-    };
-
-    const handleWalletUpdated = () => {
-      console.log("💰 Wallet updated event received");
-      // Force recalculation after wallet update
-      setTimeout(() => {
-        setIsRefreshing(false);
-      }, 100);
-    };
-
-    window.addEventListener("walletRefreshStart", handleRefreshStart);
-    window.addEventListener("walletRefreshComplete", handleRefreshComplete);
-    window.addEventListener("walletUpdated", handleWalletUpdated);
-
     return () => {
-      window.removeEventListener("walletRefreshStart", handleRefreshStart);
-      window.removeEventListener(
-        "walletRefreshComplete",
-        handleRefreshComplete
-      );
-      window.removeEventListener("walletUpdated", handleWalletUpdated);
+      if (switchingTimeoutRef.current) {
+        clearTimeout(switchingTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -233,10 +171,8 @@ export default function WalletBalance() {
       await navigator.clipboard.writeText(text);
       console.log("Address copied to clipboard");
 
-      // Trigger copy feedback animation
       setCopyState({ isCopied: true, isAnimating: true });
 
-      // Reset after 2 seconds
       setTimeout(() => {
         setCopyState({ isCopied: false, isAnimating: false });
       }, 2000);
@@ -249,70 +185,61 @@ export default function WalletBalance() {
     dispatch(openWalletSelector());
   };
 
-  // Better skeleton loading conditions - don't show during auto-refresh
+  // Enhanced skeleton logic: show skeleton until we have real balance data or are still loading
   const shouldShowSkeleton =
-    balanceLoadingState.isInitialLoad ||
-    (loading && !activeWallet) ||
-    (!balanceLoadingState.hasAttemptedLoad && activeWallet?.address);
+    isWalletSwitching ||
+    !activeWallet ||
+    !hasInitialData ||
+    !hasRealBalance ||
+    isInitialPageLoad.current || // NEW: Show skeleton on initial page load
+    loading;
 
   if (shouldShowSkeleton) {
-    console.log("🔄 WalletBalance - Showing skeleton", {
-      isInitialLoad: balanceLoadingState.isInitialLoad,
+    console.log("💰 WalletBalance - Showing skeleton:", {
+      isWalletSwitching,
+      hasActiveWallet: !!activeWallet,
+      hasInitialData,
+      hasRealBalance,
       loading,
-      activeWallet: !!activeWallet,
-      hasAttemptedLoad: balanceLoadingState.hasAttemptedLoad,
-      balanceLoaded: balanceLoadingState.balanceLoaded,
-      tokensLoaded: balanceLoadingState.tokensLoaded,
+      tokensLength: tokens.length,
+      totalBalance,
     });
     return <SkeletonWalletBalance />;
   }
 
-  // FIX: Calculate display balance from tokens if available, with deduplication
+  // Calculate display balance from tokens with deduplication
   const calculateTotalFromTokens = () => {
     if (tokens && tokens.length > 0) {
-      // Create a map to track unique tokens and prevent duplicates
       const uniqueTokens = new Map();
 
       tokens.forEach((token) => {
-        // Create a unique key for each token
         const key =
           token.contractAddress === "native" || !token.contractAddress
             ? `${token.symbol}_native`
             : `${token.symbol}_${token.contractAddress}`;
 
-        // Only add if not already in map
         if (!uniqueTokens.has(key)) {
           uniqueTokens.set(key, token);
         }
       });
 
-      // Calculate total from unique tokens
       const total = Array.from(uniqueTokens.values()).reduce(
         (sum, token) => sum + (token.value || 0),
         0
       );
-
-      console.log("💰 Calculated total from unique tokens:", {
-        tokenCount: tokens.length,
-        uniqueTokenCount: uniqueTokens.size,
-        total,
-        isRefreshing,
-      });
 
       return total;
     }
     return 0;
   };
 
-  // FIX: Use calculated total or totalBalance, but not both
   const tokensTotalValue = calculateTotalFromTokens();
   const displayBalance =
     tokensTotalValue > 0 ? tokensTotalValue : totalBalance || 0;
 
-  // FIX: Calculate 24h change from unique tokens
+  // Calculate 24h change from unique tokens
   const calculate24hChange = () => {
     if (tokens && tokens.length > 0) {
-      // Create a map to track unique tokens
       const uniqueTokens = new Map();
 
       tokens.forEach((token) => {
@@ -326,7 +253,6 @@ export default function WalletBalance() {
         }
       });
 
-      // Calculate change from unique tokens
       const totalChange = Array.from(uniqueTokens.values()).reduce(
         (sum, token) => {
           const tokenChange = token.change24h || 0;
@@ -379,7 +305,7 @@ export default function WalletBalance() {
         </div>
       </div>
 
-      {/* Balance Display - Enhanced with real-time data */}
+      {/* Balance Display */}
       <div>
         {displayBalance > 0 ? (
           <>
@@ -411,11 +337,7 @@ export default function WalletBalance() {
             </div>
             <div className="flex items-center text-xs">
               <span className="text-gray-400 font-satoshi">
-                {balanceLoadingState.hasAttemptedLoad &&
-                (balanceLoadingState.balanceLoaded ||
-                  balanceLoadingState.tokensLoaded)
-                  ? "No balance available"
-                  : "Loading balance..."}
+                No balance available
               </span>
             </div>
           </>

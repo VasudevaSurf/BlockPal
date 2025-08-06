@@ -60,8 +60,8 @@ interface ScheduledPayment {
   gasCostUSD?: string;
   smartContract?: boolean;
   enhancedAPI?: boolean;
-  lastError?: string; // Add this for failure reasons
-  failedAt?: string; // Add this for failure timestamp
+  lastError?: string;
+  failedAt?: string;
 }
 
 interface CreatePaymentData {
@@ -96,95 +96,32 @@ interface PaymentPreview {
   smartContractOptimized: boolean;
 }
 
-// Token icon helper functions
-const getTokenIconColor = (symbol: string) => {
-  const colors: Record<string, string> = {
-    Ethereum: "bg-blue-500",
-    ETH: "bg-blue-500",
-    USDT: "bg-green-500",
-    USDC: "bg-blue-600",
-    LINK: "bg-blue-700",
-    DAI: "bg-yellow-500",
-    UNI: "bg-pink-500",
-    Solana: "bg-purple-500",
-    Polkadot: "bg-pink-500",
-    Sui: "bg-cyan-500",
-    XRP: "bg-gray-500",
-    WBTC: "bg-orange-500",
-    AAVE: "bg-purple-600",
-    MATIC: "bg-purple-700",
-    CRV: "bg-red-500",
-    COMP: "bg-green-600",
-  };
-  return colors[symbol] || "bg-gray-500";
-};
+// FIXED: Supported tokens configuration with proper images
+const SUPPORTED_TOKENS = [
+  {
+    symbol: "ETH",
+    name: "Ethereum",
+    contractAddress: "native",
+    decimals: 18,
+    icon: "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
+  },
+  {
+    symbol: "USDC",
+    name: "USD Coin",
+    contractAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    decimals: 6,
+    icon: "https://coin-images.coingecko.com/coins/images/6319/large/USD_Coin_icon.png",
+  },
+  {
+    symbol: "USDT",
+    name: "Tether USD",
+    contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    decimals: 6,
+    icon: "https://coin-images.coingecko.com/coins/images/325/large/Tether.png",
+  },
+];
 
-// Generate random background color for tokens
-const getRandomTokenBgColor = (symbol: string) => {
-  const colors = [
-    "bg-red-500",
-    "bg-blue-500",
-    "bg-green-500",
-    "bg-yellow-500",
-    "bg-purple-500",
-    "bg-pink-500",
-    "bg-indigo-500",
-    "bg-cyan-500",
-    "bg-orange-500",
-    "bg-teal-500",
-    "bg-emerald-500",
-    "bg-lime-500",
-    "bg-amber-500",
-    "bg-violet-500",
-    "bg-fuchsia-500",
-    "bg-rose-500",
-    "bg-sky-500",
-  ];
-
-  // Use symbol to generate consistent color for same token
-  let hash = 0;
-  for (let i = 0; i < symbol.length; i++) {
-    hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const index = Math.abs(hash) % colors.length;
-  return colors[index];
-};
-
-const getTokenLetter = (symbol: string) => {
-  const letters: Record<string, string> = {
-    Ethereum: "Ξ",
-    ETH: "Ξ",
-    USDT: "₮",
-    USDC: "$",
-    LINK: "⛓",
-    DAI: "◈",
-    UNI: "🦄",
-    Solana: "◎",
-    Polkadot: "●",
-    Sui: "~",
-    XRP: "✕",
-    WBTC: "₿",
-    AAVE: "👻",
-    MATIC: "◆",
-    CRV: "🌊",
-    COMP: "🧠",
-  };
-  return letters[symbol] || symbol.charAt(0);
-};
-
-const isValidImageUrl = (url: string | null | undefined): boolean => {
-  if (!url || url === "null" || url === "undefined" || url === "") {
-    return false;
-  }
-  return (
-    url.startsWith("http") &&
-    (url.includes("coingecko") ||
-      url.includes("coinbase") ||
-      url.includes("cdn") ||
-      url.includes("assets"))
-  );
-};
-
+// FIXED: Token icon component with better fallback handling
 const TokenIcon = ({
   token,
   size = "w-4 h-4",
@@ -195,69 +132,51 @@ const TokenIcon = ({
   showBg?: boolean;
 }) => {
   const [imageError, setImageError] = useState(false);
-  const showImage = !imageError && isValidImageUrl(token.icon);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  if (showBg) {
-    // Show token with random background circle
-    return (
-      <div
-        className={`${size} ${getRandomTokenBgColor(
-          token.symbol
-        )} rounded-full flex items-center justify-center flex-shrink-0`}
-      >
-        {showImage ? (
-          <img
-            src={token.icon}
-            alt={token.symbol}
-            className={`${size
-              .replace("w-", "w-")
-              .replace("h-", "h-")} rounded-full`}
-            onError={(e) => {
-              console.log(
-                `❌ Image load failed for ${token.symbol}: ${token.icon}`
-              );
-              setImageError(true);
-            }}
-          />
-        ) : (
-          <span className="text-white text-xs font-medium">
-            {getTokenLetter(token.symbol)}
-          </span>
-        )}
-      </div>
-    );
-  }
+  // Get token letter for fallback
+  const getTokenLetter = (symbol: string) => {
+    const letters: Record<string, string> = {
+      ETH: "Ξ",
+      USDC: "$",
+      USDT: "₮",
+    };
+    return letters[symbol] || symbol.charAt(0);
+  };
+
+  // Get token background color
+  const getTokenColor = (symbol: string) => {
+    const colors: Record<string, string> = {
+      ETH: "bg-blue-500",
+      USDC: "bg-blue-600",
+      USDT: "bg-green-500",
+    };
+    return colors[symbol] || "bg-gray-500";
+  };
+
+  const shouldShowImage = token.icon && !imageError && imageLoaded;
 
   return (
     <div className="relative flex-shrink-0">
-      {showImage ? (
-        <>
-          <img
-            src={token.icon}
-            alt={token.symbol}
-            className={`${size} rounded-full`}
-            onError={(e) => {
-              console.log(
-                `❌ Image load failed for ${token.symbol}: ${token.icon}`
-              );
-              setImageError(true);
-            }}
-          />
-          <div
-            className={`${size} ${getTokenIconColor(
-              token.symbol
-            )} rounded-full flex items-center justify-center absolute top-0 left-0 ${
-              imageError ? "block" : "hidden"
-            }`}
-          >
-            <span className="text-white text-xs font-medium">
-              {getTokenLetter(token.symbol)}
-            </span>
-          </div>
-        </>
-      ) : (
+      {token.icon && !imageError && (
+        <img
+          src={token.icon}
+          alt={token.symbol}
+          className={`${size} rounded-full ${
+            shouldShowImage ? "block" : "hidden"
+          }`}
+          onLoad={() => setImageLoaded(true)}
+          onError={(e) => {
+            console.log(
+              `❌ Image load failed for ${token.symbol}: ${token.icon}`
+            );
+            setImageError(true);
+          }}
+        />
+      )}
+      {!shouldShowImage && (
         <div
-          className={`${size} ${getTokenIconColor(
+          className={`${size} ${getTokenColor(
             token.symbol
           )} rounded-full flex items-center justify-center`}
         >
@@ -295,8 +214,8 @@ export default function ScheduledPaymentsPage() {
   const [selectedToken, setSelectedToken] = useState<any>(null);
   const [recurringEnabled, setRecurringEnabled] = useState(false);
   const [recurringFrequency, setRecurringFrequency] = useState("weekly");
-  const [selectedTimezone, setSelectedTimezone] = useState(timezones[0]); // CHANGED: Default to UTC (index 0)
-  const [activeTab, setActiveTab] = useState<"active" | "history">("active"); // CHANGED: "completed" to "history"
+  const [selectedTimezone, setSelectedTimezone] = useState(timezones[0]);
+  const [activeTab, setActiveTab] = useState<"active" | "history">("active");
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
   const [isTimezoneDropdownOpen, setIsTimezoneDropdownOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
@@ -331,16 +250,62 @@ export default function ScheduledPaymentsPage() {
   });
   const [editRecurringEnabled, setEditRecurringEnabled] = useState(false);
   const [editSelectedTimezone, setEditSelectedTimezone] = useState(
-    timezones[0] // CHANGED: Default to UTC
+    timezones[0]
   );
   const [updating, setUpdating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Username dropdown state (add this to track username dropdown)
+  // Dropdown state
   const [isUsernameDropdownOpen, setIsUsernameDropdownOpen] = useState(false);
   const [isRecurringDropdownOpen, setIsRecurringDropdownOpen] = useState(false);
   const [isEditRecurringDropdownOpen, setIsEditRecurringDropdownOpen] =
     useState(false);
+
+  // FIXED: Process supported tokens with user balances
+  const getSupportedTokensWithBalances = () => {
+    console.log("🔍 Processing supported tokens with user balances...");
+    console.log("📋 User tokens from Redux:", tokens);
+
+    return SUPPORTED_TOKENS.map((supportedToken) => {
+      // Find matching user token by symbol or contract address
+      const userToken = tokens.find((userToken) => {
+        const symbolMatch =
+          userToken.symbol?.toLowerCase() ===
+          supportedToken.symbol.toLowerCase();
+        const addressMatch =
+          userToken.contractAddress?.toLowerCase() ===
+            supportedToken.contractAddress.toLowerCase() ||
+          (supportedToken.symbol === "ETH" &&
+            (userToken.contractAddress === "native" ||
+              userToken.symbol === "ETH"));
+
+        return symbolMatch || addressMatch;
+      });
+
+      const processedToken = {
+        id: supportedToken.contractAddress,
+        symbol: supportedToken.symbol,
+        name: supportedToken.name,
+        contractAddress: supportedToken.contractAddress,
+        decimals: supportedToken.decimals,
+        icon: supportedToken.icon,
+        balance: userToken ? parseFloat(userToken.balance || "0") : 0,
+        price: userToken ? userToken.price : 0,
+        value: userToken ? userToken.value : 0,
+      };
+
+      console.log(`💰 Processed ${supportedToken.symbol}:`, {
+        found: !!userToken,
+        balance: processedToken.balance,
+        icon: processedToken.icon,
+      });
+
+      return processedToken;
+    });
+  };
+
+  // Get the processed supported tokens
+  const supportedTokensWithBalances = getSupportedTokensWithBalances();
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -374,22 +339,18 @@ export default function ScheduledPaymentsPage() {
     isEditRecurringDropdownOpen,
   ]);
 
-  // Initialize with first available token
+  // FIXED: Initialize with ETH as default token
   useEffect(() => {
-    if (tokens.length > 0 && !selectedToken) {
-      const firstToken = tokens[0];
-      setSelectedToken({
-        name: firstToken.name,
-        symbol: firstToken.symbol,
-        contractAddress: firstToken.contractAddress || firstToken.id,
-        decimals: firstToken.decimals || 18,
-        isETH: firstToken.symbol === "ETH",
-        balance: firstToken.balance,
-        price: firstToken.price,
-        icon: firstToken.icon,
-      });
+    if (supportedTokensWithBalances.length > 0 && !selectedToken) {
+      const ethToken = supportedTokensWithBalances.find(
+        (token) => token.symbol === "ETH"
+      );
+      const defaultToken = ethToken || supportedTokensWithBalances[0];
+
+      console.log("🎯 Setting default token:", defaultToken);
+      setSelectedToken(defaultToken);
     }
-  }, [tokens, selectedToken]);
+  }, [supportedTokensWithBalances.length, selectedToken]);
 
   // Fetch scheduled payments
   useEffect(() => {
@@ -422,7 +383,6 @@ export default function ScheduledPaymentsPage() {
       setLoading(true);
 
       if (activeTab === "active") {
-        // For active tab, fetch only active payments
         const response = await fetch(
           `/api/scheduled-payments?status=active&walletAddress=${activeWallet.address}`,
           {
@@ -438,7 +398,6 @@ export default function ScheduledPaymentsPage() {
           setError(data.error || "Failed to fetch scheduled payments");
         }
       } else {
-        // For history tab, fetch ALL payments and filter client-side
         console.log("🔍 Fetching history (all payments) for filtering...");
 
         const response = await fetch(
@@ -454,7 +413,6 @@ export default function ScheduledPaymentsPage() {
           const allPayments = data.scheduledPayments || [];
           console.log("📊 All payments received:", allPayments.length);
 
-          // Filter for completed and failed payments
           const historyPayments = allPayments.filter(
             (payment: ScheduledPayment) =>
               payment.status === "completed" || payment.status === "failed"
@@ -498,7 +456,6 @@ export default function ScheduledPaymentsPage() {
       setSelectedUser(null);
     }
 
-    // Clear error when user types
     if (error) {
       setError("");
     }
@@ -516,13 +473,11 @@ export default function ScheduledPaymentsPage() {
     setEditingPayment(payment);
     setIsEditing(true);
 
-    // Parse the scheduled date
     const scheduledDate = new Date(
       payment.nextExecution || payment.scheduledFor
     );
     const dateStr = scheduledDate.toISOString().split("T")[0];
 
-    // FIXED: Ensure 24-hour format (HH:MM)
     const hours = scheduledDate.getHours().toString().padStart(2, "0");
     const minutes = scheduledDate.getMinutes().toString().padStart(2, "0");
     const timeStr = `${hours}:${minutes}`;
@@ -546,9 +501,6 @@ export default function ScheduledPaymentsPage() {
     setShowEditModal(false);
   };
 
-  // Handle update payment - Since the API doesn't support update, we'll cancel and recreate
-  // Complete handleUpdatePayment method for ScheduledPaymentsPage.tsx
-
   const handleUpdatePayment = async () => {
     if (!editingPayment) return;
 
@@ -556,13 +508,11 @@ export default function ScheduledPaymentsPage() {
       setUpdating(true);
       setError("");
 
-      // Validate form
       if (!editFormData.amount || !editFormData.date || !editFormData.time) {
         setError("Please fill in all required fields");
         return;
       }
 
-      // FIXED: Properly construct datetime
       const scheduledDateTime = new Date(
         `${editFormData.date}T${editFormData.time}:00`
       );
@@ -577,46 +527,36 @@ export default function ScheduledPaymentsPage() {
         return;
       }
 
-      // Find the original token info from the tokens array to get proper contract address and decimals
-      const originalToken = tokens.find(
+      const originalToken = supportedTokensWithBalances.find(
         (t) =>
           t.symbol === editingPayment.tokenSymbol ||
-          t.contractAddress === editingPayment.contractAddress ||
-          t.id === editingPayment.contractAddress
+          t.contractAddress === editingPayment.contractAddress
       );
 
-      // Construct proper tokenInfo object
       const tokenInfo = originalToken
         ? {
             name: originalToken.name,
             symbol: originalToken.symbol,
-            contractAddress: originalToken.contractAddress || originalToken.id,
-            decimals: originalToken.decimals || 18,
+            contractAddress: originalToken.contractAddress,
+            decimals: originalToken.decimals,
             isETH: originalToken.symbol === "ETH",
             balance: originalToken.balance,
             price: originalToken.price,
             icon: originalToken.icon,
           }
         : {
-            // Fallback if token not found in current tokens array
             name: editingPayment.tokenName,
             symbol: editingPayment.tokenSymbol,
             contractAddress: editingPayment.contractAddress,
-            decimals: 18, // Default fallback
+            decimals: editingPayment.tokenSymbol === "ETH" ? 18 : 6,
             isETH: editingPayment.tokenSymbol === "ETH",
           };
 
       console.log("🔍 Token info for update:", {
         originalTokenFound: !!originalToken,
         tokenInfo,
-        editingPayment: {
-          tokenSymbol: editingPayment.tokenSymbol,
-          contractAddress: editingPayment.contractAddress,
-        },
       });
 
-      // Since update isn't supported, we'll need to cancel and recreate
-      // First cancel the existing payment
       console.log(
         `🗑️ Cancelling existing payment: ${editingPayment.scheduleId}`
       );
@@ -645,12 +585,11 @@ export default function ScheduledPaymentsPage() {
 
       console.log("✅ Existing payment cancelled successfully");
 
-      // Create new payment with updated details
       const frequency = editRecurringEnabled ? editFormData.frequency : "once";
 
       const createBody = {
         action: "create",
-        tokenInfo: tokenInfo, // Use the properly constructed tokenInfo
+        tokenInfo: tokenInfo,
         fromAddress: editingPayment.walletAddress,
         recipient: editingPayment.recipient,
         amount: editFormData.amount,
@@ -677,40 +616,31 @@ export default function ScheduledPaymentsPage() {
       if (!createResponse.ok) {
         const errorData = await createResponse.json();
         console.error("❌ Create failed:", errorData);
-
-        // If creation failed, we should try to restore the cancelled payment
-        // But since that's complex, we'll just show the error
         throw new Error(errorData.error || "Failed to create updated payment");
       }
 
       const createResult = await createResponse.json();
       console.log("✅ Payment updated successfully (recreated):", createResult);
 
-      // Close modal and reset state
       setShowEditModal(false);
       setEditingPayment(null);
       setIsEditing(false);
 
-      // TRIGGER IMMEDIATE ACKNOWLEDGMENT CHECK FOR UPDATES
       console.log("🔔 Triggering acknowledgment check for payment update...");
       checkForNewPaymentAcknowledgments();
 
-      // Also trigger a delayed check in case there are any status changes
       setTimeout(() => {
         console.log("🔔 Secondary acknowledgment check for payment update...");
         triggerImmediateCheck();
       }, 3000);
 
-      // Refresh the payments list
       fetchScheduledPayments();
 
-      // Show success message (optional)
       console.log("✅ Payment update completed successfully");
     } catch (error: any) {
       console.error("❌ Error updating payment:", error);
       setError("Failed to update payment: " + error.message);
 
-      // Check for acknowledgments even on error
       console.log(
         "🔔 Triggering acknowledgment check for payment update error..."
       );
@@ -744,29 +674,21 @@ export default function ScheduledPaymentsPage() {
 
       if (response.ok) {
         console.log("✅ Payment deleted successfully");
-
-        // TRIGGER ACKNOWLEDGMENT CHECK
         triggerImmediateCheck();
-
         fetchScheduledPayments();
       } else {
         setError(data.error || "Failed to delete payment");
-
-        // Check for acknowledgments on error
         triggerImmediateCheck();
       }
     } catch (error: any) {
       console.error("❌ Error deleting payment:", error);
       setError("Failed to delete payment");
-
-      // Check for acknowledgments on error
       triggerImmediateCheck();
     } finally {
       setLoading(false);
     }
   };
 
-  // Update the handleCancelPayment function (around line 440)
   const handleCancelPayment = async (scheduleId: string) => {
     if (!confirm("Are you sure you want to cancel this scheduled payment?")) {
       return;
@@ -791,22 +713,15 @@ export default function ScheduledPaymentsPage() {
 
       if (response.ok) {
         console.log("✅ Payment cancelled successfully");
-
-        // TRIGGER ACKNOWLEDGMENT CHECK
         triggerImmediateCheck();
-
         fetchScheduledPayments();
       } else {
         setError(data.error || "Failed to cancel payment");
-
-        // Check for acknowledgments on error
         triggerImmediateCheck();
       }
     } catch (error: any) {
       console.error("❌ Error cancelling payment:", error);
       setError("Failed to cancel payment");
-
-      // Check for acknowledgments on error
       triggerImmediateCheck();
     } finally {
       setLoading(false);
@@ -856,9 +771,7 @@ export default function ScheduledPaymentsPage() {
       return false;
     }
 
-    // Enhanced validation for username/address
     if (selectedUser) {
-      // User selected from dropdown - use their wallet address
       if (
         !selectedUser.walletAddress ||
         !/^0x[a-fA-F0-9]{40}$/.test(selectedUser.walletAddress)
@@ -867,7 +780,6 @@ export default function ScheduledPaymentsPage() {
         return false;
       }
     } else {
-      // Direct address input - validate format
       if (!/^0x[a-fA-F0-9]{40}$/.test(formData.recipient)) {
         setError(
           "Invalid recipient address format. Please enter a valid address or select a user"
@@ -889,7 +801,6 @@ export default function ScheduledPaymentsPage() {
       return false;
     }
 
-    // FIXED: Properly construct datetime for validation
     const scheduledDateTime = new Date(`${formData.date}T${formData.time}:00`);
     if (isNaN(scheduledDateTime.getTime())) {
       setError("Invalid date or time format");
@@ -916,13 +827,11 @@ export default function ScheduledPaymentsPage() {
     setError("");
 
     try {
-      // FIXED: Properly construct datetime
       const scheduledDateTime = new Date(
         `${formData.date}T${formData.time}:00`
       );
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
-      // Use selected user's wallet address if available, otherwise use direct input
       const recipientAddress = selectedUser
         ? selectedUser.walletAddress
         : formData.recipient;
@@ -981,13 +890,11 @@ export default function ScheduledPaymentsPage() {
     setError("");
 
     try {
-      // FIXED: Properly construct datetime
       const scheduledDateTime = new Date(
         `${formData.date}T${formData.time}:00`
       );
       const frequency = recurringEnabled ? recurringFrequency : "once";
 
-      // Use selected user's wallet address if available
       const recipientAddress = selectedUser
         ? selectedUser.walletAddress
         : formData.recipient;
@@ -1044,10 +951,8 @@ export default function ScheduledPaymentsPage() {
 
       console.log("✅ Smart contract scheduled payment created successfully");
 
-      // TRIGGER IMMEDIATE ACKNOWLEDGMENT CHECK
       checkForNewPaymentAcknowledgments();
 
-      // Also trigger a second check after 5 seconds in case payment fails quickly
       setTimeout(() => {
         triggerImmediateCheck();
       }, 5000);
@@ -1056,8 +961,6 @@ export default function ScheduledPaymentsPage() {
     } catch (err: any) {
       console.error("❌ Create error:", err);
       setError(err.message || "Failed to create scheduled payment");
-
-      // Check for acknowledgments even on error
       triggerImmediateCheck();
     } finally {
       setCreating(false);
@@ -1100,7 +1003,6 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  // UPDATED: Mobile action buttons for active tab now include delete
   const renderMobileActionButtons = (payment: ScheduledPayment) => {
     if (activeTab === "active") {
       return (
@@ -1149,7 +1051,6 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  // UPDATED: Desktop action buttons for active tab now include delete
   const renderDesktopActionButtons = (payment: ScheduledPayment) => {
     if (activeTab === "active") {
       return (
@@ -1206,47 +1107,10 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  const getTokenBackgroundColor = (
-    symbol: string,
-    contractAddress?: string
-  ) => {
-    const colors: Record<string, string> = {
-      ETH: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
-      ETHEREUM: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
-      SOL: "bg-gradient-to-br from-purple-500/20 to-purple-600/30",
-      BTC: "bg-gradient-to-br from-orange-500/20 to-orange-600/30",
-      SUI: "bg-gradient-to-br from-cyan-500/20 to-cyan-600/30",
-      XRP: "bg-gradient-to-br from-gray-500/20 to-gray-600/30",
-      ADA: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
-      AVAX: "bg-gradient-to-br from-red-500/20 to-red-600/30",
-      TON: "bg-gradient-to-br from-blue-400/20 to-blue-500/30",
-      DOT: "bg-gradient-to-br from-pink-500/20 to-pink-600/30",
-      USDT: "bg-gradient-to-br from-green-500/20 to-green-600/30",
-      USDC: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
-      YAI: "bg-gradient-to-br from-yellow-500/20 to-yellow-600/30",
-      LINK: "bg-gradient-to-br from-blue-700/20 to-blue-800/30",
-    };
-
-    // Special handling for ETH/native token
-    if (
-      symbol === "ETH" ||
-      contractAddress === "native" ||
-      symbol === "ETHEREUM"
-    ) {
-      return colors.ETH || "bg-gradient-to-br from-blue-500/20 to-blue-600/30";
-    }
-
-    return (
-      colors[symbol] || "bg-gradient-to-br from-gray-500/20 to-gray-600/30"
-    );
-  };
-
-  // CHANGED: Filter payments for history tab with debugging
   const filteredPayments = scheduledPayments.filter((payment) => {
     if (activeTab === "active") {
       return payment.status === "active";
     } else {
-      // History tab shows completed and failed
       const isHistoryPayment =
         payment.status === "completed" || payment.status === "failed";
       if (payment.status === "failed") {
@@ -1268,15 +1132,6 @@ export default function ScheduledPaymentsPage() {
     statuses: scheduledPayments.map((p) => p.status),
   });
 
-  const activeCount = scheduledPayments.filter(
-    (payment) => payment.status === "active"
-  ).length;
-  // CHANGED: Count both completed and failed for history
-  const historyCount = scheduledPayments.filter(
-    (payment) => payment.status === "completed" || payment.status === "failed"
-  ).length;
-
-  // CHANGED: Helper function to get failure reason
   const getFailureReason = (payment: ScheduledPayment): string => {
     if (payment.status !== "failed" || !payment.lastError) {
       return "";
@@ -1308,7 +1163,7 @@ export default function ScheduledPaymentsPage() {
 
   return (
     <>
-      {/* Overlay Background - Includes all dropdowns */}
+      {/* Overlay Background */}
       {(isTokenDropdownOpen ||
         isTimezoneDropdownOpen ||
         isUsernameDropdownOpen ||
@@ -1341,7 +1196,7 @@ export default function ScheduledPaymentsPage() {
             </h2>
 
             <div className="space-y-3">
-              {/* Username/Address Input - Full width (larger) */}
+              {/* Username/Address Input */}
               <div>
                 <UsernameInput
                   value={formData.recipient}
@@ -1354,7 +1209,7 @@ export default function ScheduledPaymentsPage() {
 
               {/* Token, Amount, and Timezone Row */}
               <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 md:grid-cols-3 md:space-y-0">
-                {/* Token Selector */}
+                {/* FIXED: Token Selector */}
                 <div className="relative token-dropdown w-full sm:col-span-1">
                   <button
                     onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
@@ -1373,28 +1228,19 @@ export default function ScheduledPaymentsPage() {
                     <ChevronDown size={14} className="text-gray-400" />
                   </button>
 
-                  {/* Token Dropdown */}
+                  {/* FIXED: Token Dropdown - Only show supported tokens */}
                   {isTokenDropdownOpen && (
                     <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-lg max-h-40 overflow-y-auto scrollbar-hide">
-                      {tokens.map((token) => (
+                      {supportedTokensWithBalances.map((token) => (
                         <div
-                          key={token.id}
+                          key={`${token.symbol}-${token.contractAddress}`}
                           className="border border-[#2C2C2C] rounded-xl m-1.5 overflow-hidden"
                         >
                           <button
                             onClick={() => {
-                              setSelectedToken({
-                                name: token.name,
-                                symbol: token.symbol,
-                                contractAddress:
-                                  token.contractAddress || token.id,
-                                decimals: token.decimals || 18,
-                                isETH: token.symbol === "ETH",
-                                balance: token.balance,
-                                price: token.price,
-                                icon: token.icon,
-                              });
+                              setSelectedToken(token);
                               setIsTokenDropdownOpen(false);
+                              console.log("✅ Selected token:", token);
                             }}
                             className="w-full flex items-center p-2.5 hover:bg-[#1A1A1A] transition-colors text-left"
                           >
@@ -1422,7 +1268,6 @@ export default function ScheduledPaymentsPage() {
                 </div>
 
                 <div className="w-full sm:col-span-1 md:col-span-1">
-                  {/* Amount Input */}
                   <Input
                     type="text"
                     placeholder="Amount"
@@ -1472,9 +1317,8 @@ export default function ScheduledPaymentsPage() {
                 </div>
               </div>
 
-              {/* Mobile Layout - Date and Time Row */}
+              {/* Date and Time Row */}
               <div className="xl:hidden space-y-3">
-                {/* Date Time Picker - Full width on mobile - CHANGED: Added step="1" for 24-hour format */}
                 <div>
                   <DateTimePicker
                     dateValue={formData.date}
@@ -1487,11 +1331,11 @@ export default function ScheduledPaymentsPage() {
                     }
                     placeholder="Select date & time"
                     className="font-satoshi"
-                    timeProps={{ step: "1" }} // Force 24-hour format
+                    timeProps={{ step: "1" }}
                   />
                 </div>
 
-                {/* Recurring Toggle - Next line on mobile */}
+                {/* Recurring Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <Repeat size={14} className="text-gray-400 mr-2" />
@@ -1518,7 +1362,7 @@ export default function ScheduledPaymentsPage() {
                           value={recurringFrequency}
                           onChange={(e) => {
                             setRecurringFrequency(e.target.value);
-                            setIsRecurringDropdownOpen(false); // Add this line
+                            setIsRecurringDropdownOpen(false);
                           }}
                           onFocus={() => setIsRecurringDropdownOpen(true)}
                           onBlur={() => setIsRecurringDropdownOpen(false)}
@@ -1565,14 +1409,13 @@ export default function ScheduledPaymentsPage() {
             </div>
           </div>
 
-          {/* Tab Navigation - Mobile - CHANGED: Completed to History */}
+          {/* Tab Navigation - Mobile */}
           <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
                 Transaction History
               </h3>
 
-              {/* Tab Buttons */}
               <div className="flex bg-[#0F0F0F] rounded-lg p-0.5 border border-[#2C2C2C]">
                 <button
                   onClick={() => setActiveTab("active")}
@@ -1620,27 +1463,20 @@ export default function ScheduledPaymentsPage() {
                       ? "Create your first scheduled payment to automate your crypto transfers"
                       : "Completed and failed payments will appear here"}
                   </p>
-                  {/* Debug info for development */}
-                  {activeTab === "history" && scheduledPayments.length > 0 && (
-                    <div className="mt-2 text-xs text-gray-500">
-                      Debug: {scheduledPayments.length} total payments,{" "}
-                      {filteredPayments.length} in history
-                      <br />
-                      Statuses:{" "}
-                      {scheduledPayments.map((p) => p.status).join(", ")}
-                    </div>
-                  )}
                 </div>
               ) : (
                 filteredPayments.map((payment) => {
-                  const paymentToken = tokens.find(
+                  const paymentToken = supportedTokensWithBalances.find(
                     (t) =>
                       t.symbol === payment.tokenSymbol ||
                       t.contractAddress === payment.contractAddress
                   ) || {
                     symbol: payment.tokenSymbol,
                     name: payment.tokenName,
-                    icon: null,
+                    icon:
+                      SUPPORTED_TOKENS.find(
+                        (st) => st.symbol === payment.tokenSymbol
+                      )?.icon || null,
                   };
 
                   return (
@@ -1694,7 +1530,6 @@ export default function ScheduledPaymentsPage() {
                               Completed
                             </span>
                           )}
-                          {/* CHANGED: Added failed status display */}
                           {payment.status === "failed" && (
                             <span className="bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-satoshi font-medium">
                               Failed
@@ -1719,7 +1554,7 @@ export default function ScheduledPaymentsPage() {
                           )}
                       </div>
 
-                      {/* CHANGED: Display failure reason for failed payments */}
+                      {/* Display failure reason for failed payments */}
                       {payment.status === "failed" && (
                         <div className="mb-2 p-2 bg-red-900/20 border border-red-500/30 rounded-md">
                           <div className="flex items-center">
@@ -1754,9 +1589,9 @@ export default function ScheduledPaymentsPage() {
               Schedule Payment
             </h2>
 
-            {/* Form Row 1 - Username/Address (spans 6 columns) */}
+            {/* Form Row 1 */}
             <div className="grid grid-cols-12 gap-3 mb-3 items-center">
-              {/* Username/Address Input - Takes up 6 columns (double width) */}
+              {/* Username/Address Input */}
               <div className="col-span-6">
                 <UsernameInput
                   value={formData.recipient}
@@ -1767,7 +1602,7 @@ export default function ScheduledPaymentsPage() {
                 />
               </div>
 
-              {/* Token Selector */}
+              {/* FIXED: Token Selector */}
               <div className="col-span-2 relative token-dropdown">
                 <button
                   onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
@@ -1786,28 +1621,19 @@ export default function ScheduledPaymentsPage() {
                   <ChevronDown size={12} className="text-gray-400" />
                 </button>
 
-                {/* Token dropdown */}
+                {/* FIXED: Token dropdown - Only show supported tokens */}
                 {isTokenDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-xl max-h-40 overflow-y-auto scrollbar-hide">
-                    {tokens.map((token) => (
+                    {supportedTokensWithBalances.map((token) => (
                       <div
-                        key={token.id}
+                        key={`${token.symbol}-${token.contractAddress}`}
                         className="border border-[#2C2C2C] rounded-xl m-1.5 overflow-hidden"
                       >
                         <button
                           onClick={() => {
-                            setSelectedToken({
-                              name: token.name,
-                              symbol: token.symbol,
-                              contractAddress:
-                                token.contractAddress || token.id,
-                              decimals: token.decimals || 18,
-                              isETH: token.symbol === "ETH",
-                              balance: token.balance,
-                              price: token.price,
-                              icon: token.icon,
-                            });
+                            setSelectedToken(token);
                             setIsTokenDropdownOpen(false);
+                            console.log("✅ Selected token:", token);
                           }}
                           className="w-full flex items-center p-2.5 hover:bg-[#1A1A1A] transition-colors text-left"
                         >

@@ -1,4 +1,4 @@
-// src/components/auth/RegisterForm.tsx - COMPACT VERSION
+// src/components/auth/RegisterForm.tsx - UPDATED with proper registration email template
 "use client";
 
 import { useState, useEffect } from "react";
@@ -10,7 +10,10 @@ import Input from "@/components/ui/Input";
 import { registerUser, clearError } from "@/store/slices/authSlice";
 import { RootState, AppDispatch } from "@/store";
 import { auth, googleProvider } from "@/lib/firebase";
-import { sendPasswordResetEmail, EmailData } from "@/lib/emailjs";
+import {
+  sendRegistrationVerificationEmail,
+  RegistrationEmailData,
+} from "@/lib/emailjs"; // Updated import
 import EyeOff from "../icons/EyeOffIcon";
 import Eye from "../icons/EyeIcon";
 import UserIcon from "../icons/UserIcon";
@@ -85,7 +88,7 @@ export default function RegisterForm() {
     return Object.keys(errors).length === 0;
   };
 
-  // NEW: Send verification code
+  // UPDATED: Send verification code with proper registration template
   const handleSendVerificationCode = async () => {
     if (!validateForm()) {
       return;
@@ -95,27 +98,30 @@ export default function RegisterForm() {
     setFormErrors({});
 
     try {
-      console.log("📧 Sending verification code to:", formData.email);
+      console.log(
+        "📧 Sending registration verification code to:",
+        formData.email
+      );
 
       // Generate 6-digit verification code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedCode(code);
 
-      // Send email using the same service as forgot password
-      const emailData: EmailData = {
+      // UPDATED: Use registration-specific email template
+      const emailData: RegistrationEmailData = {
         to_email: formData.email,
         to_name: formData.name,
-        reset_code: code,
+        verification_code: code, // Changed from reset_code to verification_code
         app_name: "Blockpal",
       };
 
-      const emailSent = await sendPasswordResetEmail(emailData);
+      const emailSent = await sendRegistrationVerificationEmail(emailData);
 
       if (!emailSent) {
         throw new Error("Failed to send verification email");
       }
 
-      console.log("✅ Verification code sent successfully");
+      console.log("✅ Registration verification code sent successfully");
       console.log("🔑 Code for testing:", code); // For development
 
       setStep("verify");
@@ -129,7 +135,7 @@ export default function RegisterForm() {
     }
   };
 
-  // NEW: Verify code and register
+  // Verify code and register (unchanged)
   const handleVerifyAndRegister = async () => {
     if (!verificationCode.trim() || verificationCode.length !== 6) {
       setFormErrors({ code: "Please enter the 6-digit code" });
@@ -467,7 +473,8 @@ export default function RegisterForm() {
             Verify Your Email
           </h1>
           <p className="text-gray-400 font-satoshi text-sm">
-            We sent a 6-digit code to <strong>{formData.email}</strong>
+            We sent a 6-digit verification code to{" "}
+            <strong>{formData.email}</strong>
           </p>
           <p className="text-gray-500 text-xs font-satoshi mt-1">
             Please check your email inbox and spam folder

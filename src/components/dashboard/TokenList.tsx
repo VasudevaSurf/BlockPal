@@ -1,7 +1,4 @@
-// Now I need to create a simple update for the GlobalDashboardHeader to emit wallet switching events.
-// This will be handled in the next step by updating the existing header component.
-
-// Enhanced wallet// src/components/dashboard/TokenList.tsx - ENHANCED VERSION with better image loading
+// src/components/dashboard/TokenList.tsx - SIMPLE STABLE FIX
 "use client";
 import React from "react";
 import { useRouter } from "next/navigation";
@@ -58,7 +55,7 @@ const saveImageCache = (cache: Map<string, string>) => {
 // Global image cache that persists across sessions
 const imageCache = loadImageCache();
 
-// ENHANCED: Token Image Component with dark grey background instead of letters
+// Token Image Component with dark grey background
 const TokenImage = ({
   src,
   alt,
@@ -87,18 +84,9 @@ const TokenImage = ({
 
   // Load image from cache or source
   useEffect(() => {
-    // First priority: Check persistent cache
     const cachedImage = imageCache.get(cacheKey);
 
-    console.log(`🖼️ TokenImage for ${symbol}:`, {
-      cacheKey,
-      providedSrc: src,
-      cachedSrc: cachedImage,
-      hasCached: imageCache.has(cacheKey),
-    });
-
     if (cachedImage && cachedImage !== "error") {
-      console.log(`✅ Using cached image for ${symbol}: ${cachedImage}`);
       setImageSrc(cachedImage);
       setIsLoading(false);
       setHasError(false);
@@ -106,23 +94,18 @@ const TokenImage = ({
       return;
     }
 
-    // If we marked this as error in cache, show fallback
     if (cachedImage === "error") {
-      console.log(`❌ Cached error for ${symbol}`);
       setIsLoading(false);
       setHasError(true);
       if (onLoad) onLoad();
       return;
     }
 
-    // Try to load provided image URL
     if (src && src !== "null" && src !== "undefined" && src !== "") {
-      console.log(`🔄 Attempting to load new image for ${symbol}: ${src}`);
       setImageSrc(src);
       setIsLoading(true);
       setHasError(false);
     } else {
-      console.log(`⚠️ No valid image URL for ${symbol}`);
       setIsLoading(false);
       setHasError(true);
       if (onLoad) onLoad();
@@ -130,15 +113,12 @@ const TokenImage = ({
   }, [src, cacheKey, symbol]);
 
   const handleImageLoad = () => {
-    console.log(`✅ Image loaded successfully for ${symbol}: ${imageSrc}`);
     setIsLoading(false);
     setHasError(false);
 
-    // Save to persistent cache
     if (imageSrc && imageSrc !== "error") {
       imageCache.set(cacheKey, imageSrc);
       saveImageCache(imageCache);
-      console.log(`💾 Saved ${symbol} image to cache with key: ${cacheKey}`);
     }
 
     if (onLoad) {
@@ -147,11 +127,8 @@ const TokenImage = ({
   };
 
   const handleImageError = () => {
-    console.log(`❌ Image failed to load for ${symbol}: ${imageSrc}`);
     setIsLoading(false);
     setHasError(true);
-
-    // Mark as error in cache
     imageCache.set(cacheKey, "error");
     saveImageCache(imageCache);
 
@@ -164,15 +141,12 @@ const TokenImage = ({
 
   return (
     <div className={`relative ${className}`}>
-      {/* CHANGED: Dark grey background instead of letters */}
       <div
         className={`w-full h-full rounded-full flex items-center justify-center transition-opacity duration-200 ${
           shouldShowImage && !isLoading ? "opacity-0" : "opacity-100"
         }`}
-        style={{ backgroundColor: "#4A4A4A" }} // Dark grey background
-      >
-        {/* Removed the letters/icon concept completely */}
-      </div>
+        style={{ backgroundColor: "#4A4A4A" }}
+      ></div>
 
       {imageSrc && imageSrc !== "error" && (
         <img
@@ -199,60 +173,105 @@ export default function TokenList() {
   );
   const { isLoading: isNavigating, startLoading } = useNavigationLoading();
 
-  // Enhanced loading state management
-  const [tokenLoadingState, setTokenLoadingState] = useState({
-    isInitialLoad: true,
-    hasAttemptedLoad: false,
-    tokensLoaded: false,
-    imagesLoaded: false,
-    hasRealData: false, // NEW: Track if we have actual data
-  });
+  // Simple loading state management
+  const [isWalletSwitching, setIsWalletSwitching] = useState(false);
+  const [hasInitialData, setHasInitialData] = useState(false);
 
   // Track image loading completion
   const [imageLoadingStates, setImageLoadingStates] = useState<
     Record<string, boolean>
   >({});
-  const [allImagesLoaded, setAllImagesLoaded] = useState(false);
 
-  // NEW: Track wallet switching
-  const [isWalletSwitching, setIsWalletSwitching] = useState(false);
-  const previousWalletId = useRef<string | null>(null);
+  // Track wallet switching
+  const previousWalletAddress = useRef<string | null>(null);
+  const switchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dataLoadedForWallet = useRef<string | null>(null);
 
-  // Use refs to prevent duplicate API calls
-  const tokensLoaded = useRef<string | null>(null);
-
-  // Listen for wallet switching events
+  // Detect wallet switching
   useEffect(() => {
-    const handleWalletSwitchStart = () => {
-      console.log("🔄 TokenList - Wallet switch started");
-      setIsWalletSwitching(true);
-      setTokenLoadingState({
-        isInitialLoad: true,
-        hasAttemptedLoad: false,
-        tokensLoaded: false,
-        imagesLoaded: false,
-        hasRealData: false,
-      });
-      setImageLoadingStates({});
-      setAllImagesLoaded(false);
-    };
+    const currentWalletAddress = activeWallet?.address;
+    const prevAddress = previousWalletAddress.current;
 
-    const handleWalletSwitchComplete = () => {
-      console.log("✅ TokenList - Wallet switch completed");
-      setTimeout(() => {
-        setIsWalletSwitching(false);
-      }, 500);
-    };
-
-    window.addEventListener("walletSwitchStart", handleWalletSwitchStart);
-    window.addEventListener("walletSwitchComplete", handleWalletSwitchComplete);
-
-    return () => {
-      window.removeEventListener("walletSwitchStart", handleWalletSwitchStart);
-      window.removeEventListener(
-        "walletSwitchComplete",
-        handleWalletSwitchComplete
+    // If wallet changed, IMMEDIATELY start switching state
+    if (
+      prevAddress &&
+      currentWalletAddress &&
+      prevAddress !== currentWalletAddress
+    ) {
+      console.log(
+        "🪙 TokenList - Wallet switching detected - IMMEDIATE skeleton"
       );
+
+      // IMMEDIATELY set switching state and clear data
+      setIsWalletSwitching(true);
+      setHasInitialData(false);
+      dataLoadedForWallet.current = null;
+      setImageLoadingStates({});
+
+      // Clear any existing timeout
+      if (switchingTimeoutRef.current) {
+        clearTimeout(switchingTimeoutRef.current);
+      }
+
+      // Minimum switching time to prevent flickering (3 seconds for stability)
+      switchingTimeoutRef.current = setTimeout(() => {
+        console.log("🪙 TokenList - Ending switching state after timeout");
+        setIsWalletSwitching(false);
+      }, 3000); // Increased to 3 seconds for more stability
+    }
+
+    // Always update the previous wallet reference
+    previousWalletAddress.current = currentWalletAddress;
+  }, [activeWallet?.address]);
+
+  // Load data for current wallet
+  useEffect(() => {
+    if (
+      activeWallet?.address &&
+      dataLoadedForWallet.current !== activeWallet.address
+    ) {
+      console.log(
+        "🪙 TokenList - Loading tokens for wallet:",
+        activeWallet.address
+      );
+
+      dataLoadedForWallet.current = activeWallet.address;
+
+      dispatch(fetchWalletTokens(activeWallet.address))
+        .then(() => {
+          console.log("🪙 TokenList - Tokens loaded successfully");
+
+          // Only set initial data if we're not switching or if enough time has passed
+          setTimeout(() => {
+            setHasInitialData(true);
+          }, 100); // Small delay to ensure data is stable
+
+          // Don't end switching state here - let the timeout handle it
+        })
+        .catch((error) => {
+          console.error("🪙 TokenList - Error loading tokens:", error);
+          // Still mark as having data even if there's an error
+          setTimeout(() => {
+            setHasInitialData(true);
+          }, 100);
+        });
+    }
+  }, [activeWallet?.address, dispatch]);
+
+  // Mark data as loaded when we have tokens
+  useEffect(() => {
+    if (activeWallet?.address && !hasInitialData) {
+      console.log("🪙 TokenList - Tokens detected, marking as loaded");
+      setHasInitialData(true);
+    }
+  }, [tokens.length, activeWallet?.address, hasInitialData]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (switchingTimeoutRef.current) {
+        clearTimeout(switchingTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -266,7 +285,6 @@ export default function TokenList() {
 
       const cachedImage = imageCache.get(cacheKey);
 
-      // If we have a cached image and the token doesn't have a valid icon, use cached
       if (
         cachedImage &&
         cachedImage !== "error" &&
@@ -275,7 +293,6 @@ export default function TokenList() {
           token.icon === "undefined" ||
           token.icon === "")
       ) {
-        console.log(`🎨 Applying cached image to ${token.symbol}`);
         return { ...token, icon: cachedImage };
       }
 
@@ -283,143 +300,14 @@ export default function TokenList() {
     });
   }, [tokens]);
 
-  useEffect(() => {
-    console.log("🪙 TokenList - Effect triggered", {
-      activeWalletAddress: activeWallet?.address,
-      tokensLoadedFor: tokensLoaded.current,
-      tokensLength: tokens.length,
-      loading,
-      shouldFetch:
-        activeWallet?.address && tokensLoaded.current !== activeWallet.address,
-    });
-
-    // Only fetch tokens if we have an active wallet and haven't already loaded tokens for this wallet
-    if (
-      activeWallet?.address &&
-      tokensLoaded.current !== activeWallet.address
-    ) {
-      console.log(
-        "📡 TokenList - Fetching tokens for wallet:",
-        activeWallet.address
-      );
-
-      tokensLoaded.current = activeWallet.address;
-      setTokenLoadingState((prev) => ({
-        ...prev,
-        hasAttemptedLoad: true,
-        isInitialLoad: true,
-        imagesLoaded: false,
-        hasRealData: false, // Reset real data flag
-      }));
-
-      // Reset image loading states but don't clear cache
-      setImageLoadingStates({});
-      setAllImagesLoaded(false);
-
-      dispatch(fetchWalletTokens(activeWallet.address)).then(() => {
-        setTokenLoadingState((prev) => ({
-          ...prev,
-          tokensLoaded: true,
-          isInitialLoad: false,
-          hasRealData: true, // Mark as having real data
-        }));
-      });
-    } else if (tokens.length > 0 && !tokenLoadingState.tokensLoaded) {
-      // If we already have tokens, mark as loaded
-      setTokenLoadingState((prev) => ({
-        ...prev,
-        tokensLoaded: true,
-        isInitialLoad: false,
-        hasAttemptedLoad: true,
-        hasRealData: true,
-      }));
-    }
-  }, [
-    activeWallet?.address,
-    dispatch,
-    tokens.length,
-    tokenLoadingState.tokensLoaded,
-  ]);
-
-  // Reset loading state when active wallet changes
-  useEffect(() => {
-    if (
-      activeWallet?.address &&
-      tokensLoaded.current !== activeWallet.address
-    ) {
-      setTokenLoadingState({
-        isInitialLoad: true,
-        hasAttemptedLoad: false,
-        tokensLoaded: false,
-        imagesLoaded: false,
-        hasRealData: false,
-      });
-      // Don't clear image cache on wallet switch
-      setImageLoadingStates({});
-      setAllImagesLoaded(false);
-    }
-  }, [activeWallet?.address]);
-
   // Create a unique key for each token
   const getUniqueTokenKey = (token: any, index: number): string => {
     const baseKey =
       token.contractAddress && token.contractAddress !== "native"
         ? `${token.contractAddress}_${index}`
         : `${token.symbol}_native_${index}`;
-
     return baseKey;
   };
-
-  // Track when all images are loaded
-  useEffect(() => {
-    if (processedTokens.length > 0 && tokenLoadingState.tokensLoaded) {
-      const totalTokens = processedTokens.length;
-      const loadedImages =
-        Object.values(imageLoadingStates).filter(Boolean).length;
-
-      console.log(`🖼️ Image loading progress: ${loadedImages}/${totalTokens}`);
-
-      if (loadedImages === totalTokens && !allImagesLoaded) {
-        setAllImagesLoaded(true);
-        setTokenLoadingState((prev) => ({ ...prev, imagesLoaded: true }));
-        console.log("✅ All token images loaded - navigation enabled");
-      }
-    }
-  }, [
-    imageLoadingStates,
-    processedTokens.length,
-    tokenLoadingState.tokensLoaded,
-    allImagesLoaded,
-  ]);
-
-  // Initialize image loading states when tokens are available
-  useEffect(() => {
-    if (processedTokens.length > 0 && tokenLoadingState.tokensLoaded) {
-      // Initialize all tokens as not loaded, but allow immediate display
-      const initialStates: Record<string, boolean> = {};
-      processedTokens.forEach((token, index) => {
-        const uniqueKey = getUniqueTokenKey(token, index);
-        if (!(uniqueKey in imageLoadingStates)) {
-          initialStates[uniqueKey] = false;
-        }
-      });
-
-      if (Object.keys(initialStates).length > 0) {
-        setImageLoadingStates((prev) => ({ ...prev, ...initialStates }));
-      }
-
-      // Set a timeout to enable navigation after a reasonable time even if some images fail
-      const timeout = setTimeout(() => {
-        if (!allImagesLoaded) {
-          console.log("⏰ Enabling navigation after timeout");
-          setAllImagesLoaded(true);
-          setTokenLoadingState((prev) => ({ ...prev, imagesLoaded: true }));
-        }
-      }, 1000); // Reduced to 1 second for better UX
-
-      return () => clearTimeout(timeout);
-    }
-  }, [processedTokens.length, tokenLoadingState.tokensLoaded, allImagesLoaded]);
 
   // Handle individual image load completion
   const handleImageLoad = useCallback((uniqueKey: string) => {
@@ -448,25 +336,14 @@ export default function TokenList() {
 
   const handleTokenClick = (token: any) => {
     if (isNavigating) {
-      console.log("🚫 Navigation blocked - already navigating");
       return;
     }
 
-    console.log("🔍 Token clicked:", {
-      tokenId: token.id,
-      symbol: token.symbol,
-      contractAddress: token.contractAddress,
-      name: token.name,
-      activeWallet: activeWallet?.address,
-    });
-
     if (!activeWallet?.address) {
-      console.error("❌ No active wallet found");
       alert("Please select an active wallet first.");
       return;
     }
 
-    // Better ETH/native token detection
     let routeContractAddress: string;
     if (
       token.contractAddress === "native" ||
@@ -477,22 +354,17 @@ export default function TokenList() {
       token.contractAddress === ""
     ) {
       routeContractAddress = "ETH";
-      console.log("📍 Routing to ETH (native token)");
     } else {
       routeContractAddress = token.contractAddress;
-      console.log("📍 Routing to ERC-20 token:", routeContractAddress);
     }
 
     try {
       const url = `/dashboard/token/${encodeURIComponent(
         routeContractAddress
       )}?wallet=${encodeURIComponent(activeWallet.address)}`;
-      console.log("🔗 Navigating to:", url);
 
-      // Start loading state before navigation
       startLoading();
 
-      // Small delay to ensure loading state is visible
       setTimeout(() => {
         router.push(url);
       }, 100);
@@ -507,7 +379,6 @@ export default function TokenList() {
     const tokenMap = new Map();
 
     processedTokens.forEach((token, index) => {
-      // Create a unique identifier for each token
       let key;
       if (
         token.contractAddress &&
@@ -523,7 +394,6 @@ export default function TokenList() {
         }_${index}`;
       }
 
-      // Only add if not already in map (keeps first occurrence)
       if (!tokenMap.has(key)) {
         tokenMap.set(key, { ...token, uniqueIndex: index });
       }
@@ -534,47 +404,19 @@ export default function TokenList() {
 
   const displayTokens = getDisplayTokens();
 
-  // DEBUG: Log token data including icons
-  useEffect(() => {
-    if (processedTokens.length > 0) {
-      console.log("📊 Token Data Debug:");
-      console.log("Raw tokens count:", tokens.length);
-      console.log("Processed tokens count:", processedTokens.length);
-      console.log("Display tokens count:", displayTokens.length);
-
-      console.log("🗄️ Cache contents:");
-      imageCache.forEach((value, key) => {
-        console.log(`  ${key}: ${value.substring(0, 50)}...`);
-      });
-
-      displayTokens.forEach((token, index) => {
-        console.log(
-          `  [${index}] ${token.symbol}: contract="${
-            token.contractAddress
-          }", icon="${token.icon?.substring(0, 50)}..."`
-        );
-      });
-    }
-  }, [processedTokens, displayTokens]);
-
-  // ENHANCED: Better skeleton conditions including wallet switching
+  // Simple skeleton logic: show skeleton if switching OR no wallet OR no initial data OR still loading
   const shouldShowSkeleton =
-    isWalletSwitching || // NEW: Show skeleton during wallet switching
-    tokenLoadingState.isInitialLoad ||
-    (loading && tokens.length === 0) ||
-    (!tokenLoadingState.hasAttemptedLoad && activeWallet?.address) ||
-    !tokenLoadingState.hasRealData || // NEW: Show skeleton until we have real data
+    isWalletSwitching ||
+    !activeWallet ||
+    (!hasInitialData && loading) ||
     isNavigating;
 
   if (shouldShowSkeleton) {
-    console.log("🔄 TokenList - Showing skeleton", {
+    console.log("🪙 TokenList - Showing skeleton:", {
       isWalletSwitching,
-      isInitialLoad: tokenLoadingState.isInitialLoad,
+      hasActiveWallet: !!activeWallet,
+      hasInitialData,
       loading,
-      tokensLength: tokens.length,
-      hasAttemptedLoad: tokenLoadingState.hasAttemptedLoad,
-      activeWallet: !!activeWallet?.address,
-      hasRealData: tokenLoadingState.hasRealData,
       isNavigating,
     });
     return <SkeletonTokenList />;
@@ -587,7 +429,6 @@ export default function TokenList() {
           <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
             Token Holdings (0)
           </h2>
-          {/* Hidden refresh button - keeps background functionality */}
           <WalletRefreshButton
             autoRefreshInterval={10000}
             showLastUpdated={false}
@@ -609,22 +450,13 @@ export default function TokenList() {
     );
   }
 
-  // Only show "no tokens" if we've attempted to load and confirmed no tokens
-  if (
-    displayTokens.length === 0 &&
-    tokenLoadingState.hasAttemptedLoad &&
-    tokenLoadingState.tokensLoaded &&
-    tokenLoadingState.hasRealData &&
-    !loading &&
-    !isNavigating
-  ) {
+  if (displayTokens.length === 0 && hasInitialData) {
     return (
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         <div className="flex items-center justify-between mb-3 lg:mb-4">
           <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
             Token Holdings (0)
           </h2>
-          {/* Hidden refresh button - keeps background functionality */}
           <WalletRefreshButton
             autoRefreshInterval={10000}
             showLastUpdated={false}
@@ -652,7 +484,6 @@ export default function TokenList() {
         <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
           Token Holdings ({displayTokens.length})
         </h2>
-        {/* Hidden refresh button - keeps background functionality */}
         <WalletRefreshButton
           autoRefreshInterval={10000}
           showLastUpdated={false}
@@ -774,19 +605,6 @@ export default function TokenList() {
         }
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
-        }
-
-        @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .animate-spin {
-          animation: spin 1s linear infinite;
         }
       `}</style>
     </div>

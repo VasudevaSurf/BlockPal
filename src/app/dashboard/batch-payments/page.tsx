@@ -1,4 +1,3 @@
-// src/app/dashboard/batch-payments/page.tsx - UPDATED WITH PROCESSING STEP
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -263,7 +262,7 @@ export default function BatchPaymentsPage() {
   const [preview, setPreview] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [executing, setExecuting] = useState(false);
-  const [processing, setProcessing] = useState(false); // NEW: Processing state
+  const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [showResult, setShowResult] = useState(false);
   const [copied, setCopied] = useState<string>("");
@@ -274,6 +273,9 @@ export default function BatchPaymentsPage() {
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
+
+  // FIXED: Add transaction refresh trigger
+  const [transactionRefreshKey, setTransactionRefreshKey] = useState(0);
 
   useEffect(() => {
     if (tokens.length > 0 && !selectedToken) {
@@ -563,7 +565,6 @@ export default function BatchPaymentsPage() {
 
   const executeBatchWithKey = async (privateKey: string) => {
     try {
-      // NEW: Show processing modal and hide preview
       setShowPreview(false);
       setProcessing(true);
       setExecuting(false);
@@ -588,13 +589,17 @@ export default function BatchPaymentsPage() {
         throw new Error(data.error || "Batch execution failed");
       }
 
-      // NEW: Hide processing modal and show result
       setProcessing(false);
       setResult(data.result);
       setShowResult(true);
       setBatchPayments([]);
+
+      // FIXED: Trigger transaction history refresh
+      console.log(
+        "✅ Batch transaction completed, refreshing transaction history"
+      );
+      setTransactionRefreshKey((prev) => prev + 1);
     } catch (err: any) {
-      // NEW: Hide processing modal and show error result
       setProcessing(false);
       setResult({
         success: false,
@@ -624,6 +629,15 @@ export default function BatchPaymentsPage() {
     setShowResult(false);
     setError("");
     setSelectedUser(null);
+  };
+
+  // FIXED: Close result modal and refresh transaction history
+  const handleCloseResult = () => {
+    setShowResult(false);
+    setResult(null);
+    // Trigger another refresh when closing result modal
+    console.log("🔄 Closing result modal, triggering transaction refresh");
+    setTransactionRefreshKey((prev) => prev + 1);
   };
 
   const totalAmount = batchPayments.reduce(
@@ -674,6 +688,7 @@ export default function BatchPaymentsPage() {
       )}
 
       <div className="flex flex-col xl:hidden gap-2 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        {/* Mobile layout code remains the same */}
         <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
           <h2 className="text-sm font-semibold text-white mb-2 font-satoshi">
             Add Payment
@@ -778,6 +793,7 @@ export default function BatchPaymentsPage() {
           </div>
         </div>
 
+        {/* Batch summary and queue sections remain the same */}
         {batchPayments.length > 0 && (
           <>
             <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
@@ -821,6 +837,7 @@ export default function BatchPaymentsPage() {
               </div>
             </div>
 
+            {/* Batch payments queue section */}
             <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
               <h3 className="text-sm font-semibold text-white mb-1.5 font-satoshi">
                 Payments Queue ({batchPayments.length})
@@ -890,25 +907,30 @@ export default function BatchPaymentsPage() {
             <div className="h-full overflow-hidden">
               <TransactionHistory
                 walletAddress={activeWallet?.address}
-                transactionTypeFilter="batch"
-                limit={20}
-                title="Transaction History"
+                transactionTypeFilter={null} // Don't filter by type - show all transactions
+                tokenFilter={null} // Don't filter by token - show all transactions
+                limit={50}
+                title="Recent Transactions"
                 showRefresh={true}
                 className="h-full overflow-hidden"
+                useDatabase={true} // Use database only for batch payments page
               />
             </div>
           </div>
         </div>
       </div>
 
+      {/* Desktop layout */}
       <div
         className="hidden xl:flex flex-col gap-0 flex-1 min-h-0 relative"
         ref={containerRef}
       >
+        {/* Desktop batch interface section */}
         <div
           className="bg-black rounded-[16px] border border-[#2C2C2C] p-2.5 flex flex-col min-h-0 overflow-hidden"
           style={{ height: `${batchPanelHeight}%` }}
         >
+          {/* Desktop batch form and payments list - keeping existing code */}
           <div className="grid grid-cols-11 gap-1 mb-1.5 flex-shrink-0">
             <div className="col-span-6">
               <UsernameInput
@@ -1010,7 +1032,6 @@ export default function BatchPaymentsPage() {
           <div className="border-t border-[#2C2C2C] mb-1.5 flex-shrink-0 -mx-2.5"></div>
 
           <div className="bg-[#0F0F0F] rounded-lg mb-1 flex-shrink-0">
-            {/* Updated grid to 4 columns instead of 4 (removed Est. Gas column) */}
             <div className="grid grid-cols-4 gap-1 px-1.5 py-1.5">
               <div className="text-gray-400 text-xs font-satoshi text-left">
                 Username/Address
@@ -1021,10 +1042,6 @@ export default function BatchPaymentsPage() {
               <div className="text-gray-400 text-xs font-satoshi text-left">
                 Amount
               </div>
-              {/* COMMENTED: Est. Gas column */}
-              {/* <div className="text-gray-400 text-xs font-satoshi text-left">
-                Est. Gas
-              </div> */}
               <div className="text-gray-400 text-xs font-satoshi text-center">
                 Actions
               </div>
@@ -1051,7 +1068,6 @@ export default function BatchPaymentsPage() {
 
                   return (
                     <div key={payment.id}>
-                      {/* Updated grid to 4 columns instead of 4 (removed Est. Gas column) */}
                       <div className="grid grid-cols-4 gap-1 items-center py-1.5 px-1.5 hover:bg-[#1A1A1A] rounded-lg transition-colors">
                         <div className="flex items-center min-w-0">
                           <div className="w-3 h-3 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full mr-1 flex items-center justify-center flex-shrink-0 shadow-sm border border-white/10">
@@ -1083,12 +1099,6 @@ export default function BatchPaymentsPage() {
                           {payment.amount} {payment.tokenInfo.symbol}
                         </div>
 
-                        {/* COMMENTED: Est. Gas column */}
-                        {/* <div className="text-white font-satoshi text-xs">
-                          ~ 65,000 gas
-                        </div> */}
-
-                        {/* Added Actions column with individual remove button */}
                         <div className="flex items-center justify-center">
                           <button
                             onClick={() => removeFromBatch(payment.id)}
@@ -1129,6 +1139,7 @@ export default function BatchPaymentsPage() {
           )}
         </div>
 
+        {/* Resizable divider */}
         <div
           ref={dragRef}
           onMouseDown={handleMouseDown}
@@ -1153,6 +1164,7 @@ export default function BatchPaymentsPage() {
           </div>
         </div>
 
+        {/* FIXED: Desktop Transaction History with proper filtering and refresh key */}
         <div
           className="bg-black rounded-[16px] border border-[#2C2C2C] flex flex-col min-h-0 overflow-hidden"
           style={{ height: `${100 - batchPanelHeight}%` }}
@@ -1160,18 +1172,22 @@ export default function BatchPaymentsPage() {
           <div className="p-2.5 h-full flex flex-col overflow-hidden">
             <div className="h-full overflow-hidden">
               <TransactionHistory
+                key={`desktop-${transactionRefreshKey}`} // Force refresh when key changes
                 walletAddress={activeWallet?.address}
-                transactionTypeFilter="batch"
-                limit={50}
+                transactionTypeFilter={null} // Don't filter by type - show all transactions
+                tokenFilter={null} // Don't filter by token - show all transactions
+                limit={100}
                 title="Transaction History"
                 showRefresh={true}
                 className="h-full overflow-hidden"
+                useDatabase={true} // Use database only for batch payments page
               />
             </div>
           </div>
         </div>
       </div>
 
+      {/* Modals remain the same */}
       {showPreview && preview && (
         <>
           <div
@@ -1240,56 +1256,6 @@ export default function BatchPaymentsPage() {
                     </div>
                   </div>
 
-                  {/* <div className="bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C]">
-                    <h3 className="text-white font-semibold font-satoshi mb-2">
-                      Gas Estimation
-                    </h3>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Batch Gas:
-                        </span>
-                        <span className="text-white font-satoshi">
-                          {parseInt(
-                            preview.gasEstimation.batchGas
-                          ).toLocaleString()}{" "}
-                          gas
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Individual Gas:
-                        </span>
-                        <span className="text-white font-satoshi">
-                          {parseInt(
-                            preview.gasEstimation.individualGas
-                          ).toLocaleString()}{" "}
-                          gas
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Gas Savings:
-                        </span>
-                        <span className="text-green-400 font-satoshi">
-                          {parseInt(
-                            preview.gasEstimation.gasSavings
-                          ).toLocaleString()}{" "}
-                          gas ({preview.gasEstimation.savingsPercent}%)
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Estimated Cost:
-                        </span>
-                        <span className="text-white font-satoshi">
-                          {preview.gasEstimation.gasCostETH} ETH ($
-                          {preview.gasEstimation.gasCostUSD})
-                        </span>
-                      </div>
-                    </div>
-                  </div> */}
-
                   <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-2.5">
                     <div className="flex items-start">
                       <AlertTriangle
@@ -1341,7 +1307,7 @@ export default function BatchPaymentsPage() {
         </>
       )}
 
-      {/* NEW: Processing Modal */}
+      {/* Processing Modal */}
       {processing && (
         <>
           <div className="fixed inset-0 z-50 bg-black/80" />
@@ -1349,7 +1315,6 @@ export default function BatchPaymentsPage() {
           <div className="fixed inset-0 flex items-center justify-center z-50 p-2.5">
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-sm overflow-hidden">
               <div className="p-6 text-center">
-                {/* Processing Icon - Static Design with E2AF19 theme */}
                 <div className="w-16 h-16 mx-auto mb-4 relative">
                   <div className="w-16 h-16 rounded-full border-4 border-[#2C2C2C] flex items-center justify-center">
                     <div className="w-8 h-8 bg-[#E2AF19] rounded relative">
@@ -1358,7 +1323,6 @@ export default function BatchPaymentsPage() {
                       </div>
                     </div>
                   </div>
-                  {/* Static rings */}
                   <div className="absolute inset-0 border-2 border-[#E2AF19]/30 rounded-full"></div>
                   <div className="absolute inset-2 border border-[#E2AF19]/20 rounded-full"></div>
                 </div>
@@ -1376,11 +1340,12 @@ export default function BatchPaymentsPage() {
         </>
       )}
 
+      {/* FIXED: Result Modal with refresh trigger */}
       {showResult && result && (
         <>
           <div
             className="fixed inset-0 z-40 bg-white/10"
-            onClick={() => setShowResult(false)}
+            onClick={handleCloseResult}
           />
 
           <div className="fixed inset-0 flex items-center justify-center z-50 p-2.5">
@@ -1399,7 +1364,7 @@ export default function BatchPaymentsPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowResult(false)}
+                  onClick={handleCloseResult}
                   className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded-lg"
                 >
                   <X size={16} />
@@ -1439,12 +1404,6 @@ export default function BatchPaymentsPage() {
                             </button>
                           </div>
                         </div>
-                        {/* <div className="flex justify-between">
-                          <span className="text-gray-400">Gas Used:</span>
-                          <span className="text-white">
-                            {result.gasUsed?.toLocaleString()} gas
-                          </span>
-                        </div> */}
                         <div className="flex justify-between">
                           <span className="text-gray-400">
                             Total Transfers:
@@ -1498,7 +1457,7 @@ export default function BatchPaymentsPage() {
                     </Button>
                   )}
                   <Button
-                    onClick={() => setShowResult(false)}
+                    onClick={handleCloseResult}
                     className="flex-1 font-satoshi"
                   >
                     {result.success ? "Done" : "Close"}

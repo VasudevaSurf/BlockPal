@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - UPDATED: Simplified no friends state
+// src/components/FriendsPage.tsx - FIXED: Token dropdown showing only USDC, USDT, ETH
 "use client";
 
 import { useState, useEffect } from "react";
@@ -76,16 +76,23 @@ interface FundRequest {
   fulfilledBy?: string;
 }
 
-// ADDED: Default tokens that users can request even if they don't have them
-const DEFAULT_TOKENS = [
+// FIXED: Only show these three tokens
+const ALLOWED_TOKENS = [
   {
     id: "ethereum",
     symbol: "ETH",
     name: "Ethereum",
     contractAddress: "native",
     decimals: 18,
-    icon: "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png",
-    isDefault: true,
+    icon: "https://assets.coingecko.com/coins/images/279/large/ethereum.png",
+  },
+  {
+    id: "usdc",
+    symbol: "USDC",
+    name: "USD Coin",
+    contractAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    decimals: 6,
+    icon: "https://assets.coingecko.com/coins/images/6319/large/usdc.png",
   },
   {
     id: "tether",
@@ -93,8 +100,7 @@ const DEFAULT_TOKENS = [
     name: "Tether USD",
     contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
     decimals: 6,
-    icon: "https://coin-images.coingecko.com/coins/images/325/large/Tether.png",
-    isDefault: true,
+    icon: "https://assets.coingecko.com/coins/images/325/large/Tether.png",
   },
 ];
 
@@ -171,67 +177,22 @@ export default function FriendsPage() {
   // Track copied state for clipboard actions
   const [copied, setCopied] = useState<string | null>(null);
 
-  // ADDED: Combine user tokens with default tokens for fund request dropdown
-  const getAvailableTokens = () => {
-    const combinedTokens = [...DEFAULT_TOKENS];
-
-    // Add user's tokens that aren't already in defaults
-    tokens.forEach((token) => {
-      const exists = DEFAULT_TOKENS.some(
-        (defaultToken) =>
-          defaultToken.symbol.toLowerCase() === token.symbol.toLowerCase()
+  // FIXED: Get available tokens with user balances
+  const getAvailableTokensWithBalances = () => {
+    return ALLOWED_TOKENS.map((allowedToken) => {
+      // Find the user's token that matches this allowed token
+      const userToken = tokens.find(
+        (t) => t.symbol.toUpperCase() === allowedToken.symbol.toUpperCase()
       );
 
-      if (!exists) {
-        combinedTokens.push({
-          id: token.id || token.symbol.toLowerCase(),
-          symbol: token.symbol,
-          name: token.name,
-          contractAddress: token.contractAddress,
-          decimals: token.decimals,
-          icon: token.icon,
-          isDefault: false,
-        });
-      }
-    });
-
-    // Sort tokens: User's tokens first, then popular/default tokens
-    return combinedTokens.sort((a, b) => {
-      // If user has this token, prioritize it
-      const userHasA = tokens.some(
-        (t) => t.symbol.toLowerCase() === a.symbol.toLowerCase()
-      );
-      const userHasB = tokens.some(
-        (t) => t.symbol.toLowerCase() === b.symbol.toLowerCase()
-      );
-
-      if (userHasA && !userHasB) return -1;
-      if (!userHasA && userHasB) return 1;
-
-      // Among tokens user has, sort by balance (if available)
-      if (userHasA && userHasB) {
-        const tokenA = tokens.find(
-          (t) => t.symbol.toLowerCase() === a.symbol.toLowerCase()
-        );
-        const tokenB = tokens.find(
-          (t) => t.symbol.toLowerCase() === b.symbol.toLowerCase()
-        );
-
-        const balanceA = parseFloat(tokenA?.balanceFormatted || "0");
-        const balanceB = parseFloat(tokenB?.balanceFormatted || "0");
-
-        return balanceB - balanceA; // Higher balance first
-      }
-
-      // Among default tokens, maintain the predefined order
-      if (a.isDefault && b.isDefault) {
-        return (
-          DEFAULT_TOKENS.findIndex((t) => t.symbol === a.symbol) -
-          DEFAULT_TOKENS.findIndex((t) => t.symbol === b.symbol)
-        );
-      }
-
-      return 0;
+      return {
+        ...allowedToken,
+        balance: userToken?.balance || "0",
+        balanceFormatted: userToken?.balanceFormatted || "0",
+        hasBalance: userToken
+          ? parseFloat(userToken.balanceFormatted || "0") > 0
+          : false,
+      };
     });
   };
 
@@ -248,128 +209,69 @@ export default function FriendsPage() {
   const getTokenIcon = (symbol: string, contractAddress?: string) => {
     const colors: Record<string, string> = {
       ETH: "bg-blue-500",
-      ETHEREUM: "bg-blue-500",
-      SOL: "bg-purple-500",
-      BTC: "bg-orange-500",
-      SUI: "bg-cyan-500",
-      XRP: "bg-gray-500",
-      ADA: "bg-blue-600",
-      AVAX: "bg-red-500",
-      TON: "bg-blue-400",
-      DOT: "bg-pink-500",
-      USDT: "bg-green-500",
       USDC: "bg-blue-600",
-      YAI: "bg-yellow-500",
+      USDT: "bg-green-500",
     };
 
-    if (
-      symbol === "ETH" ||
-      contractAddress === "native" ||
-      symbol === "ETHEREUM"
-    ) {
-      return colors.ETH || "bg-blue-500";
-    }
-
-    return colors[symbol] || "bg-gray-500";
+    return colors[symbol.toUpperCase()] || "bg-gray-500";
   };
 
   const getTokenLetter = (symbol: string, contractAddress?: string) => {
     const letters: Record<string, string> = {
       ETH: "Ξ",
-      ETHEREUM: "Ξ",
-      SOL: "◎",
-      BTC: "₿",
-      SUI: "~",
-      XRP: "✕",
-      ADA: "₳",
-      AVAX: "A",
-      TON: "T",
-      DOT: "●",
-      USDT: "₮",
       USDC: "$",
-      YAI: "Ÿ",
+      USDT: "₮",
     };
 
-    if (
-      symbol === "ETH" ||
-      contractAddress === "native" ||
-      symbol === "ETHEREUM"
-    ) {
-      return letters.ETH || "Ξ";
-    }
-
-    return letters[symbol] || symbol.charAt(0);
+    return letters[symbol.toUpperCase()] || symbol.charAt(0);
   };
 
-  const isValidImageUrl = (url: string | null | undefined): boolean => {
-    if (!url || url === "null" || url === "undefined" || url === "") {
-      return false;
-    }
-    return (
-      url.startsWith("http") &&
-      (url.includes("coingecko") ||
-        url.includes("coinbase") ||
-        url.includes("cdn"))
-    );
-  };
-
-  // Enhanced token rendering for fund request modal
+  // FIXED: Enhanced token rendering for fund request modal
   const renderTokenOption = (token: any, isSelected: boolean = false) => {
     const symbol = token?.symbol || "ETH";
-    const contractAddress = token?.contractAddress;
-    const imageUrl = token?.icon;
-
-    // Check if user actually has this token
-    const userToken = tokens.find(
-      (t) => t.symbol.toLowerCase() === symbol.toLowerCase()
-    );
-    const hasBalance =
-      userToken && parseFloat(userToken.balanceFormatted || "0") > 0;
+    const balance = token?.balanceFormatted || "0";
+    const hasBalance = token?.hasBalance || false;
 
     return (
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center">
-          {isValidImageUrl(imageUrl) ? (
+          {/* Token Icon/Image */}
+          <div className="relative w-5 h-5 mr-2 flex-shrink-0">
             <img
-              src={imageUrl}
+              src={token.icon}
               alt={symbol}
-              className="w-4 h-4 rounded-full mr-2 flex-shrink-0"
+              className="w-5 h-5 rounded-full"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
-                const fallback = target.nextElementSibling as HTMLElement;
+                const fallback = target.parentElement?.querySelector(
+                  ".fallback-icon"
+                ) as HTMLElement;
                 if (fallback) {
-                  fallback.classList.remove("hidden");
+                  fallback.style.display = "flex";
                 }
               }}
             />
-          ) : null}
-
-          <div
-            className={`w-4 h-4 ${getTokenIcon(
-              symbol,
-              contractAddress
-            )} rounded-full mr-2 flex items-center justify-center flex-shrink-0 ${
-              isValidImageUrl(imageUrl) ? "hidden" : ""
-            }`}
-          >
-            <span className="text-white text-xs font-medium">
-              {getTokenLetter(symbol, contractAddress)}
-            </span>
+            <div
+              className={`fallback-icon absolute inset-0 ${getTokenIcon(
+                symbol
+              )} rounded-full flex items-center justify-center hidden`}
+            >
+              <span className="text-white text-xs font-medium">
+                {getTokenLetter(symbol)}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center">
-            <span className="text-white font-satoshi mr-1">{symbol}</span>
-            {userToken && hasBalance && (
-              <span className="text-green-400 text-xs font-satoshi">
-                ({userToken.balanceFormatted})
-              </span>
-            )}
-            {!userToken && token.isDefault && (
-              <span className="text-gray-400 text-xs font-satoshi">
-                (Popular)
-              </span>
-            )}
+            <span className="text-white font-satoshi mr-2">{symbol}</span>
+            <span
+              className={`text-xs font-satoshi ${
+                hasBalance ? "text-green-400" : "text-gray-400"
+              }`}
+            >
+              ({balance})
+            </span>
           </div>
         </div>
 
@@ -683,14 +585,9 @@ export default function FriendsPage() {
     setSelectedFriend(friend);
     setShowFundRequestModal(true);
 
-    // UPDATED: Set default to ETH or first available token
-    const availableTokens = getAvailableTokens();
-    const defaultToken =
-      availableTokens.find((token) => token.symbol === "ETH") ||
-      availableTokens[0];
-
+    // Set default to ETH
     setFundRequestData({
-      tokenSymbol: defaultToken?.symbol || "ETH",
+      tokenSymbol: "ETH",
       amount: "",
       message: "",
     });
@@ -738,7 +635,7 @@ export default function FriendsPage() {
         setShowFundRequestModal(false);
         setSelectedFriend(null);
         setFundRequestData({
-          tokenSymbol: getAvailableTokens()[0]?.symbol || "ETH",
+          tokenSymbol: "ETH",
           amount: "",
           message: "",
         });
@@ -1408,7 +1305,7 @@ export default function FriendsPage() {
           </div>
         </div>
 
-        {/* Fund Request Modal - UPDATED with default tokens */}
+        {/* Fund Request Modal - FIXED with only ETH, USDC, USDT */}
         {showFundRequestModal && selectedFriend && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
@@ -1454,7 +1351,7 @@ export default function FriendsPage() {
               </div>
 
               <div className="space-y-3">
-                {/* UPDATED: Token Dropdown with default tokens */}
+                {/* FIXED: Token Dropdown with only allowed tokens */}
                 <div className="relative" data-token-dropdown>
                   <button
                     type="button"
@@ -1462,7 +1359,7 @@ export default function FriendsPage() {
                     className="w-full bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg px-2.5 py-2.5 text-white font-satoshi text-left flex items-center justify-between hover:border-[#E2AF19] transition-colors focus:outline-none focus:border-[#E2AF19]"
                   >
                     {(() => {
-                      const availableTokens = getAvailableTokens();
+                      const availableTokens = getAvailableTokensWithBalances();
                       const selectedToken =
                         availableTokens.find(
                           (t) => t.symbol === fundRequestData.tokenSymbol
@@ -1472,43 +1369,24 @@ export default function FriendsPage() {
                   </button>
 
                   {showTokenDropdown && (
-                    <div className="absolute top-full left-0 right-0 z-[60] mt-1.5 bg-black border border-[#2C2C2C] rounded-lg shadow-2xl max-h-64 overflow-y-auto scrollbar-hide">
-                      {/* UPDATED: Show default tokens + user tokens */}
-                      {getAvailableTokens().map((token, index) => {
-                        const userToken = tokens.find(
-                          (t) =>
-                            t.symbol.toLowerCase() ===
-                            token.symbol.toLowerCase()
-                        );
-                        const hasBalance =
-                          userToken &&
-                          parseFloat(userToken.balanceFormatted || "0") > 0;
-
-                        return (
-                          <button
-                            key={`${token.symbol}-${index}`}
-                            type="button"
-                            onClick={() => {
-                              setFundRequestData({
-                                ...fundRequestData,
-                                tokenSymbol: token.symbol,
-                              });
-                              setShowTokenDropdown(false);
-                            }}
-                            className="w-full flex items-center px-2.5 py-2.5 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
-                          >
-                            {renderTokenOption(token)}
-                          </button>
-                        );
-                      })}
-
-                      {/* Info footer */}
-                      <div className="px-2.5 py-2 border-t border-[#2C2C2C] bg-[#0F0F0F]">
-                        <p className="text-gray-500 text-xs font-satoshi">
-                          💡 You can request ETH or USDT, even if you don't
-                          currently hold them
-                        </p>
-                      </div>
+                    <div className="absolute top-full left-0 right-0 z-[60] mt-1.5 bg-black border border-[#2C2C2C] rounded-lg shadow-2xl overflow-hidden">
+                      {/* FIXED: Show only allowed tokens */}
+                      {getAvailableTokensWithBalances().map((token) => (
+                        <button
+                          key={token.symbol}
+                          type="button"
+                          onClick={() => {
+                            setFundRequestData({
+                              ...fundRequestData,
+                              tokenSymbol: token.symbol,
+                            });
+                            setShowTokenDropdown(false);
+                          }}
+                          className="w-full flex items-center px-2.5 py-2.5 hover:bg-[#2C2C2C] transition-colors text-left border-b border-[#2C2C2C] last:border-b-0"
+                        >
+                          {renderTokenOption(token)}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>

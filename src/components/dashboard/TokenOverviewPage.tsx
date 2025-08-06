@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import {
@@ -69,6 +69,14 @@ const TIME_PERIODS = [
   { label: "1Y", value: "1Y", days: 365, interval: "daily" },
 ];
 
+// Real-time configuration
+const REFRESH_INTERVALS = {
+  TOKEN_INFO: 10000, // 10 seconds for price data
+  CHART_DATA: 30000, // 30 seconds for chart data
+  BALANCE: 15000, // 15 seconds for balance updates
+  // TRANSACTIONS: 20000,  // Disabled - only manual refresh for transactions
+};
+
 export default function TokenOverviewPage() {
   const router = useRouter();
   const params = useParams();
@@ -83,6 +91,18 @@ export default function TokenOverviewPage() {
   const [copied, setCopied] = useState<string>("");
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
+
+  // Real-time states
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  // const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  // const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('connected');
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Refs for intervals
+  const tokenInfoIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const chartDataIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const balanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // const transactionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Perfect cursor tracking states
   const [cursorPosition, setCursorPosition] = useState<{
@@ -105,72 +125,182 @@ export default function TokenOverviewPage() {
   const contractAddress = params.tokenId as string;
   const walletAddress = searchParams.get("wallet") || activeWallet?.address;
 
+  // Enhanced fetch functions with real-time capabilities
+  const fetchTokenInfo = useCallback(
+    async (showLoader = false) => {
+      if (!contractAddress || !walletAddress) return;
+
+      try {
+        if (showLoader) setLoading(true);
+        setIsRefreshing(true);
+        // setConnectionStatus('connected');
+
+        // Add timestamp to prevent caching
+        const timestamp = Date.now();
+        const response = await fetch(
+          `/api/tokens/${contractAddress}?walletAddress=${walletAddress}&t=${timestamp}`,
+          {
+            credentials: "include",
+            cache: "no-cache",
+            headers: {
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setTokenInfo(data.tokenInfo);
+          // setLastUpdated(new Date());
+          // setConnectionStatus('connected');
+        } else {
+          console.error("Failed to fetch token info");
+          // setConnectionStatus('error');
+        }
+      } catch (error) {
+        console.error("Error fetching token info:", error);
+        // setConnectionStatus('error');
+      } finally {
+        setLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [contractAddress, walletAddress]
+  );
+
+  const fetchChartData = useCallback(
+    async (period: string, showLoader = false) => {
+      if (!tokenInfo?.priceData?.id) return;
+
+      try {
+        if (showLoader) setChartLoading(true);
+
+        const periodConfig = TIME_PERIODS.find((p) => p.value === period);
+        if (!periodConfig) {
+          createMockChartData(period);
+          return;
+        }
+
+        // Add timestamp to prevent caching
+        const timestamp = Date.now();
+        const response = await fetch(
+          `/api/tokens/chart?tokenId=${tokenInfo.priceData.id}&days=${periodConfig.days}&interval=${periodConfig.interval}&t=${timestamp}`,
+          {
+            credentials: "include",
+            cache: "no-cache",
+            headers: {
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setChartData(data.chartData);
+        } else {
+          console.error("Failed to fetch chart data");
+          createMockChartData(period);
+        }
+      } catch (error) {
+        console.error("Error fetching chart data:", error);
+        createMockChartData(period);
+      } finally {
+        if (showLoader) setChartLoading(false);
+      }
+    },
+    [tokenInfo?.priceData?.id]
+  );
+
+  // Manual refresh function
+  const handleManualRefresh = useCallback(async () => {
+    // setRefreshKey(prev => prev + 1); // Only for transactions if needed
+    await Promise.all([
+      fetchTokenInfo(false),
+      fetchChartData(selectedTimeframe, false),
+    ]);
+  }, [fetchTokenInfo, fetchChartData, selectedTimeframe]);
+
+  // Setup real-time intervals
+  const setupRealTimeUpdates = useCallback(() => {
+    // Clear existing intervals
+    if (tokenInfoIntervalRef.current)
+      clearInterval(tokenInfoIntervalRef.current);
+    if (chartDataIntervalRef.current)
+      clearInterval(chartDataIntervalRef.current);
+
+    // Token info refresh (price, balance, etc.)
+    tokenInfoIntervalRef.current = setInterval(() => {
+      fetchTokenInfo(false);
+    }, REFRESH_INTERVALS.TOKEN_INFO);
+
+    // Chart data refresh
+    chartDataIntervalRef.current = setInterval(() => {
+      fetchChartData(selectedTimeframe, false);
+    }, REFRESH_INTERVALS.CHART_DATA);
+  }, [fetchTokenInfo, fetchChartData, selectedTimeframe]);
+
+  // Initial load
   useEffect(() => {
     if (contractAddress && walletAddress) {
-      fetchTokenInfo();
+      fetchTokenInfo(true);
     }
-  }, [contractAddress, walletAddress]);
+  }, [contractAddress, walletAddress, fetchTokenInfo]);
 
+  // Chart data load when token info changes
   useEffect(() => {
     if (tokenInfo?.priceData?.id) {
-      fetchChartData(selectedTimeframe);
+      fetchChartData(selectedTimeframe, true);
     }
-  }, [tokenInfo, selectedTimeframe]);
+  }, [tokenInfo?.priceData?.id, selectedTimeframe, fetchChartData]);
 
-  const fetchTokenInfo = async () => {
-    try {
-      setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+  // Setup real-time updates
+  useEffect(() => {
+    if (tokenInfo?.priceData?.id) {
+      setupRealTimeUpdates();
+    }
 
-      const response = await fetch(
-        `/api/tokens/${contractAddress}?walletAddress=${walletAddress}`,
-        { credentials: "include" }
-      );
+    return () => {
+      if (tokenInfoIntervalRef.current)
+        clearInterval(tokenInfoIntervalRef.current);
+      if (chartDataIntervalRef.current)
+        clearInterval(chartDataIntervalRef.current);
+    };
+  }, [tokenInfo?.priceData?.id, setupRealTimeUpdates]);
 
-      if (response.ok) {
-        const data = await response.json();
-        setTokenInfo(data.tokenInfo);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (tokenInfoIntervalRef.current)
+        clearInterval(tokenInfoIntervalRef.current);
+      if (chartDataIntervalRef.current)
+        clearInterval(chartDataIntervalRef.current);
+      if (balanceIntervalRef.current) clearInterval(balanceIntervalRef.current);
+      // if (transactionIntervalRef.current) clearInterval(transactionIntervalRef.current);
+    };
+  }, []);
+
+  // Handle visibility change (pause/resume when tab is not active)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Pause updates when tab is not visible
+        if (tokenInfoIntervalRef.current)
+          clearInterval(tokenInfoIntervalRef.current);
+        if (chartDataIntervalRef.current)
+          clearInterval(chartDataIntervalRef.current);
       } else {
-        console.error("Failed to fetch token info");
+        // Resume updates when tab becomes visible
+        handleManualRefresh();
+        setupRealTimeUpdates();
       }
-    } catch (error) {
-      console.error("Error fetching token info:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  const fetchChartData = async (period: string) => {
-    if (!tokenInfo?.priceData?.id) return;
-
-    try {
-      setChartLoading(true);
-
-      const periodConfig = TIME_PERIODS.find((p) => p.value === period);
-      if (!periodConfig) {
-        createMockChartData(period);
-        return;
-      }
-
-      const response = await fetch(
-        `/api/tokens/chart?tokenId=${tokenInfo.priceData.id}&days=${periodConfig.days}&interval=${periodConfig.interval}`,
-        { credentials: "include" }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setChartData(data.chartData);
-      } else {
-        console.error("Failed to fetch chart data");
-        createMockChartData(period);
-      }
-    } catch (error) {
-      console.error("Error fetching chart data:", error);
-      createMockChartData(period);
-    } finally {
-      setChartLoading(false);
-    }
-  };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [handleManualRefresh, setupRealTimeUpdates]);
 
   const createMockChartData = (period: string) => {
     const basePrice = tokenInfo?.priceData?.current_price || 2400;
@@ -181,20 +311,20 @@ export default function TokenOverviewPage() {
 
     switch (period) {
       case "1D":
-        dataPoints = 24; // 24 hours
-        timeInterval = 60 * 60 * 1000; // 1 hour intervals
+        dataPoints = 24;
+        timeInterval = 60 * 60 * 1000;
         break;
       case "1W":
-        dataPoints = 7; // 7 days
-        timeInterval = 24 * 60 * 60 * 1000; // 1 day intervals
+        dataPoints = 7;
+        timeInterval = 24 * 60 * 60 * 1000;
         break;
       case "1M":
-        dataPoints = 30; // 30 days
-        timeInterval = 24 * 60 * 60 * 1000; // 1 day intervals
+        dataPoints = 30;
+        timeInterval = 24 * 60 * 60 * 1000;
         break;
       case "1Y":
-        dataPoints = 12; // 12 months
-        timeInterval = 30 * 24 * 60 * 60 * 1000; // ~1 month intervals
+        dataPoints = 12;
+        timeInterval = 30 * 24 * 60 * 60 * 1000;
         break;
       default:
         dataPoints = 24;
@@ -206,7 +336,6 @@ export default function TokenOverviewPage() {
       const timestamp = (now - (dataPoints - i - 1) * timeInterval) / 1000;
       const date = new Date(timestamp * 1000);
 
-      // Create realistic price movements based on timeframe
       let volatility = 0.02;
       switch (period) {
         case "1D":
@@ -225,7 +354,6 @@ export default function TokenOverviewPage() {
 
       const trend = Math.sin(i * 0.1) * 0.001;
       const randomWalk = (Math.random() - 0.5) * volatility;
-
       const priceChange = i === 0 ? 0 : trend + randomWalk;
       const price =
         i === 0 ? basePrice : prices[i - 1].price * (1 + priceChange);
@@ -380,26 +508,6 @@ export default function TokenOverviewPage() {
     return letters[symbol] || symbol.charAt(0);
   };
 
-  const getRandomTokenBg = (symbol: string) => {
-    const backgrounds = [
-      "bg-blue-500/20",
-      "bg-purple-500/20",
-      "bg-green-500/20",
-      "bg-yellow-500/20",
-      "bg-red-500/20",
-      "bg-cyan-500/20",
-      "bg-pink-500/20",
-      "bg-orange-500/20",
-      "bg-indigo-500/20",
-      "bg-teal-500/20",
-    ];
-
-    const index =
-      symbol.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) %
-      backgrounds.length;
-    return backgrounds[index];
-  };
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -421,7 +529,7 @@ export default function TokenOverviewPage() {
     return `${sign}${value.toFixed(2)}%`;
   };
 
-  // Improved Y-axis generation following the 7-step strategy
+  // Improved Y-axis generation
   const generateYAxisValues = (
     prices,
     height,
@@ -431,25 +539,17 @@ export default function TokenOverviewPage() {
   ) => {
     if (!prices || prices.length === 0) return [];
 
-    // Step 1: Find the actual price range
     const minPrice = Math.min(...prices.map((p) => p.price));
     const maxPrice = Math.max(...prices.map((p) => p.price));
     const priceRange = maxPrice - minPrice || 1;
 
-    // Step 2: Decide how many horizontal lines to show (5 is optimal)
     const targetLines = 5;
 
-    // Step 3: Calculate a nice "step" between each price line
     const calculateNiceStep = (range, targetSteps) => {
       const rawStep = range / (targetSteps - 1);
-
-      // Find the magnitude (power of 10)
       const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
-
-      // Normalize to get a number between 1-10
       const normalized = rawStep / magnitude;
 
-      // Choose nice round numbers: 1, 2, 5, or 10
       let niceNormalized;
       if (normalized <= 1) niceNormalized = 1;
       else if (normalized <= 2) niceNormalized = 2;
@@ -460,25 +560,19 @@ export default function TokenOverviewPage() {
     };
 
     const step = calculateNiceStep(priceRange, targetLines);
-
-    // Step 4: Pick a starting price for the top line (round up maxPrice to nearest step)
     const topPrice = Math.ceil(maxPrice / step) * step;
 
-    // Step 5: Create the list of price labels by subtracting the step
     const yAxisValues = [];
     let currentPrice = topPrice;
 
-    // Generate labels from top to bottom
     while (currentPrice >= minPrice - step) {
-      // Step 6 & 7: Calculate Y position and add to array
       const normalizedValue = (currentPrice - chartMin) / paddedRange;
       const y = height - normalizedValue * height;
 
-      // Only include values that are within reasonable chart bounds
       if (y >= -10 && y <= height + 10) {
         yAxisValues.push({
           value: currentPrice,
-          y: Math.max(0, Math.min(height, y)), // Clamp to chart bounds
+          y: Math.max(0, Math.min(height, y)),
         });
       }
 
@@ -488,29 +582,18 @@ export default function TokenOverviewPage() {
     return yAxisValues;
   };
 
-  // Improved formatting function for Y-axis labels
   const formatYAxisValue = (value) => {
-    // Handle very small values (crypto tokens)
     if (Math.abs(value) < 0.001) {
       return value.toFixed(6).replace(/\.?0+$/, "");
-    }
-    // Small values
-    else if (Math.abs(value) < 1) {
+    } else if (Math.abs(value) < 1) {
       return value.toFixed(4).replace(/\.?0+$/, "");
-    }
-    // Medium values - show appropriate decimals
-    else if (Math.abs(value) < 100) {
-      // For values like 1.5, 2.0, 45.25 etc
+    } else if (Math.abs(value) < 100) {
       const decimals = value % 1 === 0 ? 0 : 2;
       return value.toFixed(decimals);
-    }
-    // Larger values - minimal decimals
-    else if (Math.abs(value) < 10000) {
+    } else if (Math.abs(value) < 10000) {
       const decimals = value % 1 === 0 ? 0 : 1;
       return value.toFixed(decimals);
-    }
-    // Very large values - use K/M notation
-    else if (Math.abs(value) >= 1000000) {
+    } else if (Math.abs(value) >= 1000000) {
       return `${(value / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
     } else if (Math.abs(value) >= 1000) {
       return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}K`;
@@ -538,13 +621,11 @@ export default function TokenOverviewPage() {
     const maxPrice = Math.max(...prices.map((p) => p.price));
     const priceRange = maxPrice - minPrice || 1;
 
-    // Add padding to prevent chart from touching edges
-    const paddingPercent = 0.05; // 5% padding on top and bottom
+    const paddingPercent = 0.05;
     const paddedRange = priceRange * (1 + 2 * paddingPercent);
     const chartMin = minPrice - priceRange * paddingPercent;
     const chartMax = maxPrice + priceRange * paddingPercent;
 
-    // Use the improved Y-axis generation
     const yAxisValues = generateYAxisValues(
       prices,
       height,
@@ -563,10 +644,8 @@ export default function TokenOverviewPage() {
       width
     );
 
-    // Map chart points using the same coordinate system as Y-axis
     const points = prices.map((point, index) => {
       const x = (index / (prices.length - 1)) * width;
-      // Use the same transformation as Y-axis calculation
       const normalizedValue = (point.price - chartMin) / paddedRange;
       const y = height - normalizedValue * height;
 
@@ -600,16 +679,13 @@ export default function TokenOverviewPage() {
     const svgElement = event.currentTarget;
     const rect = svgElement.getBoundingClientRect();
 
-    // Get mouse coordinates relative to SVG
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
 
-    // Convert to SVG coordinate system
     const viewBox = svgElement.viewBox.baseVal;
     const svgX = (mouseX / rect.width) * viewBox.width;
     const svgY = (mouseY / rect.height) * viewBox.height;
 
-    // Check if mouse is within chart bounds
     const isWithinBounds =
       mouseX >= 0 &&
       mouseX <= rect.width &&
@@ -617,15 +693,12 @@ export default function TokenOverviewPage() {
       mouseY <= rect.height;
 
     if (isWithinBounds && points && points.length > 0) {
-      // Update cursor position
       setCursorPosition({ x: svgX, y: svgY });
 
-      // Find the closest data point
       const progress = Math.max(0, Math.min(1, svgX / viewBox.width));
       const exactIndex = progress * (points.length - 1);
       const index = Math.round(exactIndex);
 
-      // Get the point at this index
       const point = points[Math.max(0, Math.min(points.length - 1, index))];
 
       if (point) {
@@ -637,19 +710,16 @@ export default function TokenOverviewPage() {
         });
       }
     } else {
-      // Clear states when outside bounds
       setCursorPosition(null);
       setPriceData(null);
     }
   };
 
   const handleMouseLeave = () => {
-    // Immediately clear all states when mouse leaves
     forceClearTooltip();
   };
 
   const handleMouseEnter = () => {
-    // Clear states when entering to ensure clean start
     forceClearTooltip();
   };
 
@@ -658,8 +728,38 @@ export default function TokenOverviewPage() {
     setChartLoading(true);
   };
 
+  // Real-time status indicator (commented out for clean UI)
+  // const RealTimeStatus = () => (
+  //   <div className="flex items-center gap-2 text-xs">
+  //     <div className={`w-2 h-2 rounded-full ${
+  //       connectionStatus === 'connected' ? 'bg-green-400' :
+  //       connectionStatus === 'error' ? 'bg-red-400' : 'bg-yellow-400'
+  //     } ${isRefreshing ? 'animate-pulse' : ''}`} />
+  //     <span className="text-gray-400 font-satoshi">
+  //       {connectionStatus === 'connected' ? 'Live' :
+  //        connectionStatus === 'error' ? 'Error' : 'Connecting...'}
+  //     </span>
+  //     {lastUpdated && (
+  //       <span className="text-gray-500 font-satoshi">
+  //         Updated {lastUpdated.toLocaleTimeString()}
+  //       </span>
+  //     )}
+  //   </div>
+  // );
+
   const TimePeriodButtons = ({ className = "" }: { className?: string }) => (
-    <div className={`flex gap-1 ${className}`}>
+    <div className={`flex gap-1 items-center ${className}`}>
+      {/* Manual refresh button - commented out for clean UI */}
+      {/* <button
+        onClick={handleManualRefresh}
+        disabled={isRefreshing}
+        className={`p-1.5 rounded-md bg-[#2C2C2C] text-white hover:bg-[#3C3C3C] transition-colors mr-2 ${
+          isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+        title="Refresh data"
+      >
+        <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
+      </button> */}
       {TIME_PERIODS.map((period) => (
         <button
           key={period.value}
@@ -838,7 +938,7 @@ export default function TokenOverviewPage() {
             )}
           </div>
 
-          {/* Fixed Y-axis labels container */}
+          {/* Y-axis labels */}
           <div
             className="w-10 sm:w-12 md:w-14 relative pl-1 sm:pl-1.5 md:pl-2 flex-shrink-0"
             style={{ height: `${height}px` }}
@@ -915,7 +1015,6 @@ export default function TokenOverviewPage() {
       <div
         className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden"
         onMouseMove={(e) => {
-          // Global mouse tracking - clear tooltip if not over chart
           const target = e.target as HTMLElement;
           const isOverChart = target.closest(".chart-container");
           if (!isOverChart && (cursorPosition || priceData)) {
@@ -923,50 +1022,53 @@ export default function TokenOverviewPage() {
           }
         }}
       >
+        {/* Mobile Layout */}
         <div
           className="flex flex-col xl:hidden gap-2.5 flex-1 min-h-0 overflow-y-auto scrollbar-hide"
           onMouseEnter={forceClearTooltip}
         >
+          {/* Token Header */}
           <div
             className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0"
             onMouseEnter={forceClearTooltip}
           >
-            <div className="flex items-center mb-2.5">
-              {tokenInfo.priceData?.image ? (
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center">
+                {tokenInfo.priceData?.image ? (
+                  <div className="w-7 h-7 rounded-full mr-2.5 flex items-center justify-center p-0.5">
+                    <img
+                      src={tokenInfo.priceData.image}
+                      alt={tokenInfo.symbol}
+                      className="w-full h-full rounded-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                        target.nextElementSibling?.classList.remove("hidden");
+                      }}
+                    />
+                  </div>
+                ) : null}
                 <div
-                  className={`w-7 h-7 rounded-full mr-2.5 flex items-center justify-center p-0.5`}
+                  className={`w-7 h-7 ${getTokenIcon(
+                    tokenInfo.symbol
+                  )} rounded-full mr-2.5 flex items-center justify-center ${
+                    tokenInfo.priceData?.image ? "hidden" : ""
+                  }`}
                 >
-                  <img
-                    src={tokenInfo.priceData.image}
-                    alt={tokenInfo.symbol}
-                    className="w-full h-full rounded-full object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                      target.nextElementSibling?.classList.remove("hidden");
-                    }}
-                  />
+                  <span className="text-white text-sm font-bold">
+                    {getTokenLetter(tokenInfo.symbol)}
+                  </span>
                 </div>
-              ) : null}
-              <div
-                className={`w-7 h-7 ${getTokenIcon(
-                  tokenInfo.symbol
-                )} rounded-full mr-2.5 flex items-center justify-center ${
-                  tokenInfo.priceData?.image ? "hidden" : ""
-                }`}
-              >
-                <span className="text-white text-sm font-bold">
-                  {getTokenLetter(tokenInfo.symbol)}
-                </span>
+                <div>
+                  <h2 className="text-lg font-bold text-white font-mayeka">
+                    {tokenInfo.name}
+                  </h2>
+                  <p className="text-gray-400 text-xs font-satoshi">
+                    {tokenInfo.symbol}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-bold text-white font-mayeka">
-                  {tokenInfo.name}
-                </h2>
-                <p className="text-gray-400 text-xs font-satoshi">
-                  {tokenInfo.symbol}
-                </p>
-              </div>
+              {/* Removed RealTimeStatus component */}
             </div>
 
             {tokenInfo.priceData && (
@@ -1002,6 +1104,7 @@ export default function TokenOverviewPage() {
             )}
           </div>
 
+          {/* Price Chart */}
           <div
             className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0"
             onMouseEnter={forceClearTooltip}
@@ -1040,6 +1143,7 @@ export default function TokenOverviewPage() {
             />
           </div>
 
+          {/* Balance Section */}
           <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
             <div className="flex items-center justify-between mb-2.5">
               <div className="flex items-center">
@@ -1102,6 +1206,7 @@ export default function TokenOverviewPage() {
             </div>
           </div>
 
+          {/* Token Links */}
           <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
             {tokenInfo.priceData && (
               <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
@@ -1175,30 +1280,28 @@ export default function TokenOverviewPage() {
                 {tokenInfo.symbol === "ETH" ? (
                   <>
                     Ethereum is a global, open-source platform for decentralized
-                    applications. In other words, the vision is to create a
-                    world computer that anyone can build applications in a
-                    decentralized manner; while all states and data are
-                    distributed and publicly accessible.
+                    applications. It enables users to build applications in a
+                    decentralized manner with distributed states and data.
                   </>
                 ) : (
                   <>
                     {tokenInfo.name} is a cryptocurrency token that provides
-                    various utilities and features within its ecosystem. It
-                    enables users to participate in the network's governance,
-                    facilitate transactions, and access various decentralized
-                    applications and services.
+                    various utilities within its ecosystem for governance,
+                    transactions, and decentralized applications.
                   </>
                 )}
               </p>
             )}
           </div>
 
+          {/* Transaction History */}
           <div
             className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0"
             onMouseEnter={forceClearTooltip}
           >
             <div className="max-h-44 overflow-y-auto scrollbar-hide">
               <TransactionHistory
+                key={refreshKey}
                 walletAddress={walletAddress}
                 tokenFilter={getTokenFilterForTransactions()}
                 transactionTypeFilter={getTransactionTypeFilter()}
@@ -1207,25 +1310,25 @@ export default function TokenOverviewPage() {
                 compact={true}
                 className="min-h-0"
                 isTokenOverview={true}
+                useDatabase={false}
               />
             </div>
           </div>
         </div>
 
+        {/* Desktop Layout */}
         <div
           className="hidden xl:flex gap-3 flex-1 min-h-0"
           onMouseEnter={forceClearTooltip}
         >
           <div className="flex-1 flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto space-y-3 scrollbar-hide">
+              {/* Main Chart Section */}
               <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3.5 flex-shrink-0">
                 <div className="flex items-center justify-between mb-3.5">
                   <div className="flex items-center">
                     {tokenInfo.priceData?.image ? (
-                      <div
-                        className={`w-9 h-9
-                         rounded-full mr-2.5 flex items-center justify-center p-0.5`}
-                      >
+                      <div className="w-9 h-9 rounded-full mr-2.5 flex items-center justify-center p-0.5">
                         <img
                           src={tokenInfo.priceData.image}
                           alt={tokenInfo.symbol}
@@ -1253,32 +1356,35 @@ export default function TokenOverviewPage() {
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-white text-xs font-satoshi mb-0.5">
-                      Contract Address
-                    </div>
-                    <div className="flex items-center space-x-1.5 mb-2 justify-end">
-                      <span className="text-gray-400 text-xs font-satoshi">
-                        {tokenInfo.contractAddress === "native"
-                          ? "Native Token"
-                          : `${tokenInfo.contractAddress.slice(
-                              0,
-                              9
-                            )}...${tokenInfo.contractAddress.slice(-7)}`}
-                      </span>
-                      {tokenInfo.contractAddress !== "native" && (
-                        <button
-                          onClick={() =>
-                            copyToClipboard(
-                              tokenInfo.contractAddress,
-                              "contract"
-                            )
-                          }
-                          className="hover:text-white transition-colors"
-                        >
-                          <Copy size={13} className="text-gray-400" />
-                        </button>
-                      )}
+                  <div className="flex items-center gap-4">
+                    {/* Removed RealTimeStatus component */}
+                    <div className="text-right">
+                      <div className="text-white text-xs font-satoshi mb-0.5">
+                        Contract Address
+                      </div>
+                      <div className="flex items-center space-x-1.5 mb-2 justify-end">
+                        <span className="text-gray-400 text-xs font-satoshi">
+                          {tokenInfo.contractAddress === "native"
+                            ? "Native Token"
+                            : `${tokenInfo.contractAddress.slice(
+                                0,
+                                9
+                              )}...${tokenInfo.contractAddress.slice(-7)}`}
+                        </span>
+                        {tokenInfo.contractAddress !== "native" && (
+                          <button
+                            onClick={() =>
+                              copyToClipboard(
+                                tokenInfo.contractAddress,
+                                "contract"
+                              )
+                            }
+                            className="hover:text-white transition-colors"
+                          >
+                            <Copy size={13} className="text-gray-400" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1362,6 +1468,7 @@ export default function TokenOverviewPage() {
                 )}
               </div>
 
+              {/* About Section */}
               <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3.5 flex-shrink-0">
                 {tokenInfo.priceData && (
                   <div className="flex items-center space-x-2.5 mb-3.5">
@@ -1435,18 +1542,15 @@ export default function TokenOverviewPage() {
                     {tokenInfo.symbol === "ETH" ? (
                       <>
                         Ethereum is a global, open-source platform for
-                        decentralized applications. In other words, the vision
-                        is to create a world computer that anyone can build
-                        applications in a decentralized manner; while all states
-                        and data are distributed and publicly accessible.
+                        decentralized applications. It enables users to build
+                        applications in a decentralized manner with distributed
+                        states and data.
                       </>
                     ) : (
                       <>
                         {tokenInfo.name} is a cryptocurrency token that provides
-                        various utilities and features within its ecosystem. It
-                        enables users to participate in the network's
-                        governance, facilitate transactions, and access various
-                        decentralized applications and services.
+                        various utilities within its ecosystem for governance,
+                        transactions, and decentralized applications.
                       </>
                     )}
                   </p>
@@ -1455,6 +1559,7 @@ export default function TokenOverviewPage() {
             </div>
           </div>
 
+          {/* Sidebar */}
           <div
             className="w-[390px] flex-shrink-0 h-full"
             onMouseEnter={forceClearTooltip}
@@ -1531,6 +1636,7 @@ export default function TokenOverviewPage() {
               <div className="flex-1 min-h-0 flex flex-col">
                 <div className="flex-1 overflow-y-auto pr-1.5 scrollbar-hide">
                   <TransactionHistory
+                    // Removed refreshKey to prevent auto-refresh
                     walletAddress={walletAddress}
                     tokenFilter={getTokenFilterForTransactions()}
                     transactionTypeFilter={getTransactionTypeFilter()}
@@ -1539,6 +1645,7 @@ export default function TokenOverviewPage() {
                     compact={true}
                     className="flex-1 min-h-0"
                     isTokenOverview={true}
+                    useDatabase={false}
                   />
                 </div>
               </div>

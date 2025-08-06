@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED VERSION with Back Button for Token Overview
+// src/components/dashboard/GlobalDashboardHeader.tsx - ENHANCED VERSION with wallet switch events
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -140,6 +140,10 @@ export default function GlobalDashboardHeader({
   const walletsLoaded = useRef(false);
   const activeWalletSynced = useRef(false);
   const notificationsFetched = useRef(false);
+
+  // NEW: Track wallet switching state to prevent multiple simultaneous switches
+  const [isSwitchingWallet, setIsSwitchingWallet] = useState(false);
+  const switchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check if we're on a token overview page
   const isTokenOverviewPage = pathname.startsWith("/dashboard/token/");
@@ -312,9 +316,15 @@ export default function GlobalDashboardHeader({
     }
   };
 
-  // Enhanced wallet selection with proper data loading
+  // ENHANCED: Wallet selection with proper event emission and switching state
   const handleWalletSelect = async (walletId: string) => {
     console.log("🎯 Header - Wallet selected:", walletId);
+
+    // Prevent multiple simultaneous wallet switches
+    if (isSwitchingWallet) {
+      console.log("⚠️ Already switching wallets, ignoring request");
+      return;
+    }
 
     // Find the selected wallet
     const selectedWallet = wallets.find((w) => w.id === walletId);
@@ -323,14 +333,40 @@ export default function GlobalDashboardHeader({
       return;
     }
 
+    // Get current wallet for event emission
+    const currentWalletAddress = activeWallet?.address;
+
+    // Set switching state
+    setIsSwitchingWallet(true);
+
+    // Clear any existing timeout
+    if (switchingTimeoutRef.current) {
+      clearTimeout(switchingTimeoutRef.current);
+    }
+
     try {
-      // Step 1: Clear existing tokens to show loading state
+      console.log("🔄 Header - Emitting wallet switch start event", {
+        from: currentWalletAddress,
+        to: selectedWallet.address,
+      });
+
+      // NEW: Emit wallet switch start event BEFORE any other actions
+      window.dispatchEvent(
+        new CustomEvent("walletSwitchStart", {
+          detail: {
+            fromWallet: currentWalletAddress,
+            toWallet: selectedWallet.address,
+            source: "header",
+          },
+        })
+      );
+
+      // Step 1: Set active wallet locally first
+      dispatch(setActiveWallet(walletId));
+
+      // Step 2: Clear existing tokens to show loading state
       dispatch(clearTokens());
       console.log("🧹 Cleared existing tokens");
-
-      // Step 2: Set active wallet locally first
-      dispatch(setActiveWallet(walletId));
-      console.log("🎯 Set active wallet locally");
 
       // Step 3: Sync with database
       await dispatch(setActiveWalletInDB(walletId));
@@ -361,10 +397,49 @@ export default function GlobalDashboardHeader({
           refreshDashboard();
         }, 500);
       }
+
+      // NEW: Emit wallet switch completion event after a short delay
+      setTimeout(() => {
+        console.log("✅ Header - Emitting wallet switch complete event");
+        window.dispatchEvent(
+          new CustomEvent("walletSwitchComplete", {
+            detail: {
+              walletAddress: selectedWallet.address,
+              source: "header",
+            },
+          })
+        );
+      }, 100);
     } catch (error) {
       console.error("❌ Failed to switch wallet:", error);
+
+      // Emit error event
+      window.dispatchEvent(
+        new CustomEvent("walletSwitchError", {
+          detail: {
+            error: error,
+            walletId: walletId,
+            source: "header",
+          },
+        })
+      );
+    } finally {
+      // Reset switching state after a delay to ensure all components have updated
+      switchingTimeoutRef.current = setTimeout(() => {
+        setIsSwitchingWallet(false);
+        switchingTimeoutRef.current = null;
+      }, 1000);
     }
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (switchingTimeoutRef.current) {
+        clearTimeout(switchingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle wallet button click
   const handleWalletButtonClick = () => {
@@ -472,7 +547,10 @@ export default function GlobalDashboardHeader({
             <button
               ref={walletButtonRef}
               onClick={handleWalletButtonClick}
-              className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] hover:border-[#E2AF19] transition-colors group"
+              disabled={isSwitchingWallet} // NEW: Disable during switching
+              className={`flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] hover:border-[#E2AF19] transition-colors group ${
+                isSwitchingWallet ? "opacity-50 cursor-not-allowed" : ""
+              }`}
               title={activeWalletData.name} // Show full name on hover
             >
               <div
@@ -485,7 +563,9 @@ export default function GlobalDashboardHeader({
 
               <div className="flex-1 min-w-0">
                 <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors block">
-                  {truncateWalletName(activeWalletData.name)}
+                  {isSwitchingWallet
+                    ? "Switching..."
+                    : truncateWalletName(activeWalletData.name)}
                 </span>
               </div>
 
@@ -504,7 +584,7 @@ export default function GlobalDashboardHeader({
                 size={12}
                 className={`text-gray-400 group-hover:text-[#E2AF19] transition-all lg:w-3 lg:h-3 ${
                   walletSwitcherOpen ? "rotate-180" : ""
-                }`}
+                } ${isSwitchingWallet ? "animate-spin" : ""}`}
               />
             </button>
           )}

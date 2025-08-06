@@ -1,4 +1,4 @@
-// src/app/api/alchemy/transactions/route.ts - NEW ENDPOINT FOR ALCHEMY INTEGRATION
+// src/app/api/alchemy/transactions/route.ts - ENHANCED WITH METHOD SIGNATURES
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 
@@ -9,11 +9,15 @@ const ALCHEMY_API_KEY =
 // Cache for storing method signatures and transaction receipts
 const methodSignatureCache = new Map();
 const receiptCache = new Map();
+const fullTransactionCache = new Map();
 
-// Known DeFi method signatures from the original JS file
+// Known DeFi method signatures (same as JS file)
 const KNOWN_METHODS = {
+  // Transfers
   "0xa9059cbb": { name: "Transfer", type: "transfer" },
   "0x23b872dd": { name: "Transfer From", type: "transfer" },
+
+  // Swaps
   "0x38ed1739": { name: "Swap", type: "swap" },
   "0x8803dbee": { name: "Swap", type: "swap" },
   "0x7ff36ab5": { name: "Swap ETH", type: "swap" },
@@ -22,6 +26,8 @@ const KNOWN_METHODS = {
   "0x4a25d94a": { name: "Swap to ETH", type: "swap" },
   "0x3593564c": { name: "Universal Router", type: "swap" },
   "0x415565b0": { name: "0x Protocol", type: "swap" },
+
+  // DeFi Operations
   "0x095ea7b3": { name: "Approve", type: "approval" },
   "0xe8e33700": { name: "Add Liquidity", type: "liquidity" },
   "0xbaa2abde": { name: "Remove Liquidity", type: "liquidity" },
@@ -30,14 +36,18 @@ const KNOWN_METHODS = {
   "0xa0712d68": { name: "Mint", type: "mint" },
   "0xdb006a75": { name: "Redeem", type: "redeem" },
   "0x1249c58b": { name: "Mint", type: "mint" },
+
+  // Staking
   "0xa694fc3a": { name: "Stake", type: "stake" },
   "0x2e17de78": { name: "Unstake", type: "stake" },
   "0xe9fad8ee": { name: "Exit", type: "stake" },
+
+  // Multicall
   "0xac9650d8": { name: "Multicall", type: "multicall" },
   "0x5ae401dc": { name: "Multicall", type: "multicall" },
 };
 
-// Format amount helper function from the original JS file
+// Format amount helper function
 function formatAmount(value: string | number, decimals = 18): string {
   if (!value || value === "0") return "0";
 
@@ -77,49 +87,111 @@ function getMethodSignature(input: string): string | null {
   return input.substring(0, 10);
 }
 
-// Detect transaction type based on method signature
-function detectTransactionType(tx: any): string {
+// Get full transaction data with method signature
+async function getFullTransactionData(hash: string): Promise<any> {
+  const cacheKey = `full-tx-${hash}`;
+  if (fullTransactionCache.has(cacheKey)) {
+    return fullTransactionCache.get(cacheKey);
+  }
+
+  try {
+    const response = await fetch(
+      `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: 1,
+          jsonrpc: "2.0",
+          method: "eth_getTransactionByHash",
+          params: [hash],
+        }),
+      }
+    );
+
+    const data = await response.json();
+    if (data.result) {
+      fullTransactionCache.set(cacheKey, data.result);
+
+      // Clean cache periodically
+      if (fullTransactionCache.size > 500) {
+        const entries = Array.from(fullTransactionCache.entries());
+        fullTransactionCache.clear();
+        entries.slice(-250).forEach(([key, value]) => {
+          fullTransactionCache.set(key, value);
+        });
+      }
+    }
+
+    return data.result;
+  } catch (error) {
+    console.error("Error fetching full transaction:", error);
+    return null;
+  }
+}
+
+// Detect transaction type based on method signature (like JS file)
+async function detectTransactionType(tx: any): Promise<string> {
   const cacheKey = `${tx.hash}-type`;
   if (methodSignatureCache.has(cacheKey)) {
     return methodSignatureCache.get(cacheKey);
   }
 
-  // Check if it's a simple transfer (no input data or just transfer data)
-  if (!tx.input || tx.input === "0x") {
-    return "Transfer";
-  }
+  try {
+    // Get full transaction details to check method signature
+    const fullTx = await getFullTransactionData(tx.hash);
 
-  const methodSig = getMethodSignature(tx.input);
-
-  // Check if it's a known method
-  if (methodSig && KNOWN_METHODS[methodSig]) {
-    const method = KNOWN_METHODS[methodSig];
-
-    // For simple transfers, still show as Transfer
-    if (method.type === "transfer" && methodSig === "0xa9059cbb") {
-      methodSignatureCache.set(cacheKey, "Transfer");
-      return "Transfer";
+    // Check if it's a simple transfer (no input data or just transfer data)
+    if (!fullTx?.input || fullTx.input === "0x") {
+      // Simple ETH transfer - show direction-based type
+      const result = tx.direction === "sent" ? "Sent" : "Received";
+      methodSignatureCache.set(cacheKey, result);
+      return result;
     }
 
-    // For all other methods, show the method name
-    methodSignatureCache.set(cacheKey, method.name);
-    return method.name;
-  }
+    const methodSig = getMethodSignature(fullTx.input);
 
-  // Unknown method - it's a contract interaction
-  const transactionType = "Contract Interaction";
-  methodSignatureCache.set(cacheKey, transactionType);
-  return transactionType;
+    // Check if it's a known method
+    if (methodSig && KNOWN_METHODS[methodSig]) {
+      const method = KNOWN_METHODS[methodSig];
+
+      // For simple transfers, still show as Sent/Received
+      if (method.type === "transfer" && methodSig === "0xa9059cbb") {
+        const result = tx.direction === "sent" ? "Sent" : "Received";
+        methodSignatureCache.set(cacheKey, result);
+        return result;
+      }
+
+      // For all other methods, show the method name
+      methodSignatureCache.set(cacheKey, method.name);
+      return method.name;
+    }
+
+    // Unknown method - it's a contract interaction
+    const result = "Contract Interaction";
+    methodSignatureCache.set(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error(
+      `Error detecting transaction type for ${tx.hash}:`,
+      error.message
+    );
+    const result = tx.direction === "sent" ? "Sent" : "Received";
+    methodSignatureCache.set(cacheKey, result);
+    return result;
+  }
 }
 
-// Get token transfers using Alchemy SDK
+// Get token transfers using Alchemy SDK (enhanced with method signatures)
 async function getTokenTransfers(walletAddress: string, tokenAddress: string) {
   const isETH =
     tokenAddress.toLowerCase() === "eth" ||
     tokenAddress === "0x0000000000000000000000000000000000000000" ||
     tokenAddress === "native";
 
-  console.log("🔍 Alchemy API: Fetching transfers for", {
+  console.log("🔍 Enhanced Alchemy API: Fetching transfers for", {
     walletAddress,
     tokenAddress,
     isETH,
@@ -137,7 +209,7 @@ async function getTokenTransfers(walletAddress: string, tokenAddress: string) {
   };
 
   if (isETH) {
-    // For ETH, use external and internal categories
+    // For ETH, use external and internal categories (like JS file)
     params.category = ["external", "internal"];
   } else {
     // For ERC20 tokens, specify the contract
@@ -188,7 +260,7 @@ async function getTokenTransfers(walletAddress: string, tokenAddress: string) {
 
     const receivedData = await receivedResponse.json();
 
-    console.log("📊 Alchemy API: Transfer results", {
+    console.log("📊 Enhanced Alchemy API: Transfer results", {
       sent: sentData.result?.transfers?.length || 0,
       received: receivedData.result?.transfers?.length || 0,
     });
@@ -198,7 +270,7 @@ async function getTokenTransfers(walletAddress: string, tokenAddress: string) {
       received: receivedData.result?.transfers || [],
     };
   } catch (error) {
-    console.error("❌ Alchemy API: Error fetching transfers:", error);
+    console.error("❌ Enhanced Alchemy API: Error fetching transfers:", error);
     return {
       sent: [],
       received: [],
@@ -206,24 +278,24 @@ async function getTokenTransfers(walletAddress: string, tokenAddress: string) {
   }
 }
 
-// Process transfers and add enhanced metadata
+// Process transfers and add enhanced metadata (like JS file)
 async function processTransfers(transfers: any, walletAddress: string) {
   const allTransactions = [];
   const processedHashes = new Set();
 
-  // Combine sent and received transfers
+  // Combine sent and received transfers (like JS file)
   let combinedTransfers = [
     ...transfers.sent.map((tx: any) => ({ ...tx, direction: "sent" })),
     ...transfers.received.map((tx: any) => ({ ...tx, direction: "received" })),
   ];
 
   console.log(
-    "🔄 Alchemy API: Processing",
+    "🔄 Enhanced Alchemy API: Processing",
     combinedTransfers.length,
-    "transfers"
+    "transfers with method detection"
   );
 
-  // Process in batches to avoid overwhelming the system
+  // Process in batches to avoid overwhelming the system (like JS file)
   const BATCH_SIZE = 10;
 
   for (let i = 0; i < combinedTransfers.length; i += BATCH_SIZE) {
@@ -239,13 +311,16 @@ async function processTransfers(transfers: any, walletAddress: string) {
         try {
           processedHashes.add(tx.hash);
 
-          // Detect transaction type (might be a swap!)
-          const transactionType = detectTransactionType(tx);
+          // Enhanced transaction type detection (like JS file)
+          const transactionType = await detectTransactionType(tx);
+
+          // Get full transaction data for input field
+          const fullTx = await getFullTransactionData(tx.hash);
 
           return {
             hash: tx.hash,
             direction: tx.direction,
-            type: transactionType,
+            type: transactionType, // Now includes: "Sent", "Received", "Contract Interaction", "Approve", "Swap", etc.
             category: tx.category,
             asset: tx.asset || "ETH",
             value: tx.value || "0",
@@ -256,7 +331,7 @@ async function processTransfers(transfers: any, walletAddress: string) {
             gasUsed: tx.gasUsed || "N/A",
             contractAddress:
               tx.rawContract?.address || (tx.asset === "ETH" ? "native" : null),
-            input: tx.input || "0x",
+            input: fullTx?.input || "0x", // Include input data for method detection
             timestamp: tx.metadata?.blockTimestamp || new Date().toISOString(),
           };
         } catch (error) {
@@ -268,13 +343,13 @@ async function processTransfers(transfers: any, walletAddress: string) {
 
     allTransactions.push(...batchResults.filter((tx: any) => tx !== null));
 
-    // Add small delay between batches
+    // Add small delay between batches (like JS file)
     if (i + BATCH_SIZE < combinedTransfers.length) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
 
-  // Sort by block number (newest first)
+  // Sort by block number (newest first) like JS file
   allTransactions.sort((a: any, b: any) => {
     const aBlock = parseInt(a.blockNum, 16);
     const bBlock = parseInt(b.blockNum, 16);
@@ -282,9 +357,9 @@ async function processTransfers(transfers: any, walletAddress: string) {
   });
 
   console.log(
-    "✅ Alchemy API: Processed",
+    "✅ Enhanced Alchemy API: Processed",
     allTransactions.length,
-    "transactions"
+    "transactions with method signatures"
   );
 
   return allTransactions;
@@ -317,7 +392,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("📡 Alchemy API: Request received", {
+    console.log("📡 Enhanced Alchemy API: Request received", {
       walletAddress,
       contractAddress,
       username: decoded.username,
@@ -332,19 +407,19 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Get transfers using Alchemy API
+      // Get transfers using enhanced Alchemy API
       const transfers = await getTokenTransfers(walletAddress, contractAddress);
 
-      // Process transfers and add enhanced metadata
+      // Process transfers and add enhanced metadata with method signatures
       const processedTransactions = await processTransfers(
         transfers,
         walletAddress
       );
 
       console.log(
-        "✅ Alchemy API: Returning",
+        "✅ Enhanced Alchemy API: Returning",
         processedTransactions.length,
-        "transactions"
+        "transactions with enhanced type detection"
       );
 
       return NextResponse.json({
@@ -356,12 +431,12 @@ export async function POST(request: NextRequest) {
         timestamp: new Date().toISOString(),
       });
     } catch (alchemyError: any) {
-      console.error("❌ Alchemy API Error:", alchemyError);
+      console.error("❌ Enhanced Alchemy API Error:", alchemyError);
 
       return NextResponse.json(
         {
           success: false,
-          error: "Failed to fetch transactions from Alchemy",
+          error: "Failed to fetch transactions from Enhanced Alchemy",
           details: alchemyError.message || "Unknown Alchemy API error",
           transactions: [],
         },
@@ -369,7 +444,7 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error: any) {
-    console.error("💥 Alchemy API Route Error:", error);
+    console.error("💥 Enhanced Alchemy API Route Error:", error);
     return NextResponse.json(
       {
         success: false,
@@ -384,7 +459,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
-      error: "Method not allowed. Use POST to fetch transactions.",
+      error: "Method not allowed. Use POST to fetch enhanced transactions.",
     },
     { status: 405 }
   );
