@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import axios from "axios";
 
 const ALCHEMY_API_KEY =
-  process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "EH1H6OhzYUtjjHCYJ49zv43ILefPyF0X";
+  process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "tFaWgpOB1QAns76d3CgbT";
 const COINGECKO_API_KEY =
   process.env.NEXT_PUBLIC_COINGECKO_API_KEY || "CG-xCH4APq7mHESUuEFzDU5GTSy";
 

@@ -4,7 +4,7 @@ import { verifyToken } from "@/lib/auth";
 
 // Initialize Alchemy configuration
 const ALCHEMY_API_KEY =
-  process.env.ALCHEMY_API_KEY || "EH1H6OhzYUtjjHCYJ49zv43ILefPyF0X";
+  process.env.ALCHEMY_API_KEY || "tFaWgpOB1QAns76d3CgbT";
 
 // Cache for storing method signatures and transaction receipts
 const methodSignatureCache = new Map();

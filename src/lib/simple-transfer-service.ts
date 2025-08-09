@@ -88,7 +88,7 @@ const ERC20_ABI = [
 ];
 
 const ALCHEMY_API_KEY =
-  process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "EH1H6OhzYUtjjHCYJ49zv43ILefPyF0X";
+  process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "tFaWgpOB1QAns76d3CgbT";
 
 export interface TransferPreview {
   network: string;

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Initialize provider (using enhanced approach from the JS file)
     const provider = new ethers.JsonRpcProvider(
       `https://eth-mainnet.g.alchemy.com/v2/${
-        process.env.ALCHEMY_API_KEY || "EH1H6OhzYUtjjHCYJ49zv43ILefPyF0X"
+        process.env.ALCHEMY_API_KEY || "tFaWgpOB1QAns76d3CgbT"
       }`
     );
 
