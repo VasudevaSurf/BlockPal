@@ -4,7 +4,7 @@ import axios from "axios";
 const ALCHEMY_API_KEY =
   process.env.ALCHEMY_API_KEY || "EH1H6OhzYUtjjHCYJ49zv43ILefPyF0X";
 const COINGECKO_API_KEY =
-  process.env.COINGECKO_API_KEY || "CG-JxUrd1Y1MHtzK2LSkonPTam9";
+  process.env.COINGECKO_API_KEY || "CG-xCH4APq7mHESUuEFzDU5GTSy";
 
 export class CryptoService {
   private provider: ethers.JsonRpcProvider;

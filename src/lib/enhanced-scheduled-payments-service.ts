@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 const ALCHEMY_API_KEY =
   process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "EH1H6OhzYUtjjHCYJ49zv43ILefPyF0X";
 const COINGECKO_API_KEY =
-  process.env.NEXT_PUBLIC_COINGECKO_API_KEY || "CG-JxUrd1Y1MHtzK2LSkonPTam9";
+  process.env.NEXT_PUBLIC_COINGECKO_API_KEY || "CG-xCH4APq7mHESUuEFzDU5GTSy";
 
 // FIXED: Smart Contract Configuration (matching the JavaScript file exactly)
 const CONTRACT_CONFIG = {
