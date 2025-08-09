@@ -1,4 +1,4 @@
-// src/lib/dashboard-service.ts
+// src/lib/dashboard-service.ts - FIXED VERSION
 import { ethers } from "ethers";
 import axios from "axios";
 
@@ -8,31 +8,19 @@ const COINGECKO_API_KEY =
   process.env.NEXT_PUBLIC_COINGECKO_API_KEY || "CG-xCH4APq7mHESUuEFzDU5GTSy";
 const ALCHEMY_URL = `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
 
-// Use Pro API if you have a paid key, otherwise use free API
-const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3"; // Change to https://api.coingecko.com/api/v3 for free tier
+// Use the free API endpoint
+const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
 
-// Preset top 20 tokens on Ethereum (lowercase for comparison)
-const PRESET_TOKENS = [
-  "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", // WETH
-  "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // USDC
-  "0xdac17f958d2ee523a2206206994597c13d831ec7", // USDT
-  "0x6b175474e89094c44da98b954eedeac495271d0f", // DAI
-  "0x514910771af9ca656af840dff83e8264ecf986ca", // LINK
-  "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984", // UNI
-  "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0", // MATIC
-  "0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce", // SHIB
-  "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9", // AAVE
-  "0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2", // MKR
-  "0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f", // SNX
-  "0xd533a949740bb3306d119cc777fa900ba034cd52", // CRV
-  "0xc00e94cb662c3520282e6f5717214004a7f26888", // COMP
-  "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e", // YFI
-  "0x6b3595068778dd592e39a122f4f5a5cf09c90fe2", // SUSHI
-  "0xba100000625a3754423978a60c9317c58a424e3d", // BAL
-  "0x4e15361fd6b4bb609fa63c81a2be19d873717870", // FTM
-  "0x111111111117dc0aa78b770fa6a738034120c302", // 1INCH
-  "0x0d8775f648430679a709e98d2b0cb6250d2887ef", // BAT
-].map((addr) => addr.toLowerCase());
+// Known token mappings (contract address -> CoinGecko ID)
+const TOKEN_ID_MAPPINGS: Record<string, string> = {
+  "0xdac17f958d2ee523a2206206994597c13d831ec7": "tether", // USDT
+  "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": "usd-coin", // USDC
+  "0x6b175474e89094c44da98b954eedeac495271d0f": "dai", // DAI
+  "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": "weth", // WETH
+  "0x514910771af9ca656af840dff83e8264ecf986ca": "chainlink", // LINK
+  "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984": "uniswap", // UNI
+  // Add more known tokens as needed
+};
 
 interface TokenMetadata {
   contractAddress: string;
@@ -64,13 +52,18 @@ interface TokenDashboardData {
 export class DashboardService {
   private provider: ethers.JsonRpcProvider;
   private coinGeckoHeaders: Record<string, string>;
+  private priceCache: Map<
+    string,
+    { price: number; change24h: number; timestamp: number }
+  > = new Map();
+  private CACHE_DURATION = 60000; // 1 minute cache
 
   constructor() {
     this.provider = new ethers.JsonRpcProvider(ALCHEMY_URL);
-    // Properly set headers for CoinGecko API
+    // Use demo API key header for free tier
     this.coinGeckoHeaders = {
       accept: "application/json",
-      "x-cg-pro-api-key": COINGECKO_API_KEY, // Use x-cg-demo-api-key for free tier
+      "x-cg-demo-api-key": COINGECKO_API_KEY,
     };
   }
 
@@ -85,7 +78,7 @@ export class DashboardService {
       const ethBalance = await this.provider.getBalance(walletAddress);
       const ethBalanceFormatted = parseFloat(ethers.formatEther(ethBalance));
 
-      // Add ETH as native token (always include even if balance is 0 for new users)
+      // Always include ETH
       tokens.push({
         contractAddress: "native",
         balance: ethBalance.toString(),
@@ -102,10 +95,14 @@ export class DashboardService {
 
       if (response.data.result?.tokenBalances) {
         for (const token of response.data.result.tokenBalances) {
-          // Include token even if balance is 0 (for tracking purposes)
+          // Skip if balance is 0
+          if (token.tokenBalance === "0x0" || token.tokenBalance === "0x") {
+            continue;
+          }
+
           const contractAddress = token.contractAddress.toLowerCase();
 
-          // Get decimals for proper formatting
+          // Get decimals using Alchemy's getTokenMetadata
           let decimals = 18;
           try {
             const metadataResponse = await axios.post(ALCHEMY_URL, {
@@ -121,10 +118,9 @@ export class DashboardService {
             );
           }
 
-          const balance =
-            token.tokenBalance === "0x0"
-              ? 0
-              : parseFloat(ethers.formatUnits(token.tokenBalance, decimals));
+          const balance = parseFloat(
+            ethers.formatUnits(token.tokenBalance, decimals)
+          );
 
           tokens.push({
             contractAddress,
@@ -134,7 +130,7 @@ export class DashboardService {
         }
       }
 
-      console.log(`✅ Found ${tokens.length} tokens (including ETH)`);
+      console.log(`✅ Found ${tokens.length} tokens with balance`);
       return tokens;
     } catch (error) {
       console.error("❌ Error fetching wallet tokens:", error);
@@ -142,17 +138,7 @@ export class DashboardService {
     }
   }
 
-  // Filter tokens against preset list (for new users)
-  filterPresetTokens(tokens: TokenBalance[]): TokenBalance[] {
-    const presetSet = new Set(PRESET_TOKENS);
-    return tokens.filter(
-      (token) =>
-        token.contractAddress === "native" ||
-        presetSet.has(token.contractAddress.toLowerCase())
-    );
-  }
-
-  // Get token metadata from CoinGecko with proper error handling
+  // Get token metadata from CoinGecko with better error handling
   async getTokenMetadata(
     contractAddress: string
   ): Promise<TokenMetadata | null> {
@@ -169,10 +155,43 @@ export class DashboardService {
         };
       }
 
-      // Try CoinGecko API
+      // Check if we have a known mapping
+      const knownId = TOKEN_ID_MAPPINGS[contractAddress.toLowerCase()];
+      if (knownId) {
+        console.log(
+          `✅ Using known mapping for ${contractAddress}: ${knownId}`
+        );
+
+        // Get data using the known ID
+        const response = await axios.get(
+          `${COINGECKO_BASE_URL}/coins/${knownId}`,
+          {
+            headers: this.coinGeckoHeaders,
+            timeout: 5000,
+          }
+        );
+
+        if (response.data) {
+          return {
+            contractAddress,
+            symbol: response.data.symbol?.toUpperCase() || "UNKNOWN",
+            name: response.data.name || "Unknown Token",
+            decimals:
+              response.data.detail_platforms?.ethereum?.decimal_place || 18,
+            imageUrl:
+              response.data.image?.large || response.data.image?.small || "",
+            geckoId: response.data.id,
+          };
+        }
+      }
+
+      // Try by contract address
       const response = await axios.get(
         `${COINGECKO_BASE_URL}/coins/ethereum/contract/${contractAddress}`,
-        { headers: this.coinGeckoHeaders }
+        {
+          headers: this.coinGeckoHeaders,
+          timeout: 5000,
+        }
       );
 
       if (response.data) {
@@ -182,20 +201,27 @@ export class DashboardService {
           name: response.data.name || "Unknown Token",
           decimals:
             response.data.detail_platforms?.ethereum?.decimal_place || 18,
-          imageUrl: response.data.image?.large || "",
+          imageUrl:
+            response.data.image?.large || response.data.image?.small || "",
           geckoId: response.data.id,
         };
       }
     } catch (error: any) {
-      console.log(
-        `⚠️ CoinGecko API error for ${contractAddress}:`,
-        error.response?.status
-      );
+      if (error.response?.status === 429) {
+        console.log("⚠️ CoinGecko rate limit hit");
+      } else if (error.response?.status === 404) {
+        console.log(`⚠️ Token ${contractAddress} not found on CoinGecko`);
+      } else {
+        console.log(
+          `⚠️ CoinGecko API error for ${contractAddress}:`,
+          error.message
+        );
+      }
     }
     return null;
   }
 
-  // Fallback: Get metadata from Alchemy
+  // Get metadata from Alchemy as fallback
   async getTokenMetadataFromAlchemy(
     contractAddress: string
   ): Promise<TokenMetadata | null> {
@@ -223,35 +249,169 @@ export class DashboardService {
     return null;
   }
 
-  // Fallback: Get metadata from blockchain
-  async getTokenMetadataFromBlockchain(
-    contractAddress: string
-  ): Promise<TokenMetadata | null> {
+  // Enhanced batch price fetching with better fallbacks
+  async batchFetchTokenPrices(
+    contractAddresses: string[]
+  ): Promise<Record<string, { price: number; change24h: number }>> {
+    const prices: Record<string, { price: number; change24h: number }> = {};
+
     try {
-      const abi = [
-        "function name() view returns (string)",
-        "function symbol() view returns (string)",
-        "function decimals() view returns (uint8)",
-      ];
-      const contract = new ethers.Contract(contractAddress, abi, this.provider);
+      console.log(
+        "💰 Batch fetching prices for",
+        contractAddresses.length,
+        "tokens"
+      );
 
-      const [name, symbol, decimals] = await Promise.all([
-        contract.name().catch(() => "Unknown Token"),
-        contract.symbol().catch(() => "UNKNOWN"),
-        contract.decimals().catch(() => 18),
-      ]);
+      // Handle ETH separately
+      if (contractAddresses.includes("native")) {
+        try {
+          // Check cache first
+          const cached = this.priceCache.get("ethereum");
+          if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+            prices["native"] = {
+              price: cached.price,
+              change24h: cached.change24h,
+            };
+            console.log("✅ Using cached ETH price:", cached.price);
+          } else {
+            const ethResponse = await axios.get(
+              `${COINGECKO_BASE_URL}/simple/price`,
+              {
+                params: {
+                  ids: "ethereum",
+                  vs_currencies: "usd",
+                  include_24hr_change: true,
+                },
+                headers: this.coinGeckoHeaders,
+                timeout: 5000,
+              }
+            );
 
-      return {
-        contractAddress,
-        symbol: symbol.toUpperCase(),
-        name,
-        decimals,
-        imageUrl: "",
-      };
+            if (ethResponse.data?.ethereum) {
+              const price = ethResponse.data.ethereum.usd || 0;
+              const change = ethResponse.data.ethereum.usd_24h_change || 0;
+              prices["native"] = { price, change24h: change };
+              this.priceCache.set("ethereum", {
+                price,
+                change24h: change,
+                timestamp: Date.now(),
+              });
+              console.log("✅ ETH price fetched:", price);
+            }
+          }
+        } catch (error) {
+          console.log("⚠️ Failed to fetch ETH price, using fallback");
+          prices["native"] = { price: 0, change24h: 0 };
+        }
+      }
+
+      // Filter out native and get ERC-20 addresses
+      const erc20Addresses = contractAddresses.filter(
+        (addr) => addr !== "native"
+      );
+
+      if (erc20Addresses.length > 0) {
+        // Try to get prices using known IDs first
+        const knownTokens: string[] = [];
+        const unknownAddresses: string[] = [];
+
+        for (const addr of erc20Addresses) {
+          const knownId = TOKEN_ID_MAPPINGS[addr.toLowerCase()];
+          if (knownId) {
+            knownTokens.push(knownId);
+            // Map the ID back to address for later
+            prices[addr.toLowerCase()] = { price: 0, change24h: 0 }; // Default
+          } else {
+            unknownAddresses.push(addr);
+          }
+        }
+
+        // Fetch prices for known tokens by ID
+        if (knownTokens.length > 0) {
+          try {
+            const idsString = knownTokens.join(",");
+            const response = await axios.get(
+              `${COINGECKO_BASE_URL}/simple/price`,
+              {
+                params: {
+                  ids: idsString,
+                  vs_currencies: "usd",
+                  include_24hr_change: true,
+                },
+                headers: this.coinGeckoHeaders,
+                timeout: 5000,
+              }
+            );
+
+            if (response.data) {
+              // Map prices back to contract addresses
+              for (const [contractAddr, geckoId] of Object.entries(
+                TOKEN_ID_MAPPINGS
+              )) {
+                if (response.data[geckoId]) {
+                  prices[contractAddr.toLowerCase()] = {
+                    price: response.data[geckoId].usd || 0,
+                    change24h: response.data[geckoId].usd_24h_change || 0,
+                  };
+                  console.log(
+                    `✅ Price for ${geckoId}: $${response.data[geckoId].usd}`
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            console.log("⚠️ Failed to fetch known token prices");
+          }
+        }
+
+        // Try to fetch remaining unknown tokens by contract address
+        if (unknownAddresses.length > 0) {
+          try {
+            const addresses = unknownAddresses.join(",");
+            const response = await axios.get(
+              `${COINGECKO_BASE_URL}/simple/token_price/ethereum`,
+              {
+                params: {
+                  contract_addresses: addresses,
+                  vs_currencies: "usd",
+                  include_24hr_change: true,
+                },
+                headers: this.coinGeckoHeaders,
+                timeout: 5000,
+              }
+            );
+
+            if (response.data) {
+              for (const [address, data] of Object.entries(response.data)) {
+                const priceData = data as any;
+                prices[address.toLowerCase()] = {
+                  price: priceData.usd || 0,
+                  change24h: priceData.usd_24h_change || 0,
+                };
+              }
+            }
+          } catch (error) {
+            console.log("⚠️ Failed to fetch unknown token prices");
+          }
+        }
+
+        // Set 0 for any tokens that still don't have prices
+        for (const addr of erc20Addresses) {
+          if (!prices[addr.toLowerCase()]) {
+            prices[addr.toLowerCase()] = { price: 0, change24h: 0 };
+          }
+        }
+      }
+
+      return prices;
     } catch (error) {
-      console.log(`⚠️ Blockchain metadata fetch failed for ${contractAddress}`);
+      console.error("❌ Error in batch price fetching:", error);
+      // Return 0 prices as fallback
+      for (const addr of contractAddresses) {
+        prices[addr.toLowerCase()] = { price: 0, change24h: 0 };
+      }
+      return prices;
     }
-    return null;
   }
 
   // Get metadata with fallback chain
@@ -272,13 +432,6 @@ export class DashboardService {
       return metadata;
     }
 
-    // Try blockchain
-    metadata = await this.getTokenMetadataFromBlockchain(contractAddress);
-    if (metadata) {
-      console.log(`✅ Got metadata from blockchain for ${contractAddress}`);
-      return metadata;
-    }
-
     // Return minimal data as last resort
     console.log(`⚠️ Using minimal metadata for ${contractAddress}`);
     return {
@@ -288,107 +441,6 @@ export class DashboardService {
       decimals: 18,
       imageUrl: "",
     };
-  }
-
-  // Batch fetch token prices from CoinGecko with proper error handling
-  async batchFetchTokenPrices(
-    contractAddresses: string[]
-  ): Promise<Record<string, { price: number; change24h: number }>> {
-    const prices: Record<string, { price: number; change24h: number }> = {};
-
-    try {
-      console.log(
-        "💰 Batch fetching prices for",
-        contractAddresses.length,
-        "tokens"
-      );
-
-      // Handle ETH separately
-      const ethIndex = contractAddresses.findIndex((addr) => addr === "native");
-      if (ethIndex !== -1) {
-        contractAddresses = contractAddresses.filter(
-          (addr) => addr !== "native"
-        );
-
-        try {
-          // Get ETH price
-          const ethResponse = await axios.get(
-            `${COINGECKO_BASE_URL}/simple/price`,
-            {
-              params: {
-                ids: "ethereum",
-                vs_currencies: "usd",
-                include_24hr_change: true,
-              },
-              headers: this.coinGeckoHeaders,
-            }
-          );
-
-          if (ethResponse.data?.ethereum) {
-            prices["native"] = {
-              price: ethResponse.data.ethereum.usd || 0,
-              change24h: ethResponse.data.ethereum.usd_24h_change || 0,
-            };
-            console.log("✅ ETH price fetched:", prices["native"].price);
-          }
-        } catch (error: any) {
-          console.log("⚠️ Failed to fetch ETH price, using fallback");
-          prices["native"] = { price: 0, change24h: 0 };
-        }
-      }
-
-      // Batch fetch ERC-20 token prices
-      if (contractAddresses.length > 0) {
-        try {
-          const addresses = contractAddresses.join(",");
-          const response = await axios.get(
-            `${COINGECKO_BASE_URL}/simple/token_price/ethereum`,
-            {
-              params: {
-                contract_addresses: addresses,
-                vs_currencies: "usd",
-                include_24hr_change: true,
-              },
-              headers: this.coinGeckoHeaders,
-            }
-          );
-
-          if (response.data) {
-            for (const [address, data] of Object.entries(response.data)) {
-              const priceData = data as any;
-              prices[address.toLowerCase()] = {
-                price: priceData.usd || 0,
-                change24h: priceData.usd_24h_change || 0,
-              };
-            }
-            console.log(
-              `✅ Fetched prices for ${
-                Object.keys(response.data).length
-              } tokens`
-            );
-          }
-        } catch (error: any) {
-          console.log(
-            "⚠️ Batch price fetch failed, will use 0 for unknown prices"
-          );
-          // Set price to 0 for tokens that failed
-          for (const addr of contractAddresses) {
-            if (!prices[addr.toLowerCase()]) {
-              prices[addr.toLowerCase()] = { price: 0, change24h: 0 };
-            }
-          }
-        }
-      }
-
-      return prices;
-    } catch (error) {
-      console.error("❌ Error in batch price fetching:", error);
-      // Return empty prices as fallback
-      for (const addr of contractAddresses) {
-        prices[addr.toLowerCase()] = { price: 0, change24h: 0 };
-      }
-      return prices;
-    }
   }
 
   // Initialize dashboard for new user
@@ -402,15 +454,11 @@ export class DashboardService {
     try {
       // Step 1: Get all tokens from Alchemy
       const allTokens = await this.getWalletTokens(walletAddress);
-      console.log(`📊 Found ${allTokens.length} total tokens`);
+      console.log(`📊 Found ${allTokens.length} tokens with balance`);
 
-      // Step 2: Filter against preset tokens
-      const filteredTokens = this.filterPresetTokens(allTokens);
-      console.log(`📋 Filtered to ${filteredTokens.length} preset tokens`);
-
-      // Step 3: Get metadata for each token
+      // Step 2: Get metadata for each token
       const metadata: TokenMetadata[] = [];
-      const metadataPromises = filteredTokens.map(async (token) => {
+      const metadataPromises = allTokens.map(async (token) => {
         const tokenMetadata = await this.getTokenMetadataWithFallback(
           token.contractAddress
         );
@@ -420,15 +468,15 @@ export class DashboardService {
       const metadataResults = await Promise.all(metadataPromises);
       metadata.push(...metadataResults);
 
-      // Step 4: Batch fetch prices
-      const addresses = filteredTokens.map((t) => t.contractAddress);
+      // Step 3: Batch fetch prices
+      const addresses = allTokens.map((t) => t.contractAddress);
       const prices = await this.batchFetchTokenPrices(addresses);
 
-      // Step 5: Combine data and calculate values
+      // Step 4: Combine data and calculate values
       const dashboardTokens: TokenDashboardData[] = [];
       let totalValue = 0;
 
-      for (const token of filteredTokens) {
+      for (const token of allTokens) {
         const meta = metadata.find(
           (m) =>
             m.contractAddress.toLowerCase() ===
@@ -472,7 +520,7 @@ export class DashboardService {
     }
   }
 
-  // Refresh dashboard (for both new and returning users)
+  // Refresh dashboard
   async refreshDashboard(
     walletAddress: string,
     storedMetadata: TokenMetadata[]
@@ -483,29 +531,48 @@ export class DashboardService {
     console.log("🔄 Refreshing dashboard for:", walletAddress);
 
     try {
-      // Step 1: Get current token balances from Alchemy
+      // Get current token balances
       const currentBalances = await this.getWalletTokens(walletAddress);
 
-      // Create a map of stored metadata for quick lookup
+      // For any new tokens not in metadata, fetch their metadata
+      const newTokenAddresses = currentBalances
+        .map((b) => b.contractAddress.toLowerCase())
+        .filter(
+          (addr) =>
+            !storedMetadata.find(
+              (m) => m.contractAddress.toLowerCase() === addr
+            )
+        );
+
+      const newMetadata: TokenMetadata[] = [];
+      if (newTokenAddresses.length > 0) {
+        console.log(
+          `📋 Found ${newTokenAddresses.length} new tokens, fetching metadata...`
+        );
+        for (const addr of newTokenAddresses) {
+          const meta = await this.getTokenMetadataWithFallback(addr);
+          newMetadata.push(meta);
+        }
+      }
+
+      // Combine stored and new metadata
+      const allMetadata = [...storedMetadata, ...newMetadata];
       const metadataMap = new Map(
-        storedMetadata.map((m) => [m.contractAddress.toLowerCase(), m])
+        allMetadata.map((m) => [m.contractAddress.toLowerCase(), m])
       );
 
-      // Filter to only tokens we have metadata for
-      const relevantBalances = currentBalances.filter((b) =>
-        metadataMap.has(b.contractAddress.toLowerCase())
-      );
-
-      // Step 2: Batch fetch current prices
-      const addresses = relevantBalances.map((t) => t.contractAddress);
+      // Batch fetch current prices for all tokens
+      const addresses = currentBalances.map((t) => t.contractAddress);
       const prices = await this.batchFetchTokenPrices(addresses);
 
-      // Step 3: Combine and calculate
+      // Combine and calculate
       const dashboardTokens: TokenDashboardData[] = [];
       let totalValue = 0;
 
-      for (const balance of relevantBalances) {
-        const meta = metadataMap.get(balance.contractAddress.toLowerCase())!;
+      for (const balance of currentBalances) {
+        const meta = metadataMap.get(balance.contractAddress.toLowerCase());
+        if (!meta) continue; // Skip if no metadata
+
         const priceData = prices[balance.contractAddress.toLowerCase()] || {
           price: 0,
           change24h: 0,
@@ -543,7 +610,7 @@ export class DashboardService {
     }
   }
 
-  // Add new token to dashboard
+  // Add token to dashboard
   async addTokenToDashboard(
     contractAddress: string,
     walletAddress: string
@@ -554,13 +621,12 @@ export class DashboardService {
     console.log("➕ Adding token to dashboard:", contractAddress);
 
     try {
-      // Normalize address
       contractAddress = contractAddress.toLowerCase();
 
-      // Get metadata with fallback chain
+      // Get metadata
       const metadata = await this.getTokenMetadataWithFallback(contractAddress);
 
-      // Get balance (might be 0)
+      // Get balance
       let balance = 0;
       try {
         const abi = ["function balanceOf(address) view returns (uint256)"];
@@ -592,7 +658,6 @@ export class DashboardService {
       };
 
       console.log(`✅ Token added: ${metadata.symbol} (${metadata.name})`);
-
       return { token, metadata };
     } catch (error) {
       console.error("❌ Error adding token:", error);
