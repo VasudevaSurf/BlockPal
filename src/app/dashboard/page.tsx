@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - Fixed to properly handle loading states
+// src/app/dashboard/page.tsx - FIXED with proper user switching
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -11,6 +11,7 @@ import {
   setActiveWallet,
   setActiveWalletInDB,
   getActiveWalletFromDB,
+  clearWalletState,
 } from "@/store/slices/walletSlice";
 import { useDashboardV2 } from "@/hooks/useDashboardV2";
 import WalletBalance from "@/components/dashboard/WalletBalance";
@@ -34,6 +35,7 @@ interface DashboardState {
   hasActiveWallet: boolean;
   showWelcomeModal: boolean;
   initialLoadComplete: boolean;
+  currentUserId: string | null;
 }
 
 export default function DashboardPage() {
@@ -76,6 +78,7 @@ export default function DashboardPage() {
     hasActiveWallet: false,
     showWelcomeModal: false,
     initialLoadComplete: false,
+    currentUserId: null,
   });
 
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
@@ -85,11 +88,70 @@ export default function DashboardPage() {
     authChecked: false,
     walletsLoaded: false,
     activeWalletSynced: false,
+    lastUserId: null as string | null,
   });
+
+  // CRITICAL: Detect user changes and clear state
+  useEffect(() => {
+    const userId = user?.id || user?.username || null;
+
+    // If user changed (including logout), clear wallet state
+    if (
+      initializationRef.current.lastUserId &&
+      initializationRef.current.lastUserId !== userId
+    ) {
+      console.log("👤 User changed, clearing wallet state", {
+        oldUser: initializationRef.current.lastUserId,
+        newUser: userId,
+      });
+
+      // Clear wallet state
+      dispatch(clearWalletState());
+
+      // Reset initialization flags
+      initializationRef.current.walletsLoaded = false;
+      initializationRef.current.activeWalletSynced = false;
+
+      // Reset dashboard state
+      setDashboardState({
+        authLoading: false,
+        walletsLoading: false,
+        authResolved: true,
+        walletsResolved: false,
+        activeWalletResolved: false,
+        hasWallets: false,
+        hasActiveWallet: false,
+        showWelcomeModal: false,
+        initialLoadComplete: false,
+        currentUserId: userId,
+      });
+
+      // Clear any cached data
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("walletNameOverrides");
+        localStorage.removeItem("dashboard-user-data-v2");
+        localStorage.removeItem("activeWalletId");
+      }
+    }
+
+    // Update last user ID
+    initializationRef.current.lastUserId = userId;
+
+    // Update dashboard state with current user
+    setDashboardState((prev) => ({
+      ...prev,
+      currentUserId: userId,
+    }));
+  }, [user, dispatch]);
 
   // Log dashboard status on mount
   useEffect(() => {
     console.log("📊 Dashboard mounted");
+
+    // Cleanup function
+    return () => {
+      console.log("📊 Dashboard unmounting");
+    };
   }, []);
 
   // STEP 1: Auth Check
@@ -114,19 +176,30 @@ export default function DashboardPage() {
   useEffect(() => {
     if (dashboardState.authResolved && !isAuthenticated && !authLoading) {
       console.log("🚪 Dashboard - Not authenticated, redirecting to auth");
+
+      // Clear wallet state before redirecting
+      dispatch(clearWalletState());
+
       router.push("/auth");
     }
-  }, [dashboardState.authResolved, isAuthenticated, authLoading, router]);
+  }, [
+    dashboardState.authResolved,
+    isAuthenticated,
+    authLoading,
+    router,
+    dispatch,
+  ]);
 
-  // STEP 3: Load Wallets
+  // STEP 3: Load Wallets (only for current user)
   useEffect(() => {
     if (
       dashboardState.authResolved &&
       isAuthenticated &&
       user &&
-      !initializationRef.current.walletsLoaded
+      !initializationRef.current.walletsLoaded &&
+      dashboardState.currentUserId === (user.id || user.username)
     ) {
-      console.log("📡 Dashboard - Loading wallets");
+      console.log("📡 Dashboard - Loading wallets for user:", user.username);
       initializationRef.current.walletsLoaded = true;
       setDashboardState((prev) => ({ ...prev, walletsLoading: true }));
 
@@ -141,6 +214,7 @@ export default function DashboardPage() {
         console.log("📦 Wallets loaded:", {
           hasWallets,
           count: walletsData?.length || 0,
+          userId: user.username,
         });
 
         setDashboardState((prev) => ({
@@ -153,23 +227,48 @@ export default function DashboardPage() {
         }));
       });
     }
-  }, [dashboardState.authResolved, isAuthenticated, user, dispatch]);
+  }, [
+    dashboardState.authResolved,
+    isAuthenticated,
+    user,
+    dashboardState.currentUserId,
+    dispatch,
+  ]);
 
-  // STEP 4: Sync Active Wallet
+  // STEP 4: Sync Active Wallet (only if wallets belong to current user)
   useEffect(() => {
     if (
       dashboardState.walletsResolved &&
       wallets.length > 0 &&
-      !initializationRef.current.activeWalletSynced
+      !initializationRef.current.activeWalletSynced &&
+      user &&
+      dashboardState.currentUserId === (user.id || user.username)
     ) {
-      console.log("🎯 Dashboard - Setting active wallet");
+      console.log(
+        "🎯 Dashboard - Setting active wallet for user:",
+        user.username
+      );
       initializationRef.current.activeWalletSynced = true;
 
       dispatch(getActiveWalletFromDB()).then((result) => {
         if (result.type === "wallet/getActiveWalletFromDB/fulfilled") {
           const { activeWalletId } = result.payload as any;
           if (activeWalletId) {
-            dispatch(setActiveWallet(activeWalletId));
+            // Verify the wallet belongs to current user's wallets
+            const walletExists = wallets.find((w) => w.id === activeWalletId);
+            if (walletExists) {
+              dispatch(setActiveWallet(activeWalletId));
+            } else {
+              console.warn(
+                "⚠️ Active wallet from DB doesn't belong to current user"
+              );
+              // Set first wallet as active
+              if (wallets.length > 0) {
+                const firstWallet = wallets[0];
+                dispatch(setActiveWallet(firstWallet.id));
+                dispatch(setActiveWalletInDB(firstWallet.id));
+              }
+            }
           } else if (wallets.length > 0) {
             const firstWallet = wallets[0];
             dispatch(setActiveWallet(firstWallet.id));
@@ -194,7 +293,13 @@ export default function DashboardPage() {
         hasActiveWallet: false,
       }));
     }
-  }, [dashboardState.walletsResolved, wallets, dispatch]);
+  }, [
+    dashboardState.walletsResolved,
+    wallets,
+    user,
+    dashboardState.currentUserId,
+    dispatch,
+  ]);
 
   // Handle wallet selection
   const handleWalletSelect = async (walletId: string) => {
@@ -259,6 +364,8 @@ export default function DashboardPage() {
     isLoading,
     tokensCount: tokens.length,
     totalValue,
+    currentUser: user?.username,
+    currentUserId: dashboardState.currentUserId,
   });
 
   // Show loading skeleton during initial setup
@@ -293,44 +400,6 @@ export default function DashboardPage() {
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
-      {/* Development Mode Status Bar - COMMENTED OUT FOR PRODUCTION */}
-      {/* {process.env.NODE_ENV === "development" && isInitialized && activeWallet && (
-        <div className="bg-black/50 rounded-lg p-2 mb-2 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-3">
-            <span
-              className={`px-2 py-0.5 rounded ${
-                isNewUser
-                  ? "bg-green-500/20 text-green-400"
-                  : "bg-blue-500/20 text-blue-400"
-              }`}
-            >
-              {isNewUser ? "NEW USER" : "RETURNING USER"}
-            </span>
-            <span className="text-gray-400">
-              {isInitialized ? "Initialized" : "Not Initialized"}
-            </span>
-            <span className="text-gray-400">Refreshes: {refreshCount}</span>
-            {lastRefresh && (
-              <span className="text-gray-400">
-                Last: {lastRefresh.toLocaleTimeString()}
-              </span>
-            )}
-            {isRefreshing && (
-              <span className="text-yellow-400 animate-pulse">
-                Refreshing...
-              </span>
-            )}
-          </div>
-          <button
-            onClick={handleManualRefresh}
-            disabled={isRefreshing}
-            className="px-2 py-1 bg-[#E2AF19] text-black rounded hover:bg-[#D4A853] disabled:opacity-50"
-          >
-            Manual Refresh
-          </button>
-        </div>
-      )} */}
-
       {/* Error Display */}
       {error && (
         <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-2">
@@ -382,7 +451,7 @@ export default function DashboardPage() {
               <span className="text-black text-2xl font-bold">₿</span>
             </div>
             <h3 className="text-white text-lg font-satoshi font-semibold mb-2">
-              Welcome to Blockpal
+              Welcome to Blockpal, {user?.displayName || user?.name || "User"}
             </h3>
             <p className="text-gray-400 font-satoshi text-sm mb-4">
               {wallets.length === 0

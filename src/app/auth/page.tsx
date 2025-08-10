@@ -1,11 +1,58 @@
+// src/app/auth/page.tsx - COMPLETE FIXED VERSION
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState, AppDispatch } from "@/store";
+import { clearWalletState } from "@/store/slices/walletSlice";
+import { resetUIState } from "@/store/slices/uiSlice";
+import { clearError } from "@/store/slices/authSlice";
+import { appCleanupService } from "@/lib/app-cleanup-service";
 import LoginForm from "@/components/auth/LoginForm";
 import RegisterForm from "@/components/auth/RegisterForm";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+
+  // Cleanup on component mount to ensure clean state
+  useEffect(() => {
+    console.log("🔍 Auth page mounted, performing cleanup check");
+
+    // Verify clean state
+    const isClean = appCleanupService.verifyCleanState();
+    if (!isClean) {
+      console.log("🧹 Detected unclean state on auth page, cleaning up...");
+
+      // Dispatch cleanup actions
+      dispatch(clearWalletState());
+      dispatch(resetUIState());
+
+      // Perform full cleanup
+      appCleanupService.performFullCleanup();
+    }
+
+    // Clear any existing errors
+    dispatch(clearError());
+  }, [dispatch]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log("✅ User authenticated, redirecting to dashboard");
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, router]);
+
+  // Cleanup when switching between login and register
+  const handleFormSwitch = (toLogin: boolean) => {
+    // Clear any errors when switching forms
+    dispatch(clearError());
+    setIsLogin(toLogin);
+  };
 
   return (
     <div className="h-screen flex p-4 overflow-hidden bg-[#0F0F0F]">
@@ -33,7 +80,7 @@ export default function AuthPage() {
                 <p className="text-gray-400 font-satoshi text-sm">
                   Don't have an account?{" "}
                   <button
-                    onClick={() => setIsLogin(false)}
+                    onClick={() => handleFormSwitch(false)}
                     className="font-medium hover:opacity-80 text-[#E2AF19] font-satoshi"
                   >
                     Create an account
@@ -43,7 +90,7 @@ export default function AuthPage() {
                 <p className="text-gray-400 font-satoshi text-sm">
                   Have an account already?{" "}
                   <button
-                    onClick={() => setIsLogin(true)}
+                    onClick={() => handleFormSwitch(true)}
                     className="font-medium hover:opacity-80 text-[#E2AF19] font-satoshi"
                   >
                     Login

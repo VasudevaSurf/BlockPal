@@ -1,3 +1,4 @@
+// src/store/slices/uiSlice.ts - FIXED with reset action
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { UIState } from "@/types";
 
@@ -26,6 +27,11 @@ const uiSlice = createSlice({
     setSidebarOpen: (state, action: PayloadAction<boolean>) => {
       state.sidebarOpen = action.payload;
     },
+    // NEW: Reset UI state to initial values
+    resetUIState: (state) => {
+      console.log("🧹 Resetting UI state");
+      Object.assign(state, initialState);
+    },
   },
 });
 
@@ -35,6 +41,7 @@ export const {
   openWalletSelector,
   closeWalletSelector,
   setSidebarOpen,
+  resetUIState,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

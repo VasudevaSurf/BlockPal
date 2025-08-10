@@ -1,6 +1,11 @@
-// src/store/slices/authSlice.ts - FIXED with proper error handling
+// src/store/slices/authSlice.ts - FIXED with proper state cleanup
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { AuthState, User } from "@/types";
+import { AppDispatch } from "@/store";
+
+// Import wallet actions for cleanup
+import { clearWalletState } from "./walletSlice";
+import { resetUIState } from "./uiSlice";
 
 const initialState: AuthState = {
   user: null,
@@ -26,256 +31,300 @@ const safeJsonParse = async (response: Response) => {
   }
 };
 
+// Helper function to clear all app data
+const clearAllAppData = () => {
+  if (typeof window !== "undefined") {
+    console.log("🧹 Clearing all app data from storage");
+
+    // Clear specific keys
+    const keysToRemove = [
+      "activeWalletId",
+      "auth-token",
+      "walletNameOverrides",
+      "dashboard-user-data-v2",
+      "dashboard-user-data",
+    ];
+
+    keysToRemove.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+
+    // Clear any prefixed keys
+    const allLocalKeys = Object.keys(localStorage);
+    const allSessionKeys = Object.keys(sessionStorage);
+
+    allLocalKeys.forEach((key) => {
+      if (
+        key.startsWith("wallet-") ||
+        key.startsWith("token-") ||
+        key.startsWith("blockpal-") ||
+        key.startsWith("dashboard-") ||
+        key.startsWith("cache-") ||
+        key.startsWith("realtime-")
+      ) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    allSessionKeys.forEach((key) => {
+      if (
+        key.startsWith("wallet") ||
+        key.startsWith("token") ||
+        key.startsWith("blockpal") ||
+        key.startsWith("dashboard") ||
+        key.startsWith("cache") ||
+        key.startsWith("realtime")
+      ) {
+        sessionStorage.removeItem(key);
+      }
+    });
+
+    console.log("✅ Storage cleared");
+  }
+};
+
 // Async thunks for API calls
-export const loginUser = createAsyncThunk(
-  "auth/loginUser",
-  async (
-    credentials: {
-      email: string;
-      password: string;
-      twoFactorCode?: string;
-    },
-    { rejectWithValue }
-  ) => {
+export const loginUser = createAsyncThunk<
+  User,
+  { email: string; password: string; twoFactorCode?: string },
+  { dispatch: AppDispatch }
+>("auth/loginUser", async (credentials, { rejectWithValue, dispatch }) => {
+  try {
+    console.log("🔐 Redux: Starting login request");
+
+    // Clear any existing state before login
+    dispatch(clearWalletState());
+    dispatch(resetUIState());
+    clearAllAppData();
+
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(credentials),
+      credentials: "include",
+    });
+
+    console.log("📥 Redux: Login response received", {
+      ok: response.ok,
+      status: response.status,
+    });
+
+    let data;
     try {
-      console.log("🔐 Redux: Starting login request");
-      console.log("📧 Email:", credentials.email);
-      console.log("🔑 Has 2FA code:", !!credentials.twoFactorCode);
+      data = await safeJsonParse(response);
+    } catch (parseError) {
+      console.error("❌ Failed to parse login response:", parseError);
+      return rejectWithValue("Server returned invalid response");
+    }
 
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(credentials),
-        credentials: "include",
-      });
+    if (!response.ok) {
+      console.log("❌ Redux: Login failed", data.error);
 
-      console.log("📥 Redux: Login response received", {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-      });
-
-      // Handle different response types
-      let data;
-      try {
-        data = await safeJsonParse(response);
-      } catch (parseError) {
-        console.error("❌ Failed to parse login response:", parseError);
-        return rejectWithValue("Server returned invalid response");
-      }
-
-      console.log("📋 Redux: Parsed response data:", {
-        hasUser: !!data.user,
-        error: data.error,
-        requiresTwoFactor: !!data.requiresTwoFactor,
-      });
-
-      if (!response.ok) {
-        console.log("❌ Redux: Login failed", data.error);
-
-        // Handle 2FA requirement
-        if (data.error === "2FA_REQUIRED" || data.requiresTwoFactor) {
-          console.log("🔐 Redux: 2FA required");
-          return rejectWithValue("2FA_REQUIRED");
-        }
-
-        return rejectWithValue(
-          data.error || `Server error: ${response.status}`
-        );
-      }
-
-      // Handle successful response that still requires 2FA
-      if (data.requiresTwoFactor && !data.user) {
-        console.log("🔐 Redux: 2FA required (success response)");
+      if (data.error === "2FA_REQUIRED" || data.requiresTwoFactor) {
+        console.log("🔐 Redux: 2FA required");
         return rejectWithValue("2FA_REQUIRED");
       }
 
-      if (!data.user) {
-        console.error("❌ Redux: No user data in successful response");
-        return rejectWithValue("Authentication failed - no user data");
-      }
-
-      console.log("✅ Redux: Login successful", data.user);
-
-      // Verify cookie was set
-      setTimeout(() => {
-        if (typeof window !== "undefined") {
-          const cookies = document.cookie;
-          const hasAuthToken = cookies.includes("auth-token");
-          console.log("🍪 Redux: Cookie check after login:", hasAuthToken);
-        }
-      }, 100);
-
-      return data.user;
-    } catch (error) {
-      console.error("💥 Redux: Network error during login:", error);
-
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        return rejectWithValue(
-          "Network connection failed. Please check your internet connection."
-        );
-      }
-
-      return rejectWithValue("An unexpected error occurred during login");
+      return rejectWithValue(data.error || `Server error: ${response.status}`);
     }
-  }
-);
 
-export const registerUser = createAsyncThunk(
-  "auth/registerUser",
-  async (
-    userData: { name: string; email: string; password: string },
-    { rejectWithValue }
-  ) => {
-    try {
-      console.log("📝 Redux: Starting registration request");
+    if (data.requiresTwoFactor && !data.user) {
+      console.log("🔐 Redux: 2FA required (success response)");
+      return rejectWithValue("2FA_REQUIRED");
+    }
 
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(userData),
-        credentials: "include",
-      });
+    if (!data.user) {
+      console.error("❌ Redux: No user data in successful response");
+      return rejectWithValue("Authentication failed - no user data");
+    }
 
-      let data;
-      try {
-        data = await safeJsonParse(response);
-      } catch (parseError) {
-        console.error("❌ Failed to parse registration response:", parseError);
-        return rejectWithValue("Server returned invalid response");
-      }
+    console.log("✅ Redux: Login successful", data.user);
 
-      if (!response.ok) {
-        return rejectWithValue(
-          data.error || `Server error: ${response.status}`
-        );
-      }
+    // Clear wallet state after successful login to ensure clean slate
+    dispatch(clearWalletState());
 
-      if (!data.user) {
-        return rejectWithValue("Registration failed - no user data");
-      }
+    return data.user;
+  } catch (error) {
+    console.error("💥 Redux: Network error during login:", error);
 
-      console.log("✅ Redux: Registration successful");
-      return data.user;
-    } catch (error) {
-      console.error("💥 Redux: Network error during registration:", error);
-
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        return rejectWithValue(
-          "Network connection failed. Please check your internet connection."
-        );
-      }
-
+    if (error instanceof TypeError && error.message.includes("fetch")) {
       return rejectWithValue(
-        "An unexpected error occurred during registration"
+        "Network connection failed. Please check your internet connection."
       );
     }
+
+    return rejectWithValue("An unexpected error occurred during login");
   }
-);
+});
 
-export const logoutUser = createAsyncThunk(
-  "auth/logoutUser",
-  async (_, { rejectWithValue }) => {
+export const registerUser = createAsyncThunk<
+  User,
+  { name: string; email: string; password: string },
+  { dispatch: AppDispatch }
+>("auth/registerUser", async (userData, { rejectWithValue, dispatch }) => {
+  try {
+    console.log("📝 Redux: Starting registration request");
+
+    // Clear any existing state before registration
+    dispatch(clearWalletState());
+    dispatch(resetUIState());
+    clearAllAppData();
+
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(userData),
+      credentials: "include",
+    });
+
+    let data;
     try {
-      console.log("🚪 Redux: Starting logout request");
-
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-
-      // Don't parse response for logout - just check if it succeeded
-      if (!response.ok) {
-        console.warn(
-          "⚠️ Redux: Logout API failed, but continuing with local cleanup"
-        );
-        // Don't reject - we still want to clear local state
-      } else {
-        console.log("✅ Redux: Logout API successful");
-      }
-
-      // Always clear local storage regardless of API response
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("activeWalletId");
-        localStorage.removeItem("auth-token");
-
-        // Clear any other cached data
-        const keys = Object.keys(localStorage);
-        keys.forEach((key) => {
-          if (
-            key.startsWith("wallet-") ||
-            key.startsWith("token-") ||
-            key.startsWith("blockpal-")
-          ) {
-            localStorage.removeItem(key);
-          }
-        });
-      }
-
-      return null;
-    } catch (error) {
-      console.error("💥 Redux: Network error during logout:", error);
-
-      // Still clear local state even if network fails
-      if (typeof window !== "undefined") {
-        localStorage.clear();
-      }
-
-      // Don't reject logout - we want to clear state regardless
-      return null;
+      data = await safeJsonParse(response);
+    } catch (parseError) {
+      console.error("❌ Failed to parse registration response:", parseError);
+      return rejectWithValue("Server returned invalid response");
     }
+
+    if (!response.ok) {
+      return rejectWithValue(data.error || `Server error: ${response.status}`);
+    }
+
+    if (!data.user) {
+      return rejectWithValue("Registration failed - no user data");
+    }
+
+    console.log("✅ Redux: Registration successful");
+
+    // Clear wallet state after successful registration
+    dispatch(clearWalletState());
+
+    return data.user;
+  } catch (error) {
+    console.error("💥 Redux: Network error during registration:", error);
+
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      return rejectWithValue(
+        "Network connection failed. Please check your internet connection."
+      );
+    }
+
+    return rejectWithValue("An unexpected error occurred during registration");
   }
-);
+});
 
-export const checkAuthStatus = createAsyncThunk(
-  "auth/checkAuthStatus",
-  async (_, { rejectWithValue }) => {
-    try {
-      console.log("🔍 Redux: Checking auth status");
+export const logoutUser = createAsyncThunk<
+  null,
+  void,
+  { dispatch: AppDispatch }
+>("auth/logoutUser", async (_, { rejectWithValue, dispatch }) => {
+  try {
+    console.log("🚪 Redux: Starting logout request");
 
-      const response = await fetch("/api/auth/me", {
-        credentials: "include",
-      });
+    // Clear all state immediately
+    dispatch(clearWalletState());
+    dispatch(resetUIState());
+    clearAllAppData();
 
-      console.log("📥 Redux: Auth check response", {
-        ok: response.ok,
-        status: response.status,
-      });
+    const response = await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
 
-      if (!response.ok) {
-        console.log("❌ Redux: Auth check failed");
-        return rejectWithValue("Not authenticated");
-      }
+    if (!response.ok) {
+      console.warn(
+        "⚠️ Redux: Logout API failed, but continuing with local cleanup"
+      );
+    } else {
+      console.log("✅ Redux: Logout API successful");
+    }
 
-      let data;
+    // Force clear everything again after API call
+    clearAllAppData();
+
+    // Clear any service workers or cached data
+    if (typeof window !== "undefined" && "caches" in window) {
       try {
-        data = await safeJsonParse(response);
-      } catch (parseError) {
-        console.error("❌ Failed to parse auth check response:", parseError);
-        return rejectWithValue("Server returned invalid response");
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map((cacheName) => caches.delete(cacheName))
+        );
+      } catch (error) {
+        console.log("Could not clear caches:", error);
       }
-
-      if (!data.user) {
-        return rejectWithValue("No user data in auth response");
-      }
-
-      console.log("✅ Redux: Auth check successful", data.user);
-      return data.user;
-    } catch (error) {
-      console.error("💥 Redux: Network error during auth check:", error);
-
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        return rejectWithValue("Network connection failed");
-      }
-
-      return rejectWithValue("An unexpected error occurred");
     }
+
+    return null;
+  } catch (error) {
+    console.error("💥 Redux: Network error during logout:", error);
+
+    // Still clear local state even if network fails
+    clearAllAppData();
+
+    return null;
   }
-);
+});
+
+export const checkAuthStatus = createAsyncThunk<
+  User,
+  void,
+  { dispatch: AppDispatch }
+>("auth/checkAuthStatus", async (_, { rejectWithValue, dispatch }) => {
+  try {
+    console.log("🔍 Redux: Checking auth status");
+
+    const response = await fetch("/api/auth/me", {
+      credentials: "include",
+    });
+
+    console.log("📥 Redux: Auth check response", {
+      ok: response.ok,
+      status: response.status,
+    });
+
+    if (!response.ok) {
+      console.log("❌ Redux: Auth check failed");
+      // Clear state if auth check fails
+      dispatch(clearWalletState());
+      clearAllAppData();
+      return rejectWithValue("Not authenticated");
+    }
+
+    let data;
+    try {
+      data = await safeJsonParse(response);
+    } catch (parseError) {
+      console.error("❌ Failed to parse auth check response:", parseError);
+      dispatch(clearWalletState());
+      clearAllAppData();
+      return rejectWithValue("Server returned invalid response");
+    }
+
+    if (!data.user) {
+      dispatch(clearWalletState());
+      clearAllAppData();
+      return rejectWithValue("No user data in auth response");
+    }
+
+    console.log("✅ Redux: Auth check successful", data.user);
+    return data.user;
+  } catch (error) {
+    console.error("💥 Redux: Network error during auth check:", error);
+
+    dispatch(clearWalletState());
+    clearAllAppData();
+
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      return rejectWithValue("Network connection failed");
+    }
+
+    return rejectWithValue("An unexpected error occurred");
+  }
+});
 
 const authSlice = createSlice({
   name: "auth",
@@ -287,21 +336,18 @@ const authSlice = createSlice({
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
-    // Add manual authentication setter
     setAuthenticated: (state, action: PayloadAction<User>) => {
       state.isAuthenticated = true;
       state.user = action.payload;
       state.error = null;
       state.loading = false;
     },
-    // Add manual logout
     setUnauthenticated: (state) => {
       state.isAuthenticated = false;
       state.user = null;
       state.error = null;
       state.loading = false;
     },
-    // Reset auth state completely
     resetAuthState: (state) => {
       state.user = null;
       state.isAuthenticated = false;
@@ -328,7 +374,6 @@ const authSlice = createSlice({
         console.log("❌ Redux: Login rejected", action.payload);
         state.loading = false;
 
-        // Don't clear authentication state if 2FA is required
         if (action.payload !== "2FA_REQUIRED") {
           state.isAuthenticated = false;
           state.user = null;
@@ -363,18 +408,13 @@ const authSlice = createSlice({
       })
       .addCase(logoutUser.fulfilled, (state) => {
         console.log("✅ Redux: Logout fulfilled");
-        state.loading = false;
-        state.isAuthenticated = false;
-        state.user = null;
-        state.error = null;
+        // Reset to initial state
+        Object.assign(state, initialState);
       })
-      .addCase(logoutUser.rejected, (state, action) => {
+      .addCase(logoutUser.rejected, (state) => {
         console.log("⚠️ Redux: Logout rejected, but clearing state anyway");
         // Even if logout API fails, clear the state
-        state.loading = false;
-        state.isAuthenticated = false;
-        state.user = null;
-        state.error = null; // Don't show error for logout
+        Object.assign(state, initialState);
       })
       // Check auth status cases
       .addCase(checkAuthStatus.pending, (state) => {
@@ -388,12 +428,10 @@ const authSlice = createSlice({
         state.user = action.payload;
         state.error = null;
       })
-      .addCase(checkAuthStatus.rejected, (state, action) => {
-        console.log("❌ Redux: Auth status check rejected", action.payload);
-        state.loading = false;
-        state.isAuthenticated = false;
-        state.user = null;
-        state.error = null; // Don't set error for auth check failure
+      .addCase(checkAuthStatus.rejected, (state) => {
+        console.log("❌ Redux: Auth status check rejected");
+        // Reset to initial state on auth check failure
+        Object.assign(state, initialState);
       });
   },
 });
