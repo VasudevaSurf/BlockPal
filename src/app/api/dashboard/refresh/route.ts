@@ -1,4 +1,4 @@
-// src/app/api/dashboard/refresh/route.ts - Updated for automatic refresh workflow
+// src/app/api/dashboard/refresh/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -26,28 +26,25 @@ export async function POST(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Get stored metadata
+    // Check if dashboard is initialized
     const dashboardData = await db.collection("dashboard_tokens").findOne({
       username: decoded.username,
       walletAddress: walletAddress.toLowerCase(),
     });
 
-    if (!dashboardData || !dashboardData.metadata) {
+    if (!dashboardData) {
       return NextResponse.json(
         { error: "Dashboard not initialized. Please initialize first." },
         { status: 400 }
       );
     }
 
-    // AUTOMATIC REFRESH FLOW:
-    // Step 1: Get updated token balances from Alchemy
-    // Step 2: Batch fetch current prices from CoinGecko
-    // No need to update metadata
+    // Refresh using the service
     const refreshedData = await dashboardServiceV2.refreshDashboard(
       walletAddress
     );
 
-    // Update database with refreshed values (not metadata)
+    // Update database
     await db.collection("dashboard_tokens").updateOne(
       {
         username: decoded.username,
@@ -63,7 +60,11 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    console.log(`✅ Dashboard refreshed successfully`);
+    console.log(
+      `✅ Dashboard refreshed: ${
+        refreshedData.tokens.length
+      } tokens, $${refreshedData.totalValue.toFixed(2)}`
+    );
 
     return NextResponse.json({
       tokens: refreshedData.tokens,
@@ -73,7 +74,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("❌ Dashboard refresh error:", error);
     return NextResponse.json(
-      { error: "Failed to refresh dashboard" },
+      {
+        error: "Failed to refresh dashboard",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

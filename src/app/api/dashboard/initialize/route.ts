@@ -1,4 +1,4 @@
-// src/app/api/dashboard/initialize/route.ts - Updated to use new workflow
+// src/app/api/dashboard/initialize/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -26,33 +26,37 @@ export async function POST(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Check if user is returning (has stored metadata)
+    // Check if user is returning
     const existingData = await db.collection("dashboard_tokens").findOne({
       username: decoded.username,
       walletAddress: walletAddress.toLowerCase(),
     });
 
-    const isReturningUser =
-      existingData &&
-      existingData.metadata &&
-      Object.keys(existingData.metadata).length > 0;
+    const isReturningUser = dashboardServiceV2.isReturningUser(walletAddress);
 
-    if (isReturningUser) {
-      // PHASE 2: Returning user flow
-      console.log(
-        "👤 Returning user detected, loading dashboard with stored metadata"
-      );
+    let dashboardData;
 
-      try {
-        // Step 1: Metadata already in DB
-        const metadata = existingData.metadata;
+    if (
+      isReturningUser ||
+      (existingData &&
+        existingData.metadata &&
+        Object.keys(existingData.metadata).length > 0)
+    ) {
+      // PHASE 2: Returning user
+      console.log("👤 Returning user detected, loading with stored metadata");
+      dashboardData = await dashboardServiceV2.loadReturningUser(walletAddress);
+    } else {
+      // PHASE 1: New user
+      console.log("🆕 New user detected, initializing with preset tokens");
+      dashboardData = await dashboardServiceV2.initializeNewUser(walletAddress);
 
-        // Step 2 & 3: Get balances and prices
-        const dashboardData = await dashboardServiceV2.loadReturningUser(
-          walletAddress
-        );
+      // Store metadata in MongoDB
+      if (dashboardData.metadata) {
+        const metadataObject: Record<string, any> = {};
+        dashboardData.metadata.forEach((meta: any) => {
+          metadataObject[meta.contractAddress.toLowerCase()] = meta;
+        });
 
-        // Update database with new values
         await db.collection("dashboard_tokens").updateOne(
           {
             username: decoded.username,
@@ -60,67 +64,15 @@ export async function POST(request: NextRequest) {
           },
           {
             $set: {
+              username: decoded.username,
+              walletAddress: walletAddress.toLowerCase(),
+              metadata: metadataObject,
               tokens: dashboardData.tokens,
               totalValue: dashboardData.totalValue,
+              isNewUser: dashboardData.isNewUser,
+              createdAt: new Date(),
+              updatedAt: new Date(),
               lastRefreshed: new Date(),
-              updatedAt: new Date(),
-            },
-          }
-        );
-
-        return NextResponse.json({
-          isNewUser: false,
-          tokens: dashboardData.tokens,
-          totalValue: dashboardData.totalValue,
-          metadata: metadata,
-        });
-      } catch (error) {
-        console.error("⚠️ Error loading returning user data:", error);
-        // Fall back to new user flow if there's an error
-      }
-    }
-
-    // PHASE 1: New user flow
-    console.log("🆕 New user detected, initializing with preset tokens");
-
-    const initData = await dashboardServiceV2.initializeNewUser(walletAddress);
-
-    // Store metadata in database
-    const metadataObject: Record<string, any> = {};
-    initData.metadata.forEach((meta) => {
-      metadataObject[meta.contractAddress.toLowerCase()] = meta;
-    });
-
-    await db.collection("dashboard_tokens").updateOne(
-      {
-        username: decoded.username,
-        walletAddress: walletAddress.toLowerCase(),
-      },
-      {
-        $set: {
-          username: decoded.username,
-          walletAddress: walletAddress.toLowerCase(),
-          metadata: metadataObject,
-          tokens: initData.tokens,
-          totalValue: initData.totalValue,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          lastRefreshed: new Date(),
-        },
-      },
-      { upsert: true }
-    );
-
-    // Also store individual token metadata for global reference
-    for (const meta of initData.metadata) {
-      if (meta.contractAddress !== "native") {
-        await db.collection("token_metadata").updateOne(
-          { contractAddress: meta.contractAddress.toLowerCase() },
-          {
-            $set: {
-              ...meta,
-              contractAddress: meta.contractAddress.toLowerCase(),
-              updatedAt: new Date(),
             },
           },
           { upsert: true }
@@ -128,16 +80,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Update with fresh data
+    if (dashboardData.tokens && dashboardData.tokens.length > 0) {
+      await db.collection("dashboard_tokens").updateOne(
+        {
+          username: decoded.username,
+          walletAddress: walletAddress.toLowerCase(),
+        },
+        {
+          $set: {
+            tokens: dashboardData.tokens,
+            totalValue: dashboardData.totalValue,
+            lastRefreshed: new Date(),
+            updatedAt: new Date(),
+          },
+        }
+      );
+    }
+
+    console.log(
+      `✅ Dashboard initialized: ${
+        dashboardData.tokens?.length || 0
+      } tokens, $${dashboardData.totalValue?.toFixed(2) || 0}`
+    );
+
     return NextResponse.json({
-      isNewUser: true,
-      tokens: initData.tokens,
-      totalValue: initData.totalValue,
-      metadata: initData.metadata,
+      isNewUser: dashboardData.isNewUser || false,
+      tokens: dashboardData.tokens || [],
+      totalValue: dashboardData.totalValue || 0,
+      metadata: dashboardData.metadata || [],
     });
   } catch (error) {
     console.error("❌ Dashboard initialization error:", error);
     return NextResponse.json(
-      { error: "Failed to initialize dashboard" },
+      {
+        error: "Failed to initialize dashboard",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

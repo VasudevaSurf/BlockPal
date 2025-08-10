@@ -1,6 +1,8 @@
+// src/app/api/dashboard/remove-token/route.ts - NEW FILE
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
+import { dashboardServiceV2 } from "@/lib/dashboard-service-v2";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +22,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalize addresses
     const normalizedContract = contractAddress.toLowerCase();
     const normalizedWallet = walletAddress.toLowerCase();
 
@@ -41,24 +42,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Filter out the token from metadata and tokens
-    const updatedMetadata = (dashboardData.metadata || []).filter(
-      (m: any) => m.contractAddress.toLowerCase() !== normalizedContract
-    );
+    // Remove from service cache
+    dashboardServiceV2.removeTokenFromDashboard(contractAddress, walletAddress);
 
-    const removedToken = (dashboardData.tokens || []).find(
+    // Filter out the token
+    const updatedMetadata = { ...dashboardData.metadata };
+    delete updatedMetadata[normalizedContract];
+
+    const removedToken = dashboardData.tokens?.find(
       (t: any) => t.contractAddress.toLowerCase() === normalizedContract
     );
 
-    const updatedTokens = (dashboardData.tokens || []).filter(
-      (t: any) => t.contractAddress.toLowerCase() !== normalizedContract
-    );
+    const updatedTokens =
+      dashboardData.tokens?.filter(
+        (t: any) => t.contractAddress.toLowerCase() !== normalizedContract
+      ) || [];
 
     const updatedTotalValue =
       (dashboardData.totalValue || 0) - (removedToken?.value || 0);
 
     // Update database
-    const result = await db.collection("dashboard_tokens").updateOne(
+    await db.collection("dashboard_tokens").updateOne(
       {
         username: decoded.username,
         walletAddress: normalizedWallet,
@@ -72,13 +76,6 @@ export async function POST(request: NextRequest) {
         },
       }
     );
-
-    if (result.modifiedCount === 0) {
-      return NextResponse.json(
-        { error: "Failed to remove token" },
-        { status: 500 }
-      );
-    }
 
     console.log(`✅ Token removed successfully`);
 

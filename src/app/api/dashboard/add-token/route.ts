@@ -1,4 +1,4 @@
-// src/app/api/dashboard/add-token/route.ts - Updated for Phase 3 workflow
+// src/app/api/dashboard/add-token/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalize addresses
     const normalizedContract = contractAddress.toLowerCase();
     const normalizedWallet = walletAddress.toLowerCase();
 
@@ -36,40 +35,29 @@ export async function POST(request: NextRequest) {
       walletAddress: normalizedWallet,
     });
 
-    if (!dashboardData) {
-      return NextResponse.json(
-        { error: "Dashboard not initialized" },
-        { status: 400 }
-      );
-    }
-
     // Check if token already exists
-    if (dashboardData.metadata && dashboardData.metadata[normalizedContract]) {
+    if (dashboardData?.metadata && dashboardData.metadata[normalizedContract]) {
       return NextResponse.json(
         { error: "Token already in dashboard" },
         { status: 400 }
       );
     }
 
-    // PHASE 3: Add token workflow
-    // 1. Get metadata (CoinGecko first, Alchemy as fallback)
-    // 2. Get token balance
-    // 3. Batch fetch price with existing tokens
+    // Add token using service
     const { token: newToken, metadata } =
       await dashboardServiceV2.addTokenToDashboard(
         contractAddress,
         walletAddress
       );
 
-    // Update metadata in database
+    // Update database
     const updatedMetadata = {
-      ...(dashboardData.metadata || {}),
+      ...(dashboardData?.metadata || {}),
       [normalizedContract]: metadata,
     };
 
-    // Add new token to existing tokens
-    const updatedTokens = [...(dashboardData.tokens || []), newToken];
-    const updatedTotalValue = (dashboardData.totalValue || 0) + newToken.value;
+    const updatedTokens = [...(dashboardData?.tokens || []), newToken];
+    const updatedTotalValue = (dashboardData?.totalValue || 0) + newToken.value;
 
     await db.collection("dashboard_tokens").updateOne(
       {
@@ -83,17 +71,10 @@ export async function POST(request: NextRequest) {
           totalValue: updatedTotalValue,
           updatedAt: new Date(),
         },
-      }
-    );
-
-    // Store in global metadata collection
-    await db.collection("token_metadata").updateOne(
-      { contractAddress: normalizedContract },
-      {
-        $set: {
-          ...metadata,
-          contractAddress: normalizedContract,
-          updatedAt: new Date(),
+        $setOnInsert: {
+          username: decoded.username,
+          walletAddress: normalizedWallet,
+          createdAt: new Date(),
         },
       },
       { upsert: true }
@@ -106,8 +87,14 @@ export async function POST(request: NextRequest) {
       token: newToken,
       metadata,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("❌ Add token error:", error);
-    return NextResponse.json({ error: "Failed to add token" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: error.message || "Failed to add token",
+        details: error.toString(),
+      },
+      { status: 500 }
+    );
   }
 }
