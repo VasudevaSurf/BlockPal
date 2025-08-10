@@ -1,3 +1,4 @@
+// src/components/dashboard/TokenOverviewPage.tsx
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -27,6 +28,7 @@ import SimpleTransferModal from "@/components/transfer/SimpleTransferModal";
 import TransactionHistory from "@/components/transactions/TransactionHistory";
 import UserQRCodeModal from "@/components/profile/UserQRCodeModal";
 import { SkeletonTokenOverview } from "@/components/ui/Skeleton";
+import { RealtimePriceDisplay } from "@/components/realtime/RealtimePriceService";
 
 interface TokenInfo {
   name: string;
@@ -69,14 +71,6 @@ const TIME_PERIODS = [
   { label: "1Y", value: "1Y", days: 365, interval: "daily" },
 ];
 
-// Real-time configuration
-const REFRESH_INTERVALS = {
-  TOKEN_INFO: 10000, // 10 seconds for price data
-  CHART_DATA: 30000, // 30 seconds for chart data
-  BALANCE: 15000, // 15 seconds for balance updates
-  // TRANSACTIONS: 20000,  // Disabled - only manual refresh for transactions
-};
-
 export default function TokenOverviewPage() {
   const router = useRouter();
   const params = useParams();
@@ -91,20 +85,9 @@ export default function TokenOverviewPage() {
   const [copied, setCopied] = useState<string>("");
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
-
-  // Real-time states
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  // const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  // const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('connected');
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Refs for intervals
-  const tokenInfoIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const chartDataIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const balanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  // const transactionIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Perfect cursor tracking states
+  // Perfect cursor tracking states for chart
   const [cursorPosition, setCursorPosition] = useState<{
     x: number;
     y: number;
@@ -125,17 +108,14 @@ export default function TokenOverviewPage() {
   const contractAddress = params.tokenId as string;
   const walletAddress = searchParams.get("wallet") || activeWallet?.address;
 
-  // Enhanced fetch functions with real-time capabilities
+  // Fetch token info
   const fetchTokenInfo = useCallback(
     async (showLoader = false) => {
       if (!contractAddress || !walletAddress) return;
 
       try {
         if (showLoader) setLoading(true);
-        setIsRefreshing(true);
-        // setConnectionStatus('connected');
 
-        // Add timestamp to prevent caching
         const timestamp = Date.now();
         const response = await fetch(
           `/api/tokens/${contractAddress}?walletAddress=${walletAddress}&t=${timestamp}`,
@@ -152,23 +132,19 @@ export default function TokenOverviewPage() {
         if (response.ok) {
           const data = await response.json();
           setTokenInfo(data.tokenInfo);
-          // setLastUpdated(new Date());
-          // setConnectionStatus('connected');
         } else {
           console.error("Failed to fetch token info");
-          // setConnectionStatus('error');
         }
       } catch (error) {
         console.error("Error fetching token info:", error);
-        // setConnectionStatus('error');
       } finally {
         setLoading(false);
-        setIsRefreshing(false);
       }
     },
     [contractAddress, walletAddress]
   );
 
+  // Fetch chart data
   const fetchChartData = useCallback(
     async (period: string, showLoader = false) => {
       if (!tokenInfo?.priceData?.id) return;
@@ -182,7 +158,6 @@ export default function TokenOverviewPage() {
           return;
         }
 
-        // Add timestamp to prevent caching
         const timestamp = Date.now();
         const response = await fetch(
           `/api/tokens/chart?tokenId=${tokenInfo.priceData.id}&days=${periodConfig.days}&interval=${periodConfig.interval}&t=${timestamp}`,
@@ -213,34 +188,6 @@ export default function TokenOverviewPage() {
     [tokenInfo?.priceData?.id]
   );
 
-  // Manual refresh function
-  const handleManualRefresh = useCallback(async () => {
-    // setRefreshKey(prev => prev + 1); // Only for transactions if needed
-    await Promise.all([
-      fetchTokenInfo(false),
-      fetchChartData(selectedTimeframe, false),
-    ]);
-  }, [fetchTokenInfo, fetchChartData, selectedTimeframe]);
-
-  // Setup real-time intervals
-  const setupRealTimeUpdates = useCallback(() => {
-    // Clear existing intervals
-    if (tokenInfoIntervalRef.current)
-      clearInterval(tokenInfoIntervalRef.current);
-    if (chartDataIntervalRef.current)
-      clearInterval(chartDataIntervalRef.current);
-
-    // Token info refresh (price, balance, etc.)
-    tokenInfoIntervalRef.current = setInterval(() => {
-      fetchTokenInfo(false);
-    }, REFRESH_INTERVALS.TOKEN_INFO);
-
-    // Chart data refresh
-    chartDataIntervalRef.current = setInterval(() => {
-      fetchChartData(selectedTimeframe, false);
-    }, REFRESH_INTERVALS.CHART_DATA);
-  }, [fetchTokenInfo, fetchChartData, selectedTimeframe]);
-
   // Initial load
   useEffect(() => {
     if (contractAddress && walletAddress) {
@@ -254,53 +201,6 @@ export default function TokenOverviewPage() {
       fetchChartData(selectedTimeframe, true);
     }
   }, [tokenInfo?.priceData?.id, selectedTimeframe, fetchChartData]);
-
-  // Setup real-time updates
-  useEffect(() => {
-    if (tokenInfo?.priceData?.id) {
-      setupRealTimeUpdates();
-    }
-
-    return () => {
-      if (tokenInfoIntervalRef.current)
-        clearInterval(tokenInfoIntervalRef.current);
-      if (chartDataIntervalRef.current)
-        clearInterval(chartDataIntervalRef.current);
-    };
-  }, [tokenInfo?.priceData?.id, setupRealTimeUpdates]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (tokenInfoIntervalRef.current)
-        clearInterval(tokenInfoIntervalRef.current);
-      if (chartDataIntervalRef.current)
-        clearInterval(chartDataIntervalRef.current);
-      if (balanceIntervalRef.current) clearInterval(balanceIntervalRef.current);
-      // if (transactionIntervalRef.current) clearInterval(transactionIntervalRef.current);
-    };
-  }, []);
-
-  // Handle visibility change (pause/resume when tab is not active)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Pause updates when tab is not visible
-        if (tokenInfoIntervalRef.current)
-          clearInterval(tokenInfoIntervalRef.current);
-        if (chartDataIntervalRef.current)
-          clearInterval(chartDataIntervalRef.current);
-      } else {
-        // Resume updates when tab becomes visible
-        handleManualRefresh();
-        setupRealTimeUpdates();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [handleManualRefresh, setupRealTimeUpdates]);
 
   const createMockChartData = (period: string) => {
     const basePrice = tokenInfo?.priceData?.current_price || 2400;
@@ -529,23 +429,23 @@ export default function TokenOverviewPage() {
     return `${sign}${value.toFixed(2)}%`;
   };
 
-  // Improved Y-axis generation
+  // Chart generation functions
   const generateYAxisValues = (
-    prices,
-    height,
-    chartMin,
-    chartMax,
-    paddedRange
+    prices: any,
+    height: number,
+    chartMin: number,
+    chartMax: number,
+    paddedRange: number
   ) => {
     if (!prices || prices.length === 0) return [];
 
-    const minPrice = Math.min(...prices.map((p) => p.price));
-    const maxPrice = Math.max(...prices.map((p) => p.price));
+    const minPrice = Math.min(...prices.map((p: any) => p.price));
+    const maxPrice = Math.max(...prices.map((p: any) => p.price));
     const priceRange = maxPrice - minPrice || 1;
 
     const targetLines = 5;
 
-    const calculateNiceStep = (range, targetSteps) => {
+    const calculateNiceStep = (range: number, targetSteps: number) => {
       const rawStep = range / (targetSteps - 1);
       const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
       const normalized = rawStep / magnitude;
@@ -582,7 +482,7 @@ export default function TokenOverviewPage() {
     return yAxisValues;
   };
 
-  const formatYAxisValue = (value) => {
+  const formatYAxisValue = (value: number) => {
     if (Math.abs(value) < 0.001) {
       return value.toFixed(6).replace(/\.?0+$/, "");
     } else if (Math.abs(value) < 1) {
@@ -665,7 +565,6 @@ export default function TokenOverviewPage() {
     return { path, areaPath, points, yAxisValues, xAxisLabels };
   };
 
-  // Perfect cursor tracking implementation
   const handleChartMouseMove = (
     event: React.MouseEvent<SVGSVGElement>,
     points: Array<{
@@ -728,38 +627,8 @@ export default function TokenOverviewPage() {
     setChartLoading(true);
   };
 
-  // Real-time status indicator (commented out for clean UI)
-  // const RealTimeStatus = () => (
-  //   <div className="flex items-center gap-2 text-xs">
-  //     <div className={`w-2 h-2 rounded-full ${
-  //       connectionStatus === 'connected' ? 'bg-green-400' :
-  //       connectionStatus === 'error' ? 'bg-red-400' : 'bg-yellow-400'
-  //     } ${isRefreshing ? 'animate-pulse' : ''}`} />
-  //     <span className="text-gray-400 font-satoshi">
-  //       {connectionStatus === 'connected' ? 'Live' :
-  //        connectionStatus === 'error' ? 'Error' : 'Connecting...'}
-  //     </span>
-  //     {lastUpdated && (
-  //       <span className="text-gray-500 font-satoshi">
-  //         Updated {lastUpdated.toLocaleTimeString()}
-  //       </span>
-  //     )}
-  //   </div>
-  // );
-
   const TimePeriodButtons = ({ className = "" }: { className?: string }) => (
     <div className={`flex gap-1 items-center ${className}`}>
-      {/* Manual refresh button - commented out for clean UI */}
-      {/* <button
-        onClick={handleManualRefresh}
-        disabled={isRefreshing}
-        className={`p-1.5 rounded-md bg-[#2C2C2C] text-white hover:bg-[#3C3C3C] transition-colors mr-2 ${
-          isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
-        title="Refresh data"
-      >
-        <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
-      </button> */}
       {TIME_PERIODS.map((period) => (
         <button
           key={period.value}
@@ -808,7 +677,7 @@ export default function TokenOverviewPage() {
     const { path, areaPath, points, yAxisValues, xAxisLabels } =
       generateInteractiveChart(chartData.prices, width, height);
 
-    const gradientId = "goldGradient-stable";
+    const gradientId = `goldGradient-stable`;
 
     return (
       <div className={`relative ${className}`}>
@@ -1068,40 +937,23 @@ export default function TokenOverviewPage() {
                   </p>
                 </div>
               </div>
-              {/* Removed RealTimeStatus component */}
             </div>
 
-            {tokenInfo.priceData && (
-              <div className="mb-2.5">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-1.5">
-                  <div className="flex items-center gap-3">
-                    <div className="text-xl sm:text-2xl font-bold text-white font-satoshi">
-                      {formatCurrency(tokenInfo.priceData.current_price)}
-                    </div>
-                    <div className="flex items-center">
-                      {tokenInfo.priceData.price_change_percentage_24h >= 0 ? (
-                        <TrendingUp size={13} className="text-green-400 mr-1" />
-                      ) : (
-                        <TrendingDown size={13} className="text-red-400 mr-1" />
-                      )}
-                      <span
-                        className={`text-xs font-satoshi ${
-                          tokenInfo.priceData.price_change_percentage_24h >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {formatPercentage(
-                          tokenInfo.priceData.price_change_percentage_24h
-                        )}{" "}
-                        (24h)
-                      </span>
-                    </div>
-                  </div>
-                  <TimePeriodButtons className="flex-shrink-0" />
-                </div>
-              </div>
-            )}
+            {/* Real-time Price Section with TimePeriodButtons */}
+            <div className="flex items-end justify-between">
+              <RealtimePriceDisplay
+                tokenAddress={tokenInfo.contractAddress}
+                tokenSymbol={tokenInfo.symbol}
+                tokenBalance={parseFloat(tokenInfo.balance)}
+                fallbackPrice={tokenInfo.priceData?.current_price || 0}
+                fallbackChange={
+                  tokenInfo.priceData?.price_change_percentage_24h || 0
+                }
+                showSparkline={false}
+                className="flex-1"
+              />
+              <TimePeriodButtons className="ml-2" />
+            </div>
           </div>
 
           {/* Price Chart */}
@@ -1109,30 +961,10 @@ export default function TokenOverviewPage() {
             className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0"
             onMouseEnter={forceClearTooltip}
           >
-            <div className="flex justify-between items-center mb-2.5">
+            <div className="mb-2.5">
               <h3 className="text-base font-semibold text-white font-satoshi">
                 Price Chart
               </h3>
-              <div className="flex items-center gap-1.5">
-                <span className="text-white text-xs font-satoshi">
-                  {tokenInfo.contractAddress === "native"
-                    ? "Native Token"
-                    : `${tokenInfo.contractAddress.slice(
-                        0,
-                        6
-                      )}...${tokenInfo.contractAddress.slice(-4)}`}
-                </span>
-                {tokenInfo.contractAddress !== "native" && (
-                  <button
-                    onClick={() =>
-                      copyToClipboard(tokenInfo.contractAddress, "contract")
-                    }
-                    className="hover:text-white transition-colors"
-                  >
-                    <Copy size={11} className="text-gray-400" />
-                  </button>
-                )}
-              </div>
             </div>
 
             <EnhancedChart
@@ -1273,21 +1105,19 @@ export default function TokenOverviewPage() {
             </h3>
             {tokenInfo.priceData?.description ? (
               <p className="text-gray-400 text-xs leading-relaxed font-satoshi mb-2.5">
-                {tokenInfo.priceData.description}
+                {tokenInfo.priceData.description.substring(0, 200)}...
               </p>
             ) : (
               <p className="text-gray-400 text-xs leading-relaxed font-satoshi mb-2.5">
                 {tokenInfo.symbol === "ETH" ? (
                   <>
                     Ethereum is a global, open-source platform for decentralized
-                    applications. It enables users to build applications in a
-                    decentralized manner with distributed states and data.
+                    applications.
                   </>
                 ) : (
                   <>
                     {tokenInfo.name} is a cryptocurrency token that provides
-                    various utilities within its ecosystem for governance,
-                    transactions, and decentralized applications.
+                    various utilities within its ecosystem.
                   </>
                 )}
               </p>
@@ -1357,7 +1187,6 @@ export default function TokenOverviewPage() {
                   </div>
 
                   <div className="flex items-center gap-4">
-                    {/* Removed RealTimeStatus component */}
                     <div className="text-right">
                       <div className="text-white text-xs font-satoshi mb-0.5">
                         Contract Address
@@ -1389,32 +1218,26 @@ export default function TokenOverviewPage() {
                   </div>
                 </div>
 
-                {tokenInfo.priceData && (
-                  <div className="flex items-center justify-between mb-3.5">
-                    <div className="flex items-center space-x-3.5">
-                      <div className="text-3xl font-bold text-white font-satoshi">
-                        {formatCurrency(tokenInfo.priceData.current_price)}
-                      </div>
-                      <div
-                        className={`text-base font-satoshi flex items-center ${
-                          tokenInfo.priceData.price_change_percentage_24h >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {tokenInfo.priceData.price_change_percentage_24h >= 0
-                          ? "▲"
-                          : "▼"}{" "}
-                        {formatPercentage(
-                          tokenInfo.priceData.price_change_percentage_24h
-                        )}
-                      </div>
-                    </div>
-                    <TimePeriodButtons />
-                  </div>
-                )}
+                {/* Real-time Price Section with TimePeriodButtons at the end */}
+                <div className="flex items-end justify-between mb-3.5">
+                  <RealtimePriceDisplay
+                    tokenAddress={tokenInfo.contractAddress}
+                    tokenSymbol={tokenInfo.symbol}
+                    tokenBalance={parseFloat(tokenInfo.balance)}
+                    fallbackPrice={tokenInfo.priceData?.current_price || 0}
+                    fallbackChange={
+                      tokenInfo.priceData?.price_change_percentage_24h || 0
+                    }
+                    showSparkline={true}
+                    className="flex-1"
+                  />
+                  <TimePeriodButtons className="ml-4" />
+                </div>
 
                 <div className="mb-7">
+                  {/* <h3 className="text-base font-semibold text-white mb-2">
+                    Chart
+                  </h3> */}
                   <div className="chart-container">
                     <EnhancedChart
                       width={550}
@@ -1535,7 +1358,7 @@ export default function TokenOverviewPage() {
                 </h3>
                 {tokenInfo.priceData?.description ? (
                   <p className="text-gray-400 text-xs leading-relaxed font-satoshi">
-                    {tokenInfo.priceData.description}
+                    {tokenInfo.priceData.description.substring(0, 500)}...
                   </p>
                 ) : (
                   <p className="text-gray-400 text-xs leading-relaxed font-satoshi">
@@ -1636,7 +1459,6 @@ export default function TokenOverviewPage() {
               <div className="flex-1 min-h-0 flex flex-col">
                 <div className="flex-1 overflow-y-auto pr-1.5 scrollbar-hide">
                   <TransactionHistory
-                    // Removed refreshKey to prevent auto-refresh
                     walletAddress={walletAddress}
                     tokenFilter={getTokenFilterForTransactions()}
                     transactionTypeFilter={getTransactionTypeFilter()}
