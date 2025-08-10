@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - UPDATED VERSION with new names
+// src/components/dashboard/Sidebar.tsx - UPDATED VERSION with coming soon routing
 "use client";
 
 import { useDispatch, useSelector } from "react-redux";
@@ -45,31 +45,31 @@ const menuItems = [
   {
     icon: DashboardIcon, // You may want to add specific icons for these
     label: "Hiber",
-    href: "/dashboard/hiber",
+    href: "/dashboard/coming-soon",
     comingSoon: true,
   },
   {
     icon: DashboardIcon, // You may want to add specific icons for these
     label: "Cipher",
-    href: "/dashboard/cipher",
+    href: "/dashboard/coming-soon",
     comingSoon: true,
   },
   {
     icon: DashboardIcon, // You may want to add specific icons for these
     label: "Anchor",
-    href: "/dashboard/anchor",
+    href: "/dashboard/coming-soon",
     comingSoon: true,
   },
   {
     icon: DashboardIcon, // You may want to add specific icons for these
     label: "InfluX",
-    href: "/dashboard/influx",
+    href: "/dashboard/coming-soon",
     comingSoon: true,
   },
   {
     icon: DashboardIcon, // You may want to add specific icons for these
     label: "Connect",
-    href: "/dashboard/connect",
+    href: "/dashboard/coming-soon",
     comingSoon: true,
   },
   {
@@ -106,11 +106,14 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       return;
     }
 
-    // Show coming soon alert for coming soon items
+    // Navigate to coming soon page for coming soon items
     if (comingSoon) {
       event?.preventDefault();
-      alert("Coming Soon!");
-      onItemClick?.();
+      startLoading();
+      setTimeout(() => {
+        router.push("/dashboard/coming-soon");
+        onItemClick?.();
+      }, 100);
       return;
     }
 
@@ -191,9 +194,11 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       <div className="flex-1 px-2 lg:px-4 overflow-y-auto relative z-20 scrollbar-hide">
         <nav className="space-y-1 lg:space-y-2 mb-4 lg:mb-6">
           {menuItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              pathname === item.href ||
+              (item.comingSoon && pathname === "/dashboard/coming-soon");
             const isDisabled =
-              (!hasWallets && item.href !== "/dashboard") || item.comingSoon;
+              !hasWallets && item.href !== "/dashboard" && !item.comingSoon;
 
             return (
               <button
@@ -201,7 +206,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 onClick={(e) => handleNavigation(item.href, item.comingSoon, e)}
                 disabled={isLoading}
                 className={`w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
-                  isActive
+                  isActive && !item.comingSoon
                     ? "bg-[#E2AF19] text-black font-medium"
                     : item.comingSoon
                     ? "text-gray-400 hover:bg-[#1C1C1C] cursor-pointer"
@@ -213,9 +218,11 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 <item.icon
                   size={16}
                   className="mr-3 flex-shrink-0"
-                  filled={isActive}
+                  filled={isActive && !item.comingSoon}
                 />
-                <span className={isActive ? "font-medium" : ""}>
+                <span
+                  className={isActive && !item.comingSoon ? "font-medium" : ""}
+                >
                   {item.label}
                 </span>
               </button>
