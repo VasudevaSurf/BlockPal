@@ -72,9 +72,9 @@ interface PricePoint {
 }
 
 const TIME_PERIODS = [
+  { label: "1H", value: "0.041", days: 0.041 },
   { label: "1D", value: "1", days: 1 },
   { label: "1W", value: "7", days: 7 },
-  { label: "1M", value: "30", days: 30 },
   { label: "1Y", value: "365", days: 365 },
 ];
 
@@ -124,17 +124,21 @@ export default function TokenOverviewPage() {
     ];
 
     if (days <= 1) {
+      // For 1 hour and 1 day: show time (5-minute intervals from CoinGecko)
       return date.toLocaleTimeString("en-US", {
         hour: "numeric",
         minute: "2-digit",
       });
     } else if (days <= 7) {
+      // For 1 week: show date and time (hourly intervals from CoinGecko)
       return `${
         monthNames[date.getMonth()]
       } ${date.getDate()} ${date.getHours()}:00`;
     } else if (days <= 90) {
+      // For up to 90 days: show date (hourly intervals from CoinGecko)
       return `${monthNames[date.getMonth()]} ${date.getDate()}`;
     } else {
+      // For 1 year: show month day (daily intervals from CoinGecko)
       return `${monthNames[date.getMonth()]} ${date.getDate()}`;
     }
   };
@@ -200,20 +204,31 @@ export default function TokenOverviewPage() {
       if (response.ok) {
         const data = await response.json();
 
+        // Updated to handle array format like UniswapChart
         if (data.chartData && data.chartData.prices) {
           const processedData = data.chartData.prices;
 
+          // Handle both array format [timestamp, price] and object format {timestamp, price}
           const formattedData = processedData.map(
-            (point: any, index: number) => ({
-              time: new Date(point.timestamp * 1000),
-              displayTime: formatDateForChart(
-                new Date(point.timestamp * 1000),
-                daysNum
-              ),
-              price: parseFloat(point.price),
-              fullDate: new Date(point.timestamp * 1000).toLocaleString(),
-              index: index,
-            })
+            (point: any, index: number) => {
+              // Check if it's array format or object format
+              const timestamp = Array.isArray(point)
+                ? point[0]
+                : point.timestamp;
+              const price = Array.isArray(point) ? point[1] : point.price;
+
+              // Convert timestamp to milliseconds if needed
+              const timestampMs =
+                timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+
+              return {
+                time: new Date(timestampMs),
+                displayTime: formatDateForChart(new Date(timestampMs), daysNum),
+                price: parseFloat(price),
+                fullDate: new Date(timestampMs).toLocaleString(),
+                index: index,
+              };
+            }
           );
 
           setPriceData(formattedData);

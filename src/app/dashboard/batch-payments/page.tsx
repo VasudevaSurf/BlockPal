@@ -251,6 +251,17 @@ export default function BatchPaymentsPage() {
     (state: RootState) => state.wallet
   );
 
+  // FILTER TOKENS TO ONLY SHOW USDT, USDC, AND ETH
+  const allowedTokens = tokens.filter((token) => {
+    const symbolUpper = token.symbol?.toUpperCase();
+    return (
+      symbolUpper === "USDT" ||
+      symbolUpper === "USDC" ||
+      symbolUpper === "ETH" ||
+      symbolUpper === "ETHEREUM"
+    );
+  });
+
   const [formData, setFormData] = useState({
     recipient: "",
     amount: "",
@@ -277,21 +288,29 @@ export default function BatchPaymentsPage() {
   // FIXED: Add transaction refresh trigger
   const [transactionRefreshKey, setTransactionRefreshKey] = useState(0);
 
+  // Updated useEffect to use filtered tokens
   useEffect(() => {
-    if (tokens.length > 0 && !selectedToken) {
-      const firstToken = tokens[0];
+    if (allowedTokens.length > 0 && !selectedToken) {
+      // Try to select ETH first, otherwise select the first available token
+      const ethToken = allowedTokens.find(
+        (t) =>
+          t.symbol?.toUpperCase() === "ETH" ||
+          t.symbol?.toUpperCase() === "ETHEREUM"
+      );
+      const firstToken = ethToken || allowedTokens[0];
+
       setSelectedToken({
         name: firstToken.name,
         symbol: firstToken.symbol,
         contractAddress: firstToken.contractAddress || firstToken.id,
         decimals: firstToken.decimals || 18,
-        isETH: firstToken.symbol === "ETH",
+        isETH: firstToken.symbol === "ETH" || firstToken.symbol === "ETHEREUM",
         balance: firstToken.balance,
         price: firstToken.price,
         logoUrl: firstToken.icon || firstToken.logoUrl,
       });
     }
-  }, [tokens, selectedToken]);
+  }, [allowedTokens, selectedToken]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -726,7 +745,7 @@ export default function BatchPaymentsPage() {
 
                 {isTokenDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-lg max-h-32 overflow-y-auto scrollbar-hide">
-                    {tokens.map((token) => (
+                    {allowedTokens.map((token) => (
                       <div
                         key={token.id}
                         className="border border-[#2C2C2C] rounded-xl m-1 overflow-hidden"
@@ -739,7 +758,9 @@ export default function BatchPaymentsPage() {
                               contractAddress:
                                 token.contractAddress || token.id,
                               decimals: token.decimals || 18,
-                              isETH: token.symbol === "ETH",
+                              isETH:
+                                token.symbol === "ETH" ||
+                                token.symbol === "ETHEREUM",
                               balance: token.balance,
                               price: token.price,
                               logoUrl: token.icon || token.logoUrl,
@@ -962,7 +983,7 @@ export default function BatchPaymentsPage() {
 
               {isTokenDropdownOpen && (
                 <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-lg max-h-32 overflow-y-auto scrollbar-hide">
-                  {tokens.map((token) => (
+                  {allowedTokens.map((token) => (
                     <div
                       key={token.id}
                       className="border border-[#2C2C2C] rounded-xl m-1 overflow-hidden"
@@ -974,7 +995,9 @@ export default function BatchPaymentsPage() {
                             symbol: token.symbol,
                             contractAddress: token.contractAddress || token.id,
                             decimals: token.decimals || 18,
-                            isETH: token.symbol === "ETH",
+                            isETH:
+                              token.symbol === "ETH" ||
+                              token.symbol === "ETHEREUM",
                             balance: token.balance,
                             price: token.price,
                             logoUrl: token.icon || token.logoUrl,
@@ -1187,7 +1210,7 @@ export default function BatchPaymentsPage() {
         </div>
       </div>
 
-      {/* Modals remain the same */}
+      {/* Rest of the modals remain the same... */}
       {showPreview && preview && (
         <>
           <div
