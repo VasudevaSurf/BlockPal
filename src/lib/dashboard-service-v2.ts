@@ -1,4 +1,4 @@
-// src/lib/dashboard-service-v2.ts - FIXED VERSION with proper data structure
+// src/lib/dashboard-service-v2.ts - FIXED VERSION without default tokens
 import { ethers } from "ethers";
 import axios from "axios";
 
@@ -9,7 +9,7 @@ const COINGECKO_API_KEY =
 const ALCHEMY_URL = `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
 
-// Preset tokens matching your dashboard.js
+// Preset tokens for checking (not for showing by default)
 const PRESET_TOKENS = [
   "native", // ETH
   "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", // WETH
@@ -116,29 +116,38 @@ export class DashboardServiceV2 {
       );
       console.log(`📊 Found ${tokenBalances.length} tokens total`);
 
-      // Filter to only preset tokens user holds
-      const userTokenAddresses = tokenBalances.map((t) =>
-        t.contractAddress.toLowerCase()
+      // FIXED: Only show tokens that have actual balance > 0
+      const tokensWithBalance = tokenBalances.filter(
+        (token) => token.balanceFormatted > 0.000001 // Filter out dust amounts
       );
-      const commonTokens = PRESET_TOKENS.filter((preset) => {
-        const presetLower = preset.toLowerCase();
-        return userTokenAddresses.includes(presetLower);
-      });
 
-      console.log(`✅ Found ${commonTokens.length} preset tokens in wallet`);
+      console.log(`✅ Found ${tokensWithBalance.length} tokens with balance`);
 
-      // Step 2: Get metadata for each token
+      // If no tokens with balance, return empty dashboard
+      if (tokensWithBalance.length === 0) {
+        console.log(
+          "📭 No tokens with balance found, returning empty dashboard"
+        );
+        return {
+          tokens: [],
+          totalValue: 0,
+          metadata: [],
+          isNewUser: true,
+        };
+      }
+
+      // Step 2: Get metadata for tokens with balance
       const metadata: TokenMetadata[] = [];
-      for (const tokenAddress of commonTokens) {
+      for (const token of tokensWithBalance) {
         const tokenMetadata = await this.getTokenMetadataFromCoinGecko(
-          tokenAddress
+          token.contractAddress
         );
         if (tokenMetadata) {
           metadata.push(tokenMetadata);
         }
       }
 
-      // Store metadata
+      // Store metadata only for tokens with balance
       const userData = {
         walletAddress: walletAddress.toLowerCase(),
         metadata: {},
@@ -161,7 +170,7 @@ export class DashboardServiceV2 {
       let totalValue = 0;
 
       for (const meta of metadata) {
-        const balance = tokenBalances.find(
+        const balance = tokensWithBalance.find(
           (b) =>
             b.contractAddress.toLowerCase() ===
             meta.contractAddress.toLowerCase()
@@ -171,19 +180,23 @@ export class DashboardServiceV2 {
         if (balance && priceData) {
           const value = balance.balanceFormatted * priceData.price;
 
-          dashboardTokens.push({
-            contractAddress: meta.contractAddress,
-            symbol: meta.symbol,
-            name: meta.name,
-            decimals: meta.decimals,
-            imageUrl: meta.imageUrl,
-            balance: balance.balanceFormatted,
-            price: priceData.price,
-            value: value,
-            change24h: priceData.change24h,
-          });
+          // Only add tokens with actual value
+          if (value > 0.01) {
+            // Filter out tokens worth less than $0.01
+            dashboardTokens.push({
+              contractAddress: meta.contractAddress,
+              symbol: meta.symbol,
+              name: meta.name,
+              decimals: meta.decimals,
+              imageUrl: meta.imageUrl,
+              balance: balance.balanceFormatted,
+              price: priceData.price,
+              value: value,
+              change24h: priceData.change24h,
+            });
 
-          totalValue += value;
+            totalValue += value;
+          }
         }
       }
 
@@ -235,18 +248,42 @@ export class DashboardServiceV2 {
 
       const metadata = Object.values(userData.metadata) as TokenMetadata[];
 
-      // Get current balances and prices
+      // Get current balances
       const tokenBalances = await this.getTokenBalancesFromAlchemy(
         walletAddress
       );
+
+      // FIXED: Only get prices for tokens that have balance
+      const tokensWithBalance = [];
+      for (const meta of metadata) {
+        const balance = tokenBalances.find(
+          (b) =>
+            b.contractAddress.toLowerCase() ===
+            meta.contractAddress.toLowerCase()
+        );
+        if (balance && balance.balanceFormatted > 0.000001) {
+          tokensWithBalance.push(meta);
+        }
+      }
+
+      // If no tokens with balance, return empty
+      if (tokensWithBalance.length === 0) {
+        console.log("📭 Returning user has no tokens with balance");
+        return {
+          tokens: [],
+          totalValue: 0,
+          isNewUser: false,
+        };
+      }
+
       const prices = await this.batchFetchTokenPrices(
-        metadata.map((m) => m.contractAddress)
+        tokensWithBalance.map((m) => m.contractAddress)
       );
 
       const dashboardTokens: TokenDashboardData[] = [];
       let totalValue = 0;
 
-      for (const meta of metadata) {
+      for (const meta of tokensWithBalance) {
         const balance = tokenBalances.find(
           (b) =>
             b.contractAddress.toLowerCase() ===
@@ -257,19 +294,22 @@ export class DashboardServiceV2 {
         if (balance && priceData) {
           const value = balance.balanceFormatted * priceData.price;
 
-          dashboardTokens.push({
-            contractAddress: meta.contractAddress,
-            symbol: meta.symbol,
-            name: meta.name,
-            decimals: meta.decimals,
-            imageUrl: meta.imageUrl,
-            balance: balance.balanceFormatted,
-            price: priceData.price,
-            value: value,
-            change24h: priceData.change24h,
-          });
+          // Only show tokens with value > $0.01
+          if (value > 0.01) {
+            dashboardTokens.push({
+              contractAddress: meta.contractAddress,
+              symbol: meta.symbol,
+              name: meta.name,
+              decimals: meta.decimals,
+              imageUrl: meta.imageUrl,
+              balance: balance.balanceFormatted,
+              price: priceData.price,
+              value: value,
+              change24h: priceData.change24h,
+            });
 
-          totalValue += value;
+            totalValue += value;
+          }
         }
       }
 
@@ -303,45 +343,104 @@ export class DashboardServiceV2 {
     try {
       const userData = this.userDataCache.get(walletAddress.toLowerCase());
 
-      if (!userData || !userData.metadata) {
-        return { tokens: [], totalValue: 0 };
+      // If no metadata, get current tokens
+      if (
+        !userData ||
+        !userData.metadata ||
+        Object.keys(userData.metadata).length === 0
+      ) {
+        // Get actual tokens with balance
+        const tokenBalances = await this.getTokenBalancesFromAlchemy(
+          walletAddress
+        );
+        const tokensWithBalance = tokenBalances.filter(
+          (token) => token.balanceFormatted > 0.000001
+        );
+
+        if (tokensWithBalance.length === 0) {
+          return { tokens: [], totalValue: 0 };
+        }
+
+        // Get metadata for tokens with balance
+        const metadata: TokenMetadata[] = [];
+        for (const token of tokensWithBalance) {
+          const tokenMetadata = await this.getTokenMetadataFromCoinGecko(
+            token.contractAddress
+          );
+          if (tokenMetadata) {
+            metadata.push(tokenMetadata);
+          }
+        }
+
+        // Update cache
+        const newUserData = {
+          walletAddress: walletAddress.toLowerCase(),
+          metadata: {},
+          lastUpdated: new Date().toISOString(),
+        };
+
+        metadata.forEach((meta) => {
+          newUserData.metadata[meta.contractAddress.toLowerCase()] = meta;
+        });
+
+        this.userDataCache.set(walletAddress.toLowerCase(), newUserData);
+        this.saveUserDataToStorage();
+
+        // Continue with refresh using new metadata
+        userData.metadata = newUserData.metadata;
       }
 
       const metadata = Object.values(userData.metadata) as TokenMetadata[];
       const tokenBalances = await this.getTokenBalancesFromAlchemy(
         walletAddress
       );
-      const prices = await this.batchFetchTokenPrices(
-        metadata.map((m) => m.contractAddress)
-      );
 
-      const dashboardTokens: TokenDashboardData[] = [];
-      let totalValue = 0;
-
+      // FIXED: Only process tokens with actual balance
+      const tokensWithBalance = [];
       for (const meta of metadata) {
         const balance = tokenBalances.find(
           (b) =>
             b.contractAddress.toLowerCase() ===
             meta.contractAddress.toLowerCase()
         );
+        if (balance && balance.balanceFormatted > 0.000001) {
+          tokensWithBalance.push({ meta, balance });
+        }
+      }
+
+      if (tokensWithBalance.length === 0) {
+        return { tokens: [], totalValue: 0 };
+      }
+
+      const prices = await this.batchFetchTokenPrices(
+        tokensWithBalance.map((t) => t.meta.contractAddress)
+      );
+
+      const dashboardTokens: TokenDashboardData[] = [];
+      let totalValue = 0;
+
+      for (const { meta, balance } of tokensWithBalance) {
         const priceData = prices[meta.contractAddress.toLowerCase()];
 
         if (balance && priceData) {
           const value = balance.balanceFormatted * priceData.price;
 
-          dashboardTokens.push({
-            contractAddress: meta.contractAddress,
-            symbol: meta.symbol,
-            name: meta.name,
-            decimals: meta.decimals,
-            imageUrl: meta.imageUrl,
-            balance: balance.balanceFormatted,
-            price: priceData.price,
-            value: value,
-            change24h: priceData.change24h,
-          });
+          if (value > 0.01) {
+            // Only show tokens worth more than $0.01
+            dashboardTokens.push({
+              contractAddress: meta.contractAddress,
+              symbol: meta.symbol,
+              name: meta.name,
+              decimals: meta.decimals,
+              imageUrl: meta.imageUrl,
+              balance: balance.balanceFormatted,
+              price: priceData.price,
+              value: value,
+              change24h: priceData.change24h,
+            });
 
-          totalValue += value;
+            totalValue += value;
+          }
         }
       }
 
@@ -421,11 +520,16 @@ export class DashboardServiceV2 {
 
       // Get ETH balance
       const ethBalance = await this.provider.getBalance(walletAddress);
-      balances.push({
-        contractAddress: "native",
-        balance: ethBalance.toString(),
-        balanceFormatted: parseFloat(ethers.formatEther(ethBalance)),
-      });
+      const ethBalanceFormatted = parseFloat(ethers.formatEther(ethBalance));
+
+      // Only add ETH if it has balance
+      if (ethBalanceFormatted > 0) {
+        balances.push({
+          contractAddress: "native",
+          balance: ethBalance.toString(),
+          balanceFormatted: ethBalanceFormatted,
+        });
+      }
 
       // Get ERC-20 balances
       const response = await axios.post(ALCHEMY_URL, {
@@ -453,13 +557,18 @@ export class DashboardServiceV2 {
             console.log(`Using default decimals for ${token.contractAddress}`);
           }
 
-          balances.push({
-            contractAddress: token.contractAddress.toLowerCase(),
-            balance: token.tokenBalance,
-            balanceFormatted: parseFloat(
-              ethers.formatUnits(token.tokenBalance, decimals)
-            ),
-          });
+          const balanceFormatted = parseFloat(
+            ethers.formatUnits(token.tokenBalance, decimals)
+          );
+
+          // Only add if balance is greater than dust
+          if (balanceFormatted > 0.000001) {
+            balances.push({
+              contractAddress: token.contractAddress.toLowerCase(),
+              balance: token.tokenBalance,
+              balanceFormatted: balanceFormatted,
+            });
+          }
         }
       }
 

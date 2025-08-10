@@ -1,4 +1,4 @@
-// src/hooks/useDashboardV2.ts - FIXED VERSION with proper state management
+// src/hooks/useDashboardV2.ts - FIXED VERSION with proper empty wallet handling
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/store";
@@ -136,13 +136,13 @@ export function useDashboardV2() {
         dispatch(setTokens(reduxTokens));
         dispatch(setTotalBalance(data.totalValue || 0));
 
-        // Update local state - CRITICAL: Set isInitialized to true
+        // Update local state - CRITICAL: Set isInitialized to true even with 0 tokens
         setState({
           tokens: formattedTokens,
           totalValue: data.totalValue || 0,
           isLoading: false,
           isRefreshing: false,
-          isInitialized: true, // This is critical
+          isInitialized: true, // Always set to true after successful init
           error: null,
           lastRefresh: new Date(),
           isNewUser: data.isNewUser || false,
@@ -158,12 +158,31 @@ export function useDashboardV2() {
       } catch (error: any) {
         console.error("❌ Dashboard initialization error:", error);
         if (isMounted.current) {
-          setState((prev) => ({
-            ...prev,
-            isLoading: false,
-            isInitialized: false,
-            error: error.message || "Failed to initialize dashboard",
-          }));
+          // FIXED: Even on error, if it's a new wallet with no tokens, mark as initialized
+          if (
+            error.message?.includes("No tokens found") ||
+            error.message?.includes("empty wallet")
+          ) {
+            setState({
+              tokens: [],
+              totalValue: 0,
+              isLoading: false,
+              isRefreshing: false,
+              isInitialized: true, // Mark as initialized even with empty wallet
+              error: null,
+              lastRefresh: new Date(),
+              isNewUser: true,
+              refreshCount: 0,
+            });
+            console.log("✅ Dashboard initialized with empty wallet");
+          } else {
+            setState((prev) => ({
+              ...prev,
+              isLoading: false,
+              isInitialized: false,
+              error: error.message || "Failed to initialize dashboard",
+            }));
+          }
         }
       } finally {
         initializingRef.current = false;
@@ -187,8 +206,6 @@ export function useDashboardV2() {
         const refreshType = isAutomatic
           ? "⏰ AUTO-REFRESH"
           : "🔄 MANUAL REFRESH";
-        // Minimal logging for production
-        // console.log(`${refreshType} for wallet:`, walletAddress);
 
         const response = await fetch("/api/dashboard/refresh", {
           method: "POST",
@@ -438,9 +455,6 @@ export function useDashboardV2() {
   // Setup auto-refresh
   useEffect(() => {
     if (activeWallet?.address && state.isInitialized && !state.error) {
-      // Silent auto-refresh setup - no console log for production
-      // console.log("⏰ Setting up auto-refresh every 30 seconds");
-
       // Clear existing interval
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
@@ -449,8 +463,6 @@ export function useDashboardV2() {
       // Set up new interval
       refreshIntervalRef.current = setInterval(() => {
         if (isMounted.current && activeWallet?.address) {
-          // Silent auto-refresh - no console log for production
-          // console.log("⏰ Auto-refresh triggered");
           refreshDashboard(activeWallet.address, true);
         }
       }, REFRESH_INTERVAL);
@@ -491,8 +503,6 @@ export function useDashboardV2() {
           : Infinity;
 
         if (timeSinceLastRefresh > REFRESH_INTERVAL) {
-          // Silent refresh on tab visible - no console log for production
-          // console.log("👁️ Tab visible - refreshing stale data");
           refreshDashboard(activeWallet.address, true);
         }
       }
