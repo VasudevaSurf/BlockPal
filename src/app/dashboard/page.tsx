@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - Fixed to show WalletWelcomeModal for new users
+// src/app/dashboard/page.tsx - Fixed to properly handle loading states
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -50,7 +50,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
-  // Use the new dashboard hook
+  // Use the dashboard hook
   const {
     tokens,
     totalValue,
@@ -65,7 +65,7 @@ export default function DashboardPage() {
     portfolioStats,
   } = useDashboardV2();
 
-  // Enhanced state tracking
+  // State tracking
   const [dashboardState, setDashboardState] = useState<DashboardState>({
     authLoading: true,
     walletsLoading: false,
@@ -78,7 +78,6 @@ export default function DashboardPage() {
     initialLoadComplete: false,
   });
 
-  // State for UI
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
 
   // Refs for initialization tracking
@@ -90,45 +89,13 @@ export default function DashboardPage() {
 
   // Log dashboard status on mount
   useEffect(() => {
-    console.log("📊 Dashboard mounted - New workflow implementation active");
-    console.log("⚡ Features enabled:");
-    console.log("  - Phase 1: New user initialization with preset tokens");
-    console.log("  - Phase 2: Returning user with stored metadata");
-    console.log("  - Phase 3: Add custom tokens");
-    console.log("  - Auto-refresh every 30 seconds");
+    console.log("📊 Dashboard mounted");
   }, []);
-
-  // Log user type when detected
-  useEffect(() => {
-    if (isInitialized && activeWallet) {
-      const userTypeLabel = isNewUser ? "🆕 NEW USER" : "👤 RETURNING USER";
-      console.log(
-        `${userTypeLabel} detected for wallet: ${activeWallet.address}`
-      );
-
-      if (isNewUser) {
-        console.log(
-          "📈 Initialized with preset tokens matching wallet holdings"
-        );
-      } else {
-        console.log("📂 Loaded with stored metadata from database");
-      }
-    }
-  }, [isInitialized, isNewUser, activeWallet]);
-
-  // Log refresh activity
-  useEffect(() => {
-    if (refreshCount > 0) {
-      console.log(`🔄 Dashboard refreshed ${refreshCount} times`);
-      console.log(`⏰ Last refresh: ${lastRefresh?.toLocaleTimeString()}`);
-    }
-  }, [refreshCount, lastRefresh]);
 
   // STEP 1: Auth Check
   useEffect(() => {
-    console.log("🔍 Dashboard - Auth initialization");
-
     if (!initializationRef.current.authChecked) {
+      console.log("🔍 Dashboard - Checking auth status");
       initializationRef.current.authChecked = true;
 
       setDashboardState((prev) => ({ ...prev, authLoading: true }));
@@ -143,10 +110,10 @@ export default function DashboardPage() {
     }
   }, [dispatch]);
 
-  // STEP 2: Auth Resolution
+  // STEP 2: Redirect if not authenticated
   useEffect(() => {
     if (dashboardState.authResolved && !isAuthenticated && !authLoading) {
-      console.log("🚪 Dashboard - Redirecting to auth");
+      console.log("🚪 Dashboard - Not authenticated, redirecting to auth");
       router.push("/auth");
     }
   }, [dashboardState.authResolved, isAuthenticated, authLoading, router]);
@@ -171,9 +138,9 @@ export default function DashboardPage() {
 
         const hasWallets = walletsData && walletsData.length > 0;
 
-        console.log("📦 Wallets fetch completed:", {
+        console.log("📦 Wallets loaded:", {
           hasWallets,
-          walletsCount: walletsData?.length || 0,
+          count: walletsData?.length || 0,
         });
 
         setDashboardState((prev) => ({
@@ -182,20 +149,20 @@ export default function DashboardPage() {
           walletsResolved: true,
           hasWallets,
           initialLoadComplete: true,
-          showWelcomeModal: !hasWallets, // Show modal if no wallets
+          showWelcomeModal: !hasWallets,
         }));
       });
     }
   }, [dashboardState.authResolved, isAuthenticated, user, dispatch]);
 
-  // STEP 4: Sync Active Wallet (only if wallets exist)
+  // STEP 4: Sync Active Wallet
   useEffect(() => {
     if (
       dashboardState.walletsResolved &&
       wallets.length > 0 &&
       !initializationRef.current.activeWalletSynced
     ) {
-      console.log("🎯 Dashboard - Syncing active wallet");
+      console.log("🎯 Dashboard - Setting active wallet");
       initializationRef.current.activeWalletSynced = true;
 
       dispatch(getActiveWalletFromDB()).then((result) => {
@@ -221,32 +188,27 @@ export default function DashboardPage() {
         }));
       });
     } else if (dashboardState.walletsResolved && wallets.length === 0) {
-      // No wallets - mark as resolved
-      console.log("🎯 Dashboard - No wallets found");
       setDashboardState((prev) => ({
         ...prev,
         activeWalletResolved: true,
         hasActiveWallet: false,
       }));
     }
-  }, [dashboardState.walletsResolved, wallets.length, dispatch]);
+  }, [dashboardState.walletsResolved, wallets, dispatch]);
 
   // Handle wallet selection
   const handleWalletSelect = async (walletId: string) => {
-    console.log("🎯 Dashboard - Wallet selected:", walletId);
+    console.log("🎯 Wallet selected:", walletId);
     dispatch(setActiveWallet(walletId));
     await dispatch(setActiveWalletInDB(walletId));
   };
 
   // Handle wallet creation
   const handleWalletCreated = () => {
-    console.log("✅ Wallet created, refreshing wallets list");
-
-    // Reset initialization flags
+    console.log("✅ Wallet created, refreshing wallets");
     initializationRef.current.walletsLoaded = false;
     initializationRef.current.activeWalletSynced = false;
 
-    // Close modal and refresh wallets
     setDashboardState((prev) => ({
       ...prev,
       showWelcomeModal: false,
@@ -255,7 +217,6 @@ export default function DashboardPage() {
       activeWalletResolved: false,
     }));
 
-    // Reload wallets
     dispatch(fetchWallets());
   };
 
@@ -265,21 +226,23 @@ export default function DashboardPage() {
     manualRefresh();
   };
 
-  // Determine loading state
+  // Determine if we should show skeleton
   const shouldShowSkeleton =
     dashboardState.authLoading ||
     !dashboardState.authResolved ||
     (isAuthenticated && !dashboardState.walletsResolved) ||
-    (wallets.length > 0 && !dashboardState.activeWalletResolved) ||
-    (activeWallet && !isInitialized && isLoading);
+    (wallets.length > 0 && !dashboardState.activeWalletResolved);
 
+  // Determine if we should show content
   const shouldShowContent =
     dashboardState.authResolved &&
     isAuthenticated &&
     dashboardState.walletsResolved &&
+    dashboardState.activeWalletResolved &&
     !dashboardState.authLoading &&
     !dashboardState.walletsLoading;
 
+  // Determine if we should show welcome modal
   const shouldShowWelcomeModal =
     dashboardState.walletsResolved &&
     !dashboardState.walletsLoading &&
@@ -289,36 +252,14 @@ export default function DashboardPage() {
     isAuthenticated;
 
   console.log("🎨 Dashboard render state:", {
-    authResolved: dashboardState.authResolved,
-    walletsResolved: dashboardState.walletsResolved,
-    activeWalletResolved: dashboardState.activeWalletResolved,
-    walletsCount: wallets.length,
     shouldShowSkeleton,
     shouldShowContent,
-    shouldShowWelcomeModal,
-    showWelcomeModal: dashboardState.showWelcomeModal,
-    initialLoadComplete: dashboardState.initialLoadComplete,
-    isAuthenticated,
+    activeWallet: activeWallet?.address,
+    isInitialized,
+    isLoading,
+    tokensCount: tokens.length,
+    totalValue,
   });
-
-  // Log portfolio stats periodically
-  useEffect(() => {
-    if (isInitialized && portfolioStats.tokenCount > 0) {
-      console.log("📊 Portfolio Stats:");
-      console.log(`  Total Value: $${totalValue.toFixed(2)}`);
-      console.log(`  Token Count: ${portfolioStats.tokenCount}`);
-      console.log(
-        `  24h Change: ${portfolioStats.totalChangePercentage.toFixed(2)}%`
-      );
-      if (portfolioStats.topGainers.length > 0) {
-        console.log(
-          `  Top Gainer: ${
-            portfolioStats.topGainers[0].symbol
-          } (+${portfolioStats.topGainers[0].change24h.toFixed(2)}%)`
-        );
-      }
-    }
-  }, [isInitialized, portfolioStats, totalValue]);
 
   // Show loading skeleton during initial setup
   if (shouldShowSkeleton) {
@@ -352,47 +293,54 @@ export default function DashboardPage() {
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
-      {/* Refresh Status Bar (only in development) */}
-      {process.env.NODE_ENV === "development" &&
-        isInitialized &&
-        activeWallet && (
-          <div className="bg-black/50 rounded-lg p-2 mb-2 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-3">
-              <span
-                className={`px-2 py-0.5 rounded ${
-                  isNewUser
-                    ? "bg-green-500/20 text-green-400"
-                    : "bg-blue-500/20 text-blue-400"
-                }`}
-              >
-                {isNewUser ? "NEW USER" : "RETURNING USER"}
-              </span>
-              <span className="text-gray-400">Refreshes: {refreshCount}</span>
-              {lastRefresh && (
-                <span className="text-gray-400">
-                  Last: {lastRefresh.toLocaleTimeString()}
-                </span>
-              )}
-              {isRefreshing && (
-                <span className="text-yellow-400 animate-pulse">
-                  Refreshing...
-                </span>
-              )}
-            </div>
-            <button
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className="px-2 py-1 bg-[#E2AF19] text-black rounded hover:bg-[#D4A853] disabled:opacity-50"
+      {/* Development Mode Status Bar - COMMENTED OUT FOR PRODUCTION */}
+      {/* {process.env.NODE_ENV === "development" && isInitialized && activeWallet && (
+        <div className="bg-black/50 rounded-lg p-2 mb-2 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-3">
+            <span
+              className={`px-2 py-0.5 rounded ${
+                isNewUser
+                  ? "bg-green-500/20 text-green-400"
+                  : "bg-blue-500/20 text-blue-400"
+              }`}
             >
-              Manual Refresh
-            </button>
+              {isNewUser ? "NEW USER" : "RETURNING USER"}
+            </span>
+            <span className="text-gray-400">
+              {isInitialized ? "Initialized" : "Not Initialized"}
+            </span>
+            <span className="text-gray-400">Refreshes: {refreshCount}</span>
+            {lastRefresh && (
+              <span className="text-gray-400">
+                Last: {lastRefresh.toLocaleTimeString()}
+              </span>
+            )}
+            {isRefreshing && (
+              <span className="text-yellow-400 animate-pulse">
+                Refreshing...
+              </span>
+            )}
           </div>
-        )}
+          <button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="px-2 py-1 bg-[#E2AF19] text-black rounded hover:bg-[#D4A853] disabled:opacity-50"
+          >
+            Manual Refresh
+          </button>
+        </div>
+      )} */}
 
       {/* Error Display */}
       {error && (
         <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-2">
           <p className="text-red-400 text-xs font-satoshi">{error}</p>
+          <button
+            onClick={handleManualRefresh}
+            className="text-red-400 underline text-xs mt-1"
+          >
+            Try Again
+          </button>
         </div>
       )}
 
@@ -427,7 +375,7 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : (
-        // Empty state when no wallets or waiting for wallet
+        // Empty state when no wallets
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-4">
@@ -458,7 +406,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Welcome Modal - FIXED: Now properly shows for users with no wallets */}
+      {/* Welcome Modal */}
       <WalletWelcomeModal
         isOpen={shouldShowWelcomeModal}
         onClose={() => {

@@ -1,4 +1,4 @@
-// src/hooks/useDashboardV2.ts - Enhanced dashboard hook with proper workflow
+// src/hooks/useDashboardV2.ts - FIXED VERSION with proper state management
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/store";
@@ -28,7 +28,7 @@ interface DashboardState {
   refreshCount: number;
 }
 
-const REFRESH_INTERVAL = 30000; // 30 seconds as specified
+const REFRESH_INTERVAL = 30000; // 30 seconds
 
 export function useDashboardV2() {
   const dispatch = useDispatch<AppDispatch>();
@@ -37,7 +37,7 @@ export function useDashboardV2() {
   const [state, setState] = useState<DashboardState>({
     tokens: [],
     totalValue: 0,
-    isLoading: false,
+    isLoading: true, // Start with loading true
     isRefreshing: false,
     isInitialized: false,
     error: null,
@@ -49,18 +49,27 @@ export function useDashboardV2() {
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const initializingRef = useRef(false);
   const currentWalletRef = useRef<string | null>(null);
-  const isComponentMounted = useRef(true);
+  const isMounted = useRef(true);
 
-  // Initialize dashboard (Phase 1 for new user, Phase 2 for returning user)
+  // Initialize dashboard
   const initializeDashboard = useCallback(
     async (walletAddress: string) => {
+      // Prevent duplicate initialization
       if (initializingRef.current) {
         console.log("⏳ Dashboard initialization already in progress");
         return;
       }
 
       initializingRef.current = true;
-      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      // Only set loading if not already initialized
+      if (!state.isInitialized) {
+        setState((prev) => ({
+          ...prev,
+          isLoading: true,
+          error: null,
+        }));
+      }
 
       try {
         console.log("🚀 Initializing dashboard for wallet:", walletAddress);
@@ -73,15 +82,45 @@ export function useDashboardV2() {
         });
 
         if (!response.ok) {
-          throw new Error("Failed to initialize dashboard");
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to initialize dashboard");
         }
 
         const data = await response.json();
+        console.log("📊 Dashboard API response received:", {
+          tokensCount: data.tokens?.length || 0,
+          totalValue: data.totalValue,
+          isNewUser: data.isNewUser,
+        });
 
-        if (!isComponentMounted.current) return;
+        if (!isMounted.current) {
+          console.log("⚠️ Component unmounted, skipping state update");
+          return;
+        }
+
+        // Ensure tokens is an array
+        const tokensArray = Array.isArray(data.tokens) ? data.tokens : [];
+
+        // Map tokens to the correct format
+        const formattedTokens: DashboardToken[] = tokensArray.map(
+          (token: any) => ({
+            contractAddress: token.contractAddress || "unknown",
+            symbol: token.symbol || "UNKNOWN",
+            name: token.name || "Unknown Token",
+            decimals: typeof token.decimals === "number" ? token.decimals : 18,
+            imageUrl: token.imageUrl || token.logoUrl || token.image || "",
+            balance: typeof token.balance === "number" ? token.balance : 0,
+            price: typeof token.price === "number" ? token.price : 0,
+            value: typeof token.value === "number" ? token.value : 0,
+            change24h:
+              typeof token.change24h === "number" ? token.change24h : 0,
+          })
+        );
+
+        console.log("✅ Formatted tokens:", formattedTokens.length, "tokens");
 
         // Update Redux store
-        const reduxTokens = data.tokens.map((token: DashboardToken) => ({
+        const reduxTokens = formattedTokens.map((token) => ({
           id: token.contractAddress,
           symbol: token.symbol,
           name: token.name,
@@ -95,59 +134,48 @@ export function useDashboardV2() {
         }));
 
         dispatch(setTokens(reduxTokens));
-        dispatch(setTotalBalance(data.totalValue));
+        dispatch(setTotalBalance(data.totalValue || 0));
 
+        // Update local state - CRITICAL: Set isInitialized to true
         setState({
-          tokens: data.tokens || [],
+          tokens: formattedTokens,
           totalValue: data.totalValue || 0,
           isLoading: false,
           isRefreshing: false,
-          isInitialized: true,
+          isInitialized: true, // This is critical
           error: null,
           lastRefresh: new Date(),
-          isNewUser: data.isNewUser,
+          isNewUser: data.isNewUser || false,
           refreshCount: 0,
         });
 
         const userType = data.isNewUser ? "NEW USER" : "RETURNING USER";
         console.log(
           `✅ Dashboard initialized [${userType}]: ${
-            data.tokens.length
-          } tokens, $${data.totalValue.toFixed(2)}`
+            formattedTokens.length
+          } tokens, $${(data.totalValue || 0).toFixed(2)}`
         );
-
-        // API call breakdown logging
-        if (data.isNewUser) {
-          console.log("📊 API Calls (New User):");
-          console.log("  1x Alchemy token balance call");
-          console.log(
-            `  ${data.metadata?.length || 0}x CoinGecko metadata calls`
-          );
-          console.log("  1x CoinGecko batch price call");
-        } else {
-          console.log("📊 API Calls (Returning User):");
-          console.log("  1x Alchemy token balance call");
-          console.log("  1x CoinGecko batch price call");
-        }
-      } catch (error) {
+      } catch (error: any) {
         console.error("❌ Dashboard initialization error:", error);
-        if (isComponentMounted.current) {
+        if (isMounted.current) {
           setState((prev) => ({
             ...prev,
             isLoading: false,
-            error: "Failed to initialize dashboard",
+            isInitialized: false,
+            error: error.message || "Failed to initialize dashboard",
           }));
         }
       } finally {
         initializingRef.current = false;
       }
     },
-    [dispatch]
+    [dispatch, state.isInitialized]
   );
 
-  // Refresh dashboard (Automatic refresh workflow)
+  // Refresh dashboard
   const refreshDashboard = useCallback(
     async (walletAddress: string, isAutomatic: boolean = false) => {
+      // Don't refresh if not initialized
       if (!state.isInitialized) {
         console.log("⚠️ Dashboard not initialized, skipping refresh");
         return;
@@ -159,7 +187,8 @@ export function useDashboardV2() {
         const refreshType = isAutomatic
           ? "⏰ AUTO-REFRESH"
           : "🔄 MANUAL REFRESH";
-        console.log(`${refreshType} for wallet:`, walletAddress);
+        // Minimal logging for production
+        // console.log(`${refreshType} for wallet:`, walletAddress);
 
         const response = await fetch("/api/dashboard/refresh", {
           method: "POST",
@@ -169,15 +198,46 @@ export function useDashboardV2() {
         });
 
         if (!response.ok) {
-          throw new Error("Failed to refresh dashboard");
+          const errorData = await response.json().catch(() => ({}));
+
+          // If dashboard not initialized error, reinitialize
+          if (errorData.error?.includes("not initialized")) {
+            console.log(
+              "📊 Dashboard not initialized on server, reinitializing..."
+            );
+            setState((prev) => ({ ...prev, isRefreshing: false }));
+            await initializeDashboard(walletAddress);
+            return;
+          }
+
+          throw new Error(errorData.error || "Failed to refresh dashboard");
         }
 
         const data = await response.json();
 
-        if (!isComponentMounted.current) return;
+        if (!isMounted.current) return;
+
+        // Ensure tokens is an array
+        const tokensArray = Array.isArray(data.tokens) ? data.tokens : [];
+
+        // Map tokens properly
+        const formattedTokens: DashboardToken[] = tokensArray.map(
+          (token: any) => ({
+            contractAddress: token.contractAddress || "unknown",
+            symbol: token.symbol || "UNKNOWN",
+            name: token.name || "Unknown Token",
+            decimals: typeof token.decimals === "number" ? token.decimals : 18,
+            imageUrl: token.imageUrl || token.logoUrl || token.image || "",
+            balance: typeof token.balance === "number" ? token.balance : 0,
+            price: typeof token.price === "number" ? token.price : 0,
+            value: typeof token.value === "number" ? token.value : 0,
+            change24h:
+              typeof token.change24h === "number" ? token.change24h : 0,
+          })
+        );
 
         // Update Redux store
-        const reduxTokens = data.tokens.map((token: DashboardToken) => ({
+        const reduxTokens = formattedTokens.map((token) => ({
           id: token.contractAddress,
           symbol: token.symbol,
           name: token.name,
@@ -191,42 +251,38 @@ export function useDashboardV2() {
         }));
 
         dispatch(setTokens(reduxTokens));
-        dispatch(setTotalBalance(data.totalValue));
+        dispatch(setTotalBalance(data.totalValue || 0));
 
         setState((prev) => ({
           ...prev,
-          tokens: data.tokens || [],
+          tokens: formattedTokens,
           totalValue: data.totalValue || 0,
           isRefreshing: false,
           lastRefresh: new Date(),
           refreshCount: prev.refreshCount + 1,
+          error: null,
         }));
 
         console.log(
           `✅ Dashboard refreshed (#${state.refreshCount + 1}): ${
-            data.tokens.length
-          } tokens, $${data.totalValue.toFixed(2)}`
+            formattedTokens.length
+          } tokens, $${(data.totalValue || 0).toFixed(2)}`
         );
-
-        // API call breakdown for refresh
-        console.log("📊 API Calls (Refresh):");
-        console.log("  1x Alchemy token balance call");
-        console.log("  1x CoinGecko batch price call");
-      } catch (error) {
+      } catch (error: any) {
         console.error("❌ Dashboard refresh error:", error);
-        if (isComponentMounted.current) {
+        if (isMounted.current) {
           setState((prev) => ({
             ...prev,
             isRefreshing: false,
-            error: "Failed to refresh dashboard",
+            error: error.message || "Failed to refresh dashboard",
           }));
         }
       }
     },
-    [state.isInitialized, state.refreshCount, dispatch]
+    [state.isInitialized, state.refreshCount, dispatch, initializeDashboard]
   );
 
-  // Add token to dashboard (Phase 3)
+  // Add token
   const addToken = useCallback(
     async (contractAddress: string) => {
       if (!activeWallet?.address) {
@@ -235,47 +291,54 @@ export function useDashboardV2() {
 
       console.log("➕ Adding token to dashboard:", contractAddress);
 
-      const response = await fetch("/api/dashboard/add-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contractAddress,
-          walletAddress: activeWallet.address,
-        }),
-        credentials: "include",
-      });
+      try {
+        const response = await fetch("/api/dashboard/add-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contractAddress,
+            walletAddress: activeWallet.address,
+          }),
+          credentials: "include",
+        });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to add token");
-      }
+        const data = await response.json();
 
-      const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to add token");
+        }
 
-      // Add token to state
-      setState((prev) => {
-        const newTokens = [...prev.tokens, data.token];
-        const newTotalValue = prev.totalValue + data.token.value;
-
-        return {
-          ...prev,
-          tokens: newTokens,
-          totalValue: newTotalValue,
+        // Format the new token
+        const formattedToken: DashboardToken = {
+          contractAddress: data.token.contractAddress,
+          symbol: data.token.symbol || "UNKNOWN",
+          name: data.token.name || "Unknown Token",
+          decimals: data.token.decimals || 18,
+          imageUrl: data.token.imageUrl || data.token.logoUrl || "",
+          balance: data.token.balance || 0,
+          price: data.token.price || 0,
+          value: data.token.value || 0,
+          change24h: data.token.change24h || 0,
         };
-      });
 
-      console.log(`✅ Token added: ${data.token.symbol}`);
-      console.log("📊 API Calls (Add Token):");
-      console.log("  1x CoinGecko/Alchemy metadata call");
-      console.log("  1x Alchemy token balance call");
-      console.log("  1x CoinGecko batch price call");
+        // Add token to state
+        setState((prev) => ({
+          ...prev,
+          tokens: [...prev.tokens, formattedToken],
+          totalValue: prev.totalValue + formattedToken.value,
+        }));
 
-      return data.token;
+        console.log(`✅ Token added: ${data.token.symbol}`);
+        return formattedToken;
+      } catch (error: any) {
+        console.error("❌ Error adding token:", error);
+        throw error;
+      }
     },
     [activeWallet]
   );
 
-  // Remove token from dashboard
+  // Remove token
   const removeToken = useCallback(
     async (contractAddress: string) => {
       if (!activeWallet?.address) {
@@ -284,53 +347,99 @@ export function useDashboardV2() {
 
       console.log("➖ Removing token from dashboard:", contractAddress);
 
-      const response = await fetch("/api/dashboard/remove-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contractAddress,
-          walletAddress: activeWallet.address,
-        }),
-        credentials: "include",
-      });
+      try {
+        const response = await fetch("/api/dashboard/remove-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contractAddress,
+            walletAddress: activeWallet.address,
+          }),
+          credentials: "include",
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to remove token");
+        if (!response.ok) {
+          throw new Error("Failed to remove token");
+        }
+
+        // Remove token from state
+        setState((prev) => {
+          const removedToken = prev.tokens.find(
+            (t) => t.contractAddress === contractAddress
+          );
+          const newTokens = prev.tokens.filter(
+            (t) => t.contractAddress !== contractAddress
+          );
+          const newTotalValue = prev.totalValue - (removedToken?.value || 0);
+
+          return {
+            ...prev,
+            tokens: newTokens,
+            totalValue: newTotalValue,
+          };
+        });
+
+        console.log(`✅ Token removed`);
+      } catch (error: any) {
+        console.error("❌ Error removing token:", error);
+        throw error;
       }
-
-      // Remove token from state
-      setState((prev) => {
-        const removedToken = prev.tokens.find(
-          (t) => t.contractAddress === contractAddress
-        );
-        const newTokens = prev.tokens.filter(
-          (t) => t.contractAddress !== contractAddress
-        );
-        const newTotalValue = prev.totalValue - (removedToken?.value || 0);
-
-        return {
-          ...prev,
-          tokens: newTokens,
-          totalValue: newTotalValue,
-        };
-      });
-
-      console.log(`✅ Token removed`);
     },
     [activeWallet]
   );
 
-  // Manual refresh trigger
+  // Manual refresh
   const manualRefresh = useCallback(() => {
     if (activeWallet?.address) {
-      refreshDashboard(activeWallet.address, false);
+      if (!state.isInitialized) {
+        console.log("🔄 Manual refresh triggered - initializing first");
+        initializeDashboard(activeWallet.address);
+      } else {
+        refreshDashboard(activeWallet.address, false);
+      }
     }
-  }, [activeWallet, refreshDashboard]);
+  }, [
+    activeWallet,
+    refreshDashboard,
+    initializeDashboard,
+    state.isInitialized,
+  ]);
 
-  // Setup auto-refresh (30 seconds interval)
+  // Handle wallet changes
   useEffect(() => {
-    if (activeWallet?.address && state.isInitialized) {
-      console.log("⏰ Setting up auto-refresh every 30 seconds");
+    if (!activeWallet?.address) {
+      console.log("⚠️ No active wallet");
+      return;
+    }
+
+    // Check if wallet changed
+    if (currentWalletRef.current !== activeWallet.address) {
+      console.log("👛 Wallet changed or initial load, initializing dashboard");
+      currentWalletRef.current = activeWallet.address;
+
+      // Reset state for new wallet
+      setState({
+        tokens: [],
+        totalValue: 0,
+        isLoading: true,
+        isRefreshing: false,
+        isInitialized: false,
+        error: null,
+        lastRefresh: null,
+        isNewUser: false,
+        refreshCount: 0,
+      });
+
+      // Initialize for new wallet
+      initializeDashboard(activeWallet.address);
+    }
+  }, [activeWallet?.address, initializeDashboard]);
+
+  // Setup auto-refresh
+  useEffect(() => {
+    if (activeWallet?.address && state.isInitialized && !state.error) {
+      // Silent auto-refresh setup - no console log for production
+      // console.log("⏰ Setting up auto-refresh every 30 seconds");
 
       // Clear existing interval
       if (refreshIntervalRef.current) {
@@ -339,8 +448,9 @@ export function useDashboardV2() {
 
       // Set up new interval
       refreshIntervalRef.current = setInterval(() => {
-        if (isComponentMounted.current) {
-          console.log("⏰ Auto-refresh triggered");
+        if (isMounted.current && activeWallet?.address) {
+          // Silent auto-refresh - no console log for production
+          // console.log("⏰ Auto-refresh triggered");
           refreshDashboard(activeWallet.address, true);
         }
       }, REFRESH_INTERVAL);
@@ -348,59 +458,41 @@ export function useDashboardV2() {
       return () => {
         if (refreshIntervalRef.current) {
           clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
         }
       };
     }
-  }, [activeWallet?.address, state.isInitialized, refreshDashboard]);
-
-  // Handle wallet changes
-  useEffect(() => {
-    if (activeWallet?.address) {
-      // Check if wallet changed
-      if (currentWalletRef.current !== activeWallet.address) {
-        console.log("👛 Wallet changed, reinitializing dashboard");
-        currentWalletRef.current = activeWallet.address;
-
-        // Clear existing data
-        setState({
-          tokens: [],
-          totalValue: 0,
-          isLoading: false,
-          isRefreshing: false,
-          isInitialized: false,
-          error: null,
-          lastRefresh: null,
-          isNewUser: false,
-          refreshCount: 0,
-        });
-
-        // Initialize for new wallet
-        initializeDashboard(activeWallet.address);
-      }
-    }
-  }, [activeWallet?.address, initializeDashboard]);
+  }, [
+    activeWallet?.address,
+    state.isInitialized,
+    state.error,
+    refreshDashboard,
+  ]);
 
   // Cleanup on unmount
   useEffect(() => {
+    isMounted.current = true;
+
     return () => {
-      isComponentMounted.current = false;
+      isMounted.current = false;
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
       }
     };
   }, []);
 
-  // Handle visibility change (pause/resume refresh)
+  // Handle visibility change
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && activeWallet?.address && state.isInitialized) {
-        // Tab became visible - check if we need to refresh
         const timeSinceLastRefresh = state.lastRefresh
           ? Date.now() - state.lastRefresh.getTime()
           : Infinity;
 
         if (timeSinceLastRefresh > REFRESH_INTERVAL) {
-          console.log("👁️ Tab visible - refreshing stale data");
+          // Silent refresh on tab visible - no console log for production
+          // console.log("👁️ Tab visible - refreshing stale data");
           refreshDashboard(activeWallet.address, true);
         }
       }

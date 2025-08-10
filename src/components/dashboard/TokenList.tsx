@@ -143,7 +143,7 @@ export default function TokenList() {
   };
 
   // Show skeleton while loading initial data
-  if (!activeWallet || !isInitialized || (isLoading && tokens.length === 0)) {
+  if (!activeWallet || (!isInitialized && isLoading)) {
     return <SkeletonTokenList />;
   }
 
@@ -162,7 +162,8 @@ export default function TokenList() {
             >
               <Plus size={16} className="lg:w-5 lg:h-5" />
             </button>
-            <button
+            {/* Refresh button commented out for production but functionality remains active */}
+            {/* <button
               onClick={handleRefresh}
               disabled={isRefreshing}
               className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
@@ -174,7 +175,7 @@ export default function TokenList() {
                   isRefreshing ? "animate-spin" : ""
                 }`}
               />
-            </button>
+            </button> */}
           </div>
         </div>
 

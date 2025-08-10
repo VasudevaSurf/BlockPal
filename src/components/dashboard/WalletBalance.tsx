@@ -100,7 +100,7 @@ export default function WalletBalance() {
   };
 
   // Show skeleton during initial load or when switching wallets
-  if (!activeWallet || !isInitialized || (isLoading && tokens.length === 0)) {
+  if (!activeWallet || (!isInitialized && isLoading)) {
     return <SkeletonWalletBalance />;
   }
 
@@ -117,15 +117,15 @@ export default function WalletBalance() {
             Wallet Balance
           </h2>
 
-          {/* Refresh indicator */}
-          {isRefreshing && (
+          {/* Refresh indicator - commented out for production */}
+          {/* {isRefreshing && (
             <div className="flex items-center gap-1">
               <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
               <span className="text-xs text-[#E2AF19] font-satoshi">
                 Updating...
               </span>
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Address and Copy Button with Refresh Info */}
@@ -152,12 +152,12 @@ export default function WalletBalance() {
                 <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
               </button>
 
-              {/* Manual Refresh Button */}
-              <button
+              {/* Manual Refresh Button - commented out for production */}
+              {/* <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative group"
-                title={`Last refresh: ${getTimeSinceRefresh()}`}
+                className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh wallet data"
               >
                 <RefreshCw
                   size={14}
@@ -165,17 +165,7 @@ export default function WalletBalance() {
                     isRefreshing ? "animate-spin" : ""
                   }`}
                 />
-
-                {/* Tooltip */}
-                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-black border border-[#2C2C2C] rounded px-2 py-1 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  <div className="text-gray-400">
-                    Last: {getTimeSinceRefresh()}
-                  </div>
-                  <div className="text-gray-500 text-[10px]">
-                    Auto-refresh: 30s
-                  </div>
-                </div>
-              </button>
+              </button> */}
             </>
           )}
         </div>
@@ -205,7 +195,7 @@ export default function WalletBalance() {
               >
                 ({formatPercentage(changePercentage)})
               </span>
-              <span className="text-gray-500 font-satoshi">24h</span>
+              {/* <span className="text-gray-500 font-satoshi">24h</span> */}
             </>
           ) : (
             <span className="text-gray-400 font-satoshi">
@@ -214,21 +204,21 @@ export default function WalletBalance() {
           )}
         </div>
 
-        {/* Token Count and Refresh Info */}
-        <div className="flex items-center gap-3 mt-2">
-          <span className="text-xs text-gray-500 font-satoshi">
+        <div className="flex items-center">
+          {/* <span className="text-xs text-gray-500 font-satoshi">
             {tokens.length} {tokens.length === 1 ? "token" : "tokens"}
-          </span>
-          {refreshCount > 0 && (
+          </span> */}
+          {/* Refresh count commented out for production */}
+          {/* {refreshCount > 0 && (
             <span className="text-xs text-gray-500 font-satoshi">
               • Refreshed {refreshCount}x
             </span>
-          )}
+          )} */}
         </div>
       </div>
 
-      {/* Development Mode: Show additional stats */}
-      {process.env.NODE_ENV === "development" && (
+      {/* Development Mode: Show additional stats - COMMENTED OUT FOR PRODUCTION */}
+      {/* {process.env.NODE_ENV === "development" && (
         <div className="mt-3 pt-3 border-t border-[#2C2C2C]">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
@@ -255,7 +245,7 @@ export default function WalletBalance() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
