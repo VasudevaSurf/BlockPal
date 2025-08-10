@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED with proper wallet creation handling
+// src/app/dashboard/page.tsx - FIXED with proper import vs create handling
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -36,7 +36,7 @@ interface DashboardState {
   showWelcomeModal: boolean;
   initialLoadComplete: boolean;
   currentUserId: string | null;
-  walletCreationInProgress: boolean; // NEW: Track wallet creation
+  walletOperationInProgress: boolean; // Track any wallet operation
 }
 
 export default function DashboardPage() {
@@ -80,7 +80,7 @@ export default function DashboardPage() {
     showWelcomeModal: false,
     initialLoadComplete: false,
     currentUserId: null,
-    walletCreationInProgress: false, // NEW: Initialize
+    walletOperationInProgress: false,
   });
 
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
@@ -91,6 +91,7 @@ export default function DashboardPage() {
     walletsLoaded: false,
     activeWalletSynced: false,
     lastUserId: null as string | null,
+    isProcessingWalletOperation: false,
   });
 
   // CRITICAL: Detect user changes and clear state
@@ -113,6 +114,7 @@ export default function DashboardPage() {
       // Reset initialization flags
       initializationRef.current.walletsLoaded = false;
       initializationRef.current.activeWalletSynced = false;
+      initializationRef.current.isProcessingWalletOperation = false;
 
       // Reset dashboard state
       setDashboardState({
@@ -126,7 +128,7 @@ export default function DashboardPage() {
         showWelcomeModal: false,
         initialLoadComplete: false,
         currentUserId: userId,
-        walletCreationInProgress: false,
+        walletOperationInProgress: false,
       });
 
       // Clear any cached data
@@ -201,7 +203,7 @@ export default function DashboardPage() {
       user &&
       !initializationRef.current.walletsLoaded &&
       dashboardState.currentUserId === (user.id || user.username) &&
-      !dashboardState.walletCreationInProgress // Don't load during creation
+      !initializationRef.current.isProcessingWalletOperation
     ) {
       console.log("📡 Dashboard - Loading wallets for user:", user.username);
       initializationRef.current.walletsLoaded = true;
@@ -236,7 +238,6 @@ export default function DashboardPage() {
     isAuthenticated,
     user,
     dashboardState.currentUserId,
-    dashboardState.walletCreationInProgress,
     dispatch,
   ]);
 
@@ -248,7 +249,7 @@ export default function DashboardPage() {
       !initializationRef.current.activeWalletSynced &&
       user &&
       dashboardState.currentUserId === (user.id || user.username) &&
-      !dashboardState.walletCreationInProgress // Don't sync during creation
+      !initializationRef.current.isProcessingWalletOperation
     ) {
       console.log(
         "🎯 Dashboard - Setting active wallet for user:",
@@ -292,7 +293,11 @@ export default function DashboardPage() {
           hasActiveWallet: true,
         }));
       });
-    } else if (dashboardState.walletsResolved && wallets.length === 0) {
+    } else if (
+      dashboardState.walletsResolved &&
+      wallets.length === 0 &&
+      !initializationRef.current.isProcessingWalletOperation
+    ) {
       setDashboardState((prev) => ({
         ...prev,
         activeWalletResolved: true,
@@ -304,7 +309,6 @@ export default function DashboardPage() {
     wallets,
     user,
     dashboardState.currentUserId,
-    dashboardState.walletCreationInProgress,
     dispatch,
   ]);
 
@@ -315,74 +319,82 @@ export default function DashboardPage() {
     await dispatch(setActiveWalletInDB(walletId));
   };
 
-  // FIXED: Enhanced wallet creation handler
+  // FIXED: Enhanced wallet creation handler that properly handles both create and import
   const handleWalletCreated = async () => {
-    console.log("✅ Wallet created, updating dashboard state");
+    console.log("✅ Wallet operation completed (create/import)");
 
-    // Mark wallet creation in progress
+    // Mark wallet operation in progress
+    initializationRef.current.isProcessingWalletOperation = true;
     setDashboardState((prev) => ({
       ...prev,
-      walletCreationInProgress: true,
+      walletOperationInProgress: true,
       showWelcomeModal: false,
     }));
 
-    // Reset initialization flags
+    // Reset initialization flags to allow re-fetching
     initializationRef.current.walletsLoaded = false;
     initializationRef.current.activeWalletSynced = false;
 
-    // Fetch wallets
-    const result = await dispatch(fetchWallets());
+    try {
+      // Fetch wallets
+      const result = await dispatch(fetchWallets());
 
-    const walletsData =
-      result.type === "wallet/fetchWallets/fulfilled"
-        ? (result.payload as any[])
-        : [];
+      const walletsData =
+        result.type === "wallet/fetchWallets/fulfilled"
+          ? (result.payload as any[])
+          : [];
 
-    const hasWallets = walletsData && walletsData.length > 0;
+      const hasWallets = walletsData && walletsData.length > 0;
 
-    console.log("📦 Wallets after creation:", {
-      hasWallets,
-      count: walletsData?.length || 0,
-    });
+      console.log("📦 Wallets after operation:", {
+        hasWallets,
+        count: walletsData?.length || 0,
+      });
 
-    if (hasWallets) {
-      // Set the first (newly created) wallet as active
-      const newWallet = walletsData[walletsData.length - 1]; // Usually the newest wallet
-      if (newWallet) {
-        await dispatch(
-          setActiveWallet(newWallet._id?.toString() || newWallet.id)
-        );
-        await dispatch(
-          setActiveWalletInDB(newWallet._id?.toString() || newWallet.id)
-        );
+      if (hasWallets) {
+        // Get the most recently created/imported wallet (usually the last one)
+        const newWallet = walletsData[walletsData.length - 1];
+
+        if (newWallet) {
+          const walletId = newWallet._id?.toString() || newWallet.id;
+
+          // Set as active wallet
+          await dispatch(setActiveWallet(walletId));
+          await dispatch(setActiveWalletInDB(walletId));
+
+          // Update state to show the dashboard
+          setDashboardState((prev) => ({
+            ...prev,
+            walletsResolved: true,
+            activeWalletResolved: true,
+            hasWallets: true,
+            hasActiveWallet: true,
+            walletOperationInProgress: false,
+          }));
+
+          // Allow the dashboard hook to naturally initialize
+          // The useDashboardV2 hook will automatically detect the new active wallet
+          // and fetch tokens if they exist
+          console.log(
+            "🔄 Dashboard will auto-initialize for wallet:",
+            newWallet.walletAddress || newWallet.address
+          );
+        }
+      } else {
+        // If still no wallets (shouldn't happen), reset state
+        setDashboardState((prev) => ({
+          ...prev,
+          walletsResolved: true,
+          activeWalletResolved: true,
+          hasWallets: false,
+          hasActiveWallet: false,
+          walletOperationInProgress: false,
+          showWelcomeModal: true,
+        }));
       }
-
-      // Update state to show the dashboard with empty token list
-      setDashboardState((prev) => ({
-        ...prev,
-        walletsResolved: true,
-        activeWalletResolved: true,
-        hasWallets: true,
-        hasActiveWallet: true,
-        walletCreationInProgress: false,
-        showWelcomeModal: false,
-      }));
-
-      // Force a manual refresh to initialize the dashboard for the new wallet
-      setTimeout(() => {
-        manualRefresh();
-      }, 500);
-    } else {
-      // If still no wallets (shouldn't happen), reset state
-      setDashboardState((prev) => ({
-        ...prev,
-        walletsResolved: true,
-        activeWalletResolved: true,
-        hasWallets: false,
-        hasActiveWallet: false,
-        walletCreationInProgress: false,
-        showWelcomeModal: true,
-      }));
+    } finally {
+      // Clear the operation flag
+      initializationRef.current.isProcessingWalletOperation = false;
     }
   };
 
@@ -392,16 +404,17 @@ export default function DashboardPage() {
     manualRefresh();
   };
 
-  // FIXED: Better skeleton condition
+  // FIXED: Better skeleton condition that considers wallet operations
   const shouldShowSkeleton =
     dashboardState.authLoading ||
     !dashboardState.authResolved ||
     (isAuthenticated &&
       !dashboardState.walletsResolved &&
-      !dashboardState.walletCreationInProgress) ||
+      !dashboardState.walletOperationInProgress) ||
     (wallets.length > 0 &&
       !dashboardState.activeWalletResolved &&
-      !dashboardState.walletCreationInProgress);
+      !dashboardState.walletOperationInProgress) ||
+    (dashboardState.walletOperationInProgress && !isInitialized); // Show skeleton during operation until dashboard initializes
 
   // FIXED: Better content condition
   const shouldShowContent =
@@ -411,7 +424,7 @@ export default function DashboardPage() {
     (dashboardState.activeWalletResolved || wallets.length === 0) &&
     !dashboardState.authLoading &&
     !dashboardState.walletsLoading &&
-    !dashboardState.walletCreationInProgress;
+    (!dashboardState.walletOperationInProgress || isInitialized); // Show content when initialized even during operation
 
   // Determine if we should show welcome modal
   const shouldShowWelcomeModal =
@@ -421,13 +434,13 @@ export default function DashboardPage() {
     dashboardState.initialLoadComplete &&
     dashboardState.showWelcomeModal &&
     isAuthenticated &&
-    !dashboardState.walletCreationInProgress;
+    !dashboardState.walletOperationInProgress;
 
   console.log("🎨 Dashboard render state:", {
     shouldShowSkeleton,
     shouldShowContent,
     shouldShowWelcomeModal,
-    walletCreationInProgress: dashboardState.walletCreationInProgress,
+    walletOperationInProgress: dashboardState.walletOperationInProgress,
     activeWallet: activeWallet?.address,
     isInitialized,
     isLoading,
