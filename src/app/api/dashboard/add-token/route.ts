@@ -1,7 +1,8 @@
+// src/app/api/dashboard/add-token/route.ts - Updated for Phase 3 workflow
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
-import { dashboardService } from "@/lib/dashboard-service";
+import { dashboardServiceV2 } from "@/lib/dashboard-service-v2";
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,26 +44,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if token already exists
-    const existingToken = dashboardData.metadata?.find(
-      (m: any) => m.contractAddress.toLowerCase() === normalizedContract
-    );
-
-    if (existingToken) {
+    if (dashboardData.metadata && dashboardData.metadata[normalizedContract]) {
       return NextResponse.json(
         { error: "Token already in dashboard" },
         { status: 400 }
       );
     }
 
-    // Add new token using fallback chain
+    // PHASE 3: Add token workflow
+    // 1. Get metadata (CoinGecko first, Alchemy as fallback)
+    // 2. Get token balance
+    // 3. Batch fetch price with existing tokens
     const { token: newToken, metadata } =
-      await dashboardService.addTokenToDashboard(
+      await dashboardServiceV2.addTokenToDashboard(
         contractAddress,
         walletAddress
       );
 
     // Update metadata in database
-    const updatedMetadata = [...(dashboardData.metadata || []), metadata];
+    const updatedMetadata = {
+      ...(dashboardData.metadata || {}),
+      [normalizedContract]: metadata,
+    };
+
+    // Add new token to existing tokens
     const updatedTokens = [...(dashboardData.tokens || []), newToken];
     const updatedTotalValue = (dashboardData.totalValue || 0) + newToken.value;
 
@@ -81,20 +86,18 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Store in global metadata if it has useful info
-    if (metadata.symbol !== "UNKNOWN" || metadata.imageUrl) {
-      await db.collection("token_metadata").updateOne(
-        { contractAddress: normalizedContract },
-        {
-          $set: {
-            ...metadata,
-            contractAddress: normalizedContract,
-            updatedAt: new Date(),
-          },
+    // Store in global metadata collection
+    await db.collection("token_metadata").updateOne(
+      { contractAddress: normalizedContract },
+      {
+        $set: {
+          ...metadata,
+          contractAddress: normalizedContract,
+          updatedAt: new Date(),
         },
-        { upsert: true }
-      );
-    }
+      },
+      { upsert: true }
+    );
 
     console.log(`✅ Token added successfully: ${metadata.symbol}`);
 

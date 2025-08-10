@@ -1,7 +1,8 @@
+// src/app/api/dashboard/refresh/route.ts - Updated for automatic refresh workflow
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
-import { dashboardService } from "@/lib/dashboard-service";
+import { dashboardServiceV2 } from "@/lib/dashboard-service-v2";
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,13 +39,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Refresh with current data (get latest balances and prices)
-    const refreshedData = await dashboardService.refreshDashboard(
-      walletAddress,
-      dashboardData.metadata
+    // AUTOMATIC REFRESH FLOW:
+    // Step 1: Get updated token balances from Alchemy
+    // Step 2: Batch fetch current prices from CoinGecko
+    // No need to update metadata
+    const refreshedData = await dashboardServiceV2.refreshDashboard(
+      walletAddress
     );
 
-    // Update database with refreshed data
+    // Update database with refreshed values (not metadata)
     await db.collection("dashboard_tokens").updateOne(
       {
         username: decoded.username,

@@ -1,7 +1,8 @@
+// src/app/api/dashboard/initialize/route.ts - Updated to use new workflow
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/mongodb";
-import { dashboardService } from "@/lib/dashboard-service";
+import { dashboardServiceV2 } from "@/lib/dashboard-service-v2";
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,31 +26,33 @@ export async function POST(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Check if user already has dashboard data for this wallet
+    // Check if user is returning (has stored metadata)
     const existingData = await db.collection("dashboard_tokens").findOne({
       username: decoded.username,
       walletAddress: walletAddress.toLowerCase(),
     });
 
-    if (
+    const isReturningUser =
       existingData &&
       existingData.metadata &&
-      existingData.metadata.length > 0
-    ) {
+      Object.keys(existingData.metadata).length > 0;
+
+    if (isReturningUser) {
+      // PHASE 2: Returning user flow
       console.log(
-        "📊 Returning user detected, using stored metadata and refreshing"
+        "👤 Returning user detected, loading dashboard with stored metadata"
       );
 
-      // For returning users, use stored metadata and refresh prices
-      const metadata = existingData.metadata || [];
-
       try {
-        const refreshedData = await dashboardService.refreshDashboard(
-          walletAddress,
-          metadata
+        // Step 1: Metadata already in DB
+        const metadata = existingData.metadata;
+
+        // Step 2 & 3: Get balances and prices
+        const dashboardData = await dashboardServiceV2.loadReturningUser(
+          walletAddress
         );
 
-        // Update last refresh time
+        // Update database with new values
         await db.collection("dashboard_tokens").updateOne(
           {
             username: decoded.username,
@@ -57,40 +60,37 @@ export async function POST(request: NextRequest) {
           },
           {
             $set: {
+              tokens: dashboardData.tokens,
+              totalValue: dashboardData.totalValue,
               lastRefreshed: new Date(),
-              tokens: refreshedData.tokens,
-              totalValue: refreshedData.totalValue,
+              updatedAt: new Date(),
             },
           }
         );
 
         return NextResponse.json({
           isNewUser: false,
-          tokens: refreshedData.tokens,
-          totalValue: refreshedData.totalValue,
-          metadata,
+          tokens: dashboardData.tokens,
+          totalValue: dashboardData.totalValue,
+          metadata: metadata,
         });
-      } catch (refreshError) {
-        console.error(
-          "⚠️ Refresh failed, returning cached data:",
-          refreshError
-        );
-        // If refresh fails, return cached data
-        return NextResponse.json({
-          isNewUser: false,
-          tokens: existingData.tokens || [],
-          totalValue: existingData.totalValue || 0,
-          metadata,
-        });
+      } catch (error) {
+        console.error("⚠️ Error loading returning user data:", error);
+        // Fall back to new user flow if there's an error
       }
     }
 
-    // New user - initialize dashboard with preset tokens
+    // PHASE 1: New user flow
     console.log("🆕 New user detected, initializing with preset tokens");
 
-    const initData = await dashboardService.initializeNewUser(walletAddress);
+    const initData = await dashboardServiceV2.initializeNewUser(walletAddress);
 
-    // Store metadata and initial data in database
+    // Store metadata in database
+    const metadataObject: Record<string, any> = {};
+    initData.metadata.forEach((meta) => {
+      metadataObject[meta.contractAddress.toLowerCase()] = meta;
+    });
+
     await db.collection("dashboard_tokens").updateOne(
       {
         username: decoded.username,
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         $set: {
           username: decoded.username,
           walletAddress: walletAddress.toLowerCase(),
-          metadata: initData.metadata,
+          metadata: metadataObject,
           tokens: initData.tokens,
           totalValue: initData.totalValue,
           createdAt: new Date(),
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       { upsert: true }
     );
 
-    // Store global token metadata for future use
+    // Also store individual token metadata for global reference
     for (const meta of initData.metadata) {
       if (meta.contractAddress !== "native") {
         await db.collection("token_metadata").updateOne(

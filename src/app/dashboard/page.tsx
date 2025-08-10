@@ -1,21 +1,18 @@
-// src/app/dashboard/page.tsx - FIXED VERSION - No Flickering During Wallet Switch
+// src/app/dashboard/page.tsx - Fixed to show WalletWelcomeModal for new users
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/store";
-import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
+import { checkAuthStatus } from "@/store/slices/authSlice";
 import {
   fetchWallets,
   setActiveWallet,
   setActiveWalletInDB,
   getActiveWalletFromDB,
-  fetchWalletTokens,
-  updateWalletBalance,
-  clearTokens,
 } from "@/store/slices/walletSlice";
-import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
+import { useDashboardV2 } from "@/hooks/useDashboardV2";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
@@ -28,34 +25,15 @@ import {
 } from "@/components/ui/Skeleton";
 
 interface DashboardState {
-  // Loading phases
   authLoading: boolean;
   walletsLoading: boolean;
-  tokensLoading: boolean;
-  balanceLoading: boolean;
-
-  // Completion flags
   authResolved: boolean;
   walletsResolved: boolean;
   activeWalletResolved: boolean;
-  tokensResolved: boolean;
-  balanceResolved: boolean;
-
-  // Data flags
   hasWallets: boolean;
   hasActiveWallet: boolean;
-  hasTokens: boolean;
-  hasBalance: boolean;
-
-  // UI states
   showWelcomeModal: boolean;
   initialLoadComplete: boolean;
-  dataRefreshed: boolean;
-
-  // NEW: Wallet switching state
-  isWalletSwitching: boolean;
-  switchingFromWallet: string | null;
-  switchingToWallet: string | null;
 }
 
 export default function DashboardPage() {
@@ -67,116 +45,86 @@ export default function DashboardPage() {
   const {
     wallets,
     activeWallet,
-    tokens,
-    totalBalance,
     loading: walletLoading,
   } = useSelector((state: RootState) => state.wallet);
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
-  // Enhanced state tracking with wallet switching
+  // Use the new dashboard hook
+  const {
+    tokens,
+    totalValue,
+    isLoading,
+    isRefreshing,
+    isInitialized,
+    error,
+    lastRefresh,
+    isNewUser,
+    refreshCount,
+    manualRefresh,
+    portfolioStats,
+  } = useDashboardV2();
+
+  // Enhanced state tracking
   const [dashboardState, setDashboardState] = useState<DashboardState>({
     authLoading: true,
     walletsLoading: false,
-    tokensLoading: false,
-    balanceLoading: false,
     authResolved: false,
     walletsResolved: false,
     activeWalletResolved: false,
-    tokensResolved: false,
-    balanceResolved: false,
     hasWallets: false,
     hasActiveWallet: false,
-    hasTokens: false,
-    hasBalance: false,
     showWelcomeModal: false,
     initialLoadComplete: false,
-    dataRefreshed: false,
-    isWalletSwitching: false, // NEW
-    switchingFromWallet: null, // NEW
-    switchingToWallet: null, // NEW
   });
 
-  // Wallet switcher state
+  // State for UI
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
 
-  // Use refs to prevent duplicate calls and track current operations
+  // Refs for initialization tracking
   const initializationRef = useRef({
     authChecked: false,
     walletsLoaded: false,
     activeWalletSynced: false,
-    tokensLoaded: false,
-    balanceLoaded: false,
-    pageLoadTime: Date.now(),
-    currentWalletAddress: null as string | null,
   });
 
-  // Real-time dashboard hook (KEEPING FUNCTIONALITY BUT DISABLING NOTIFICATIONS)
-  const {
-    data: realtimeData,
-    isMonitoring,
-    lastUpdated,
-    changeAmount,
-    hasChanges,
-    notifications,
-    refreshDashboard,
-    status,
-    isDataStale,
-  } = useRealtimeDashboard();
-
-  // NEW: Track wallet switching and show skeleton during transition
+  // Log dashboard status on mount
   useEffect(() => {
-    const currentWalletAddress = activeWallet?.address;
-    const previousWalletAddress =
-      initializationRef.current.currentWalletAddress;
+    console.log("📊 Dashboard mounted - New workflow implementation active");
+    console.log("⚡ Features enabled:");
+    console.log("  - Phase 1: New user initialization with preset tokens");
+    console.log("  - Phase 2: Returning user with stored metadata");
+    console.log("  - Phase 3: Add custom tokens");
+    console.log("  - Auto-refresh every 30 seconds");
+  }, []);
 
-    if (currentWalletAddress !== previousWalletAddress) {
-      console.log("🔄 Dashboard - Active wallet changed:", {
-        from: previousWalletAddress,
-        to: currentWalletAddress,
-      });
+  // Log user type when detected
+  useEffect(() => {
+    if (isInitialized && activeWallet) {
+      const userTypeLabel = isNewUser ? "🆕 NEW USER" : "👤 RETURNING USER";
+      console.log(
+        `${userTypeLabel} detected for wallet: ${activeWallet.address}`
+      );
 
-      // If this is a wallet switch (not initial load), start switching state
-      if (previousWalletAddress && currentWalletAddress) {
+      if (isNewUser) {
         console.log(
-          "🔄 Dashboard - Wallet switching detected, showing skeleton"
+          "📈 Initialized with preset tokens matching wallet holdings"
         );
-
-        setDashboardState((prev) => ({
-          ...prev,
-          isWalletSwitching: true,
-          switchingFromWallet: previousWalletAddress,
-          switchingToWallet: currentWalletAddress,
-          tokensLoading: true,
-          balanceLoading: true,
-          tokensResolved: false,
-          balanceResolved: false,
-          hasTokens: false,
-          hasBalance: false,
-          dataRefreshed: false,
-        }));
-
-        // Reset data loading flags
-        initializationRef.current.tokensLoaded = false;
-        initializationRef.current.balanceLoaded = false;
-
-        // Emit wallet switch start event
-        window.dispatchEvent(
-          new CustomEvent("walletSwitchStart", {
-            detail: {
-              fromWallet: previousWalletAddress,
-              toWallet: currentWalletAddress,
-            },
-          })
-        );
+      } else {
+        console.log("📂 Loaded with stored metadata from database");
       }
-
-      // Update tracking
-      initializationRef.current.currentWalletAddress = currentWalletAddress;
     }
-  }, [activeWallet?.address]);
+  }, [isInitialized, isNewUser, activeWallet]);
 
-  // STEP 1: Auth Check Effect
+  // Log refresh activity
+  useEffect(() => {
+    if (refreshCount > 0) {
+      console.log(`🔄 Dashboard refreshed ${refreshCount} times`);
+      console.log(`⏰ Last refresh: ${lastRefresh?.toLocaleTimeString()}`);
+    }
+  }, [refreshCount, lastRefresh]);
+
+  // STEP 1: Auth Check
   useEffect(() => {
     console.log("🔍 Dashboard - Auth initialization");
 
@@ -193,9 +141,9 @@ export default function DashboardPage() {
         }));
       });
     }
-  }, []);
+  }, [dispatch]);
 
-  // STEP 2: Auth Resolution Effect
+  // STEP 2: Auth Resolution
   useEffect(() => {
     if (dashboardState.authResolved && !isAuthenticated && !authLoading) {
       console.log("🚪 Dashboard - Redirecting to auth");
@@ -203,7 +151,7 @@ export default function DashboardPage() {
     }
   }, [dashboardState.authResolved, isAuthenticated, authLoading, router]);
 
-  // STEP 3: Wallets Loading Effect
+  // STEP 3: Load Wallets
   useEffect(() => {
     if (
       dashboardState.authResolved &&
@@ -212,7 +160,6 @@ export default function DashboardPage() {
       !initializationRef.current.walletsLoaded
     ) {
       console.log("📡 Dashboard - Loading wallets");
-
       initializationRef.current.walletsLoaded = true;
       setDashboardState((prev) => ({ ...prev, walletsLoading: true }));
 
@@ -234,13 +181,14 @@ export default function DashboardPage() {
           walletsLoading: false,
           walletsResolved: true,
           hasWallets,
-          initialLoadComplete: !hasWallets, // NEW: Mark as complete if no wallets found
+          initialLoadComplete: true,
+          showWelcomeModal: !hasWallets, // Show modal if no wallets
         }));
       });
     }
   }, [dashboardState.authResolved, isAuthenticated, user, dispatch]);
 
-  // STEP 4: Active Wallet Sync Effect
+  // STEP 4: Sync Active Wallet (only if wallets exist)
   useEffect(() => {
     if (
       dashboardState.walletsResolved &&
@@ -248,7 +196,6 @@ export default function DashboardPage() {
       !initializationRef.current.activeWalletSynced
     ) {
       console.log("🎯 Dashboard - Syncing active wallet");
-
       initializationRef.current.activeWalletSynced = true;
 
       dispatch(getActiveWalletFromDB()).then((result) => {
@@ -261,12 +208,10 @@ export default function DashboardPage() {
             dispatch(setActiveWallet(firstWallet.id));
             dispatch(setActiveWalletInDB(firstWallet.id));
           }
-        } else {
-          if (wallets.length > 0) {
-            const firstWallet = wallets[0];
-            dispatch(setActiveWallet(firstWallet.id));
-            dispatch(setActiveWalletInDB(firstWallet.id));
-          }
+        } else if (wallets.length > 0) {
+          const firstWallet = wallets[0];
+          dispatch(setActiveWallet(firstWallet.id));
+          dispatch(setActiveWalletInDB(firstWallet.id));
         }
 
         setDashboardState((prev) => ({
@@ -276,298 +221,106 @@ export default function DashboardPage() {
         }));
       });
     } else if (dashboardState.walletsResolved && wallets.length === 0) {
-      // NEW: If no wallets found, mark as resolved
-      console.log("🎯 Dashboard - No wallets found, marking as resolved");
+      // No wallets - mark as resolved
+      console.log("🎯 Dashboard - No wallets found");
       setDashboardState((prev) => ({
         ...prev,
         activeWalletResolved: true,
         hasActiveWallet: false,
-        initialLoadComplete: true, // Mark as complete for welcome modal
       }));
     }
   }, [dashboardState.walletsResolved, wallets.length, dispatch]);
 
-  // STEP 5: ENHANCED - Load tokens and balance when active wallet is available
-  useEffect(() => {
-    if (
-      dashboardState.activeWalletResolved &&
-      activeWallet?.address &&
-      (!initializationRef.current.tokensLoaded ||
-        !initializationRef.current.balanceLoaded ||
-        initializationRef.current.currentWalletAddress !== activeWallet.address)
-    ) {
-      console.log(
-        "🪙💰 Dashboard - Loading tokens and balance for active wallet"
-      );
-
-      const needsTokens =
-        !initializationRef.current.tokensLoaded ||
-        initializationRef.current.currentWalletAddress !== activeWallet.address;
-      const needsBalance =
-        !initializationRef.current.balanceLoaded ||
-        initializationRef.current.currentWalletAddress !== activeWallet.address;
-
-      setDashboardState((prev) => ({
-        ...prev,
-        tokensLoading: needsTokens,
-        balanceLoading: needsBalance,
-      }));
-
-      const loadPromises: Promise<any>[] = [];
-
-      if (needsTokens) {
-        initializationRef.current.tokensLoaded = true;
-        loadPromises.push(
-          dispatch(fetchWalletTokens(activeWallet.address)).then((result) => {
-            const tokensData =
-              result.type === "wallet/fetchWalletTokens/fulfilled"
-                ? (result.payload as any)?.tokens || []
-                : [];
-
-            console.log("🪙 Tokens fetch completed:", {
-              tokensCount: tokensData.length,
-            });
-
-            setDashboardState((prev) => ({
-              ...prev,
-              tokensLoading: false,
-              tokensResolved: true,
-              hasTokens: tokensData.length > 0,
-            }));
-
-            return result;
-          })
-        );
-      }
-
-      if (needsBalance) {
-        initializationRef.current.balanceLoaded = true;
-        loadPromises.push(
-          dispatch(updateWalletBalance(activeWallet.address)).then((result) => {
-            console.log("💰 Balance update completed");
-
-            setDashboardState((prev) => ({
-              ...prev,
-              balanceLoading: false,
-              balanceResolved: true,
-              hasBalance: true,
-            }));
-
-            return result;
-          })
-        );
-      }
-
-      // Wait for all loading to complete
-      Promise.all(loadPromises).then(() => {
-        console.log(
-          "✅ Dashboard - All data loaded, ending wallet switch if active"
-        );
-
-        setDashboardState((prev) => ({
-          ...prev,
-          initialLoadComplete: true,
-          dataRefreshed: true,
-          isWalletSwitching: false, // NEW: End wallet switching
-          switchingFromWallet: null,
-          switchingToWallet: null,
-        }));
-
-        // Emit wallet switch completion event
-        if (dashboardState.isWalletSwitching) {
-          window.dispatchEvent(
-            new CustomEvent("walletSwitchComplete", {
-              detail: { walletAddress: activeWallet.address },
-            })
-          );
-        }
-      });
-    }
-  }, [
-    dashboardState.activeWalletResolved,
-    activeWallet?.address,
-    dispatch,
-    initializationRef.current.currentWalletAddress,
-    dashboardState.isWalletSwitching,
-  ]);
-
-  // ENHANCED: Wallet selection handler with immediate clearing
+  // Handle wallet selection
   const handleWalletSelect = async (walletId: string) => {
     console.log("🎯 Dashboard - Wallet selected:", walletId);
-
-    // Find the selected wallet
-    const selectedWallet = wallets.find((w) => w.id === walletId);
-    if (!selectedWallet) {
-      console.error("❌ Selected wallet not found");
-      return;
-    }
-
-    // Get current wallet for tracking
-    const currentWalletAddress = activeWallet?.address;
-
-    console.log("🔄 Dashboard - Starting wallet switch", {
-      from: currentWalletAddress,
-      to: selectedWallet.address,
-    });
-
-    // IMMEDIATELY clear existing data and set switching state
-    dispatch(clearTokens());
-
-    setDashboardState((prev) => ({
-      ...prev,
-      isWalletSwitching: true,
-      switchingFromWallet: currentWalletAddress || null,
-      switchingToWallet: selectedWallet.address,
-      tokensLoading: true,
-      balanceLoading: true,
-      tokensResolved: false,
-      balanceResolved: false,
-      hasTokens: false,
-      hasBalance: false,
-      dataRefreshed: false,
-    }));
-
-    // Reset loading state for new wallet
-    initializationRef.current.tokensLoaded = false;
-    initializationRef.current.balanceLoaded = false;
-    initializationRef.current.currentWalletAddress = selectedWallet.address;
-
-    // Emit wallet switch start event
-    window.dispatchEvent(
-      new CustomEvent("walletSwitchStart", {
-        detail: {
-          fromWallet: currentWalletAddress,
-          toWallet: selectedWallet.address,
-        },
-      })
-    );
-
-    try {
-      // Set locally first for immediate UI response
-      dispatch(setActiveWallet(walletId));
-
-      // Sync with database
-      await dispatch(setActiveWalletInDB(walletId));
-      console.log("✅ Active wallet synced with database");
-
-      // Force refresh dashboard data for new wallet
-      setTimeout(() => {
-        if (refreshDashboard) {
-          refreshDashboard();
-        }
-      }, 500);
-    } catch (error) {
-      console.error("❌ Failed to sync active wallet with database:", error);
-
-      // Reset switching state on error
-      setDashboardState((prev) => ({
-        ...prev,
-        isWalletSwitching: false,
-        switchingFromWallet: null,
-        switchingToWallet: null,
-      }));
-    }
+    dispatch(setActiveWallet(walletId));
+    await dispatch(setActiveWalletInDB(walletId));
   };
 
+  // Handle wallet creation
   const handleWalletCreated = () => {
-    // Reset all initialization flags
-    initializationRef.current = {
-      authChecked: true,
-      walletsLoaded: false,
-      activeWalletSynced: false,
-      tokensLoaded: false,
-      balanceLoaded: false,
-      pageLoadTime: Date.now(),
-      currentWalletAddress: null,
-    };
+    console.log("✅ Wallet created, refreshing wallets list");
 
-    // Reset dashboard state
+    // Reset initialization flags
+    initializationRef.current.walletsLoaded = false;
+    initializationRef.current.activeWalletSynced = false;
+
+    // Close modal and refresh wallets
     setDashboardState((prev) => ({
       ...prev,
-      walletsLoading: false,
-      tokensLoading: false,
-      balanceLoading: false,
+      showWelcomeModal: false,
+      walletsLoading: true,
       walletsResolved: false,
       activeWalletResolved: false,
-      tokensResolved: false,
-      balanceResolved: false,
-      hasWallets: false,
-      hasActiveWallet: false,
-      hasTokens: false,
-      hasBalance: false,
-      showWelcomeModal: false,
-      initialLoadComplete: false,
-      dataRefreshed: false,
-      isWalletSwitching: false,
-      switchingFromWallet: null,
-      switchingToWallet: null,
     }));
 
     // Reload wallets
     dispatch(fetchWallets());
   };
 
-  // Manual refresh handler
-  const handleManualRefresh = async () => {
-    console.log("🔄 Manual refresh triggered");
-    try {
-      if (refreshDashboard) {
-        await refreshDashboard();
-      }
-      console.log("✅ Manual refresh completed");
-    } catch (error) {
-      console.error("❌ Manual refresh failed:", error);
-    }
+  // Handle manual refresh
+  const handleManualRefresh = () => {
+    console.log("🔄 Manual refresh requested");
+    manualRefresh();
   };
 
-  // ENHANCED: Better loading conditions including wallet switching
+  // Determine loading state
   const shouldShowSkeleton =
     dashboardState.authLoading ||
     !dashboardState.authResolved ||
-    (isAuthenticated &&
-      (!dashboardState.walletsResolved || dashboardState.walletsLoading)) ||
+    (isAuthenticated && !dashboardState.walletsResolved) ||
     (wallets.length > 0 && !dashboardState.activeWalletResolved) ||
-    (dashboardState.hasActiveWallet &&
-      (dashboardState.tokensLoading || dashboardState.balanceLoading) &&
-      !dashboardState.dataRefreshed) ||
-    dashboardState.isWalletSwitching; // NEW: Show skeleton during wallet switching
+    (activeWallet && !isInitialized && isLoading);
 
   const shouldShowContent =
     dashboardState.authResolved &&
     isAuthenticated &&
     dashboardState.walletsResolved &&
     !dashboardState.authLoading &&
-    !dashboardState.walletsLoading &&
-    !dashboardState.isWalletSwitching; // NEW: Hide content during switching
+    !dashboardState.walletsLoading;
 
   const shouldShowWelcomeModal =
     dashboardState.walletsResolved &&
     !dashboardState.walletsLoading &&
     wallets.length === 0 &&
     dashboardState.initialLoadComplete &&
-    !dashboardState.isWalletSwitching && // Only hide during actual wallet switching, not when no wallets exist
-    isAuthenticated; // NEW: Ensure user is authenticated
+    dashboardState.showWelcomeModal &&
+    isAuthenticated;
 
   console.log("🎨 Dashboard render state:", {
     authResolved: dashboardState.authResolved,
     walletsResolved: dashboardState.walletsResolved,
     activeWalletResolved: dashboardState.activeWalletResolved,
-    tokensResolved: dashboardState.tokensResolved,
-    balanceResolved: dashboardState.balanceResolved,
-    isWalletSwitching: dashboardState.isWalletSwitching,
-    switchingFromWallet: dashboardState.switchingFromWallet,
-    switchingToWallet: dashboardState.switchingToWallet,
-    walletsFromRedux: wallets.length,
+    walletsCount: wallets.length,
     shouldShowSkeleton,
     shouldShowContent,
     shouldShowWelcomeModal,
+    showWelcomeModal: dashboardState.showWelcomeModal,
     initialLoadComplete: dashboardState.initialLoadComplete,
     isAuthenticated,
-    currentWalletAddress: initializationRef.current.currentWalletAddress,
-    activeWalletAddress: activeWallet?.address,
   });
 
-  // Show loading skeleton during initial setup or wallet switching
+  // Log portfolio stats periodically
+  useEffect(() => {
+    if (isInitialized && portfolioStats.tokenCount > 0) {
+      console.log("📊 Portfolio Stats:");
+      console.log(`  Total Value: $${totalValue.toFixed(2)}`);
+      console.log(`  Token Count: ${portfolioStats.tokenCount}`);
+      console.log(
+        `  24h Change: ${portfolioStats.totalChangePercentage.toFixed(2)}%`
+      );
+      if (portfolioStats.topGainers.length > 0) {
+        console.log(
+          `  Top Gainer: ${
+            portfolioStats.topGainers[0].symbol
+          } (+${portfolioStats.topGainers[0].change24h.toFixed(2)}%)`
+        );
+      }
+    }
+  }, [isInitialized, portfolioStats, totalValue]);
+
+  // Show loading skeleton during initial setup
   if (shouldShowSkeleton) {
     return (
       <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
@@ -578,7 +331,7 @@ export default function DashboardPage() {
           <SkeletonSwapSection />
         </div>
 
-        {/* Desktop Layout Skeleton - ENHANCED with slightly wider SwapSection */}
+        {/* Desktop Layout Skeleton */}
         <div className="hidden xl:flex gap-4 flex-1 min-h-0">
           <div className="flex-1 flex flex-col gap-4 min-w-0 max-w-[68%]">
             <SkeletonWalletBalance />
@@ -599,10 +352,54 @@ export default function DashboardPage() {
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
+      {/* Refresh Status Bar (only in development) */}
+      {process.env.NODE_ENV === "development" &&
+        isInitialized &&
+        activeWallet && (
+          <div className="bg-black/50 rounded-lg p-2 mb-2 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-3">
+              <span
+                className={`px-2 py-0.5 rounded ${
+                  isNewUser
+                    ? "bg-green-500/20 text-green-400"
+                    : "bg-blue-500/20 text-blue-400"
+                }`}
+              >
+                {isNewUser ? "NEW USER" : "RETURNING USER"}
+              </span>
+              <span className="text-gray-400">Refreshes: {refreshCount}</span>
+              {lastRefresh && (
+                <span className="text-gray-400">
+                  Last: {lastRefresh.toLocaleTimeString()}
+                </span>
+              )}
+              {isRefreshing && (
+                <span className="text-yellow-400 animate-pulse">
+                  Refreshing...
+                </span>
+              )}
+            </div>
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="px-2 py-1 bg-[#E2AF19] text-black rounded hover:bg-[#D4A853] disabled:opacity-50"
+            >
+              Manual Refresh
+            </button>
+          </div>
+        )}
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-2">
+          <p className="text-red-400 text-xs font-satoshi">{error}</p>
+        </div>
+      )}
+
       {/* Main Dashboard Content */}
-      {wallets.length > 0 ? (
+      {wallets.length > 0 && activeWallet ? (
         <div className="flex flex-col xl:flex-row gap-3 lg:gap-4 flex-1 min-h-0">
-          {/* Mobile Layout - unchanged */}
+          {/* Mobile Layout */}
           <div className="flex xl:hidden flex-col gap-3 lg:gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
             <div className="flex-shrink-0">
               <WalletBalance />
@@ -615,7 +412,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Desktop Layout - ENHANCED with slightly wider SwapSection */}
+          {/* Desktop Layout */}
           <div className="hidden xl:flex flex-1 flex-col gap-4 min-w-0 max-w-[68%]">
             <div className="flex-shrink-0">
               <WalletBalance />
@@ -625,29 +422,43 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ENHANCED: Slightly wider SwapSection with fine-tuned sizing */}
           <div className="hidden xl:block w-[32%] min-w-[360px] max-w-[440px] flex-shrink-0 h-full">
             <SwapSection />
           </div>
         </div>
       ) : (
-        // Empty state
+        // Empty state when no wallets or waiting for wallet
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-12 h-12 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-black text-lg font-bold">₿</span>
+            <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-black text-2xl font-bold">₿</span>
             </div>
-            <h3 className="text-white text-base font-satoshi mb-2">
+            <h3 className="text-white text-lg font-satoshi font-semibold mb-2">
               Welcome to Blockpal
             </h3>
-            <p className="text-gray-400 font-satoshi text-sm">
-              Setting up your wallet experience...
+            <p className="text-gray-400 font-satoshi text-sm mb-4">
+              {wallets.length === 0
+                ? "Create or import a wallet to get started"
+                : "Setting up your dashboard..."}
             </p>
+            {wallets.length === 0 && (
+              <button
+                onClick={() =>
+                  setDashboardState((prev) => ({
+                    ...prev,
+                    showWelcomeModal: true,
+                  }))
+                }
+                className="px-4 py-2 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+              >
+                Get Started
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Welcome Modal */}
+      {/* Welcome Modal - FIXED: Now properly shows for users with no wallets */}
       <WalletWelcomeModal
         isOpen={shouldShowWelcomeModal}
         onClose={() => {
