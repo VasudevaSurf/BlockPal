@@ -198,10 +198,11 @@ class PriceWebSocketManager {
 // Singleton instance
 let priceManager: PriceWebSocketManager | null = null;
 
-// Hook for using real-time prices
+// Hook for using real-time prices with fallback support
 export function useRealtimePrice(
   tokenAddress: string | null,
-  enabled: boolean = true
+  enabled: boolean = true,
+  fallbackChange?: number // Add fallback 24hr change parameter
 ) {
   const [priceData, setPriceData] = useState<{
     price: number;
@@ -213,7 +214,7 @@ export function useRealtimePrice(
   }>({
     price: 0,
     symbol: "",
-    change: 0,
+    change: fallbackChange || 0, // Use fallback if provided
     timestamp: new Date().toISOString(),
     isConnected: false,
     isLoading: true,
@@ -241,17 +242,20 @@ export function useRealtimePrice(
 
     // Create callback
     callbackRef.current = (data: any) => {
-      setPriceData({
+      setPriceData((prev) => ({
         price: data.price || 0,
         symbol: data.symbol || "",
-        change: data.change || 0,
+        // If WebSocket doesn't provide change, keep the existing/fallback value
+        change:
+          data.change !== undefined
+            ? data.change
+            : fallbackChange || prev.change,
         timestamp: data.timestamp || new Date().toISOString(),
         isConnected: true,
         isLoading: false,
-      });
+      }));
     };
 
-    // Connect and subscribe
     // Connect and subscribe
     const setup = async () => {
       try {
@@ -276,25 +280,40 @@ export function useRealtimePrice(
         priceManager.unsubscribe(processedAddress, callbackRef.current);
       }
     };
-  }, [tokenAddress, enabled]);
+  }, [tokenAddress, enabled, fallbackChange]);
+
+  // Update change when fallback changes
+  useEffect(() => {
+    if (fallbackChange !== undefined) {
+      setPriceData((prev) => ({ ...prev, change: fallbackChange }));
+    }
+  }, [fallbackChange]);
 
   return priceData;
 }
 
-// Component for displaying real-time price
+// Component for displaying real-time price with fallback support
 export function RealtimePriceDisplay({
   tokenAddress,
   tokenSymbol,
+  tokenBalance,
+  fallbackPrice,
+  fallbackChange,
   className = "",
   showChange = true,
   showTimestamp = false,
+  showSparkline = false,
   size = "default",
 }: {
   tokenAddress: string;
   tokenSymbol?: string;
+  tokenBalance?: number;
+  fallbackPrice?: number;
+  fallbackChange?: number;
   className?: string;
   showChange?: boolean;
   showTimestamp?: boolean;
+  showSparkline?: boolean;
   size?: "small" | "default" | "large";
 }) {
   // Convert native/ETH to WETH address for price tracking
@@ -305,7 +324,18 @@ export function RealtimePriceDisplay({
       : tokenAddress;
 
   const { price, symbol, change, timestamp, isConnected, isLoading } =
-    useRealtimePrice(priceAddress);
+    useRealtimePrice(priceAddress, true, fallbackChange);
+
+  const [priceHistory, setPriceHistory] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (price > 0) {
+      setPriceHistory((prev) => {
+        const newHistory = [...prev, price].slice(-20);
+        return newHistory;
+      });
+    }
+  }, [price]);
 
   const formatPrice = (value: number) => {
     if (value < 0.000001) return `$${value.toExponential(2)}`;
@@ -331,6 +361,25 @@ export function RealtimePriceDisplay({
     large: "text-3xl",
   };
 
+  // Calculate sparkline path
+  const calculateSparkline = () => {
+    if (priceHistory.length < 2) return "";
+
+    const min = Math.min(...priceHistory);
+    const max = Math.max(...priceHistory);
+    const range = max - min || 1;
+    const width = 50;
+    const height = 20;
+
+    const points = priceHistory.map((p, i) => {
+      const x = (i / (priceHistory.length - 1)) * width;
+      const y = height - ((p - min) / range) * height;
+      return `${x},${y}`;
+    });
+
+    return `M ${points.join(" L ")}`;
+  };
+
   if (isLoading) {
     return (
       <div className={`animate-pulse ${className}`}>
@@ -339,48 +388,69 @@ export function RealtimePriceDisplay({
     );
   }
 
+  // Use fallback price if real-time price is not available
+  const displayPrice = price > 0 ? price : fallbackPrice || 0;
+  // Use the change value from state (which includes fallback)
+  const displayChange = change;
+
   return (
     <div className={`relative ${className}`}>
-      {/* Connection indicator */}
-      {/* <div className="absolute -top-2 -right-2">
-        <div
-          className={`w-2 h-2 rounded-full ${
-            isConnected ? "bg-green-400" : "bg-red-400"
-          } ${isConnected ? "animate-pulse" : ""}`}
-        />
-      </div> */}
-
       {/* Price display */}
       <div className="flex items-center gap-3">
-        <div
-          className={`font-bold text-white ${sizeClasses[size]} font-satoshi`}
-        >
-          {price > 0 ? formatPrice(price) : "--"}
+        <div>
+          <div
+            className={`font-bold text-white ${sizeClasses[size]} font-satoshi`}
+          >
+            {displayPrice > 0 ? formatPrice(displayPrice) : "--"}
+          </div>
+          {/* {tokenBalance !== undefined && (
+            <div className="text-gray-400 text-xs font-satoshi mt-1">
+              {tokenBalance.toFixed(6)} {tokenSymbol || symbol || ""}
+              {displayPrice > 0 && tokenBalance > 0 && (
+                <span className="ml-2">
+                  ≈ ${(displayPrice * tokenBalance).toFixed(2)}
+                </span>
+              )}
+            </div>
+          )} */}
         </div>
 
         {showChange && (
           <div
             className={`flex items-center text-sm font-satoshi ${
-              change >= 0 ? "text-green-400" : "text-red-400"
+              displayChange >= 0 ? "text-green-400" : "text-red-400"
             }`}
           >
-            <span className="mr-1">{change >= 0 ? "↑" : "↓"}</span>
-            {formatChange(change)}
+            <span className="mr-1">{displayChange >= 0 ? "↑" : "↓"}</span>
+            {formatChange(displayChange)}
+          </div>
+        )}
+
+        {showSparkline && priceHistory.length > 1 && (
+          <div className="ml-auto">
+            <svg width="50" height="20" className="overflow-visible">
+              <path
+                d={calculateSparkline()}
+                fill="none"
+                stroke={displayChange >= 0 ? "#10b981" : "#ef4444"}
+                strokeWidth="1.5"
+              />
+            </svg>
           </div>
         )}
       </div>
 
       {/* Symbol and timestamp */}
-      <div className="flex items-center gap-2 mt-1">
-        <span className="text-gray-400 text-xs font-satoshi">
-          {symbol || tokenSymbol || "Loading..."}
-        </span>
-        {showTimestamp && (
+      {showTimestamp && (
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-gray-400 text-xs font-satoshi">
+            {symbol || tokenSymbol || "Loading..."}
+          </span>
           <span className="text-gray-500 text-xs font-satoshi">
             {new Date(timestamp).toLocaleTimeString()}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -397,11 +467,15 @@ export function AdvancedPriceTicker({
     symbol: string;
     balance?: string;
     decimals?: number;
+    priceChange24h?: number; // Add this for fallback
   };
   className?: string;
 }) {
-  const { price, symbol, change, timestamp, isConnected } =
-    useRealtimePrice(tokenAddress);
+  const { price, symbol, change, timestamp, isConnected } = useRealtimePrice(
+    tokenAddress,
+    true,
+    tokenInfo?.priceChange24h
+  );
   const [priceHistory, setPriceHistory] = useState<number[]>([]);
   const [highPrice, setHighPrice] = useState(0);
   const [lowPrice, setLowPrice] = useState(Infinity);
