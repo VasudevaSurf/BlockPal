@@ -1,4 +1,4 @@
-// src/components/ui/DateTimePicker.tsx - Compact Version
+// src/components/ui/DateTimePicker.tsx - 24 Hour Format Version
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -25,6 +25,7 @@ interface DateTimePickerProps {
   onTimeChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  timeProps?: any;
 }
 
 // New Combined DateTimePicker Component
@@ -35,6 +36,7 @@ export function DateTimePicker({
   onTimeChange,
   placeholder = "Select date & time",
   className = "",
+  timeProps = {},
 }: DateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showTimeAfterDate, setShowTimeAfterDate] = useState(false);
@@ -156,13 +158,8 @@ export function DateTimePicker({
     });
 
     if (timeValue) {
-      const [hours, minutes] = timeValue.split(":").map(Number);
-      const period = hours >= 12 ? "PM" : "AM";
-      const displayHour = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-      const timeStr = `${displayHour}:${minutes
-        .toString()
-        .padStart(2, "0")} ${period}`;
-      return `${dateStr} at ${timeStr}`;
+      // Simply display the 24-hour time as is
+      return `${dateStr} at ${timeValue}`;
     }
 
     return `${dateStr} - Select time`;
@@ -186,6 +183,7 @@ export function DateTimePicker({
       .padStart(2, "0")}`;
   };
 
+  // Updated quick times - all in 24-hour format
   const quickTimes = [
     {
       label: "Now",
@@ -197,12 +195,12 @@ export function DateTimePicker({
           .padStart(2, "0")}`;
       },
     },
-    { label: "9:00 AM", value: () => "09:00" },
-    { label: "12:00 PM", value: () => "12:00" },
-    { label: "2:00 PM", value: () => "14:00" },
-    { label: "5:00 PM", value: () => "17:00" },
-    { label: "6:00 PM", value: () => "18:00" },
-    { label: "8:00 PM", value: () => "20:00" },
+    { label: "09:00", value: () => "09:00" },
+    { label: "12:00", value: () => "12:00" },
+    { label: "14:00", value: () => "14:00" },
+    { label: "17:00", value: () => "17:00" },
+    { label: "18:00", value: () => "18:00" },
+    { label: "20:00", value: () => "20:00" },
   ];
 
   const handleTimeSelect = (time: string) => {
@@ -359,7 +357,7 @@ export function DateTimePicker({
                 <div className="text-center">
                   <h3 className="text-white font-semibold font-satoshi flex items-center justify-center text-xs">
                     <Clock size={14} className="mr-1.5" />
-                    Select Time
+                    Select Time (24-hour)
                   </h3>
                   <p className="text-gray-400 text-xs font-satoshi">
                     {selectedDate?.toLocaleDateString("en-US", {
@@ -372,17 +370,18 @@ export function DateTimePicker({
                 <div className="w-8"></div> {/* Spacer for alignment */}
               </div>
 
-              {/* Time Input */}
+              {/* Time Input - always 24-hour format */}
               <div className="mb-3">
                 <input
                   type="time"
                   value={timeValue}
                   onChange={(e) => onTimeChange(e.target.value)}
                   className="w-full bg-[#2C2C2C] border border-[#4C4C4C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-center focus:outline-none focus:border-[#E2AF19] text-sm"
+                  step="60"
                 />
               </div>
 
-              {/* Quick Time Buttons */}
+              {/* Quick Time Buttons - 24-hour format */}
               <div className="grid grid-cols-2 gap-1.5 mb-3">
                 {quickTimes.map((time) => (
                   <button
@@ -693,7 +692,7 @@ export function DatePicker({
   );
 }
 
-// Keep original TimePicker for backward compatibility
+// Keep original TimePicker for backward compatibility - Updated to 24-hour format
 export function TimePicker({
   value,
   onChange,
@@ -717,22 +716,15 @@ export function TimePicker({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const displayTime = value
-    ? (() => {
-        const [hours, minutes] = value.split(":").map(Number);
-        const period = hours >= 12 ? "PM" : "AM";
-        const displayHour = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-        return `${displayHour}:${minutes
-          .toString()
-          .padStart(2, "0")} ${period}`;
-      })()
-    : placeholder;
+  // Display time in 24-hour format
+  const displayTime = value || placeholder;
 
   const clearTime = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange("");
   };
 
+  // Updated quick times - all in 24-hour format
   const quickTimes = [
     {
       label: "Now",
@@ -744,13 +736,13 @@ export function TimePicker({
           .padStart(2, "0")}`;
       },
     },
-    { label: "9:00 AM", value: () => "09:00" },
-    { label: "12:00 PM", value: () => "12:00" },
-    { label: "2:00 PM", value: () => "14:00" },
-    { label: "5:00 PM", value: () => "17:00" },
-    { label: "6:00 PM", value: () => "18:00" },
-    { label: "8:00 PM", value: () => "20:00" },
-    { label: "10:00 PM", value: () => "22:00" },
+    { label: "09:00", value: () => "09:00" },
+    { label: "12:00", value: () => "12:00" },
+    { label: "14:00", value: () => "14:00" },
+    { label: "17:00", value: () => "17:00" },
+    { label: "18:00", value: () => "18:00" },
+    { label: "20:00", value: () => "20:00" },
+    { label: "22:00", value: () => "22:00" },
   ];
 
   return (
@@ -788,7 +780,7 @@ export function TimePicker({
       {isOpen && (
         <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-black border border-[#2C2C2C] rounded-lg shadow-xl p-3">
           <h3 className="text-white font-semibold font-satoshi mb-2 text-center text-xs">
-            Select Time
+            Select Time (24-hour)
           </h3>
 
           <div className="mb-3">
@@ -797,6 +789,7 @@ export function TimePicker({
               value={value}
               onChange={(e) => onChange(e.target.value)}
               className="w-full bg-[#2C2C2C] border border-[#4C4C4C] rounded-lg px-2.5 py-1.5 text-white font-satoshi text-center focus:outline-none focus:border-[#E2AF19] text-sm"
+              step="60"
             />
           </div>
 

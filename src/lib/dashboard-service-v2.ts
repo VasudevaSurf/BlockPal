@@ -1,4 +1,4 @@
-// src/lib/dashboard-service-v2.ts - FIXED to match dashboard.js approach
+// src/lib/dashboard-service-v2.ts - FIXED to properly persist added tokens
 import { ethers } from "ethers";
 import axios from "axios";
 
@@ -93,6 +93,7 @@ export class DashboardServiceV2 {
           data[key] = value;
         });
         localStorage.setItem("dashboard-user-data-v2", JSON.stringify(data));
+        console.log("💾 User data saved to localStorage");
       } catch (error) {
         console.error("Error saving user data:", error);
       }
@@ -148,6 +149,18 @@ export class DashboardServiceV2 {
       // If no preset tokens with balance, return empty
       if (tokensToDisplay.length === 0) {
         console.log("📭 No preset tokens with balance found");
+
+        // Still create user data structure for future token additions
+        const userData = {
+          walletAddress: walletAddress.toLowerCase(),
+          metadata: {},
+          displayedTokens: [], // Empty array for new user with no tokens
+          lastUpdated: new Date().toISOString(),
+        };
+
+        this.userDataCache.set(walletAddress.toLowerCase(), userData);
+        this.saveUserDataToStorage();
+
         return {
           tokens: [],
           totalValue: 0,
@@ -169,12 +182,18 @@ export class DashboardServiceV2 {
       const userData = {
         walletAddress: walletAddress.toLowerCase(),
         metadata: {},
-        displayedTokens: tokensToDisplay, // Store which tokens are displayed
+        displayedTokens: [], // Initialize empty array
         lastUpdated: new Date().toISOString(),
       };
 
+      // Add metadata and displayedTokens
       metadata.forEach((meta) => {
-        userData.metadata[meta.contractAddress.toLowerCase()] = meta;
+        const key =
+          meta.contractAddress === "native"
+            ? "native"
+            : meta.contractAddress.toLowerCase();
+        userData.metadata[key] = meta;
+        userData.displayedTokens.push(key); // Add to displayed tokens
       });
 
       this.userDataCache.set(walletAddress.toLowerCase(), userData);
@@ -259,9 +278,16 @@ export class DashboardServiceV2 {
         return this.initializeNewUser(walletAddress);
       }
 
-      // Get displayed tokens list (only tokens user chose to display)
+      // FIXED: Use displayedTokens if available, otherwise use all metadata keys
       const displayedTokens =
-        userData.displayedTokens || Object.keys(userData.metadata);
+        userData.displayedTokens && userData.displayedTokens.length > 0
+          ? userData.displayedTokens
+          : Object.keys(userData.metadata);
+
+      console.log(
+        `📋 Loading ${displayedTokens.length} displayed tokens for returning user`
+      );
+
       const metadata = displayedTokens
         .map((token: string) => {
           const key = token === "native" ? "native" : token.toLowerCase();
@@ -361,9 +387,12 @@ export class DashboardServiceV2 {
         return { tokens: result.tokens, totalValue: result.totalValue };
       }
 
-      // Get displayed tokens list
+      // FIXED: Use displayedTokens if available
       const displayedTokens =
-        userData.displayedTokens || Object.keys(userData.metadata);
+        userData.displayedTokens && userData.displayedTokens.length > 0
+          ? userData.displayedTokens
+          : Object.keys(userData.metadata);
+
       const metadata = displayedTokens
         .map((token: string) => {
           const key = token === "native" ? "native" : token.toLowerCase();
@@ -438,7 +467,7 @@ export class DashboardServiceV2 {
     console.log("➕ PHASE 3: Adding new token to dashboard:", contractAddress);
 
     try {
-      contractAddress = contractAddress.toLowerCase();
+      const normalizedAddress = contractAddress.toLowerCase();
 
       // Get metadata
       let metadata = await this.getTokenMetadataFromCoinGecko(contractAddress);
@@ -449,35 +478,50 @@ export class DashboardServiceV2 {
         throw new Error("Could not fetch token metadata");
       }
 
-      // Store in user data
-      const userData = this.userDataCache.get(walletAddress.toLowerCase()) || {
-        walletAddress: walletAddress.toLowerCase(),
-        metadata: {},
-        displayedTokens: [],
-        lastUpdated: new Date().toISOString(),
-      };
+      // Get or create user data
+      let userData = this.userDataCache.get(walletAddress.toLowerCase());
 
-      userData.metadata[contractAddress] = metadata;
+      if (!userData) {
+        userData = {
+          walletAddress: walletAddress.toLowerCase(),
+          metadata: {},
+          displayedTokens: [],
+          lastUpdated: new Date().toISOString(),
+        };
+      }
 
-      // Add to displayed tokens if not already there
+      // Ensure displayedTokens array exists
       if (!userData.displayedTokens) {
-        userData.displayedTokens = Object.keys(userData.metadata);
-      }
-      if (!userData.displayedTokens.includes(contractAddress)) {
-        userData.displayedTokens.push(contractAddress);
+        userData.displayedTokens = Object.keys(userData.metadata || {});
       }
 
+      // Add metadata
+      userData.metadata[normalizedAddress] = metadata;
+
+      // CRITICAL FIX: Add to displayedTokens array
+      if (!userData.displayedTokens.includes(normalizedAddress)) {
+        userData.displayedTokens.push(normalizedAddress);
+        console.log(`✅ Added ${normalizedAddress} to displayedTokens array`);
+      }
+
+      // Save updated user data
       this.userDataCache.set(walletAddress.toLowerCase(), userData);
       this.saveUserDataToStorage();
+
+      console.log("📋 Updated displayedTokens:", userData.displayedTokens);
 
       // Get balance and price
       const balances = await this.getAllTokenBalances(walletAddress);
       const balance = balances.find(
-        (b) => b.contractAddress.toLowerCase() === contractAddress
-      ) || { contractAddress, balance: "0", balanceFormatted: 0 };
+        (b) => b.contractAddress.toLowerCase() === normalizedAddress
+      ) || {
+        contractAddress: normalizedAddress,
+        balance: "0",
+        balanceFormatted: 0,
+      };
 
       const prices = await this.batchFetchTokenPrices([contractAddress]);
-      const priceData = prices[contractAddress] || { price: 0, change24h: 0 };
+      const priceData = prices[normalizedAddress] || { price: 0, change24h: 0 };
 
       const token: TokenDashboardData = {
         contractAddress,
@@ -491,12 +535,47 @@ export class DashboardServiceV2 {
         change24h: priceData.change24h,
       };
 
-      console.log(`✅ Token added: ${metadata.symbol}`);
+      console.log(`✅ Token added successfully: ${metadata.symbol}`);
       return { token, metadata };
     } catch (error) {
       console.error("❌ Error adding token:", error);
       throw error;
     }
+  }
+
+  removeTokenFromDashboard(
+    contractAddress: string,
+    walletAddress: string
+  ): void {
+    const userData = this.userDataCache.get(walletAddress.toLowerCase());
+    if (userData) {
+      const normalizedAddress = contractAddress.toLowerCase();
+
+      // Remove from metadata
+      if (userData.metadata) {
+        delete userData.metadata[normalizedAddress];
+      }
+
+      // CRITICAL FIX: Remove from displayedTokens array
+      if (userData.displayedTokens) {
+        userData.displayedTokens = userData.displayedTokens.filter(
+          (token: string) => token.toLowerCase() !== normalizedAddress
+        );
+        console.log(
+          `✅ Removed ${normalizedAddress} from displayedTokens array`
+        );
+      }
+
+      this.userDataCache.set(walletAddress.toLowerCase(), userData);
+      this.saveUserDataToStorage();
+      console.log(`✅ Token ${contractAddress} removed from dashboard`);
+    }
+  }
+
+  clearUserData(walletAddress: string): void {
+    this.userDataCache.delete(walletAddress.toLowerCase());
+    this.saveUserDataToStorage();
+    console.log(`🗑️ Cleared all data for wallet ${walletAddress}`);
   }
 
   private async getAllTokenBalances(
@@ -708,36 +787,6 @@ export class DashboardServiceV2 {
       }
       return prices;
     }
-  }
-
-  removeTokenFromDashboard(
-    contractAddress: string,
-    walletAddress: string
-  ): void {
-    const userData = this.userDataCache.get(walletAddress.toLowerCase());
-    if (userData) {
-      // Remove from metadata
-      if (userData.metadata) {
-        delete userData.metadata[contractAddress.toLowerCase()];
-      }
-
-      // Remove from displayed tokens
-      if (userData.displayedTokens) {
-        userData.displayedTokens = userData.displayedTokens.filter(
-          (token: string) =>
-            token.toLowerCase() !== contractAddress.toLowerCase()
-        );
-      }
-
-      this.saveUserDataToStorage();
-      console.log(`✅ Token ${contractAddress} removed from dashboard`);
-    }
-  }
-
-  clearUserData(walletAddress: string): void {
-    this.userDataCache.delete(walletAddress.toLowerCase());
-    this.saveUserDataToStorage();
-    console.log(`🗑️ Cleared all data for wallet ${walletAddress}`);
   }
 }
 
