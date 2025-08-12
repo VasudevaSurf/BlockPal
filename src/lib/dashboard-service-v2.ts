@@ -1,4 +1,4 @@
-// src/lib/dashboard-service-v2.ts - FIXED to properly persist added tokens
+// src/lib/dashboard-service-v2.ts - COMPLETE FIX for token persistence
 import { ethers } from "ethers";
 import axios from "axios";
 
@@ -78,6 +78,10 @@ export class DashboardServiceV2 {
           Object.entries(data).forEach(([wallet, userData]) => {
             this.userDataCache.set(wallet.toLowerCase(), userData);
           });
+          console.log(
+            "📂 Loaded user data from localStorage:",
+            Object.keys(data)
+          );
         }
       } catch (error) {
         console.error("Error loading user data:", error);
@@ -93,7 +97,10 @@ export class DashboardServiceV2 {
           data[key] = value;
         });
         localStorage.setItem("dashboard-user-data-v2", JSON.stringify(data));
-        console.log("💾 User data saved to localStorage");
+        console.log(
+          "💾 User data saved to localStorage with keys:",
+          Object.keys(data)
+        );
       } catch (error) {
         console.error("Error saving user data:", error);
       }
@@ -102,11 +109,16 @@ export class DashboardServiceV2 {
 
   isReturningUser(walletAddress: string): boolean {
     const userData = this.userDataCache.get(walletAddress.toLowerCase());
-    return !!(
+    const isReturning = !!(
       userData &&
       userData.metadata &&
       Object.keys(userData.metadata).length > 0
     );
+    console.log(
+      `🔍 Checking if returning user for ${walletAddress}: ${isReturning}`,
+      userData
+    );
+    return isReturning;
   }
 
   async initializeNewUser(walletAddress: string): Promise<{
@@ -121,6 +133,17 @@ export class DashboardServiceV2 {
     );
 
     try {
+      // Check if we already have cached data for this wallet
+      const cachedData = this.userDataCache.get(walletAddress.toLowerCase());
+      if (
+        cachedData &&
+        cachedData.displayedTokens &&
+        cachedData.displayedTokens.length > 0
+      ) {
+        console.log("📂 Found cached data, treating as returning user");
+        return this.loadReturningUser(walletAddress);
+      }
+
       // Step 1: Get ALL token balances to check what user holds
       const allBalances = await this.getAllTokenBalances(walletAddress);
       console.log(`📊 Wallet has ${allBalances.length} tokens total`);
@@ -146,18 +169,17 @@ export class DashboardServiceV2 {
 
       console.log(`✅ User holds ${tokensToDisplay.length} preset tokens`);
 
-      // If no preset tokens with balance, return empty
+      // Create user data structure even if no preset tokens
+      const userData = {
+        walletAddress: walletAddress.toLowerCase(),
+        metadata: {},
+        displayedTokens: [],
+        lastUpdated: new Date().toISOString(),
+      };
+
+      // If no preset tokens with balance, still save structure
       if (tokensToDisplay.length === 0) {
         console.log("📭 No preset tokens with balance found");
-
-        // Still create user data structure for future token additions
-        const userData = {
-          walletAddress: walletAddress.toLowerCase(),
-          metadata: {},
-          displayedTokens: [], // Empty array for new user with no tokens
-          lastUpdated: new Date().toISOString(),
-        };
-
         this.userDataCache.set(walletAddress.toLowerCase(), userData);
         this.saveUserDataToStorage();
 
@@ -178,14 +200,6 @@ export class DashboardServiceV2 {
         }
       }
 
-      // Store metadata for future use
-      const userData = {
-        walletAddress: walletAddress.toLowerCase(),
-        metadata: {},
-        displayedTokens: [], // Initialize empty array
-        lastUpdated: new Date().toISOString(),
-      };
-
       // Add metadata and displayedTokens
       metadata.forEach((meta) => {
         const key =
@@ -193,7 +207,7 @@ export class DashboardServiceV2 {
             ? "native"
             : meta.contractAddress.toLowerCase();
         userData.metadata[key] = meta;
-        userData.displayedTokens.push(key); // Add to displayed tokens
+        userData.displayedTokens.push(key);
       });
 
       this.userDataCache.set(walletAddress.toLowerCase(), userData);
@@ -214,22 +228,19 @@ export class DashboardServiceV2 {
         if (balance && priceData) {
           const value = balance.balanceFormatted * priceData.price;
 
-          // Only add tokens with actual value
-          if (value > 0.01) {
-            dashboardTokens.push({
-              contractAddress: meta.contractAddress,
-              symbol: meta.symbol,
-              name: meta.name,
-              decimals: meta.decimals,
-              imageUrl: meta.imageUrl,
-              balance: balance.balanceFormatted,
-              price: priceData.price,
-              value: value,
-              change24h: priceData.change24h,
-            });
+          dashboardTokens.push({
+            contractAddress: meta.contractAddress,
+            symbol: meta.symbol,
+            name: meta.name,
+            decimals: meta.decimals,
+            imageUrl: meta.imageUrl,
+            balance: balance.balanceFormatted,
+            price: priceData.price,
+            value: value,
+            change24h: priceData.change24h,
+          });
 
-            totalValue += value;
-          }
+          totalValue += value;
         }
       }
 
@@ -267,27 +278,43 @@ export class DashboardServiceV2 {
     );
 
     try {
-      const userData = this.userDataCache.get(walletAddress.toLowerCase());
+      // First check localStorage
+      let userData = this.userDataCache.get(walletAddress.toLowerCase());
 
       if (
         !userData ||
         !userData.metadata ||
         Object.keys(userData.metadata).length === 0
       ) {
-        console.log("⚠️ No stored data found, treating as new user");
+        console.log(
+          "⚠️ No stored data found in cache, checking if MongoDB has data"
+        );
+        // Note: MongoDB data will be loaded separately by the API route
+        // For now, treat as new user if no localStorage data
         return this.initializeNewUser(walletAddress);
       }
 
-      // FIXED: Use displayedTokens if available, otherwise use all metadata keys
-      const displayedTokens =
-        userData.displayedTokens && userData.displayedTokens.length > 0
-          ? userData.displayedTokens
-          : Object.keys(userData.metadata);
+      // CRITICAL: Use displayedTokens array as source of truth
+      let displayedTokens = userData.displayedTokens || [];
+
+      // If displayedTokens is empty but we have metadata, reconstruct it
+      if (
+        displayedTokens.length === 0 &&
+        Object.keys(userData.metadata).length > 0
+      ) {
+        console.log("⚠️ displayedTokens empty, reconstructing from metadata");
+        displayedTokens = Object.keys(userData.metadata);
+        userData.displayedTokens = displayedTokens;
+        this.userDataCache.set(walletAddress.toLowerCase(), userData);
+        this.saveUserDataToStorage();
+      }
 
       console.log(
-        `📋 Loading ${displayedTokens.length} displayed tokens for returning user`
+        `📋 Loading ${displayedTokens.length} displayed tokens for returning user:`,
+        displayedTokens
       );
 
+      // Get metadata for all displayed tokens
       const metadata = displayedTokens
         .map((token: string) => {
           const key = token === "native" ? "native" : token.toLowerCase();
@@ -295,23 +322,8 @@ export class DashboardServiceV2 {
         })
         .filter(Boolean) as TokenMetadata[];
 
-      // Get current balances for ALL tokens
-      const allBalances = await this.getAllTokenBalances(walletAddress);
-      const balanceMap = new Map(
-        allBalances.map((b) => [b.contractAddress.toLowerCase(), b])
-      );
-
-      // Only process displayed tokens that have balance
-      const tokensWithBalance = [];
-      for (const meta of metadata) {
-        const balance = balanceMap.get(meta.contractAddress.toLowerCase());
-        if (balance && balance.balanceFormatted > 0.000001) {
-          tokensWithBalance.push(meta);
-        }
-      }
-
-      if (tokensWithBalance.length === 0) {
-        console.log("📭 Returning user has no balance in displayed tokens");
+      if (metadata.length === 0) {
+        console.log("⚠️ No valid metadata found");
         return {
           tokens: [],
           totalValue: 0,
@@ -319,42 +331,52 @@ export class DashboardServiceV2 {
         };
       }
 
+      // Get current balances for ALL tokens
+      const allBalances = await this.getAllTokenBalances(walletAddress);
+      const balanceMap = new Map(
+        allBalances.map((b) => [b.contractAddress.toLowerCase(), b])
+      );
+
+      // Get prices for all displayed tokens
       const prices = await this.batchFetchTokenPrices(
-        tokensWithBalance.map((m) => m.contractAddress)
+        metadata.map((m) => m.contractAddress)
       );
 
       const dashboardTokens: TokenDashboardData[] = [];
       let totalValue = 0;
 
-      for (const meta of tokensWithBalance) {
+      // CRITICAL: Include ALL displayed tokens, regardless of balance
+      for (const meta of metadata) {
         const balance = balanceMap.get(meta.contractAddress.toLowerCase());
-        const priceData = prices[meta.contractAddress.toLowerCase()];
+        const priceData = prices[meta.contractAddress.toLowerCase()] || {
+          price: 0,
+          change24h: 0,
+        };
 
-        if (balance && priceData) {
-          const value = balance.balanceFormatted * priceData.price;
+        // Use actual balance if available, otherwise 0
+        const tokenBalance = balance ? balance.balanceFormatted : 0;
+        const value = tokenBalance * priceData.price;
 
-          if (value > 0.01) {
-            dashboardTokens.push({
-              contractAddress: meta.contractAddress,
-              symbol: meta.symbol,
-              name: meta.name,
-              decimals: meta.decimals,
-              imageUrl: meta.imageUrl,
-              balance: balance.balanceFormatted,
-              price: priceData.price,
-              value: value,
-              change24h: priceData.change24h,
-            });
+        // Add token regardless of balance or value
+        dashboardTokens.push({
+          contractAddress: meta.contractAddress,
+          symbol: meta.symbol,
+          name: meta.name,
+          decimals: meta.decimals,
+          imageUrl: meta.imageUrl,
+          balance: tokenBalance,
+          price: priceData.price,
+          value: value,
+          change24h: priceData.change24h,
+        });
 
-            totalValue += value;
-          }
-        }
+        totalValue += value;
       }
 
       console.log(
         `✅ Returning user loaded with ${
           dashboardTokens.length
-        } tokens, $${totalValue.toFixed(2)}`
+        } tokens (including 0 balance), $${totalValue.toFixed(2)}`
       );
 
       return {
@@ -382,16 +404,30 @@ export class DashboardServiceV2 {
       const userData = this.userDataCache.get(walletAddress.toLowerCase());
 
       if (!userData || !userData.metadata) {
-        // If no metadata, initialize as new user
+        console.log("⚠️ No user data found during refresh");
         const result = await this.initializeNewUser(walletAddress);
         return { tokens: result.tokens, totalValue: result.totalValue };
       }
 
-      // FIXED: Use displayedTokens if available
-      const displayedTokens =
-        userData.displayedTokens && userData.displayedTokens.length > 0
-          ? userData.displayedTokens
-          : Object.keys(userData.metadata);
+      // CRITICAL: Always use displayedTokens as source of truth
+      let displayedTokens = userData.displayedTokens || [];
+
+      // Reconstruct if needed
+      if (
+        displayedTokens.length === 0 &&
+        Object.keys(userData.metadata).length > 0
+      ) {
+        console.log("⚠️ Reconstructing displayedTokens during refresh");
+        displayedTokens = Object.keys(userData.metadata);
+        userData.displayedTokens = displayedTokens;
+        this.userDataCache.set(walletAddress.toLowerCase(), userData);
+        this.saveUserDataToStorage();
+      }
+
+      console.log(
+        `🔄 Refreshing ${displayedTokens.length} tokens:`,
+        displayedTokens
+      );
 
       const metadata = displayedTokens
         .map((token: string) => {
@@ -400,56 +436,53 @@ export class DashboardServiceV2 {
         })
         .filter(Boolean) as TokenMetadata[];
 
+      if (metadata.length === 0) {
+        return { tokens: [], totalValue: 0 };
+      }
+
       // Get current balances
       const allBalances = await this.getAllTokenBalances(walletAddress);
       const balanceMap = new Map(
         allBalances.map((b) => [b.contractAddress.toLowerCase(), b])
       );
 
-      // Only process displayed tokens with balance
-      const tokensWithBalance = [];
-      for (const meta of metadata) {
-        const balance = balanceMap.get(meta.contractAddress.toLowerCase());
-        if (balance && balance.balanceFormatted > 0.000001) {
-          tokensWithBalance.push({ meta, balance });
-        }
-      }
-
-      if (tokensWithBalance.length === 0) {
-        return { tokens: [], totalValue: 0 };
-      }
-
+      // Get current prices
       const prices = await this.batchFetchTokenPrices(
-        tokensWithBalance.map((t) => t.meta.contractAddress)
+        metadata.map((m) => m.contractAddress)
       );
 
       const dashboardTokens: TokenDashboardData[] = [];
       let totalValue = 0;
 
-      for (const { meta, balance } of tokensWithBalance) {
-        const priceData = prices[meta.contractAddress.toLowerCase()];
+      // Include ALL displayed tokens
+      for (const meta of metadata) {
+        const balance = balanceMap.get(meta.contractAddress.toLowerCase());
+        const priceData = prices[meta.contractAddress.toLowerCase()] || {
+          price: 0,
+          change24h: 0,
+        };
 
-        if (balance && priceData) {
-          const value = balance.balanceFormatted * priceData.price;
+        const tokenBalance = balance ? balance.balanceFormatted : 0;
+        const value = tokenBalance * priceData.price;
 
-          if (value > 0.01) {
-            dashboardTokens.push({
-              contractAddress: meta.contractAddress,
-              symbol: meta.symbol,
-              name: meta.name,
-              decimals: meta.decimals,
-              imageUrl: meta.imageUrl,
-              balance: balance.balanceFormatted,
-              price: priceData.price,
-              value: value,
-              change24h: priceData.change24h,
-            });
+        dashboardTokens.push({
+          contractAddress: meta.contractAddress,
+          symbol: meta.symbol,
+          name: meta.name,
+          decimals: meta.decimals,
+          imageUrl: meta.imageUrl,
+          balance: tokenBalance,
+          price: priceData.price,
+          value: value,
+          change24h: priceData.change24h,
+        });
 
-            totalValue += value;
-          }
-        }
+        totalValue += value;
       }
 
+      console.log(
+        `✅ Dashboard refreshed with ${dashboardTokens.length} tokens`
+      );
       return { tokens: dashboardTokens, totalValue };
     } catch (error) {
       console.error("❌ Error refreshing dashboard:", error);
@@ -490,25 +523,39 @@ export class DashboardServiceV2 {
         };
       }
 
-      // Ensure displayedTokens array exists
+      // Initialize displayedTokens if not exists
       if (!userData.displayedTokens) {
-        userData.displayedTokens = Object.keys(userData.metadata || {});
+        userData.displayedTokens = [];
+      }
+
+      // Initialize metadata if not exists
+      if (!userData.metadata) {
+        userData.metadata = {};
+      }
+
+      // Check if token already exists
+      if (userData.displayedTokens.includes(normalizedAddress)) {
+        console.log(`⚠️ Token ${normalizedAddress} already in displayedTokens`);
+        throw new Error("Token already in dashboard");
       }
 
       // Add metadata
       userData.metadata[normalizedAddress] = metadata;
 
-      // CRITICAL FIX: Add to displayedTokens array
-      if (!userData.displayedTokens.includes(normalizedAddress)) {
-        userData.displayedTokens.push(normalizedAddress);
-        console.log(`✅ Added ${normalizedAddress} to displayedTokens array`);
-      }
+      // CRITICAL: Add to displayedTokens array
+      userData.displayedTokens.push(normalizedAddress);
+
+      // Update timestamp
+      userData.lastUpdated = new Date().toISOString();
 
       // Save updated user data
       this.userDataCache.set(walletAddress.toLowerCase(), userData);
       this.saveUserDataToStorage();
 
-      console.log("📋 Updated displayedTokens:", userData.displayedTokens);
+      console.log(
+        `✅ Added ${normalizedAddress} to displayedTokens. Current tokens:`,
+        userData.displayedTokens
+      );
 
       // Get balance and price
       const balances = await this.getAllTokenBalances(walletAddress);
@@ -556,15 +603,21 @@ export class DashboardServiceV2 {
         delete userData.metadata[normalizedAddress];
       }
 
-      // CRITICAL FIX: Remove from displayedTokens array
+      // CRITICAL: Remove from displayedTokens array
       if (userData.displayedTokens) {
+        const beforeLength = userData.displayedTokens.length;
         userData.displayedTokens = userData.displayedTokens.filter(
           (token: string) => token.toLowerCase() !== normalizedAddress
         );
+        const afterLength = userData.displayedTokens.length;
+
         console.log(
-          `✅ Removed ${normalizedAddress} from displayedTokens array`
+          `✅ Removed ${normalizedAddress} from displayedTokens (${beforeLength} -> ${afterLength})`
         );
       }
+
+      // Update timestamp
+      userData.lastUpdated = new Date().toISOString();
 
       this.userDataCache.set(walletAddress.toLowerCase(), userData);
       this.saveUserDataToStorage();
@@ -605,9 +658,7 @@ export class DashboardServiceV2 {
 
       if (response.data.result?.tokenBalances) {
         for (const token of response.data.result.tokenBalances) {
-          if (token.tokenBalance === "0x0" || token.tokenBalance === "0x")
-            continue;
-
+          // Include all tokens, even with 0 balance
           let decimals = 18;
           try {
             const metadataResponse = await axios.post(ALCHEMY_URL, {
@@ -621,11 +672,12 @@ export class DashboardServiceV2 {
             console.log(`Using default decimals for ${token.contractAddress}`);
           }
 
-          const balanceFormatted = parseFloat(
-            ethers.formatUnits(token.tokenBalance, decimals)
-          );
+          const balanceFormatted =
+            token.tokenBalance === "0x0" || token.tokenBalance === "0x"
+              ? 0
+              : parseFloat(ethers.formatUnits(token.tokenBalance, decimals));
 
-          // Add all tokens with balance
+          // Add token even if balance is 0
           balances.push({
             contractAddress: token.contractAddress.toLowerCase(),
             balance: token.tokenBalance,

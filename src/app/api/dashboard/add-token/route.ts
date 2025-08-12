@@ -29,32 +29,38 @@ export async function POST(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Get existing dashboard data
+    // Get existing dashboard data from MongoDB
     const dashboardData = await db.collection("dashboard_tokens").findOne({
       username: decoded.username,
       walletAddress: normalizedWallet,
     });
 
-    // Check if token already exists
-    if (dashboardData?.metadata && dashboardData.metadata[normalizedContract]) {
+    // Check if token already exists in MongoDB
+    if (dashboardData?.displayedTokens?.includes(normalizedContract)) {
       return NextResponse.json(
         { error: "Token already in dashboard" },
         { status: 400 }
       );
     }
 
-    // Add token using service
+    // Add token using service (this updates localStorage)
     const { token: newToken, metadata } =
       await dashboardServiceV2.addTokenToDashboard(
         contractAddress,
         walletAddress
       );
 
-    // Update database
+    // Update MongoDB to match localStorage
     const updatedMetadata = {
       ...(dashboardData?.metadata || {}),
       [normalizedContract]: metadata,
     };
+
+    // CRITICAL: Update displayedTokens array in MongoDB
+    const updatedDisplayedTokens = [
+      ...(dashboardData?.displayedTokens || []),
+      normalizedContract,
+    ];
 
     const updatedTokens = [...(dashboardData?.tokens || []), newToken];
     const updatedTotalValue = (dashboardData?.totalValue || 0) + newToken.value;
@@ -67,6 +73,7 @@ export async function POST(request: NextRequest) {
       {
         $set: {
           metadata: updatedMetadata,
+          displayedTokens: updatedDisplayedTokens, // CRITICAL: Store displayed tokens
           tokens: updatedTokens,
           totalValue: updatedTotalValue,
           updatedAt: new Date(),
@@ -81,6 +88,10 @@ export async function POST(request: NextRequest) {
     );
 
     console.log(`✅ Token added successfully: ${metadata.symbol}`);
+    console.log(
+      `📋 Updated displayedTokens in MongoDB:`,
+      updatedDisplayedTokens
+    );
 
     return NextResponse.json({
       success: true,

@@ -26,22 +26,54 @@ export async function POST(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Check if user is returning
+    // Check if user has data in MongoDB
     const existingData = await db.collection("dashboard_tokens").findOne({
       username: decoded.username,
       walletAddress: walletAddress.toLowerCase(),
     });
 
+    // CRITICAL: Sync MongoDB data to localStorage if exists
+    if (
+      existingData &&
+      existingData.metadata &&
+      Object.keys(existingData.metadata).length > 0
+    ) {
+      console.log("📂 Found MongoDB data, syncing to localStorage");
+
+      // Extract displayedTokens from MongoDB
+      let displayedTokens = existingData.displayedTokens || [];
+
+      // If no displayedTokens but has metadata, create from metadata keys
+      if (displayedTokens.length === 0 && existingData.metadata) {
+        displayedTokens = Object.keys(existingData.metadata);
+      }
+
+      // Sync to dashboard service cache
+      const userData = {
+        walletAddress: walletAddress.toLowerCase(),
+        metadata: existingData.metadata,
+        displayedTokens: displayedTokens,
+        lastUpdated: existingData.updatedAt || new Date().toISOString(),
+      };
+
+      // Force update the service cache
+      dashboardServiceV2["userDataCache"].set(
+        walletAddress.toLowerCase(),
+        userData
+      );
+      dashboardServiceV2["saveUserDataToStorage"]();
+
+      console.log(
+        `✅ Synced ${displayedTokens.length} tokens from MongoDB to localStorage`
+      );
+    }
+
+    // Now check if returning user (after sync)
     const isReturningUser = dashboardServiceV2.isReturningUser(walletAddress);
 
     let dashboardData;
 
-    if (
-      isReturningUser ||
-      (existingData &&
-        existingData.metadata &&
-        Object.keys(existingData.metadata).length > 0)
-    ) {
+    if (isReturningUser) {
       // PHASE 2: Returning user
       console.log("👤 Returning user detected, loading with stored metadata");
       dashboardData = await dashboardServiceV2.loadReturningUser(walletAddress);
@@ -50,11 +82,18 @@ export async function POST(request: NextRequest) {
       console.log("🆕 New user detected, initializing with preset tokens");
       dashboardData = await dashboardServiceV2.initializeNewUser(walletAddress);
 
-      // Store metadata in MongoDB
-      if (dashboardData.metadata) {
+      // Store metadata in MongoDB for new user
+      if (dashboardData.metadata && dashboardData.metadata.length > 0) {
         const metadataObject: Record<string, any> = {};
+        const displayedTokens: string[] = [];
+
         dashboardData.metadata.forEach((meta: any) => {
-          metadataObject[meta.contractAddress.toLowerCase()] = meta;
+          const key =
+            meta.contractAddress === "native"
+              ? "native"
+              : meta.contractAddress.toLowerCase();
+          metadataObject[key] = meta;
+          displayedTokens.push(key);
         });
 
         await db.collection("dashboard_tokens").updateOne(
@@ -67,6 +106,7 @@ export async function POST(request: NextRequest) {
               username: decoded.username,
               walletAddress: walletAddress.toLowerCase(),
               metadata: metadataObject,
+              displayedTokens: displayedTokens,
               tokens: dashboardData.tokens,
               totalValue: dashboardData.totalValue,
               isNewUser: dashboardData.isNewUser,
@@ -80,8 +120,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update with fresh data
+    // Update MongoDB with current state
     if (dashboardData.tokens && dashboardData.tokens.length > 0) {
+      // Get current displayedTokens from service
+      const serviceData = dashboardServiceV2["userDataCache"].get(
+        walletAddress.toLowerCase()
+      );
+      const displayedTokens =
+        serviceData?.displayedTokens ||
+        dashboardData.tokens.map((t: any) =>
+          t.contractAddress === "native"
+            ? "native"
+            : t.contractAddress.toLowerCase()
+        );
+
       await db.collection("dashboard_tokens").updateOne(
         {
           username: decoded.username,
@@ -90,6 +142,7 @@ export async function POST(request: NextRequest) {
         {
           $set: {
             tokens: dashboardData.tokens,
+            displayedTokens: displayedTokens,
             totalValue: dashboardData.totalValue,
             lastRefreshed: new Date(),
             updatedAt: new Date(),
