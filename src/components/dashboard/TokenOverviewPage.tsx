@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenOverviewPage.tsx
+// src/components/dashboard/TokenOverviewPage.tsx - FIXED CHART FETCHING
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -60,6 +60,10 @@ interface TokenInfo {
     twitter_screen_name?: string;
     subreddit_url?: string;
     official_forum_url?: string;
+    // Add coingecko contract if available
+    platforms?: {
+      ethereum?: string;
+    };
   } | null;
 }
 
@@ -77,6 +81,9 @@ const TIME_PERIODS = [
   { label: "1W", value: "7", days: 7 },
   { label: "1Y", value: "365", days: 365 },
 ];
+
+// CoinGecko API key - you should move this to environment variables
+const COINGECKO_API_KEY = "CG-xCH4APq7mHESUuEFzDU5GTSy";
 
 export default function TokenOverviewPage() {
   const router = useRouter();
@@ -97,7 +104,10 @@ export default function TokenOverviewPage() {
     index: number;
     price: number;
   } | null>(null);
-  const [yAxisDomain, setYAxisDomain] = useState<[number, string]>([0, "auto"]);
+  const [yAxisDomain, setYAxisDomain] = useState<[number, string | number]>([
+    0,
+    "auto",
+  ]);
   const [priceChange, setPriceChange] = useState(0);
   const [copied, setCopied] = useState<string>("");
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -179,90 +189,181 @@ export default function TokenOverviewPage() {
     [contractAddress, walletAddress]
   );
 
-  // Fetch chart data from CoinGecko-style API
+  // FIXED: Fetch chart data directly from CoinGecko API like index.js
   const fetchTokenData = async (days: string) => {
-    if (!tokenInfo?.priceData?.id) return;
+    if (!tokenInfo?.priceData) return;
 
     setChartLoading(true);
     try {
       const daysNum = parseFloat(days);
-      let apiUrl;
 
-      if (daysNum === 365) {
-        const to = Math.floor(Date.now() / 1000);
-        const from = to - 365 * 24 * 60 * 60;
-        apiUrl = `/api/tokens/chart/range?tokenId=${tokenInfo.priceData.id}&from=${from}&to=${to}`;
-      } else {
-        apiUrl = `/api/tokens/chart?tokenId=${tokenInfo.priceData.id}&days=${days}`;
+      // Get the contract address for CoinGecko
+      let coingeckoContract: string | null = null;
+
+      // Check if we have the ethereum platform address
+      if (tokenInfo.priceData.platforms?.ethereum) {
+        coingeckoContract = tokenInfo.priceData.platforms.ethereum;
+      } else if (
+        tokenInfo.contractAddress !== "native" &&
+        tokenInfo.contractAddress !== "ETH"
+      ) {
+        coingeckoContract = tokenInfo.contractAddress;
       }
 
-      const response = await fetch(apiUrl, {
-        credentials: "include",
-        cache: "no-cache",
+      let response;
+      let apiUrl;
+
+      // Use the same logic as index.js
+      if (coingeckoContract) {
+        // For ERC-20 tokens, use contract endpoint
+        if (daysNum === 365) {
+          const to = Math.floor(Date.now() / 1000);
+          const from = to - 365 * 24 * 60 * 60;
+
+          apiUrl = `https://api.coingecko.com/api/v3/coins/ethereum/contract/${coingeckoContract}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+        } else {
+          apiUrl = `https://api.coingecko.com/api/v3/coins/ethereum/contract/${coingeckoContract}/market_chart?vs_currency=usd&days=${days}`;
+        }
+      } else if (tokenInfo.priceData.id) {
+        // For native tokens or when we have coin id, use coin endpoint
+        if (daysNum === 365) {
+          const to = Math.floor(Date.now() / 1000);
+          const from = to - 365 * 24 * 60 * 60;
+
+          apiUrl = `https://api.coingecko.com/api/v3/coins/${tokenInfo.priceData.id}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+        } else {
+          apiUrl = `https://api.coingecko.com/api/v3/coins/${tokenInfo.priceData.id}/market_chart?vs_currency=usd&days=${days}`;
+        }
+      } else {
+        console.error("No valid identifier for fetching chart data");
+        return;
+      }
+
+      // Fetch directly from CoinGecko with API key
+      response = await fetch(apiUrl, {
+        headers: {
+          "x-cg-demo-api-key": COINGECKO_API_KEY,
+        },
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      const data = await response.json();
 
-        // Updated to handle array format like UniswapChart
-        if (data.chartData && data.chartData.prices) {
-          const processedData = data.chartData.prices;
+      if (data.prices) {
+        // Process the data exactly like index.js
+        const processedData = data.prices;
 
-          // Handle both array format [timestamp, price] and object format {timestamp, price}
-          const formattedData = processedData.map(
-            (point: any, index: number) => {
-              // Check if it's array format or object format
-              const timestamp = Array.isArray(point)
-                ? point[0]
-                : point.timestamp;
-              const price = Array.isArray(point) ? point[1] : point.price;
+        const formattedData = processedData.map(
+          ([timestamp, price]: [number, number], index: number) => ({
+            time: new Date(timestamp),
+            displayTime: formatDateForChart(new Date(timestamp), daysNum),
+            price: parseFloat(price.toString()),
+            fullDate: new Date(timestamp).toLocaleString(),
+            index: index,
+          })
+        );
 
-              // Convert timestamp to milliseconds if needed
-              const timestampMs =
-                timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+        setPriceData(formattedData);
 
-              return {
-                time: new Date(timestampMs),
-                displayTime: formatDateForChart(new Date(timestampMs), daysNum),
-                price: parseFloat(price),
-                fullDate: new Date(timestampMs).toLocaleString(),
-                index: index,
-              };
-            }
-          );
-
-          setPriceData(formattedData);
-
-          // Calculate price change percentage
-          if (formattedData.length > 0) {
-            const firstPrice = formattedData[0].price;
-            const lastPrice = formattedData[formattedData.length - 1].price;
-            const change = ((lastPrice - firstPrice) / firstPrice) * 100;
-            setPriceChange(change);
-          }
-
-          // Find high and low
-          const prices = formattedData.map((item: PricePoint) => item.price);
-          const maxPrice = Math.max(...prices);
-          const minPrice = Math.min(...prices);
-
-          // Set Y-axis domain with 10% padding
-          const padding = (maxPrice - minPrice) * 0.1;
-          setYAxisDomain([Math.max(0, minPrice - padding), maxPrice + padding]);
-
-          const highIndex = formattedData.findIndex(
-            (item: PricePoint) => item.price === maxPrice
-          );
-          const lowIndex = formattedData.findIndex(
-            (item: PricePoint) => item.price === minPrice
-          );
-
-          setAllTimeHigh({ index: highIndex, price: maxPrice });
-          setAllTimeLow({ index: lowIndex, price: minPrice });
+        // Calculate price change percentage
+        if (formattedData.length > 0) {
+          const firstPrice = formattedData[0].price;
+          const lastPrice = formattedData[formattedData.length - 1].price;
+          const change = ((lastPrice - firstPrice) / firstPrice) * 100;
+          setPriceChange(change);
         }
+
+        // Find high and low
+        const prices = formattedData.map((item: PricePoint) => item.price);
+        const maxPrice = Math.max(...prices);
+        const minPrice = Math.min(...prices);
+
+        // Set Y-axis domain with 10% padding
+        const padding = (maxPrice - minPrice) * 0.1;
+        setYAxisDomain([Math.max(0, minPrice - padding), maxPrice + padding]);
+
+        const highIndex = formattedData.findIndex(
+          (item: PricePoint) => item.price === maxPrice
+        );
+        const lowIndex = formattedData.findIndex(
+          (item: PricePoint) => item.price === minPrice
+        );
+
+        setAllTimeHigh({ index: highIndex, price: maxPrice });
+        setAllTimeLow({ index: lowIndex, price: minPrice });
       }
     } catch (error) {
       console.error("Error fetching token data:", error);
+
+      // Fallback to your API if direct CoinGecko fails
+      try {
+        const fallbackUrl = `/api/tokens/chart?tokenId=${tokenInfo.priceData.id}&days=${days}`;
+        const fallbackResponse = await fetch(fallbackUrl, {
+          credentials: "include",
+          cache: "no-cache",
+        });
+
+        if (fallbackResponse.ok) {
+          const data = await fallbackResponse.json();
+
+          if (data.chartData && data.chartData.prices) {
+            const processedData = data.chartData.prices;
+            const daysNum = parseFloat(days);
+
+            const formattedData = processedData.map(
+              (point: any, index: number) => {
+                const timestamp = Array.isArray(point)
+                  ? point[0]
+                  : point.timestamp;
+                const price = Array.isArray(point) ? point[1] : point.price;
+                const timestampMs =
+                  timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+
+                return {
+                  time: new Date(timestampMs),
+                  displayTime: formatDateForChart(
+                    new Date(timestampMs),
+                    daysNum
+                  ),
+                  price: parseFloat(price),
+                  fullDate: new Date(timestampMs).toLocaleString(),
+                  index: index,
+                };
+              }
+            );
+
+            setPriceData(formattedData);
+
+            if (formattedData.length > 0) {
+              const firstPrice = formattedData[0].price;
+              const lastPrice = formattedData[formattedData.length - 1].price;
+              const change = ((lastPrice - firstPrice) / firstPrice) * 100;
+              setPriceChange(change);
+            }
+
+            const prices = formattedData.map((item: PricePoint) => item.price);
+            const maxPrice = Math.max(...prices);
+            const minPrice = Math.min(...prices);
+
+            const padding = (maxPrice - minPrice) * 0.1;
+            setYAxisDomain([
+              Math.max(0, minPrice - padding),
+              maxPrice + padding,
+            ]);
+
+            const highIndex = formattedData.findIndex(
+              (item: PricePoint) => item.price === maxPrice
+            );
+            const lowIndex = formattedData.findIndex(
+              (item: PricePoint) => item.price === minPrice
+            );
+
+            setAllTimeHigh({ index: highIndex, price: maxPrice });
+            setAllTimeLow({ index: lowIndex, price: minPrice });
+          }
+        }
+      } catch (fallbackError) {
+        console.error("Fallback API also failed:", fallbackError);
+      }
     } finally {
       setChartLoading(false);
     }
@@ -275,14 +376,13 @@ export default function TokenOverviewPage() {
   }, [contractAddress, walletAddress, fetchTokenInfo]);
 
   useEffect(() => {
-    if (tokenInfo?.priceData?.id) {
+    if (tokenInfo?.priceData) {
       fetchTokenData(selectedTimeframe);
     }
-  }, [tokenInfo?.priceData?.id, selectedTimeframe]);
+  }, [tokenInfo?.priceData, selectedTimeframe]);
 
   const handleTimeframeChange = (timeframe: string) => {
     setSelectedTimeframe(timeframe);
-    fetchTokenData(timeframe);
   };
 
   const CustomTooltip = ({ active, payload, coordinate }: any) => {
@@ -524,6 +624,7 @@ export default function TokenOverviewPage() {
   const tokenBalance = parseFloat(tokenInfo.balance);
   const tokenValue = tokenBalance * (tokenInfo.priceData?.current_price || 0);
 
+  // Rest of your component remains the same...
   return (
     <>
       <style jsx global>{`
@@ -639,7 +740,17 @@ export default function TokenOverviewPage() {
                         </linearGradient>
                       </defs>
 
-                      <XAxis dataKey="displayTime" hide />
+                      <XAxis
+                        dataKey="displayTime"
+                        stroke="rgba(255, 255, 255, 0.2)"
+                        tick={{
+                          fill: "rgba(255, 255, 255, 0.4)",
+                          fontSize: 11,
+                        }}
+                        tickLine={{ stroke: "rgba(255, 255, 255, 0.1)" }}
+                        interval="preserveStartEnd"
+                        minTickGap={50}
+                      />
 
                       <YAxis
                         orientation="right"
@@ -675,6 +786,7 @@ export default function TokenOverviewPage() {
             )}
           </div>
 
+          {/* Rest of mobile layout remains the same... */}
           {/* Balance Section */}
           <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
             <div className="flex items-center justify-between mb-2.5">
@@ -732,8 +844,6 @@ export default function TokenOverviewPage() {
             </div>
           </div>
 
-          {/* Token Links - Removed for mobile to save space */}
-
           {/* Transaction History */}
           <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
             <div className="max-h-44 overflow-y-auto scrollbar-hide">
@@ -753,7 +863,7 @@ export default function TokenOverviewPage() {
           </div>
         </div>
 
-        {/* Desktop Layout */}
+        {/* Desktop Layout remains exactly the same but with fixed chart */}
         <div className="hidden xl:flex gap-3 flex-1 min-h-0">
           <div className="flex-1 flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto space-y-3 scrollbar-hide">
@@ -945,6 +1055,7 @@ export default function TokenOverviewPage() {
                   )}
                 </div>
 
+                {/* Rest of desktop layout remains the same... */}
                 {tokenInfo.priceData && (
                   <div className="flex items-center justify-between w-full text-xs mt-4">
                     <div className="bg-[#2C2C2C] px-2.5 py-2 rounded-full">
@@ -1058,7 +1169,7 @@ export default function TokenOverviewPage() {
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar - Rest remains the same */}
           <div className="w-[390px] flex-shrink-0 h-full">
             <div className="bg-black rounded-[14px] border border-[#2C2C2C] h-full flex flex-col p-3">
               <div className="flex items-center mb-3">
@@ -1105,7 +1216,7 @@ export default function TokenOverviewPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="text-gray-400 font-satoshi">
-                        = {formatCurrency(tokenValue.toFixed(2))}
+                        = {formatCurrency(tokenValue)}
                       </div>
                     </div>
                   </div>

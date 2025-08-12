@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED with proper import vs create handling
+// src/app/dashboard/page.tsx - FIXED with no modal flash during auth transitions
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -36,7 +36,8 @@ interface DashboardState {
   showWelcomeModal: boolean;
   initialLoadComplete: boolean;
   currentUserId: string | null;
-  walletOperationInProgress: boolean; // Track any wallet operation
+  walletOperationInProgress: boolean;
+  isAuthTransitioning: boolean; // NEW: Track auth state transitions
 }
 
 export default function DashboardPage() {
@@ -81,6 +82,7 @@ export default function DashboardPage() {
     initialLoadComplete: false,
     currentUserId: null,
     walletOperationInProgress: false,
+    isAuthTransitioning: false, // NEW: Initialize transition flag
   });
 
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
@@ -92,7 +94,39 @@ export default function DashboardPage() {
     activeWalletSynced: false,
     lastUserId: null as string | null,
     isProcessingWalletOperation: false,
+    lastAuthState: isAuthenticated, // NEW: Track last auth state
   });
+
+  // NEW: Detect auth state transitions
+  useEffect(() => {
+    // Check if auth state changed
+    if (
+      initializationRef.current.lastAuthState !== undefined &&
+      initializationRef.current.lastAuthState !== isAuthenticated
+    ) {
+      console.log("🔄 Auth state transitioning:", {
+        from: initializationRef.current.lastAuthState,
+        to: isAuthenticated,
+      });
+
+      // Mark as transitioning
+      setDashboardState((prev) => ({
+        ...prev,
+        isAuthTransitioning: true,
+        showWelcomeModal: false, // Hide modal during transition
+      }));
+
+      // Clear transition flag after a short delay
+      setTimeout(() => {
+        setDashboardState((prev) => ({
+          ...prev,
+          isAuthTransitioning: false,
+        }));
+      }, 500);
+    }
+
+    initializationRef.current.lastAuthState = isAuthenticated;
+  }, [isAuthenticated]);
 
   // CRITICAL: Detect user changes and clear state
   useEffect(() => {
@@ -107,6 +141,13 @@ export default function DashboardPage() {
         oldUser: initializationRef.current.lastUserId,
         newUser: userId,
       });
+
+      // Mark as auth transitioning
+      setDashboardState((prev) => ({
+        ...prev,
+        isAuthTransitioning: true,
+        showWelcomeModal: false, // Ensure modal is hidden
+      }));
 
       // Clear wallet state
       dispatch(clearWalletState());
@@ -129,6 +170,7 @@ export default function DashboardPage() {
         initialLoadComplete: false,
         currentUserId: userId,
         walletOperationInProgress: false,
+        isAuthTransitioning: true, // Keep transitioning flag
       });
 
       // Clear any cached data
@@ -137,6 +179,14 @@ export default function DashboardPage() {
         localStorage.removeItem("dashboard-user-data-v2");
         localStorage.removeItem("activeWalletId");
       }
+
+      // Clear transition flag after delay
+      setTimeout(() => {
+        setDashboardState((prev) => ({
+          ...prev,
+          isAuthTransitioning: false,
+        }));
+      }, 500);
     }
 
     // Update last user ID
@@ -203,7 +253,8 @@ export default function DashboardPage() {
       user &&
       !initializationRef.current.walletsLoaded &&
       dashboardState.currentUserId === (user.id || user.username) &&
-      !initializationRef.current.isProcessingWalletOperation
+      !initializationRef.current.isProcessingWalletOperation &&
+      !dashboardState.isAuthTransitioning // NEW: Don't load during transition
     ) {
       console.log("📡 Dashboard - Loading wallets for user:", user.username);
       initializationRef.current.walletsLoaded = true;
@@ -229,7 +280,8 @@ export default function DashboardPage() {
           walletsResolved: true,
           hasWallets,
           initialLoadComplete: true,
-          showWelcomeModal: !hasWallets,
+          // Only show modal if not transitioning and actually no wallets
+          showWelcomeModal: !hasWallets && !prev.isAuthTransitioning,
         }));
       });
     }
@@ -238,6 +290,7 @@ export default function DashboardPage() {
     isAuthenticated,
     user,
     dashboardState.currentUserId,
+    dashboardState.isAuthTransitioning, // NEW: Add transition check
     dispatch,
   ]);
 
@@ -249,7 +302,8 @@ export default function DashboardPage() {
       !initializationRef.current.activeWalletSynced &&
       user &&
       dashboardState.currentUserId === (user.id || user.username) &&
-      !initializationRef.current.isProcessingWalletOperation
+      !initializationRef.current.isProcessingWalletOperation &&
+      !dashboardState.isAuthTransitioning // NEW: Don't sync during transition
     ) {
       console.log(
         "🎯 Dashboard - Setting active wallet for user:",
@@ -296,7 +350,8 @@ export default function DashboardPage() {
     } else if (
       dashboardState.walletsResolved &&
       wallets.length === 0 &&
-      !initializationRef.current.isProcessingWalletOperation
+      !initializationRef.current.isProcessingWalletOperation &&
+      !dashboardState.isAuthTransitioning // NEW: Add transition check
     ) {
       setDashboardState((prev) => ({
         ...prev,
@@ -309,6 +364,7 @@ export default function DashboardPage() {
     wallets,
     user,
     dashboardState.currentUserId,
+    dashboardState.isAuthTransitioning, // NEW: Add transition check
     dispatch,
   ]);
 
@@ -373,8 +429,6 @@ export default function DashboardPage() {
           }));
 
           // Allow the dashboard hook to naturally initialize
-          // The useDashboardV2 hook will automatically detect the new active wallet
-          // and fetch tokens if they exist
           console.log(
             "🔄 Dashboard will auto-initialize for wallet:",
             newWallet.walletAddress || newWallet.address
@@ -404,17 +458,18 @@ export default function DashboardPage() {
     manualRefresh();
   };
 
-  // FIXED: Better skeleton condition that considers wallet operations
+  // FIXED: Better skeleton condition that considers wallet operations and transitions
   const shouldShowSkeleton =
     dashboardState.authLoading ||
     !dashboardState.authResolved ||
+    dashboardState.isAuthTransitioning || // NEW: Show skeleton during auth transition
     (isAuthenticated &&
       !dashboardState.walletsResolved &&
       !dashboardState.walletOperationInProgress) ||
     (wallets.length > 0 &&
       !dashboardState.activeWalletResolved &&
       !dashboardState.walletOperationInProgress) ||
-    (dashboardState.walletOperationInProgress && !isInitialized); // Show skeleton during operation until dashboard initializes
+    (dashboardState.walletOperationInProgress && !isInitialized);
 
   // FIXED: Better content condition
   const shouldShowContent =
@@ -424,9 +479,10 @@ export default function DashboardPage() {
     (dashboardState.activeWalletResolved || wallets.length === 0) &&
     !dashboardState.authLoading &&
     !dashboardState.walletsLoading &&
-    (!dashboardState.walletOperationInProgress || isInitialized); // Show content when initialized even during operation
+    !dashboardState.isAuthTransitioning && // NEW: Don't show content during transition
+    (!dashboardState.walletOperationInProgress || isInitialized);
 
-  // Determine if we should show welcome modal
+  // FIXED: Determine if we should show welcome modal - with transition check
   const shouldShowWelcomeModal =
     dashboardState.walletsResolved &&
     !dashboardState.walletsLoading &&
@@ -434,13 +490,16 @@ export default function DashboardPage() {
     dashboardState.initialLoadComplete &&
     dashboardState.showWelcomeModal &&
     isAuthenticated &&
-    !dashboardState.walletOperationInProgress;
+    !dashboardState.walletOperationInProgress &&
+    !dashboardState.isAuthTransitioning && // NEW: Never show modal during transition
+    !authLoading; // NEW: Extra check for auth loading
 
   console.log("🎨 Dashboard render state:", {
     shouldShowSkeleton,
     shouldShowContent,
     shouldShowWelcomeModal,
     walletOperationInProgress: dashboardState.walletOperationInProgress,
+    isAuthTransitioning: dashboardState.isAuthTransitioning,
     activeWallet: activeWallet?.address,
     isInitialized,
     isLoading,
@@ -450,7 +509,7 @@ export default function DashboardPage() {
     currentUserId: dashboardState.currentUserId,
   });
 
-  // Show loading skeleton during initial setup
+  // Show loading skeleton during initial setup or transitions
   if (shouldShowSkeleton) {
     return (
       <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
@@ -557,7 +616,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Welcome Modal */}
+      {/* Welcome Modal - Only show when appropriate */}
       <WalletWelcomeModal
         isOpen={shouldShowWelcomeModal}
         onClose={() => {
