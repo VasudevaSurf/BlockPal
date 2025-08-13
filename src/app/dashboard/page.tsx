@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { RootState, AppDispatch } from "@/store";
+import { RootState, AppDispatch, store } from "@/store";
 import { checkAuthStatus } from "@/store/slices/authSlice";
 import {
   fetchWallets,
@@ -37,7 +37,9 @@ interface DashboardState {
   initialLoadComplete: boolean;
   currentUserId: string | null;
   walletOperationInProgress: boolean;
-  isAuthTransitioning: boolean; // NEW: Track auth state transitions
+  isAuthTransitioning: boolean;
+  isInitialMount: boolean;
+  isLoggingOut: boolean; // NEW: Track logout state
 }
 
 export default function DashboardPage() {
@@ -69,7 +71,7 @@ export default function DashboardPage() {
     portfolioStats,
   } = useDashboardV2();
 
-  // State tracking
+  // State tracking with initial mount flag
   const [dashboardState, setDashboardState] = useState<DashboardState>({
     authLoading: true,
     walletsLoading: false,
@@ -82,7 +84,9 @@ export default function DashboardPage() {
     initialLoadComplete: false,
     currentUserId: null,
     walletOperationInProgress: false,
-    isAuthTransitioning: false, // NEW: Initialize transition flag
+    isAuthTransitioning: false,
+    isInitialMount: true,
+    isLoggingOut: false, // NEW: Initialize logout state
   });
 
   const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
@@ -94,10 +98,48 @@ export default function DashboardPage() {
     activeWalletSynced: false,
     lastUserId: null as string | null,
     isProcessingWalletOperation: false,
-    lastAuthState: isAuthenticated, // NEW: Track last auth state
+    lastAuthState: isAuthenticated,
+    mountTime: Date.now(), // NEW: Track mount time
   });
 
-  // NEW: Detect auth state transitions
+  // NEW: Clear initial mount flag after a delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDashboardState((prev) => ({
+        ...prev,
+        isInitialMount: false,
+      }));
+    }, 2000); // Give 2 seconds for initial load
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // NEW: Listen for logout events
+  useEffect(() => {
+    const handleLogoutStart = () => {
+      console.log("🚪 Logout initiated");
+      setDashboardState((prev) => ({
+        ...prev,
+        isLoggingOut: true,
+        showWelcomeModal: false,
+      }));
+    };
+
+    // Listen for logout events from Redux
+    const unsubscribe = store.subscribe(() => {
+      const state = store.getState();
+      // Check if logout is in progress
+      if (state.auth.loading && !state.auth.isAuthenticated) {
+        handleLogoutStart();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Detect auth state transitions
   useEffect(() => {
     // Check if auth state changed
     if (
@@ -128,7 +170,7 @@ export default function DashboardPage() {
     initializationRef.current.lastAuthState = isAuthenticated;
   }, [isAuthenticated]);
 
-  // CRITICAL: Detect user changes and clear state
+  // Detect user changes and clear state
   useEffect(() => {
     const userId = user?.id || user?.username || null;
 
@@ -170,7 +212,8 @@ export default function DashboardPage() {
         initialLoadComplete: false,
         currentUserId: userId,
         walletOperationInProgress: false,
-        isAuthTransitioning: true, // Keep transitioning flag
+        isAuthTransitioning: true,
+        isInitialMount: false, // Keep initial mount false on user change
       });
 
       // Clear any cached data
@@ -254,7 +297,7 @@ export default function DashboardPage() {
       !initializationRef.current.walletsLoaded &&
       dashboardState.currentUserId === (user.id || user.username) &&
       !initializationRef.current.isProcessingWalletOperation &&
-      !dashboardState.isAuthTransitioning // NEW: Don't load during transition
+      !dashboardState.isAuthTransitioning // Don't load during transition
     ) {
       console.log("📡 Dashboard - Loading wallets for user:", user.username);
       initializationRef.current.walletsLoaded = true;
@@ -280,8 +323,16 @@ export default function DashboardPage() {
           walletsResolved: true,
           hasWallets,
           initialLoadComplete: true,
-          // Only show modal if not transitioning and actually no wallets
-          showWelcomeModal: !hasWallets && !prev.isAuthTransitioning,
+          // Only show modal if:
+          // 1. No wallets
+          // 2. Not transitioning
+          // 3. Not initial mount
+          // 4. Not during wallet operation
+          showWelcomeModal:
+            !hasWallets &&
+            !prev.isAuthTransitioning &&
+            !prev.isInitialMount &&
+            !prev.walletOperationInProgress,
         }));
       });
     }
@@ -290,7 +341,7 @@ export default function DashboardPage() {
     isAuthenticated,
     user,
     dashboardState.currentUserId,
-    dashboardState.isAuthTransitioning, // NEW: Add transition check
+    dashboardState.isAuthTransitioning,
     dispatch,
   ]);
 
@@ -303,7 +354,7 @@ export default function DashboardPage() {
       user &&
       dashboardState.currentUserId === (user.id || user.username) &&
       !initializationRef.current.isProcessingWalletOperation &&
-      !dashboardState.isAuthTransitioning // NEW: Don't sync during transition
+      !dashboardState.isAuthTransitioning // Don't sync during transition
     ) {
       console.log(
         "🎯 Dashboard - Setting active wallet for user:",
@@ -351,7 +402,7 @@ export default function DashboardPage() {
       dashboardState.walletsResolved &&
       wallets.length === 0 &&
       !initializationRef.current.isProcessingWalletOperation &&
-      !dashboardState.isAuthTransitioning // NEW: Add transition check
+      !dashboardState.isAuthTransitioning
     ) {
       setDashboardState((prev) => ({
         ...prev,
@@ -364,7 +415,7 @@ export default function DashboardPage() {
     wallets,
     user,
     dashboardState.currentUserId,
-    dashboardState.isAuthTransitioning, // NEW: Add transition check
+    dashboardState.isAuthTransitioning,
     dispatch,
   ]);
 
@@ -375,7 +426,7 @@ export default function DashboardPage() {
     await dispatch(setActiveWalletInDB(walletId));
   };
 
-  // FIXED: Enhanced wallet creation handler that properly handles both create and import
+  // Enhanced wallet creation handler
   const handleWalletCreated = async () => {
     console.log("✅ Wallet operation completed (create/import)");
 
@@ -458,11 +509,13 @@ export default function DashboardPage() {
     manualRefresh();
   };
 
-  // FIXED: Better skeleton condition that considers wallet operations and transitions
+  // Determine loading conditions
   const shouldShowSkeleton =
     dashboardState.authLoading ||
     !dashboardState.authResolved ||
-    dashboardState.isAuthTransitioning || // NEW: Show skeleton during auth transition
+    dashboardState.isAuthTransitioning ||
+    dashboardState.isInitialMount ||
+    dashboardState.isLoggingOut || // NEW: Show skeleton during logout
     (isAuthenticated &&
       !dashboardState.walletsResolved &&
       !dashboardState.walletOperationInProgress) ||
@@ -471,7 +524,7 @@ export default function DashboardPage() {
       !dashboardState.walletOperationInProgress) ||
     (dashboardState.walletOperationInProgress && !isInitialized);
 
-  // FIXED: Better content condition
+  // Determine content display conditions
   const shouldShowContent =
     dashboardState.authResolved &&
     isAuthenticated &&
@@ -479,10 +532,11 @@ export default function DashboardPage() {
     (dashboardState.activeWalletResolved || wallets.length === 0) &&
     !dashboardState.authLoading &&
     !dashboardState.walletsLoading &&
-    !dashboardState.isAuthTransitioning && // NEW: Don't show content during transition
+    !dashboardState.isAuthTransitioning &&
+    !dashboardState.isInitialMount && // NEW: Don't show content during initial mount
     (!dashboardState.walletOperationInProgress || isInitialized);
 
-  // FIXED: Determine if we should show welcome modal - with transition check
+  // Determine if we should show welcome modal
   const shouldShowWelcomeModal =
     dashboardState.walletsResolved &&
     !dashboardState.walletsLoading &&
@@ -491,8 +545,9 @@ export default function DashboardPage() {
     dashboardState.showWelcomeModal &&
     isAuthenticated &&
     !dashboardState.walletOperationInProgress &&
-    !dashboardState.isAuthTransitioning && // NEW: Never show modal during transition
-    !authLoading; // NEW: Extra check for auth loading
+    !dashboardState.isAuthTransitioning &&
+    !dashboardState.isInitialMount && // NEW: Never show modal during initial mount
+    !authLoading;
 
   console.log("🎨 Dashboard render state:", {
     shouldShowSkeleton,
@@ -500,6 +555,7 @@ export default function DashboardPage() {
     shouldShowWelcomeModal,
     walletOperationInProgress: dashboardState.walletOperationInProgress,
     isAuthTransitioning: dashboardState.isAuthTransitioning,
+    isInitialMount: dashboardState.isInitialMount,
     activeWallet: activeWallet?.address,
     isInitialized,
     isLoading,
@@ -512,25 +568,40 @@ export default function DashboardPage() {
   // Show loading skeleton during initial setup or transitions
   if (shouldShowSkeleton) {
     return (
-      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
-        {/* Mobile Layout Skeleton */}
-        <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0">
-          <SkeletonWalletBalance />
-          <SkeletonTokenList />
-          <SkeletonSwapSection />
-        </div>
-
-        {/* Desktop Layout Skeleton */}
-        <div className="hidden xl:flex gap-4 flex-1 min-h-0">
-          <div className="flex-1 flex flex-col gap-4 min-w-0 max-w-[68%]">
+      <>
+        <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
+          {/* Mobile Layout Skeleton */}
+          <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0">
             <SkeletonWalletBalance />
             <SkeletonTokenList />
-          </div>
-          <div className="w-[32%] min-w-[360px] max-w-[440px] flex-shrink-0 h-full">
             <SkeletonSwapSection />
           </div>
+
+          {/* Desktop Layout Skeleton */}
+          <div className="hidden xl:flex gap-4 flex-1 min-h-0">
+            <div className="flex-1 flex flex-col gap-4 min-w-0 max-w-[68%]">
+              <SkeletonWalletBalance />
+              <SkeletonTokenList />
+            </div>
+            <div className="w-[32%] min-w-[360px] max-w-[440px] flex-shrink-0 h-full">
+              <SkeletonSwapSection />
+            </div>
+          </div>
         </div>
-      </div>
+
+        {/* Logout Loading Overlay */}
+        {dashboardState.isLoggingOut && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center">
+            <div className="bg-black border border-[#2C2C2C] rounded-xl p-6 flex flex-col items-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E2AF19] mb-4"></div>
+              <p className="text-white font-satoshi text-sm">Logging out...</p>
+              <p className="text-gray-400 font-satoshi text-xs mt-1">
+                Please wait
+              </p>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
