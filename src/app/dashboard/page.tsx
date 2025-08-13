@@ -99,7 +99,8 @@ export default function DashboardPage() {
     lastUserId: null as string | null,
     isProcessingWalletOperation: false,
     lastAuthState: isAuthenticated,
-    mountTime: Date.now(), // NEW: Track mount time
+    mountTime: Date.now(),
+    isActualLogout: false, // NEW: Track actual logout
   });
 
   // NEW: Clear initial mount flag after a delay
@@ -116,8 +117,10 @@ export default function DashboardPage() {
 
   // NEW: Listen for logout events
   useEffect(() => {
-    const handleLogoutStart = () => {
-      console.log("🚪 Logout initiated");
+    // Listen for custom logout event instead of Redux state
+    const handleLogoutEvent = (event: Event) => {
+      console.log("🚪 Logout event received");
+      initializationRef.current.isActualLogout = true;
       setDashboardState((prev) => ({
         ...prev,
         isLoggingOut: true,
@@ -125,17 +128,11 @@ export default function DashboardPage() {
       }));
     };
 
-    // Listen for logout events from Redux
-    const unsubscribe = store.subscribe(() => {
-      const state = store.getState();
-      // Check if logout is in progress
-      if (state.auth.loading && !state.auth.isAuthenticated) {
-        handleLogoutStart();
-      }
-    });
+    // Add event listener for custom logout event
+    window.addEventListener("userLogout", handleLogoutEvent);
 
     return () => {
-      unsubscribe();
+      window.removeEventListener("userLogout", handleLogoutEvent);
     };
   }, []);
 
@@ -515,7 +512,7 @@ export default function DashboardPage() {
     !dashboardState.authResolved ||
     dashboardState.isAuthTransitioning ||
     dashboardState.isInitialMount ||
-    dashboardState.isLoggingOut || // NEW: Show skeleton during logout
+    (dashboardState.isLoggingOut && initializationRef.current.isActualLogout) || // Only show during actual logout
     (isAuthenticated &&
       !dashboardState.walletsResolved &&
       !dashboardState.walletOperationInProgress) ||
