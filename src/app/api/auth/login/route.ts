@@ -1,4 +1,4 @@
-// src/app/api/auth/login/route.ts - UPDATED with 2FA support
+// src/app/api/auth/login/route.ts - UPDATED for username login
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -6,20 +6,29 @@ import { connectToDatabase } from "@/lib/mongodb";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, twoFactorCode } = await request.json();
+    const { username, password, twoFactorCode } = await request.json();
 
     console.log("=== LOGIN ATTEMPT START ===");
-    console.log("Email:", email);
+    console.log("Username:", username);
     console.log("Password provided:", !!password);
     console.log("2FA code provided:", !!twoFactorCode);
 
+    if (!username || !password) {
+      return NextResponse.json(
+        { error: "Username and password are required" },
+        { status: 400 }
+      );
+    }
+
     const { db } = await connectToDatabase();
 
-    // Find user by email
-    const user = await db.collection("users").findOne({ gmail: email });
+    // Find user by username
+    const user = await db.collection("users").findOne({
+      username: username.toLowerCase(),
+    });
 
     if (!user) {
-      console.log("❌ User not found:", email);
+      console.log("❌ User not found:", username);
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
@@ -33,7 +42,7 @@ export async function POST(request: NextRequest) {
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
 
     if (!isValidPassword) {
-      console.log("❌ Invalid password for user:", email);
+      console.log("❌ Invalid password for user:", username);
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
@@ -42,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ Password valid");
 
-    // NEW: Check if 2FA is enabled
+    // Check if 2FA is enabled
     if (user.twoFactorEnabled && user.twoFactorSecret) {
       console.log("🔐 2FA is enabled, checking for code...");
 
@@ -145,7 +154,7 @@ export async function POST(request: NextRequest) {
       id: user._id.toString(),
       username: user.username,
       displayName: user.displayName,
-      email: user.gmail,
+      email: user.gmail || user.email || `${user.username}@blockpal.local`, // Fallback email
       avatar: user.avatar,
       currency: user.currency,
     };

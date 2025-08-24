@@ -1,26 +1,33 @@
+// src/app/api/auth/register/route.ts - UPDATED
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
 import { connectToDatabase } from "@/lib/mongodb";
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password } = await request.json();
+    const { username, password } = await request.json();
 
-    console.log("Registration attempt for email:", email);
+    console.log("Registration attempt for username:", username);
+
+    if (!username || !password) {
+      return NextResponse.json(
+        { error: "Username and password are required" },
+        { status: 400 }
+      );
+    }
 
     const { db } = await connectToDatabase();
 
-    // Check if user already exists
+    // Check if username already exists
     const existingUser = await db.collection("users").findOne({
-      gmail: email,
+      username: username.toLowerCase(),
     });
 
     if (existingUser) {
-      console.log("User already exists:", email);
+      console.log("Username already exists:", username);
       return NextResponse.json(
-        { error: "User already exists" },
+        { error: "Username already exists" },
         { status: 409 }
       );
     }
@@ -29,15 +36,10 @@ export async function POST(request: NextRequest) {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Create username from email
-    const username =
-      email.split("@")[0] + "_" + Math.random().toString(36).substr(2, 4);
-
     // Create new user
     const newUser = {
-      username,
-      gmail: email,
-      displayName: name,
+      username: username.toLowerCase(),
+      displayName: username, // Use username as display name
       avatar: `https://avatars.dicebear.com/api/identicon/${username}.svg`,
       passwordHash,
       preferences: { notifications: true },
@@ -45,26 +47,25 @@ export async function POST(request: NextRequest) {
       Holder: false,
       createdAt: new Date(),
       lastLoginAt: new Date(),
+      authProvider: "wallet", // Mark as wallet-based auth
+      // No email or gmail field needed
     };
 
     const result = await db.collection("users").insertOne(newUser);
 
-    console.log("User created successfully:", email);
+    console.log("User created successfully:", username);
 
     // Create JWT token
     const token = jwt.sign(
-      { userId: result.insertedId, username: newUser.username },
+      { userId: result.insertedId.toString(), username: newUser.username },
       process.env.JWT_SECRET || "your-secret-key",
       { expiresIn: "24h" }
     );
 
-    console.log("Registration token created:", !!token);
-
     const userData = {
-      id: result.insertedId,
+      id: result.insertedId.toString(),
       username: newUser.username,
       displayName: newUser.displayName,
-      email: newUser.gmail,
       avatar: newUser.avatar,
       currency: newUser.currency,
     };
@@ -74,16 +75,16 @@ export async function POST(request: NextRequest) {
       token,
     });
 
-    // Set HTTP-only cookie with corrected settings
+    // Set HTTP-only cookie
     response.cookies.set("auth-token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // Changed from "strict" to "lax"
+      sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      path: "/", // Explicitly set path
+      path: "/",
     });
 
-    console.log("Registration cookie set successfully");
+    console.log("Registration successful, cookie set");
 
     return response;
   } catch (error) {

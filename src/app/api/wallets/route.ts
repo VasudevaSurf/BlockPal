@@ -1,4 +1,4 @@
-// src/app/api/wallets/route.ts - FIXED TO SAVE MNEMONIC PROPERLY
+// src/app/api/wallets/route.ts - UPDATED to handle unauthorized users
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { verifyToken } from "@/lib/auth";
@@ -36,22 +36,37 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("auth-token")?.value;
-    const decoded = verifyToken(token);
+    let decoded = null;
 
-    if (!decoded) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Try to get user from token, but continue if no token (for new users)
+    if (token) {
+      decoded = verifyToken(token);
     }
 
     const { walletAddress, walletName, privateKey, mnemonic } =
       await request.json();
 
-    console.log("🔐 Creating wallet with credentials:", {
+    console.log("🔐 Creating wallet:", {
       walletAddress: walletAddress?.slice(0, 10) + "...",
       walletName,
       hasPrivateKey: !!privateKey,
-      hasMnemonic: !!mnemonic, // FIXED: Log mnemonic presence
-      username: decoded.username,
+      hasMnemonic: !!mnemonic,
+      hasUser: !!decoded,
+      username: decoded?.username,
     });
+
+    // If no authenticated user, return error - they should register first
+    if (!decoded) {
+      console.log("❌ No authenticated user for wallet creation");
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+          message: "Please complete account registration first",
+          code: "AUTH_REQUIRED",
+        },
+        { status: 401 }
+      );
+    }
 
     // Validate wallet data
     if (!cryptoService.isValidAddress(walletAddress)) {
@@ -68,22 +83,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // FIXED: Validate mnemonic if provided
+    // Validate mnemonic if provided
     if (mnemonic && !cryptoService.isValidMnemonic(mnemonic)) {
       console.warn("⚠️ Invalid mnemonic provided, proceeding without it");
-      // Don't fail creation, just log warning
     }
 
     const { db } = await connectToDatabase();
 
     // Check if wallet already exists
     const existingWallet = await db.collection("wallets").findOne({
-      walletAddress,
+      walletAddress: walletAddress.toLowerCase(),
     });
 
     if (existingWallet) {
+      console.log("❌ Wallet already exists:", walletAddress);
       return NextResponse.json(
-        { error: "Wallet already exists" },
+        {
+          error: "Wallet already exists",
+          code: "WALLET_EXISTS_LOGIN_REQUIRED",
+          existingUser: existingWallet.username,
+        },
         { status: 409 }
       );
     }
@@ -98,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     const isDefault = userWallets.length === 0;
 
-    // FIXED: Enhanced encryption for both private key and mnemonic
+    // Enhanced encryption for both private key and mnemonic
     const encryptedPrivateKey = {
       encryptedData: Buffer.from(privateKey).toString("base64"),
       salt: "generated-salt",
@@ -107,7 +126,7 @@ export async function POST(request: NextRequest) {
       iterations: 10000,
     };
 
-    // FIXED: Properly encrypt mnemonic if provided
+    // Properly encrypt mnemonic if provided
     let encryptedMnemonic = undefined;
     if (mnemonic && mnemonic.trim()) {
       console.log("🔐 Encrypting mnemonic for storage");
@@ -125,14 +144,14 @@ export async function POST(request: NextRequest) {
 
     const newWallet = {
       username: decoded.username,
-      walletAddress,
+      walletAddress: walletAddress.toLowerCase(),
       walletName,
       status: "active",
       isDefault,
       encryptedPrivateKey,
-      encryptedMnemonic, // FIXED: Store encrypted mnemonic
+      encryptedMnemonic,
       hasEncryptedCredentials: true,
-      hasMnemonic: !!encryptedMnemonic, // FIXED: Add flag to indicate mnemonic presence
+      hasMnemonic: !!encryptedMnemonic,
       createdAt: new Date(),
       lastUsedAt: new Date(),
     };
@@ -174,7 +193,7 @@ export async function POST(request: NextRequest) {
       if (portfolioData.ethBalance > 0) {
         const ethToken = {
           username: decoded.username,
-          walletAddress,
+          walletAddress: walletAddress.toLowerCase(),
           contractAddress: "native",
           symbol: "ETH",
           name: "Ethereum",
@@ -202,7 +221,7 @@ export async function POST(request: NextRequest) {
       if (portfolioData.tokens.length > 0) {
         const tokenDocuments = portfolioData.tokens.map((token) => ({
           username: decoded.username,
-          walletAddress,
+          walletAddress: walletAddress.toLowerCase(),
           contractAddress: token.contractAddress,
           symbol: token.symbol,
           name: token.name,
@@ -252,7 +271,7 @@ export async function POST(request: NextRequest) {
       // Don't fail wallet creation if token fetch fails
     }
 
-    // FIXED: Return wallet data including mnemonic presence flag
+    // Return wallet data including mnemonic presence flag
     const walletResponse = {
       id: result.insertedId,
       username: newWallet.username,
@@ -261,7 +280,7 @@ export async function POST(request: NextRequest) {
       status: newWallet.status,
       isDefault: newWallet.isDefault,
       hasEncryptedCredentials: newWallet.hasEncryptedCredentials,
-      hasMnemonic: newWallet.hasMnemonic, // FIXED: Include mnemonic flag in response
+      hasMnemonic: newWallet.hasMnemonic,
       createdAt: newWallet.createdAt,
       lastUsedAt: newWallet.lastUsedAt,
     };

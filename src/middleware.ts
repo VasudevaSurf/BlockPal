@@ -33,16 +33,28 @@ export function middleware(request: NextRequest) {
 
   console.log("Middleware processing:", pathname);
 
-  // Public paths that don't require authentication
+  // Public paths that don't require authentication (wallet setup flow)
   const publicPaths = ["/", "/auth"];
+
+  // Always allow access to auth page (which is now wallet setup)
+  if (pathname === "/auth") {
+    console.log("Allowing access to wallet setup page");
+    return NextResponse.next();
+  }
+
+  // Always allow access to home page
+  if (pathname === "/") {
+    console.log("Allowing access to home page");
+    return NextResponse.next();
+  }
 
   // Check for authentication token
   const token = request.cookies.get("auth-token")?.value;
   console.log("Token exists:", !!token);
 
-  // If no token and trying to access protected route
+  // If no token and trying to access protected route (dashboard, etc.)
   if (!token && !publicPaths.includes(pathname)) {
-    console.log("No token, redirecting to auth");
+    console.log("No token, redirecting to wallet setup");
     return NextResponse.redirect(new URL("/auth", request.url));
   }
 
@@ -66,9 +78,17 @@ export function middleware(request: NextRequest) {
       console.log("Token appears valid for user:", payload.username);
 
       // If authenticated user is on auth page, redirect to dashboard
-      if (pathname === "/auth" || pathname === "/") {
+      if (pathname === "/auth") {
         console.log(
-          "Authenticated user on auth page, redirecting to dashboard"
+          "Authenticated user on wallet setup page, redirecting to dashboard"
+        );
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+
+      // If authenticated user is on home page, redirect to dashboard
+      if (pathname === "/") {
+        console.log(
+          "Authenticated user on home page, redirecting to dashboard"
         );
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
@@ -76,8 +96,10 @@ export function middleware(request: NextRequest) {
       return NextResponse.next();
     } catch (error) {
       console.log("Token invalid or expired:", error.message);
-      // Token is invalid
+
+      // Token is invalid, clear it and redirect to wallet setup
       if (!publicPaths.includes(pathname)) {
+        console.log("Invalid token, redirecting to wallet setup");
         const response = NextResponse.redirect(new URL("/auth", request.url));
         response.cookies.delete("auth-token");
         return response;
@@ -85,13 +107,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Allow access to public paths
+  // Allow access to public paths (home and auth/wallet setup)
   if (publicPaths.includes(pathname)) {
+    console.log("Allowing access to public path:", pathname);
     return NextResponse.next();
   }
 
-  // Default redirect to auth for unhandled cases
-  console.log("Default redirect to auth");
+  // Default: redirect to wallet setup for any unhandled cases
+  console.log("Default redirect to wallet setup");
   return NextResponse.redirect(new URL("/auth", request.url));
 }
 
@@ -103,7 +126,10 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - fonts (font files)
+     * - images (image files)
+     * - icons (icon files)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|fonts|images|icons).*)",
   ],
 };
