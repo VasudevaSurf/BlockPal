@@ -1,4 +1,4 @@
-// src/store/slices/walletSlice.ts - FIXED with proper state cleanup
+// src/store/slices/walletSlice.ts - UPDATED FOR WALLET-FIRST AUTH
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { WalletState, Wallet, Token } from "@/types";
 
@@ -14,199 +14,97 @@ const initialState: WalletState = {
 // Track pending requests to prevent duplicates
 const pendingRequests = new Set<string>();
 
-// Helper to clear wallet-related storage
+// Helper to clear wallet-related storage (but preserve primary wallet data)
 const clearWalletStorage = () => {
   if (typeof window !== "undefined") {
-    console.log("🧹 Clearing wallet storage");
+    console.log("🧹 Clearing wallet storage (preserving primary wallet)");
 
-    // Clear wallet-specific items
-    localStorage.removeItem("activeWalletId");
-    sessionStorage.removeItem("walletNameOverrides");
-
-    // Clear dashboard data
+    // Clear dashboard data but keep primary wallet info
     localStorage.removeItem("dashboard-user-data");
     localStorage.removeItem("dashboard-user-data-v2");
+    sessionStorage.removeItem("walletNameOverrides");
 
-    // Clear any wallet-prefixed items
+    // Clear any cached wallet data (but not primary wallet credentials)
     const keysToRemove: string[] = [];
-
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (
         key &&
-        (key.startsWith("wallet-") ||
-          key.startsWith("token-") ||
+        (key.startsWith("token-") ||
           key.startsWith("dashboard-") ||
-          key.startsWith("realtime-"))
+          key.startsWith("realtime-")) &&
+        // DON'T remove primary wallet data
+        !key.includes("primaryWallet") &&
+        !key.includes("walletPrivateKey") &&
+        !key.includes("walletMnemonic")
       ) {
         keysToRemove.push(key);
       }
     }
 
     keysToRemove.forEach((key) => localStorage.removeItem(key));
-
-    // Clear session storage
-    const sessionKeysToRemove: string[] = [];
-
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (
-        key &&
-        (key.includes("wallet") ||
-          key.includes("token") ||
-          key.includes("dashboard"))
-      ) {
-        sessionKeysToRemove.push(key);
-      }
-    }
-
-    sessionKeysToRemove.forEach((key) => sessionStorage.removeItem(key));
-
-    console.log("✅ Wallet storage cleared");
+    console.log("✅ Wallet storage cleared (primary wallet preserved)");
   }
 };
 
-// Async thunks...
-export const setActiveWalletInDB = createAsyncThunk(
-  "wallet/setActiveWalletInDB",
-  async (walletId: string, { rejectWithValue }) => {
-    try {
-      console.log("🎯 Setting active wallet in DB:", walletId);
+// Get primary wallet from localStorage
+const getPrimaryWalletFromStorage = (): {
+  address: string;
+  privateKey: string;
+  mnemonic?: string;
+} | null => {
+  if (typeof window === "undefined") return null;
 
-      const response = await fetch("/api/profile/active-wallet", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ walletId }),
-        credentials: "include",
-      });
+  try {
+    const primaryWallet = localStorage.getItem("primaryWallet");
+    const privateKey = localStorage.getItem("walletPrivateKey");
+    const mnemonic = localStorage.getItem("walletMnemonic");
 
-      if (!response.ok) {
-        const data = await response.json();
-        return rejectWithValue(data.error || "Failed to set active wallet");
-      }
+    if (!primaryWallet || !privateKey) return null;
 
-      const data = await response.json();
-      console.log("✅ Active wallet set in DB:", data.activeWallet);
-      return data;
-    } catch (error) {
-      console.error("❌ Error setting active wallet in DB:", error);
-      return rejectWithValue("Network error occurred");
-    }
+    const walletInfo = JSON.parse(primaryWallet);
+    return {
+      address: walletInfo.address,
+      privateKey,
+      mnemonic: mnemonic || undefined,
+    };
+  } catch (error) {
+    console.error("Error reading primary wallet from storage:", error);
+    return null;
   }
-);
+};
 
-export const getActiveWalletFromDB = createAsyncThunk(
-  "wallet/getActiveWalletFromDB",
+// Async thunks for wallet operations
+export const initializePrimaryWallet = createAsyncThunk(
+  "wallet/initializePrimaryWallet",
   async (_, { rejectWithValue }) => {
     try {
-      console.log("🔍 Getting active wallet from DB");
+      console.log("🎯 Initializing primary wallet from localStorage");
 
-      const response = await fetch("/api/profile/active-wallet", {
-        credentials: "include",
+      const walletData = getPrimaryWalletFromStorage();
+      if (!walletData) {
+        return rejectWithValue("No primary wallet found in storage");
+      }
+
+      // Create the primary wallet object
+      const primaryWallet: Wallet = {
+        id: "primary",
+        name: "Primary Wallet",
+        address: walletData.address,
+        balance: 0,
+        isActive: true,
+      };
+
+      console.log("✅ Primary wallet initialized:", {
+        address: walletData.address.slice(0, 10) + "...",
+        hasPrivateKey: !!walletData.privateKey,
+        hasMnemonic: !!walletData.mnemonic,
       });
 
-      if (!response.ok) {
-        return rejectWithValue("Failed to get active wallet");
-      }
-
-      const data = await response.json();
-      console.log("✅ Active wallet from DB:", data.activeWallet);
-      return data;
+      return { wallet: primaryWallet, walletData };
     } catch (error) {
-      console.error("❌ Error getting active wallet from DB:", error);
-      return rejectWithValue("Network error occurred");
-    }
-  }
-);
-
-export const fetchWallets = createAsyncThunk(
-  "wallet/fetchWallets",
-  async (_, { rejectWithValue, getState }) => {
-    const requestKey = "fetchWallets";
-
-    // Check if user is authenticated before fetching
-    const state = getState() as any;
-    if (!state.auth.isAuthenticated) {
-      console.log("⚠️ Not authenticated, skipping wallet fetch");
-      return [];
-    }
-
-    if (pendingRequests.has(requestKey)) {
-      console.log("🔄 fetchWallets already pending, skipping...");
-      return rejectWithValue("Request already pending");
-    }
-
-    try {
-      pendingRequests.add(requestKey);
-      console.log("📡 Fetching wallets...");
-
-      const response = await fetch("/api/wallets", {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        // If unauthorized, return empty array instead of rejecting
-        if (response.status === 401) {
-          console.log("⚠️ Unauthorized, returning empty wallets");
-          return [];
-        }
-        return rejectWithValue("Failed to fetch wallets");
-      }
-
-      const data = await response.json();
-      console.log(
-        "✅ Wallets fetched successfully:",
-        data.wallets?.length || 0
-      );
-      return data.wallets || [];
-    } catch (error) {
-      console.error("❌ Error fetching wallets:", error);
-      return rejectWithValue("Network error occurred");
-    } finally {
-      pendingRequests.delete(requestKey);
-    }
-  }
-);
-
-export const createWallet = createAsyncThunk(
-  "wallet/createWallet",
-  async (
-    walletData: {
-      walletAddress: string;
-      walletName: string;
-      privateKey: string;
-      mnemonic?: string;
-    },
-    { rejectWithValue, dispatch }
-  ) => {
-    try {
-      const response = await fetch("/api/wallets", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(walletData),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.error || "Failed to create wallet");
-      }
-
-      const newWallet = data.wallet;
-
-      // If this is the first wallet or marked as default, set it as active in DB
-      if (newWallet.isDefault) {
-        await dispatch(setActiveWalletInDB(newWallet._id || newWallet.id));
-      }
-
-      return newWallet;
-    } catch (error) {
-      return rejectWithValue("Network error occurred");
+      console.error("❌ Error initializing primary wallet:", error);
+      return rejectWithValue("Failed to initialize primary wallet");
     }
   }
 );
@@ -303,32 +201,123 @@ export const updateWalletBalance = createAsyncThunk(
   }
 );
 
-export const refreshTokenPrices = createAsyncThunk(
-  "wallet/refreshTokenPrices",
+// Set active wallet in database (for compatibility with existing components)
+export const setActiveWalletInDB = createAsyncThunk(
+  "wallet/setActiveWalletInDB",
+  async (walletId: string, { rejectWithValue }) => {
+    try {
+      console.log("🎯 Setting active wallet in DB (wallet-first):", walletId);
+
+      // In wallet-first auth, we don't need to store active wallet in DB
+      // since there's only one primary wallet per user
+      // But we keep this for compatibility with existing components
+
+      return { activeWalletId: walletId, success: true };
+    } catch (error) {
+      console.error("❌ Error setting active wallet in DB:", error);
+      return rejectWithValue("Network error occurred");
+    }
+  }
+);
+
+// Get active wallet from database (for compatibility)
+export const getActiveWalletFromDB = createAsyncThunk(
+  "wallet/getActiveWalletFromDB",
   async (_, { rejectWithValue }) => {
-    const requestKey = "refreshTokenPrices";
+    try {
+      console.log("🔍 Getting active wallet from DB (wallet-first)");
+
+      // In wallet-first auth, we just return the primary wallet as active
+      const walletData = getPrimaryWalletFromStorage();
+      if (!walletData) {
+        return rejectWithValue("No primary wallet found");
+      }
+
+      return {
+        activeWalletId: "primary",
+        activeWallet: {
+          id: "primary",
+          address: walletData.address,
+        },
+      };
+    } catch (error) {
+      console.error("❌ Error getting active wallet from DB:", error);
+      return rejectWithValue("Network error occurred");
+    }
+  }
+);
+
+// Fetch wallets (for compatibility - returns primary wallet)
+export const fetchWallets = createAsyncThunk(
+  "wallet/fetchWallets",
+  async (_, { rejectWithValue, getState }) => {
+    const requestKey = "fetchWallets";
+
+    // Check if user is authenticated before fetching
+    const state = getState() as any;
+    if (!state.auth.isAuthenticated) {
+      console.log("⚠️ Not authenticated, skipping wallet fetch");
+      return [];
+    }
 
     if (pendingRequests.has(requestKey)) {
-      console.log("🔄 refreshTokenPrices already pending, skipping...");
+      console.log("🔄 fetchWallets already pending, skipping...");
       return rejectWithValue("Request already pending");
     }
 
     try {
       pendingRequests.add(requestKey);
-      const response = await fetch("/api/tokens/prices", {
-        credentials: "include",
-      });
+      console.log("📡 Fetching wallets (wallet-first)...");
 
-      if (!response.ok) {
-        return rejectWithValue("Failed to refresh token prices");
+      const walletData = getPrimaryWalletFromStorage();
+      if (!walletData) {
+        console.log("⚠️ No primary wallet found in storage");
+        return [];
       }
 
-      const data = await response.json();
-      return data.prices;
+      // Return primary wallet as the only wallet
+      const primaryWallet = {
+        _id: "primary",
+        id: "primary",
+        walletName: "Primary Wallet",
+        name: "Primary Wallet",
+        walletAddress: walletData.address,
+        address: walletData.address,
+        isDefault: true,
+      };
+
+      console.log(
+        "✅ Primary wallet fetched:",
+        walletData.address.slice(0, 10) + "..."
+      );
+      return [primaryWallet];
     } catch (error) {
+      console.error("❌ Error fetching wallets:", error);
       return rejectWithValue("Network error occurred");
     } finally {
       pendingRequests.delete(requestKey);
+    }
+  }
+);
+
+// Get wallet credentials from localStorage
+export const getWalletCredentials = createAsyncThunk(
+  "wallet/getWalletCredentials",
+  async (_, { rejectWithValue }) => {
+    try {
+      const walletData = getPrimaryWalletFromStorage();
+      if (!walletData) {
+        return rejectWithValue("No wallet credentials found");
+      }
+
+      return {
+        address: walletData.address,
+        privateKey: walletData.privateKey,
+        mnemonic: walletData.mnemonic,
+      };
+    } catch (error) {
+      console.error("❌ Error getting wallet credentials:", error);
+      return rejectWithValue("Failed to get wallet credentials");
     }
   }
 );
@@ -337,14 +326,14 @@ const walletSlice = createSlice({
   name: "wallet",
   initialState,
   reducers: {
-    // NEW: Clear wallet state completely
+    // Clear wallet state completely (for logout)
     clearWalletState: (state) => {
       console.log("🧹 Clearing wallet state");
 
       // Clear all pending requests
       pendingRequests.clear();
 
-      // Clear storage
+      // Clear storage (but preserve primary wallet for re-auth)
       clearWalletStorage();
 
       // Reset to initial state
@@ -353,35 +342,30 @@ const walletSlice = createSlice({
       console.log("✅ Wallet state cleared");
     },
 
+    // Set the primary wallet as active
+    setPrimaryWalletActive: (state, action: PayloadAction<Wallet>) => {
+      console.log(
+        "🎯 Setting primary wallet as active:",
+        action.payload.address
+      );
+
+      state.wallets = [action.payload];
+      state.activeWallet = action.payload;
+      state.tokens = []; // Clear tokens to trigger fresh fetch
+
+      console.log("✅ Primary wallet set as active");
+    },
+
+    // Set active wallet (for compatibility with existing components)
     setActiveWallet: (state, action: PayloadAction<string>) => {
       console.log("🎯 Setting active wallet locally:", action.payload);
-      const wallet = state.wallets.find((w) => w.id === action.payload);
-      if (
-        wallet &&
-        (!state.activeWallet || state.activeWallet.id !== wallet.id)
-      ) {
-        // Reset all wallets to inactive
-        state.wallets.forEach((w) => (w.isActive = false));
-        // Set selected wallet as active
-        wallet.isActive = true;
-        state.activeWallet = wallet;
 
-        // Store active wallet ID in localStorage for offline access
-        if (typeof window !== "undefined") {
-          localStorage.setItem("activeWalletId", wallet.id);
-        }
-
-        // Calculate total balance for active wallet
-        state.totalBalance = wallet.balance;
-        console.log(
-          "✅ Active wallet set locally:",
-          wallet.name,
-          "ID:",
-          wallet.id
-        );
-
-        // Clear tokens when switching wallets to trigger fresh fetch
-        state.tokens = [];
+      if (action.payload === "primary" && state.wallets.length > 0) {
+        const primaryWallet = state.wallets[0];
+        primaryWallet.isActive = true;
+        state.activeWallet = primaryWallet;
+        state.tokens = []; // Clear tokens to trigger fresh fetch
+        console.log("✅ Primary wallet set as active (compatibility mode)");
       }
     },
 
@@ -435,37 +419,6 @@ const walletSlice = createSlice({
       );
     },
 
-    updateWalletBalances: (
-      state,
-      action: PayloadAction<
-        { walletId: string; balance: number; tokenCount: number }[]
-      >
-    ) => {
-      action.payload.forEach(({ walletId, balance, tokenCount }) => {
-        const wallet = state.wallets.find((w) => w.id === walletId);
-        if (wallet) {
-          wallet.balance = balance;
-          if (wallet.isActive) {
-            state.totalBalance = balance;
-          }
-        }
-      });
-    },
-
-    updateSingleWalletBalance: (
-      state,
-      action: PayloadAction<{ walletId: string; balance: number }>
-    ) => {
-      const { walletId, balance } = action.payload;
-      const wallet = state.wallets.find((w) => w.id === walletId);
-      if (wallet) {
-        wallet.balance = balance;
-        if (wallet.isActive) {
-          state.totalBalance = balance;
-        }
-      }
-    },
-
     clearError: (state) => {
       state.error = null;
     },
@@ -514,26 +467,9 @@ const walletSlice = createSlice({
       );
     },
 
-    updateWalletName: (
-      state,
-      action: PayloadAction<{ walletId: string; name: string }>
-    ) => {
-      const { walletId, name } = action.payload;
-      const wallet = state.wallets.find((w) => w.id === walletId);
-      if (wallet) {
-        wallet.name = name;
-      }
-    },
-
     clearTokens: (state) => {
       state.tokens = [];
       state.totalBalance = 0;
-    },
-
-    clearActiveWalletPersistence: () => {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("activeWalletId");
-      }
     },
 
     setRealtimeData: (
@@ -560,72 +496,79 @@ const walletSlice = createSlice({
       }
     },
 
-    batchUpdateFromRealtimeService: (
-      state,
-      action: PayloadAction<{
-        tokens?: Token[];
-        totalBalance?: number;
-        activeWalletBalance?: number;
-        timestamp: Date;
-      }>
-    ) => {
-      const { tokens, totalBalance, activeWalletBalance, timestamp } =
-        action.payload;
+    // Logout and clear all wallet data including localStorage
+    logoutAndClearWallet: (state) => {
+      console.log("🚪 Logging out and clearing all wallet data");
 
-      if (tokens) {
-        state.tokens = tokens;
+      // Clear all pending requests
+      pendingRequests.clear();
+
+      // Clear ALL localStorage including wallet credentials
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("primaryWallet");
+        localStorage.removeItem("walletPrivateKey");
+        localStorage.removeItem("walletMnemonic");
+        localStorage.clear();
+        sessionStorage.clear();
       }
 
-      if (totalBalance !== undefined) {
-        state.totalBalance = totalBalance;
-      }
+      // Reset to initial state
+      Object.assign(state, initialState);
 
-      if (activeWalletBalance !== undefined && state.activeWallet) {
-        state.activeWallet.balance = activeWalletBalance;
-      }
-
-      console.log("📊 Batch update from real-time service:", {
-        tokensCount: tokens?.length,
-        totalBalance,
-        timestamp: timestamp.toISOString(),
-      });
+      console.log("✅ Complete wallet logout and cleanup completed");
     },
   },
 
   extraReducers: (builder) => {
-    // Handle setActiveWalletInDB
+    // Initialize primary wallet
     builder
-      .addCase(setActiveWalletInDB.pending, (state) => {
-        console.log("🔄 Setting active wallet in DB...");
+      .addCase(initializePrimaryWallet.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
+      .addCase(initializePrimaryWallet.fulfilled, (state, action) => {
+        state.loading = false;
+        const { wallet } = action.payload;
+
+        state.wallets = [wallet];
+        state.activeWallet = wallet;
+        state.error = null;
+
+        console.log("✅ Primary wallet initialized in state");
+      })
+      .addCase(initializePrimaryWallet.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+        console.error(
+          "❌ Failed to initialize primary wallet:",
+          action.payload
+        );
+      });
+
+    // Handle setActiveWalletInDB (compatibility)
+    builder
       .addCase(setActiveWalletInDB.fulfilled, (state, action) => {
-        console.log("✅ Active wallet set in DB successfully");
+        console.log("✅ Active wallet set in DB (compatibility mode)");
       })
       .addCase(setActiveWalletInDB.rejected, (state, action) => {
-        console.error("❌ Failed to set active wallet in DB:", action.payload);
-        state.error = action.payload as string;
-      })
-      // Handle getActiveWalletFromDB
+        console.warn("⚠️ Failed to set active wallet in DB:", action.payload);
+      });
+
+    // Handle getActiveWalletFromDB (compatibility)
+    builder
       .addCase(getActiveWalletFromDB.fulfilled, (state, action) => {
-        const { activeWalletId, activeWallet } = action.payload;
-        console.log("✅ Active wallet from DB:", activeWalletId);
-
-        if (activeWalletId && activeWallet) {
-          const wallet = state.wallets.find((w) => w.id === activeWalletId);
-          if (wallet) {
-            state.wallets.forEach((w) => (w.isActive = false));
-            wallet.isActive = true;
-            state.activeWallet = wallet;
-
-            if (typeof window !== "undefined") {
-              localStorage.setItem("activeWalletId", activeWalletId);
-            }
-
-            console.log("✅ Active wallet synced from DB:", wallet.name);
-          }
-        }
+        const { activeWalletId } = action.payload;
+        console.log(
+          "✅ Active wallet from DB (compatibility):",
+          activeWalletId
+        );
       })
-      // Fetch wallets
+      .addCase(getActiveWalletFromDB.rejected, (state, action) => {
+        console.warn("⚠️ Failed to get active wallet from DB:", action.payload);
+      });
+
+    // Fetch wallets (compatibility - returns primary wallet)
+    builder
       .addCase(fetchWallets.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -633,16 +576,25 @@ const walletSlice = createSlice({
       .addCase(fetchWallets.fulfilled, (state, action) => {
         state.loading = false;
 
-        if (action.payload && Array.isArray(action.payload)) {
+        if (
+          action.payload &&
+          Array.isArray(action.payload) &&
+          action.payload.length > 0
+        ) {
           state.wallets = action.payload.map((wallet: any) => ({
             id: wallet._id?.toString() || wallet.id,
             name: wallet.walletName || wallet.name,
             address: wallet.walletAddress || wallet.address,
             balance: 0,
-            isActive: false,
+            isActive: true, // Primary wallet is always active
           }));
 
-          console.log("✅ Wallets loaded:", state.wallets.length);
+          // Set the first (and only) wallet as active
+          if (state.wallets.length > 0) {
+            state.activeWallet = state.wallets[0];
+          }
+
+          console.log("✅ Primary wallet loaded:", state.wallets.length);
         } else {
           // If no wallets, ensure state is clean
           state.wallets = [];
@@ -656,35 +608,10 @@ const walletSlice = createSlice({
         if (action.payload !== "Request already pending") {
           state.error = action.payload as string;
         }
-      })
-      // Create wallet
-      .addCase(createWallet.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(createWallet.fulfilled, (state, action) => {
-        state.loading = false;
-        const newWallet: Wallet = {
-          id: action.payload._id?.toString() || action.payload.id,
-          name: action.payload.walletName || action.payload.name,
-          address: action.payload.walletAddress || action.payload.address,
-          balance: 0,
-          isActive: action.payload.isDefault || false,
-        };
+      });
 
-        if (newWallet.isActive) {
-          state.wallets.forEach((w) => (w.isActive = false));
-          state.activeWallet = newWallet;
-        }
-
-        state.wallets.push(newWallet);
-        state.error = null;
-      })
-      .addCase(createWallet.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-      // Fetch wallet tokens
+    // Fetch wallet tokens
+    builder
       .addCase(fetchWalletTokens.pending, (state) => {
         if (state.tokens.length === 0) {
           state.loading = true;
@@ -731,40 +658,36 @@ const walletSlice = createSlice({
         if (action.payload !== "Request already pending") {
           state.error = action.payload as string;
         }
-      })
-      // Update wallet balance
-      .addCase(updateWalletBalance.fulfilled, (state, action) => {
-        const { walletAddress, balance } = action.payload;
-        const wallet = state.wallets.find((w) => w.address === walletAddress);
-        if (wallet) {
-          wallet.balance = balance;
-          if (wallet.isActive && state.tokens.length === 0) {
-            state.totalBalance = balance;
-          }
-        }
-      })
-      // Refresh token prices
-      .addCase(refreshTokenPrices.fulfilled, (state, action) => {
-        const prices = action.payload;
-        state.tokens.forEach((token) => {
-          const priceData = prices[token.symbol.toLowerCase()];
-          if (priceData) {
-            token.price = priceData.current_price;
-            token.change24h = priceData.price_change_percentage_24h;
-            token.value = token.balance * priceData.current_price;
-          }
-        });
+      });
 
-        state.totalBalance = state.tokens.reduce(
-          (total, token) => total + token.value,
-          0
-        );
+    // Update wallet balance
+    builder.addCase(updateWalletBalance.fulfilled, (state, action) => {
+      const { walletAddress, balance } = action.payload;
+      const wallet = state.wallets.find((w) => w.address === walletAddress);
+      if (wallet) {
+        wallet.balance = balance;
+        if (wallet.isActive && state.tokens.length === 0) {
+          state.totalBalance = balance;
+        }
+      }
+    });
+
+    // Get wallet credentials
+    builder
+      .addCase(getWalletCredentials.fulfilled, (state, action) => {
+        // Credentials are returned but not stored in Redux state for security
+        console.log("✅ Wallet credentials retrieved from localStorage");
+      })
+      .addCase(getWalletCredentials.rejected, (state, action) => {
+        state.error = action.payload as string;
+        console.error("❌ Failed to get wallet credentials:", action.payload);
       });
   },
 });
 
 export const {
   clearWalletState,
+  setPrimaryWalletActive,
   setActiveWallet,
   setTokens,
   setTotalBalance,
@@ -772,17 +695,13 @@ export const {
   updateTokens,
   setRealtimeData,
   updatePortfolioValue,
-  batchUpdateFromRealtimeService,
   clearError,
   setLoading,
   updateTokenBalance,
   addToken,
   removeToken,
-  updateWalletName,
   clearTokens,
-  clearActiveWalletPersistence,
-  updateWalletBalances,
-  updateSingleWalletBalance,
+  logoutAndClearWallet,
 } = walletSlice.actions;
 
 export default walletSlice.reducer;

@@ -1,3 +1,4 @@
+// src/middleware.ts - UPDATED FOR WALLET-FIRST AUTH
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -31,12 +32,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  console.log("Middleware processing:", pathname);
+  console.log("Middleware processing (wallet-first):", pathname);
 
   // Public paths that don't require authentication (wallet setup flow)
   const publicPaths = ["/", "/auth"];
 
-  // Always allow access to auth page (which is now wallet setup)
+  // Always allow access to auth page (wallet setup)
   if (pathname === "/auth") {
     console.log("Allowing access to wallet setup page");
     return NextResponse.next();

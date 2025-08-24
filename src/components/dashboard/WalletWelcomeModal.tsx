@@ -1,4 +1,14 @@
+// src/components/dashboard/WalletWelcomeModal.tsx - FIXED FOR WALLET-FIRST AUTH
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "@/store";
+import { createWalletUser, verifyWalletUser } from "@/store/slices/authSlice";
+import {
+  SecureWalletStorage,
+  WalletValidator,
+  PasswordValidator,
+} from "@/lib/wallet-security";
 import {
   X,
   Key,
@@ -14,15 +24,18 @@ import {
   Mail,
   AlertCircle,
   CheckCircle,
+  Wallet,
 } from "lucide-react";
 import Button from "../ui/Button";
 import Input from "../ui/Input";
+import { ethers } from "ethers";
 
 interface WalletWelcomeModalProps {
   isOpen: boolean;
   onClose: () => void;
   userName?: string;
   onWalletCreated: () => void;
+  onWalletExists?: (walletData: any) => void;
 }
 
 type Step =
@@ -35,16 +48,26 @@ type Step =
   | "existing-wallet-login"
   | "register-credentials";
 
+interface WalletData {
+  address: string;
+  privateKey: string;
+  mnemonic?: string;
+}
+
 export default function WalletWelcomeModal({
   isOpen,
   onClose,
   userName = "User",
   onWalletCreated,
+  onWalletExists,
 }: WalletWelcomeModalProps) {
+  const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+  const modalRef = useRef<HTMLDivElement>(null);
+
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const modalRef = useRef<HTMLDivElement>(null);
 
   // Wallet creation/import states
   const [phraseWords, setPhraseWords] = useState<string[]>(
@@ -56,11 +79,9 @@ export default function WalletWelcomeModal({
   const [newWalletName, setNewWalletName] = useState("");
 
   // Generated wallet data
-  const [generatedWallet, setGeneratedWallet] = useState<{
-    address: string;
-    privateKey: string;
-    mnemonic: string;
-  } | null>(null);
+  const [generatedWallet, setGeneratedWallet] = useState<WalletData | null>(
+    null
+  );
 
   // Registration states
   const [registrationData, setRegistrationData] = useState({
@@ -74,12 +95,8 @@ export default function WalletWelcomeModal({
     username: "",
     password: "",
   });
-  const [existingWalletData, setExistingWalletData] = useState<{
-    address: string;
-    privateKey: string;
-    mnemonic?: string;
-    username: string;
-  } | null>(null);
+  const [existingWalletData, setExistingWalletData] =
+    useState<WalletData | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -129,10 +146,10 @@ export default function WalletWelcomeModal({
     onClose();
   };
 
-  // Check if wallet exists in database
+  // Check if wallet exists in database as primary wallet
   const checkWalletExists = async (walletAddress: string) => {
     try {
-      const response = await fetch("/api/wallets/check-exists", {
+      const response = await fetch("/api/auth/check-primary-wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ walletAddress }),
@@ -157,16 +174,18 @@ export default function WalletWelcomeModal({
     setError("");
 
     try {
-      const { ethers } = await import("ethers");
+      console.log("🔐 Generating new wallet...");
       const wallet = ethers.Wallet.createRandom();
 
-      setGeneratedWallet({
+      const walletData: WalletData = {
         address: wallet.address,
         privateKey: wallet.privateKey,
         mnemonic: wallet.mnemonic?.phrase || "",
-      });
+      };
 
+      setGeneratedWallet(walletData);
       setCurrentStep("wallet-created");
+      console.log("✅ Wallet generated successfully");
     } catch (err: any) {
       console.error("Wallet generation error:", err);
       setError("Failed to generate wallet. Please try again.");
@@ -185,44 +204,49 @@ export default function WalletWelcomeModal({
     }
 
     const recoveryPhrase = filledWords.join(" ");
+
+    // Validate mnemonic
+    if (!WalletValidator.isValidMnemonic(recoveryPhrase)) {
+      setError(
+        "Invalid recovery phrase. Please check your words and try again."
+      );
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      const { ethers } = await import("ethers");
+      console.log("🔐 Importing wallet from recovery phrase...");
       const wallet = ethers.Wallet.fromPhrase(recoveryPhrase);
 
-      // Check if wallet exists
+      const walletData: WalletData = {
+        address: wallet.address,
+        privateKey: wallet.privateKey,
+        mnemonic: recoveryPhrase,
+      };
+
+      // Check if wallet exists as primary wallet
       const checkResult = await checkWalletExists(wallet.address);
 
       if (checkResult.exists) {
+        console.log("🔍 Existing primary wallet detected");
         // Wallet exists, go to login flow
-        setExistingWalletData({
-          address: wallet.address,
-          privateKey: wallet.privateKey,
-          mnemonic: recoveryPhrase,
-          username: checkResult.username,
-        });
+        setExistingWalletData(walletData);
         setLoginData({
           username: checkResult.username,
           password: "",
         });
         setCurrentStep("existing-wallet-login");
       } else {
-        // New wallet, proceed to save it
-        await saveNewWallet({
-          address: wallet.address,
-          privateKey: wallet.privateKey,
-          mnemonic: recoveryPhrase,
-          name: `Imported Wallet ${Date.now()}`,
-        });
+        console.log("🆕 New wallet, proceeding to registration");
+        // New wallet, proceed to registration
+        setGeneratedWallet(walletData);
+        setCurrentStep("register-credentials");
       }
     } catch (err: any) {
       console.error("Import error:", err);
-      setError(
-        err.message ||
-          "Failed to import wallet. Please check your recovery phrase."
-      );
+      setError("Failed to import wallet. Please check your recovery phrase.");
     } finally {
       setLoading(false);
     }
@@ -235,100 +259,75 @@ export default function WalletWelcomeModal({
       return;
     }
 
+    // Validate private key
+    if (!WalletValidator.isValidPrivateKey(privateKey.trim())) {
+      setError("Invalid private key format. Please check and try again.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      const { ethers } = await import("ethers");
+      console.log("🔐 Importing wallet from private key...");
       const wallet = new ethers.Wallet(privateKey.trim());
 
-      // Check if wallet exists
+      const walletData: WalletData = {
+        address: wallet.address,
+        privateKey: wallet.privateKey,
+      };
+
+      // Check if wallet exists as primary wallet
       const checkResult = await checkWalletExists(wallet.address);
 
       if (checkResult.exists) {
+        console.log("🔍 Existing primary wallet detected");
         // Wallet exists, go to login flow
-        setExistingWalletData({
-          address: wallet.address,
-          privateKey: wallet.privateKey,
-          username: checkResult.username,
-        });
+        setExistingWalletData(walletData);
         setLoginData({
           username: checkResult.username,
           password: "",
         });
         setCurrentStep("existing-wallet-login");
       } else {
-        // New wallet, proceed to save it
-        await saveNewWallet({
-          address: wallet.address,
-          privateKey: wallet.privateKey,
-          name: walletName.trim(),
-        });
+        console.log("🆕 New wallet, proceeding to registration");
+        // New wallet, proceed to registration
+        setGeneratedWallet(walletData);
+        setCurrentStep("register-credentials");
       }
     } catch (err: any) {
       console.error("Import error:", err);
-      setError(
-        err.message || "Failed to import wallet. Please check your private key."
-      );
+      setError("Failed to import wallet. Please check your private key.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Save new wallet (goes to registration if user doesn't exist)
-  const saveNewWallet = async (walletData: {
-    address: string;
-    privateKey: string;
-    mnemonic?: string;
-    name: string;
-  }) => {
-    try {
-      const response = await fetch("/api/wallets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          walletAddress: walletData.address,
-          walletName: walletData.name,
-          privateKey: walletData.privateKey,
-          mnemonic: walletData.mnemonic,
-        }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401 || data.error?.includes("Unauthorized")) {
-          // No user logged in, go to registration
-          setGeneratedWallet({
-            address: walletData.address,
-            privateKey: walletData.privateKey,
-            mnemonic: walletData.mnemonic || "",
-          });
-          setNewWalletName(walletData.name);
-          setCurrentStep("register-credentials");
-          return;
-        }
-        throw new Error(data.error || "Failed to save wallet");
-      }
-
-      // Success - wallet saved
-      setCurrentStep("wallet-created");
-      onWalletCreated();
-    } catch (error: any) {
-      throw error;
-    }
-  };
-
-  // Handle registration for new user
+  // Handle user registration
   const handleRegisterUser = async () => {
-    if (registrationData.password !== registrationData.confirmPassword) {
+    const { username, password, confirmPassword } = registrationData;
+
+    // Validate username
+    const usernameValidation = PasswordValidator.isValidUsername(username);
+    if (!usernameValidation.valid) {
+      setError(usernameValidation.message || "Invalid username");
+      return;
+    }
+
+    // Validate password
+    const passwordValidation = PasswordValidator.isValidPassword(password);
+    if (!passwordValidation.valid) {
+      setError(passwordValidation.message || "Invalid password");
+      return;
+    }
+
+    if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    if (!registrationData.username.trim() || !registrationData.password) {
-      setError("Please fill in all fields");
+    if (!generatedWallet) {
+      setError("No wallet data available");
       return;
     }
 
@@ -336,110 +335,90 @@ export default function WalletWelcomeModal({
     setError("");
 
     try {
-      // Register user first
-      const registerResponse = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: registrationData.username,
-          password: registrationData.password,
-        }),
-        credentials: "include",
-      });
+      console.log("📝 Creating new wallet-based user...");
 
-      const registerData = await registerResponse.json();
+      // Dispatch user creation action
+      const result = await dispatch(
+        createWalletUser({
+          username: username.trim(),
+          password: password,
+          walletAddress: generatedWallet.address,
+        })
+      );
 
-      if (!registerResponse.ok) {
-        throw new Error(registerData.error || "Failed to create account");
+      if (createWalletUser.fulfilled.match(result)) {
+        console.log("✅ User created successfully");
+
+        // Store wallet credentials in localStorage
+        SecureWalletStorage.storeWalletCredentials(generatedWallet);
+
+        // Success
+        onWalletCreated();
+        handleClose();
+      } else {
+        const errorMessage =
+          (result.payload as string) || "Failed to create account";
+        setError(errorMessage);
       }
-
-      // Now save the wallet
-      const walletData = generatedWallet || {
-        address: existingWalletData?.address || "",
-        privateKey: existingWalletData?.privateKey || "",
-        mnemonic: existingWalletData?.mnemonic,
-      };
-
-      const walletResponse = await fetch("/api/wallets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          walletAddress: walletData.address,
-          walletName: newWalletName || "My Wallet",
-          privateKey: walletData.privateKey,
-          mnemonic: walletData.mnemonic,
-        }),
-        credentials: "include",
-      });
-
-      if (!walletResponse.ok) {
-        const error = await walletResponse.json();
-        throw new Error(error.error || "Failed to save wallet");
-      }
-
-      onWalletCreated();
-      handleClose();
     } catch (error: any) {
-      setError(error.message);
+      console.error("❌ Registration error:", error);
+      setError(error.message || "Failed to create account");
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle login for existing user
+  // Handle existing user login
   const handleExistingUserLogin = async () => {
     if (!loginData.password) {
       setError("Please enter your password");
       return;
     }
 
+    if (!existingWalletData) {
+      setError("No wallet data available");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      // Login user
-      const loginResponse = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: loginData.username,
+      console.log("🔐 Verifying existing wallet user...");
+
+      // Dispatch verification action
+      const result = await dispatch(
+        verifyWalletUser({
+          walletAddress: existingWalletData.address,
           password: loginData.password,
-        }),
-        credentials: "include",
-      });
+        })
+      );
 
-      const loginDataResult = await loginResponse.json();
+      if (verifyWalletUser.fulfilled.match(result)) {
+        console.log("✅ User verification successful");
 
-      if (!loginResponse.ok) {
-        if (loginDataResult.error === "2FA_REQUIRED") {
-          setError(
-            "2FA authentication required. Please login through the main login form."
-          );
-          return;
-        }
-        throw new Error(loginDataResult.error || "Invalid password");
+        // Store wallet credentials in localStorage
+        SecureWalletStorage.storeWalletCredentials(existingWalletData);
+
+        // Success
+        onWalletCreated();
+        handleClose();
+      } else {
+        const errorMessage = (result.payload as string) || "Invalid password";
+        setError(errorMessage);
       }
-
-      // Successfully logged in
-      onWalletCreated();
-      handleClose();
     } catch (error: any) {
-      setError(error.message);
+      console.error("❌ Login error:", error);
+      setError(error.message || "Authentication failed");
     } finally {
       setLoading(false);
     }
   };
 
   // Handle save generated wallet
-  const handleSaveGeneratedWallet = async () => {
+  const handleSaveGeneratedWallet = () => {
     if (!generatedWallet) return;
-
-    await saveNewWallet({
-      address: generatedWallet.address,
-      privateKey: generatedWallet.privateKey,
-      mnemonic: generatedWallet.mnemonic,
-      name: newWalletName.trim(),
-    });
+    setCurrentStep("register-credentials");
   };
 
   // Helper functions for form inputs
@@ -481,14 +460,15 @@ export default function WalletWelcomeModal({
   // Render functions for each step
   const renderWelcomeStep = () => (
     <div className="text-center">
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-white font-mayeka mb-1.5">
-          Welcome to Blockpal
-        </h2>
-        <p className="text-gray-400 font-satoshi">
-          Choose how you'd like to get started
-        </p>
+      <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-6">
+        <Wallet size={32} className="text-black" />
       </div>
+      <h2 className="text-xl font-bold text-white font-mayeka mb-1.5">
+        Welcome to Blockpal
+      </h2>
+      <p className="text-gray-400 font-satoshi mb-6">
+        Choose how you'd like to get started
+      </p>
 
       <div className="space-y-3">
         <Button
@@ -511,6 +491,12 @@ export default function WalletWelcomeModal({
           Import existing wallet
         </Button>
       </div>
+
+      {error && (
+        <div className="mt-4 bg-red-900/20 border border-red-500/50 rounded-lg p-2.5">
+          <p className="text-red-400 text-xs font-satoshi">{error}</p>
+        </div>
+      )}
     </div>
   );
 
@@ -710,8 +696,8 @@ export default function WalletWelcomeModal({
           <textarea
             value={privateKey}
             onChange={(e) => setPrivateKey(e.target.value)}
-            placeholder="Enter your private key"
-            className="w-full h-24 px-2.5 py-2.5 border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-400 focus:outline-none focus:border-[#E2AF19] resize-none font-satoshi text-xs"
+            placeholder="Enter your private key (0x...)"
+            className="w-full h-24 px-2.5 py-2.5 border border-[#2C2C2C] rounded-lg text-white placeholder:text-gray-400 focus:outline-none focus:border-[#E2AF19] resize-none font-satoshi text-xs bg-black"
             style={{ fontSize: "14px" }}
           />
           <div className="flex justify-end mt-1.5">
@@ -856,6 +842,14 @@ export default function WalletWelcomeModal({
         <p className="text-gray-400 text-xs font-satoshi">
           Set up your account to secure your wallet
         </p>
+        {generatedWallet && (
+          <div className="mt-2 p-2 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+            <p className="text-blue-400 text-xs font-satoshi">
+              Wallet: {generatedWallet.address?.slice(0, 8)}...
+              {generatedWallet.address?.slice(-6)}
+            </p>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -889,7 +883,7 @@ export default function WalletWelcomeModal({
 
         <Input
           type="password"
-          placeholder="Create password"
+          placeholder="Create password (min 6 characters)"
           value={registrationData.password}
           onChange={(e) => {
             setRegistrationData((prev) => ({
@@ -920,7 +914,10 @@ export default function WalletWelcomeModal({
         <Button
           onClick={handleRegisterUser}
           disabled={
-            loading || !registrationData.username || !registrationData.password
+            loading ||
+            !registrationData.username ||
+            !registrationData.password ||
+            !registrationData.confirmPassword
           }
           className="w-full"
           size="lg"
@@ -931,7 +928,8 @@ export default function WalletWelcomeModal({
 
       <div className="mt-4 p-2.5 bg-green-900/20 border border-green-500/50 rounded-lg">
         <p className="text-green-400 text-xs font-satoshi">
-          Your wallet will be saved securely after account creation.
+          🔒 Your private keys are stored securely in your browser. We never
+          store passwords - only secure verification tokens.
         </p>
       </div>
     </div>
@@ -943,16 +941,17 @@ export default function WalletWelcomeModal({
         <CheckCircle size={24} className="text-white" />
       </div>
       <h2 className="text-xl font-bold text-white font-mayeka mb-1.5">
-        Welcome to Blockpal!
+        Wallet Ready!
       </h2>
       <p className="text-gray-400 font-satoshi mb-4">
-        Your wallet has been successfully set up and is ready to use.
+        Your wallet has been generated successfully. Please save your
+        credentials securely.
       </p>
 
       {generatedWallet && (
         <div className="bg-[#0F0F0F] rounded-lg p-3 mb-4 text-left">
           <h3 className="text-white font-semibold mb-2 font-satoshi">
-            ⚠️ Save Your Wallet Details
+            ⚠️ Important: Save These Credentials
           </h3>
           <div className="space-y-2 text-xs">
             <div>
@@ -978,33 +977,24 @@ export default function WalletWelcomeModal({
               </div>
             )}
           </div>
+
+          <div className="mt-3 p-2 bg-amber-900/20 border border-amber-500/50 rounded-lg">
+            <p className="text-amber-400 text-xs font-satoshi">
+              💾 These credentials are stored securely in your browser. Back
+              them up safely!
+            </p>
+          </div>
         </div>
       )}
 
-      {generatedWallet ? (
-        <div className="space-y-2">
-          <Button
-            onClick={handleSaveGeneratedWallet}
-            className="w-full"
-            size="lg"
-            disabled={loading}
-          >
-            {loading ? "Saving..." : "Continue to Dashboard"}
-          </Button>
-          <Button
-            onClick={() => setCurrentStep("create-wallet")}
-            variant="secondary"
-            className="w-full"
-            size="lg"
-          >
-            Generate New Wallet
-          </Button>
-        </div>
-      ) : (
-        <Button onClick={handleClose} className="w-full" size="lg">
-          Continue to Dashboard
-        </Button>
-      )}
+      <Button
+        onClick={handleSaveGeneratedWallet}
+        className="w-full"
+        size="lg"
+        disabled={loading}
+      >
+        Continue to Account Setup
+      </Button>
     </div>
   );
 

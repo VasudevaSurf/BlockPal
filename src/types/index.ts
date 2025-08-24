@@ -1,11 +1,20 @@
+// src/types/index.ts - UPDATED FOR WALLET-FIRST AUTH
 export interface User {
   id: string;
-  email: string;
-  name: string;
-  username?: string;
+  email?: string; // Keep optional for backward compatibility
+  name?: string; // Keep optional for backward compatibility
+  username: string;
   displayName?: string;
+  primaryWalletAddress: string; // NEW: Primary wallet address
   avatar?: string;
   currency?: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  error: string | null;
 }
 
 export interface Wallet {
@@ -18,6 +27,10 @@ export interface Wallet {
   isDefault?: boolean;
   createdAt?: Date;
   lastUsedAt?: Date;
+  // Add optional fields for wallet metadata
+  isPrimary?: boolean;
+  hasPrivateKey?: boolean;
+  hasMnemonic?: boolean;
 }
 
 export interface Token {
@@ -170,4 +183,113 @@ export interface CryptoServiceConfig {
   network: string;
   chainId: number;
   rpcUrl: string;
+}
+
+// NEW: Wallet credentials interface (for localStorage)
+export interface WalletCredentials {
+  address: string;
+  privateKey: string;
+  mnemonic?: string;
+}
+
+// NEW: Database user schema interface
+export interface DatabaseUser {
+  _id?: string;
+  username: string;
+  displayName: string;
+  primaryWalletAddress: string;
+  passwordSalt: string; // Hex string
+  encryptedVerificationToken: string; // Hex string
+  verificationTokenIV: string; // Hex string
+  avatar?: string;
+  preferences?: {
+    notifications: boolean;
+  };
+  currency?: string;
+  authProvider: "wallet";
+  createdAt: Date;
+  lastLoginAt: Date;
+}
+
+// NEW: API response types
+export interface CreateWalletUserRequest {
+  username: string;
+  password: string;
+  walletAddress: string;
+}
+
+export interface VerifyWalletUserRequest {
+  walletAddress: string;
+  password: string;
+}
+
+export interface CheckPrimaryWalletRequest {
+  walletAddress: string;
+}
+
+export interface CheckPrimaryWalletResponse {
+  exists: boolean;
+  walletAddress: string;
+  username?: string;
+  userDisplayName?: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: string;
+  message?: string;
+}
+
+// NEW: Wallet storage types
+export interface PrimaryWalletStorage {
+  address: string;
+}
+
+// NEW: Security types for PBKDF2
+export interface SecurityConfig {
+  saltLength: number;
+  keyLength: number;
+  iterations: number;
+  algorithm: string;
+}
+
+// Error types
+export interface ApiError {
+  error: string;
+  message?: string;
+  code?: string;
+}
+
+// Dashboard types (existing, unchanged)
+export interface DashboardToken {
+  contractAddress: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  imageUrl: string;
+  balance: number;
+  price: number;
+  value: number;
+  change24h: number;
+}
+
+export interface PortfolioStats {
+  totalChange24h: number;
+  totalChangePercentage: number;
+  topGainers: DashboardToken[];
+  topLosers: DashboardToken[];
+  tokenCount: number;
+}
+
+// Component prop types
+export interface WalletComponentProps {
+  onWalletCreated?: () => void;
+  onWalletImported?: (walletData: WalletCredentials) => void;
+  onError?: (error: string) => void;
+}
+
+export interface AuthComponentProps {
+  onAuthSuccess?: (user: User) => void;
+  onAuthError?: (error: string) => void;
+  redirectPath?: string;
 }

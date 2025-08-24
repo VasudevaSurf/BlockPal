@@ -17,7 +17,14 @@ export async function GET(request: NextRequest) {
     // Get user data
     const user = await db.collection("users").findOne(
       { _id: new ObjectId(decoded.userId) },
-      { projection: { passwordHash: 0 } } // Exclude password hash
+      {
+        projection: {
+          // EXCLUDE password-related fields
+          passwordSalt: 0,
+          encryptedVerificationToken: 0,
+          verificationTokenIV: 0,
+        },
+      }
     );
 
     if (!user) {
@@ -28,7 +35,8 @@ export async function GET(request: NextRequest) {
       id: user._id,
       username: user.username,
       displayName: user.displayName,
-      email: user.gmail,
+      name: user.displayName, // Add name field for compatibility
+      primaryWalletAddress: user.primaryWalletAddress,
       avatar: user.avatar,
       currency: user.currency,
     };
