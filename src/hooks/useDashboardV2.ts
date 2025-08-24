@@ -1,4 +1,4 @@
-// src/hooks/useDashboardV2.ts - FIXED VERSION with proper empty wallet handling
+// src/hooks/useDashboardV2.ts - FIXED with better error handling and retry logic
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/store";
@@ -29,15 +29,18 @@ interface DashboardState {
 }
 
 const REFRESH_INTERVAL = 30000; // 30 seconds
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000; // 2 seconds
 
 export function useDashboardV2() {
   const dispatch = useDispatch<AppDispatch>();
   const { activeWallet } = useSelector((state: RootState) => state.wallet);
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
   const [state, setState] = useState<DashboardState>({
     tokens: [],
     totalValue: 0,
-    isLoading: true, // Start with loading true
+    isLoading: true,
     isRefreshing: false,
     isInitialized: false,
     error: null,
@@ -50,20 +53,30 @@ export function useDashboardV2() {
   const initializingRef = useRef(false);
   const currentWalletRef = useRef<string | null>(null);
   const isMounted = useRef(true);
+  const retryCount = useRef(0);
 
-  // Initialize dashboard
+  // Initialize dashboard with retry logic
   const initializeDashboard = useCallback(
-    async (walletAddress: string) => {
+    async (walletAddress: string, attempt: number = 1) => {
       // Prevent duplicate initialization
-      if (initializingRef.current) {
+      if (initializingRef.current && attempt === 1) {
         console.log("⏳ Dashboard initialization already in progress");
         return;
       }
 
-      initializingRef.current = true;
+      // Verify authentication and wallet
+      if (!isAuthenticated || !walletAddress) {
+        console.log("⚠️ Not authenticated or no wallet address");
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: "Authentication required",
+        }));
+        return;
+      }
 
-      // Only set loading if not already initialized
-      if (!state.isInitialized) {
+      if (attempt === 1) {
+        initializingRef.current = true;
         setState((prev) => ({
           ...prev,
           isLoading: true,
@@ -72,18 +85,26 @@ export function useDashboardV2() {
       }
 
       try {
-        console.log("🚀 Initializing dashboard for wallet:", walletAddress);
+        console.log(
+          `🚀 Initializing dashboard for wallet: ${walletAddress} (attempt ${attempt})`
+        );
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
         const response = await fetch("/api/dashboard/initialize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ walletAddress }),
           credentials: "include",
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || "Failed to initialize dashboard");
+          throw new Error(errorData.error || `HTTP ${response.status}`);
         }
 
         const data = await response.json();
@@ -101,20 +122,38 @@ export function useDashboardV2() {
         // Ensure tokens is an array
         const tokensArray = Array.isArray(data.tokens) ? data.tokens : [];
 
-        // Map tokens to the correct format
+        // Map tokens to the correct format with better error handling
         const formattedTokens: DashboardToken[] = tokensArray.map(
-          (token: any) => ({
-            contractAddress: token.contractAddress || "unknown",
-            symbol: token.symbol || "UNKNOWN",
-            name: token.name || "Unknown Token",
-            decimals: typeof token.decimals === "number" ? token.decimals : 18,
-            imageUrl: token.imageUrl || token.logoUrl || token.image || "",
-            balance: typeof token.balance === "number" ? token.balance : 0,
-            price: typeof token.price === "number" ? token.price : 0,
-            value: typeof token.value === "number" ? token.value : 0,
-            change24h:
-              typeof token.change24h === "number" ? token.change24h : 0,
-          })
+          (token: any) => {
+            try {
+              return {
+                contractAddress: token.contractAddress || "unknown",
+                symbol: token.symbol || "UNKNOWN",
+                name: token.name || "Unknown Token",
+                decimals:
+                  typeof token.decimals === "number" ? token.decimals : 18,
+                imageUrl: token.imageUrl || token.logoUrl || token.image || "",
+                balance: typeof token.balance === "number" ? token.balance : 0,
+                price: typeof token.price === "number" ? token.price : 0,
+                value: typeof token.value === "number" ? token.value : 0,
+                change24h:
+                  typeof token.change24h === "number" ? token.change24h : 0,
+              };
+            } catch (tokenError) {
+              console.warn("⚠️ Error formatting token:", token, tokenError);
+              return {
+                contractAddress: "error",
+                symbol: "ERROR",
+                name: "Error Token",
+                decimals: 18,
+                imageUrl: "",
+                balance: 0,
+                price: 0,
+                value: 0,
+                change24h: 0,
+              };
+            }
+          }
         );
 
         console.log("✅ Formatted tokens:", formattedTokens.length, "tokens");
@@ -149,6 +188,9 @@ export function useDashboardV2() {
           refreshCount: 0,
         });
 
+        // Reset retry count on success
+        retryCount.current = 0;
+
         const userType = data.isNewUser ? "NEW USER" : "RETURNING USER";
         console.log(
           `✅ Dashboard initialized [${userType}]: ${
@@ -157,62 +199,108 @@ export function useDashboardV2() {
         );
       } catch (error: any) {
         console.error("❌ Dashboard initialization error:", error);
-        if (isMounted.current) {
-          // FIXED: Even on error, if it's a new wallet with no tokens, mark as initialized
-          if (
-            error.message?.includes("No tokens found") ||
-            error.message?.includes("empty wallet")
-          ) {
-            setState({
-              tokens: [],
-              totalValue: 0,
-              isLoading: false,
-              isRefreshing: false,
-              isInitialized: true, // Mark as initialized even with empty wallet
-              error: null,
-              lastRefresh: new Date(),
-              isNewUser: true,
-              refreshCount: 0,
-            });
-            console.log("✅ Dashboard initialized with empty wallet");
-          } else {
-            setState((prev) => ({
-              ...prev,
-              isLoading: false,
-              isInitialized: false,
-              error: error.message || "Failed to initialize dashboard",
-            }));
-          }
+
+        if (!isMounted.current) {
+          return;
+        }
+
+        // Handle specific error types
+        if (error.name === "AbortError") {
+          console.error("⏰ Dashboard initialization timed out");
+        }
+
+        // Retry logic
+        if (
+          attempt < MAX_RETRIES &&
+          !error.message?.includes("Authentication required")
+        ) {
+          console.log(
+            `🔄 Retrying dashboard initialization (${
+              attempt + 1
+            }/${MAX_RETRIES})`
+          );
+          setTimeout(() => {
+            initializeDashboard(walletAddress, attempt + 1);
+          }, RETRY_DELAY * attempt);
+          return;
+        }
+
+        // Handle different error scenarios
+        if (
+          error.message?.includes("No tokens found") ||
+          error.message?.includes("empty wallet") ||
+          error.message?.includes("not initialized")
+        ) {
+          setState({
+            tokens: [],
+            totalValue: 0,
+            isLoading: false,
+            isRefreshing: false,
+            isInitialized: true, // Mark as initialized even with empty wallet
+            error: null,
+            lastRefresh: new Date(),
+            isNewUser: true,
+            refreshCount: 0,
+          });
+          console.log("✅ Dashboard initialized with empty wallet");
+        } else {
+          setState((prev) => ({
+            ...prev,
+            isLoading: false,
+            isInitialized: false,
+            error: error.message || "Failed to initialize dashboard",
+          }));
         }
       } finally {
-        initializingRef.current = false;
+        if (attempt === 1) {
+          initializingRef.current = false;
+        }
       }
     },
-    [dispatch, state.isInitialized]
+    [dispatch, isAuthenticated]
   );
 
-  // Refresh dashboard
+  // Refresh dashboard with retry logic
   const refreshDashboard = useCallback(
-    async (walletAddress: string, isAutomatic: boolean = false) => {
+    async (
+      walletAddress: string,
+      isAutomatic: boolean = false,
+      attempt: number = 1
+    ) => {
       // Don't refresh if not initialized
-      if (!state.isInitialized) {
+      if (!state.isInitialized && !isAutomatic) {
         console.log("⚠️ Dashboard not initialized, skipping refresh");
         return;
       }
 
-      setState((prev) => ({ ...prev, isRefreshing: true, error: null }));
+      // Verify authentication
+      if (!isAuthenticated) {
+        console.log("⚠️ Not authenticated, skipping refresh");
+        return;
+      }
+
+      if (attempt === 1) {
+        setState((prev) => ({ ...prev, isRefreshing: true, error: null }));
+      }
 
       try {
         const refreshType = isAutomatic
           ? "⏰ AUTO-REFRESH"
           : "🔄 MANUAL REFRESH";
+        console.log(`${refreshType} (attempt ${attempt})`);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
         const response = await fetch("/api/dashboard/refresh", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ walletAddress }),
           credentials: "include",
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
@@ -227,7 +315,7 @@ export function useDashboardV2() {
             return;
           }
 
-          throw new Error(errorData.error || "Failed to refresh dashboard");
+          throw new Error(errorData.error || `HTTP ${response.status}`);
         }
 
         const data = await response.json();
@@ -237,20 +325,42 @@ export function useDashboardV2() {
         // Ensure tokens is an array
         const tokensArray = Array.isArray(data.tokens) ? data.tokens : [];
 
-        // Map tokens properly
+        // Map tokens properly with error handling
         const formattedTokens: DashboardToken[] = tokensArray.map(
-          (token: any) => ({
-            contractAddress: token.contractAddress || "unknown",
-            symbol: token.symbol || "UNKNOWN",
-            name: token.name || "Unknown Token",
-            decimals: typeof token.decimals === "number" ? token.decimals : 18,
-            imageUrl: token.imageUrl || token.logoUrl || token.image || "",
-            balance: typeof token.balance === "number" ? token.balance : 0,
-            price: typeof token.price === "number" ? token.price : 0,
-            value: typeof token.value === "number" ? token.value : 0,
-            change24h:
-              typeof token.change24h === "number" ? token.change24h : 0,
-          })
+          (token: any) => {
+            try {
+              return {
+                contractAddress: token.contractAddress || "unknown",
+                symbol: token.symbol || "UNKNOWN",
+                name: token.name || "Unknown Token",
+                decimals:
+                  typeof token.decimals === "number" ? token.decimals : 18,
+                imageUrl: token.imageUrl || token.logoUrl || token.image || "",
+                balance: typeof token.balance === "number" ? token.balance : 0,
+                price: typeof token.price === "number" ? token.price : 0,
+                value: typeof token.value === "number" ? token.value : 0,
+                change24h:
+                  typeof token.change24h === "number" ? token.change24h : 0,
+              };
+            } catch (tokenError) {
+              console.warn(
+                "⚠️ Error formatting token during refresh:",
+                token,
+                tokenError
+              );
+              return {
+                contractAddress: "error",
+                symbol: "ERROR",
+                name: "Error Token",
+                decimals: 18,
+                imageUrl: "",
+                balance: 0,
+                price: 0,
+                value: 0,
+                change24h: 0,
+              };
+            }
+          }
         );
 
         // Update Redux store
@@ -280,6 +390,9 @@ export function useDashboardV2() {
           error: null,
         }));
 
+        // Reset retry count on success
+        retryCount.current = 0;
+
         console.log(
           `✅ Dashboard refreshed (#${state.refreshCount + 1}): ${
             formattedTokens.length
@@ -287,16 +400,45 @@ export function useDashboardV2() {
         );
       } catch (error: any) {
         console.error("❌ Dashboard refresh error:", error);
-        if (isMounted.current) {
-          setState((prev) => ({
-            ...prev,
-            isRefreshing: false,
-            error: error.message || "Failed to refresh dashboard",
-          }));
+
+        if (!isMounted.current) return;
+
+        // Handle timeout
+        if (error.name === "AbortError") {
+          console.error("⏰ Dashboard refresh timed out");
         }
+
+        // Retry logic for refresh
+        if (
+          attempt < MAX_RETRIES &&
+          isAutomatic &&
+          !error.message?.includes("Authentication required")
+        ) {
+          console.log(
+            `🔄 Retrying dashboard refresh (${attempt + 1}/${MAX_RETRIES})`
+          );
+          setTimeout(() => {
+            refreshDashboard(walletAddress, isAutomatic, attempt + 1);
+          }, RETRY_DELAY * attempt);
+          return;
+        }
+
+        setState((prev) => ({
+          ...prev,
+          isRefreshing: false,
+          error: isAutomatic
+            ? null
+            : error.message || "Failed to refresh dashboard",
+        }));
       }
     },
-    [state.isInitialized, state.refreshCount, dispatch, initializeDashboard]
+    [
+      state.isInitialized,
+      state.refreshCount,
+      dispatch,
+      initializeDashboard,
+      isAuthenticated,
+    ]
   );
 
   // Add token
@@ -424,8 +566,8 @@ export function useDashboardV2() {
 
   // Handle wallet changes
   useEffect(() => {
-    if (!activeWallet?.address) {
-      console.log("⚠️ No active wallet");
+    if (!activeWallet?.address || !isAuthenticated) {
+      console.log("⚠️ No active wallet or not authenticated");
       return;
     }
 
@@ -450,7 +592,7 @@ export function useDashboardV2() {
       // Initialize for new wallet
       initializeDashboard(activeWallet.address);
     }
-  }, [activeWallet?.address, initializeDashboard]);
+  }, [activeWallet?.address, isAuthenticated, initializeDashboard]);
 
   // Setup auto-refresh
   useEffect(() => {
@@ -462,7 +604,7 @@ export function useDashboardV2() {
 
       // Set up new interval
       refreshIntervalRef.current = setInterval(() => {
-        if (isMounted.current && activeWallet?.address) {
+        if (isMounted.current && activeWallet?.address && isAuthenticated) {
           refreshDashboard(activeWallet.address, true);
         }
       }, REFRESH_INTERVAL);
@@ -479,6 +621,7 @@ export function useDashboardV2() {
     state.isInitialized,
     state.error,
     refreshDashboard,
+    isAuthenticated,
   ]);
 
   // Cleanup on unmount
@@ -497,7 +640,12 @@ export function useDashboardV2() {
   // Handle visibility change
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && activeWallet?.address && state.isInitialized) {
+      if (
+        !document.hidden &&
+        activeWallet?.address &&
+        state.isInitialized &&
+        isAuthenticated
+      ) {
         const timeSinceLastRefresh = state.lastRefresh
           ? Date.now() - state.lastRefresh.getTime()
           : Infinity;
@@ -517,6 +665,7 @@ export function useDashboardV2() {
     state.isInitialized,
     state.lastRefresh,
     refreshDashboard,
+    isAuthenticated,
   ]);
 
   // Calculate portfolio statistics

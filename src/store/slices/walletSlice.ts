@@ -1,6 +1,7 @@
-// src/store/slices/walletSlice.ts - UPDATED FOR WALLET-FIRST AUTH
+// src/store/slices/walletSlice.ts - FIXED FOR ADDITIONAL WALLETS
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { WalletState, Wallet, Token } from "@/types";
+import { SecureWalletStorage } from "@/lib/wallet-security";
 
 const initialState: WalletState = {
   wallets: [],
@@ -36,7 +37,8 @@ const clearWalletStorage = () => {
         // DON'T remove primary wallet data
         !key.includes("primaryWallet") &&
         !key.includes("walletPrivateKey") &&
-        !key.includes("walletMnemonic")
+        !key.includes("walletMnemonic") &&
+        !key.includes("additionalWallets")
       ) {
         keysToRemove.push(key);
       }
@@ -47,30 +49,54 @@ const clearWalletStorage = () => {
   }
 };
 
-// Get primary wallet from localStorage
-const getPrimaryWalletFromStorage = (): {
-  address: string;
-  privateKey: string;
-  mnemonic?: string;
-} | null => {
-  if (typeof window === "undefined") return null;
+// NEW: Load all wallets (primary + additional)
+const loadAllWallets = (): Wallet[] => {
+  const wallets: Wallet[] = [];
 
-  try {
-    const primaryWallet = localStorage.getItem("primaryWallet");
-    const privateKey = localStorage.getItem("walletPrivateKey");
-    const mnemonic = localStorage.getItem("walletMnemonic");
+  // Get primary wallet
+  const primaryCredentials = SecureWalletStorage.getPrimaryWalletCredentials();
+  if (primaryCredentials) {
+    wallets.push({
+      id: "primary",
+      name: "Primary Wallet",
+      address: primaryCredentials.address,
+      balance: 0,
+      isActive: true,
+    });
+  }
 
-    if (!primaryWallet || !privateKey) return null;
+  // Get additional wallets
+  const additionalWallets = SecureWalletStorage.getAdditionalWallets();
+  additionalWallets.forEach((wallet) => {
+    wallets.push({
+      id: wallet.id,
+      name: wallet.name,
+      address: wallet.address,
+      balance: 0,
+      isActive: false,
+    });
+  });
 
-    const walletInfo = JSON.parse(primaryWallet);
-    return {
-      address: walletInfo.address,
-      privateKey,
-      mnemonic: mnemonic || undefined,
-    };
-  } catch (error) {
-    console.error("Error reading primary wallet from storage:", error);
-    return null;
+  console.log(
+    `📂 Loaded ${wallets.length} wallets (1 primary + ${additionalWallets.length} additional)`
+  );
+  return wallets;
+};
+
+// NEW: Get wallet credentials by ID
+const getWalletCredentials = (walletId: string) => {
+  if (walletId === "primary") {
+    return SecureWalletStorage.getPrimaryWalletCredentials();
+  } else {
+    const additionalWallets = SecureWalletStorage.getAdditionalWallets();
+    const wallet = additionalWallets.find((w) => w.id === walletId);
+    return wallet
+      ? {
+          address: wallet.address,
+          privateKey: wallet.privateKey,
+          mnemonic: wallet.mnemonic,
+        }
+      : null;
   }
 };
 
@@ -79,32 +105,27 @@ export const initializePrimaryWallet = createAsyncThunk(
   "wallet/initializePrimaryWallet",
   async (_, { rejectWithValue }) => {
     try {
-      console.log("🎯 Initializing primary wallet from localStorage");
+      console.log("🎯 Initializing wallet system...");
 
-      const walletData = getPrimaryWalletFromStorage();
-      if (!walletData) {
-        return rejectWithValue("No primary wallet found in storage");
+      const allWallets = loadAllWallets();
+      if (allWallets.length === 0) {
+        return rejectWithValue("No wallets found in storage");
       }
 
-      // Create the primary wallet object
-      const primaryWallet: Wallet = {
-        id: "primary",
-        name: "Primary Wallet",
-        address: walletData.address,
-        balance: 0,
-        isActive: true,
-      };
+      const primaryWallet = allWallets.find((w) => w.id === "primary");
+      if (!primaryWallet) {
+        return rejectWithValue("No primary wallet found");
+      }
 
-      console.log("✅ Primary wallet initialized:", {
-        address: walletData.address.slice(0, 10) + "...",
-        hasPrivateKey: !!walletData.privateKey,
-        hasMnemonic: !!walletData.mnemonic,
+      console.log("✅ Wallet system initialized:", {
+        primary: primaryWallet.address.slice(0, 10) + "...",
+        total: allWallets.length,
       });
 
-      return { wallet: primaryWallet, walletData };
+      return { wallets: allWallets, primaryWallet };
     } catch (error) {
-      console.error("❌ Error initializing primary wallet:", error);
-      return rejectWithValue("Failed to initialize primary wallet");
+      console.error("❌ Error initializing wallet system:", error);
+      return rejectWithValue("Failed to initialize wallet system");
     }
   }
 );
@@ -209,9 +230,7 @@ export const setActiveWalletInDB = createAsyncThunk(
       console.log("🎯 Setting active wallet in DB (wallet-first):", walletId);
 
       // In wallet-first auth, we don't need to store active wallet in DB
-      // since there's only one primary wallet per user
-      // But we keep this for compatibility with existing components
-
+      // since we manage it locally with localStorage
       return { activeWalletId: walletId, success: true };
     } catch (error) {
       console.error("❌ Error setting active wallet in DB:", error);
@@ -227,18 +246,13 @@ export const getActiveWalletFromDB = createAsyncThunk(
     try {
       console.log("🔍 Getting active wallet from DB (wallet-first)");
 
-      // In wallet-first auth, we just return the primary wallet as active
-      const walletData = getPrimaryWalletFromStorage();
-      if (!walletData) {
-        return rejectWithValue("No primary wallet found");
-      }
+      // Check localStorage for active wallet preference
+      const activeWalletId =
+        localStorage.getItem("activeWalletId") || "primary";
 
       return {
-        activeWalletId: "primary",
-        activeWallet: {
-          id: "primary",
-          address: walletData.address,
-        },
+        activeWalletId,
+        activeWallet: { id: activeWalletId },
       };
     } catch (error) {
       console.error("❌ Error getting active wallet from DB:", error);
@@ -247,7 +261,7 @@ export const getActiveWalletFromDB = createAsyncThunk(
   }
 );
 
-// Fetch wallets (for compatibility - returns primary wallet)
+// Fetch wallets (returns all wallets from localStorage)
 export const fetchWallets = createAsyncThunk(
   "wallet/fetchWallets",
   async (_, { rejectWithValue, getState }) => {
@@ -267,30 +281,24 @@ export const fetchWallets = createAsyncThunk(
 
     try {
       pendingRequests.add(requestKey);
-      console.log("📡 Fetching wallets (wallet-first)...");
+      console.log("📡 Fetching all wallets...");
 
-      const walletData = getPrimaryWalletFromStorage();
-      if (!walletData) {
-        console.log("⚠️ No primary wallet found in storage");
-        return [];
-      }
+      const allWallets = loadAllWallets();
 
-      // Return primary wallet as the only wallet
-      const primaryWallet = {
-        _id: "primary",
-        id: "primary",
-        walletName: "Primary Wallet",
-        name: "Primary Wallet",
-        walletAddress: walletData.address,
-        address: walletData.address,
-        isDefault: true,
-      };
+      // Convert to API format for compatibility
+      const formattedWallets = allWallets.map((wallet) => ({
+        _id: wallet.id,
+        id: wallet.id,
+        walletName: wallet.name,
+        name: wallet.name,
+        walletAddress: wallet.address,
+        address: wallet.address,
+        isDefault: wallet.id === "primary",
+        isPrimary: wallet.id === "primary",
+      }));
 
-      console.log(
-        "✅ Primary wallet fetched:",
-        walletData.address.slice(0, 10) + "..."
-      );
-      return [primaryWallet];
+      console.log("✅ All wallets fetched:", formattedWallets.length);
+      return formattedWallets;
     } catch (error) {
       console.error("❌ Error fetching wallets:", error);
       return rejectWithValue("Network error occurred");
@@ -301,19 +309,20 @@ export const fetchWallets = createAsyncThunk(
 );
 
 // Get wallet credentials from localStorage
-export const getWalletCredentials = createAsyncThunk(
-  "wallet/getWalletCredentials",
-  async (_, { rejectWithValue }) => {
+export const getWalletCredentialsById = createAsyncThunk(
+  "wallet/getWalletCredentialsById",
+  async (walletId: string, { rejectWithValue }) => {
     try {
-      const walletData = getPrimaryWalletFromStorage();
-      if (!walletData) {
+      const credentials = getWalletCredentials(walletId);
+      if (!credentials) {
         return rejectWithValue("No wallet credentials found");
       }
 
       return {
-        address: walletData.address,
-        privateKey: walletData.privateKey,
-        mnemonic: walletData.mnemonic,
+        walletId,
+        address: credentials.address,
+        privateKey: credentials.privateKey,
+        mnemonic: credentials.mnemonic,
       };
     } catch (error) {
       console.error("❌ Error getting wallet credentials:", error);
@@ -356,17 +365,59 @@ const walletSlice = createSlice({
       console.log("✅ Primary wallet set as active");
     },
 
-    // Set active wallet (for compatibility with existing components)
+    // FIXED: Set active wallet (works with both primary and additional wallets)
     setActiveWallet: (state, action: PayloadAction<string>) => {
-      console.log("🎯 Setting active wallet locally:", action.payload);
+      const walletId = action.payload;
+      console.log("🎯 Setting active wallet locally:", walletId);
 
-      if (action.payload === "primary" && state.wallets.length > 0) {
-        const primaryWallet = state.wallets[0];
-        primaryWallet.isActive = true;
-        state.activeWallet = primaryWallet;
+      // Find wallet in current wallet list
+      const wallet = state.wallets.find((w) => w.id === walletId);
+      if (wallet) {
+        // Update all wallets to be inactive
+        state.wallets.forEach((w) => (w.isActive = false));
+
+        // Set selected wallet as active
+        wallet.isActive = true;
+        state.activeWallet = wallet;
         state.tokens = []; // Clear tokens to trigger fresh fetch
-        console.log("✅ Primary wallet set as active (compatibility mode)");
+
+        // Store active wallet preference in localStorage
+        if (typeof window !== "undefined") {
+          localStorage.setItem("activeWalletId", walletId);
+        }
+
+        console.log("✅ Active wallet updated:", {
+          id: walletId,
+          name: wallet.name,
+          address: wallet.address.slice(0, 10) + "...",
+        });
+      } else {
+        console.error("❌ Wallet not found in current wallet list:", walletId);
       }
+    },
+
+    // NEW: Refresh wallet list (reload from localStorage)
+    refreshWalletList: (state) => {
+      console.log("🔄 Refreshing wallet list from localStorage");
+
+      const allWallets = loadAllWallets();
+      const activeWalletId = state.activeWallet?.id || "primary";
+
+      // Update wallets array
+      state.wallets = allWallets;
+
+      // Find and set active wallet
+      const activeWallet = allWallets.find((w) => w.id === activeWalletId);
+      if (activeWallet) {
+        activeWallet.isActive = true;
+        state.activeWallet = activeWallet;
+      } else if (allWallets.length > 0) {
+        // Fallback to first wallet if active wallet not found
+        allWallets[0].isActive = true;
+        state.activeWallet = allWallets[0];
+      }
+
+      console.log("✅ Wallet list refreshed:", allWallets.length, "wallets");
     },
 
     setTokens: (state, action: PayloadAction<Token[]>) => {
@@ -504,13 +555,7 @@ const walletSlice = createSlice({
       pendingRequests.clear();
 
       // Clear ALL localStorage including wallet credentials
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("primaryWallet");
-        localStorage.removeItem("walletPrivateKey");
-        localStorage.removeItem("walletMnemonic");
-        localStorage.clear();
-        sessionStorage.clear();
-      }
+      SecureWalletStorage.clearAllWalletData();
 
       // Reset to initial state
       Object.assign(state, initialState);
@@ -528,21 +573,18 @@ const walletSlice = createSlice({
       })
       .addCase(initializePrimaryWallet.fulfilled, (state, action) => {
         state.loading = false;
-        const { wallet } = action.payload;
+        const { wallets, primaryWallet } = action.payload;
 
-        state.wallets = [wallet];
-        state.activeWallet = wallet;
+        state.wallets = wallets;
+        state.activeWallet = primaryWallet;
         state.error = null;
 
-        console.log("✅ Primary wallet initialized in state");
+        console.log("✅ Wallet system initialized in state");
       })
       .addCase(initializePrimaryWallet.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
-        console.error(
-          "❌ Failed to initialize primary wallet:",
-          action.payload
-        );
+        console.error("❌ Failed to initialize wallet system:", action.payload);
       });
 
     // Handle setActiveWalletInDB (compatibility)
@@ -567,7 +609,7 @@ const walletSlice = createSlice({
         console.warn("⚠️ Failed to get active wallet from DB:", action.payload);
       });
 
-    // Fetch wallets (compatibility - returns primary wallet)
+    // Fetch wallets
     builder
       .addCase(fetchWallets.pending, (state) => {
         state.loading = true;
@@ -586,15 +628,31 @@ const walletSlice = createSlice({
             name: wallet.walletName || wallet.name,
             address: wallet.walletAddress || wallet.address,
             balance: 0,
-            isActive: true, // Primary wallet is always active
+            isActive: wallet.isDefault || wallet.isPrimary || false,
           }));
 
-          // Set the first (and only) wallet as active
-          if (state.wallets.length > 0) {
+          // Set active wallet (prefer stored preference or primary)
+          const activeWalletId =
+            typeof window !== "undefined"
+              ? localStorage.getItem("activeWalletId")
+              : null;
+
+          if (activeWalletId) {
+            const preferredWallet = state.wallets.find(
+              (w) => w.id === activeWalletId
+            );
+            if (preferredWallet) {
+              state.wallets.forEach((w) => (w.isActive = false));
+              preferredWallet.isActive = true;
+              state.activeWallet = preferredWallet;
+            }
+          } else if (state.wallets.length > 0) {
+            // Fallback to first wallet
+            state.wallets[0].isActive = true;
             state.activeWallet = state.wallets[0];
           }
 
-          console.log("✅ Primary wallet loaded:", state.wallets.length);
+          console.log("✅ All wallets loaded:", state.wallets.length);
         } else {
           // If no wallets, ensure state is clean
           state.wallets = [];
@@ -674,11 +732,11 @@ const walletSlice = createSlice({
 
     // Get wallet credentials
     builder
-      .addCase(getWalletCredentials.fulfilled, (state, action) => {
+      .addCase(getWalletCredentialsById.fulfilled, (state, action) => {
         // Credentials are returned but not stored in Redux state for security
         console.log("✅ Wallet credentials retrieved from localStorage");
       })
-      .addCase(getWalletCredentials.rejected, (state, action) => {
+      .addCase(getWalletCredentialsById.rejected, (state, action) => {
         state.error = action.payload as string;
         console.error("❌ Failed to get wallet credentials:", action.payload);
       });
@@ -689,6 +747,7 @@ export const {
   clearWalletState,
   setPrimaryWalletActive,
   setActiveWallet,
+  refreshWalletList,
   setTokens,
   setTotalBalance,
   updateToken,

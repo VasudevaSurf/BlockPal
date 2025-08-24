@@ -1,4 +1,3 @@
-// src/app/api/wallets/route.ts - FIXED FOR WALLET-FIRST AUTH
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { verifyToken } from "@/lib/auth";
@@ -15,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // For wallet-first auth, we only return the primary wallet
+    // Get user's primary wallet from database
     const user = await db.collection("users").findOne({
       username: decoded.username,
     });
@@ -31,6 +30,7 @@ export async function GET(request: NextRequest) {
       username: user.username,
       walletAddress: user.primaryWalletAddress,
       walletName: "Primary Wallet",
+      name: "Primary Wallet",
       status: "active",
       isDefault: true,
       isPrimary: true,
@@ -53,8 +53,6 @@ export async function POST(request: NextRequest) {
     const token = request.cookies.get("auth-token")?.value;
     const decoded = verifyToken(token);
 
-    // In wallet-first auth, wallet creation is handled during user registration
-    // This endpoint now only handles additional wallet creation (if needed)
     if (!decoded) {
       return NextResponse.json(
         {
@@ -66,15 +64,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { walletAddress, walletName, privateKey, mnemonic } =
+    const { walletAddress, walletName, privateKey, mnemonic, isAdditional } =
       await request.json();
 
-    console.log("🔐 Creating additional wallet:", {
+    console.log("🔐 Creating wallet:", {
       walletAddress: walletAddress?.slice(0, 10) + "...",
       walletName,
       hasPrivateKey: !!privateKey,
       hasMnemonic: !!mnemonic,
       username: decoded.username,
+      isAdditional: isAdditional,
     });
 
     // Validate wallet data
@@ -85,7 +84,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!cryptoService.isValidPrivateKey(privateKey)) {
+    if (privateKey && !cryptoService.isValidPrivateKey(privateKey)) {
       return NextResponse.json(
         { error: "Invalid private key" },
         { status: 400 }
@@ -94,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     const { db } = await connectToDatabase();
 
-    // Check if this wallet is already registered as someone's primary wallet
+    // Check if this wallet is already someone's primary wallet
     const existingUser = await db.collection("users").findOne({
       primaryWalletAddress: walletAddress.toLowerCase(),
     });
@@ -113,106 +112,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For wallet-first auth, we don't actually store additional wallets in DB
-    // The private keys should be managed client-side only
-    // But we can return success for compatibility
+    // For additional wallets (not primary), just return success
+    // The wallet will be stored only in localStorage
+    if (isAdditional) {
+      const walletResponse = {
+        id: "additional-" + Date.now(),
+        username: decoded.username,
+        walletAddress: walletAddress.toLowerCase(),
+        walletName: walletName || "Additional Wallet",
+        name: walletName || "Additional Wallet",
+        status: "active",
+        isDefault: false,
+        isPrimary: false,
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+      };
 
-    const walletResponse = {
-      id: "additional-" + Date.now(),
-      username: decoded.username,
-      walletAddress: walletAddress.toLowerCase(),
-      walletName: walletName || "Additional Wallet",
-      status: "active",
-      isDefault: false,
-      isPrimary: false,
-      createdAt: new Date(),
-      lastUsedAt: new Date(),
-    };
+      console.log("✅ Additional wallet created (client-side only):", {
+        walletId: walletResponse.id,
+        address: walletAddress.slice(0, 10) + "...",
+      });
 
-    console.log("✅ Additional wallet processed:", {
-      walletId: walletResponse.id,
-      address: walletAddress.slice(0, 10) + "...",
-    });
+      return NextResponse.json({
+        wallet: walletResponse,
+        message: "Additional wallet created (stored client-side only)",
+        storeInLocalStorage: true,
+      });
+    }
 
-    return NextResponse.json({
-      wallet: walletResponse,
-      message: "Additional wallet processed (stored client-side only)",
-    });
+    // For primary wallet, this should have been handled during user creation
+    console.log(
+      "⚠️ Primary wallet creation should happen during user registration"
+    );
+
+    return NextResponse.json(
+      {
+        error: "Primary wallet should be created during user registration",
+        code: "INVALID_OPERATION",
+      },
+      { status: 400 }
+    );
   } catch (error) {
     console.error("💥 Create wallet error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-// src/app/api/wallets/private-key/route.ts - FIXED FOR WALLET-FIRST AUTH
-import { NextRequest, NextResponse } from "next/server";
-import { verifyToken } from "@/lib/auth";
-
-export async function POST(request: NextRequest) {
-  try {
-    const token = request.cookies.get("auth-token")?.value;
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { walletAddress } = await request.json();
-
-    console.log("🔑 Private key request (wallet-first auth):", {
-      walletAddress: walletAddress?.slice(0, 10) + "...",
-      username: decoded.username,
-    });
-
-    // In wallet-first auth, private keys are stored client-side only
-    // This endpoint should instruct the client to get them from localStorage
-    return NextResponse.json({
-      success: true,
-      message: "Private keys are stored client-side only",
-      instruction: "RETRIEVE_FROM_LOCALSTORAGE",
-      walletAddress,
-    });
-  } catch (error) {
-    console.error("💥 Get private key error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const token = request.cookies.get("auth-token")?.value;
-    const decoded = verifyToken(token);
-
-    if (!decoded) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const walletAddress = searchParams.get("walletAddress");
-
-    if (!walletAddress) {
-      return NextResponse.json(
-        { error: "Wallet address required" },
-        { status: 400 }
-      );
-    }
-
-    // For wallet-first auth, credentials are always stored client-side
-    return NextResponse.json({
-      hasPrivateKey: true, // Assume true since wallet-first auth requires it
-      hasMnemonic: true, // May or may not exist, but indicate support
-      hasEncryptedCredentials: false, // Not stored server-side
-      requiresPassword: false, // No server-side encryption
-      clientSideStorage: true, // Indicate credentials are client-side
-    });
-  } catch (error) {
-    console.error("💥 Check credentials error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

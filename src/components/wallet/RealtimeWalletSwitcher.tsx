@@ -1,4 +1,4 @@
-// src/components/wallet/RealtimeWalletSwitcher.tsx - ENHANCED WITH CREDENTIAL OPTIONS
+// src/components/wallet/RealtimeWalletSwitcher.tsx - FIXED WITH PROPER SWITCHING
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -24,7 +24,7 @@ import { RootState, AppDispatch } from "@/store";
 import {
   setActiveWallet,
   setActiveWalletInDB,
-  fetchWallets,
+  refreshWalletList, // NEW: Import refreshWalletList
   fetchWalletTokens,
   updateWalletBalance,
   clearTokens,
@@ -34,6 +34,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import WalletWelcomeModal from "@/components/dashboard/WalletWelcomeModal";
 import { sendPasswordResetEmail, EmailData } from "@/lib/emailjs";
+import { SecureWalletStorage } from "@/lib/wallet-security";
 
 interface RealtimeWalletSwitcherProps {
   isOpen: boolean;
@@ -47,7 +48,6 @@ interface WalletCredentials {
   mnemonic?: string;
 }
 
-// UPDATED: Added credential selection step
 type CredentialsStep =
   | "list"
   | "verify"
@@ -55,7 +55,6 @@ type CredentialsStep =
   | "select_credential"
   | "display";
 
-// UPDATED: Added credential type
 type CredentialType = "privateKey" | "mnemonic";
 
 // Skeleton Loader Component
@@ -88,7 +87,7 @@ export default function RealtimeWalletSwitcher({
   const { user } = useSelector((state: RootState) => state.auth);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Use the real-time wallet balances hook
+  // Real-time wallet balances hook
   const { realtimeBalances, isMonitoring, lastUpdateTime, refreshAllWallets } =
     useRealtimeWalletBalances();
 
@@ -101,7 +100,7 @@ export default function RealtimeWalletSwitcher({
     width: 280,
   });
 
-  // UPDATED: Enhanced credentials state
+  // Credentials state
   const [credentialsStep, setCredentialsStep] =
     useState<CredentialsStep>("list");
   const [selectedWalletForCredentials, setSelectedWalletForCredentials] =
@@ -128,7 +127,7 @@ export default function RealtimeWalletSwitcher({
   const [renameFeedback, setRenameFeedback] = useState<string>("");
   const [savingRename, setSavingRename] = useState(false);
 
-  // Persist local wallet names across wallet switches
+  // Persist local wallet names
   const [localWalletNames, setLocalWalletNames] = useState<
     Record<string, string>
   >(() => {
@@ -143,14 +142,21 @@ export default function RealtimeWalletSwitcher({
     return {};
   });
 
-  // Get user profile for auth provider info
   const [userProfile, setUserProfile] = useState<any>(null);
+
+  // NEW: Track wallet switching state to prevent multiple simultaneous switches
+  const [isSwitchingWallet, setIsSwitchingWallet] = useState(false);
+  const switchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       fetchUserProfile();
 
-      // Clean up any old/invalid wallet name overrides when modal opens
+      // NEW: Refresh wallet list when modal opens to get latest wallets
+      console.log("🔄 Refreshing wallet list on modal open...");
+      dispatch(refreshWalletList());
+
+      // Clean up any old wallet name overrides
       if (typeof window !== "undefined" && wallets.length > 0) {
         try {
           const stored = sessionStorage.getItem("walletNameOverrides");
@@ -185,7 +191,7 @@ export default function RealtimeWalletSwitcher({
         }
       }
     }
-  }, [isOpen, wallets.length]);
+  }, [isOpen, wallets.length, dispatch]);
 
   const fetchUserProfile = async () => {
     try {
@@ -220,7 +226,7 @@ export default function RealtimeWalletSwitcher({
         rightEdge = headerRect.right;
       }
 
-      const dropdownHeight = 450; // Increased height for credential selection
+      const dropdownHeight = 450;
       const viewportHeight = window.innerHeight;
       const spaceBelow = viewportHeight - triggerRect.bottom;
       const spaceAbove = triggerRect.top;
@@ -244,9 +250,7 @@ export default function RealtimeWalletSwitcher({
   // Outside click handling
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (walletModalOpen) {
-        return;
-      }
+      if (walletModalOpen) return;
 
       const walletModalElement = document.querySelector("[data-wallet-modal]");
       if (
@@ -276,7 +280,7 @@ export default function RealtimeWalletSwitcher({
     }
   }, [isOpen, onClose, triggerRef, walletModalOpen]);
 
-  // Enhanced close handler to reset credentials state
+  // Enhanced close handler
   const handleClose = () => {
     setCredentialsStep("list");
     setSelectedWalletForCredentials(null);
@@ -338,48 +342,149 @@ export default function RealtimeWalletSwitcher({
     }
   };
 
-  // Enhanced wallet selection
+  // ENHANCED: Wallet selection with proper switching for additional wallets
   const handleSelectWallet = async (walletId: string) => {
     console.log("🎯 RealtimeWalletSwitcher - Wallet selected:", walletId);
 
-    if (switchingWallet === walletId) {
-      console.log("⚠️ Already switching to this wallet, ignoring");
+    // Prevent multiple simultaneous wallet switches
+    if (isSwitchingWallet) {
+      console.log("⚠️ Already switching wallets, ignoring request");
       return;
     }
 
+    // Find the selected wallet
     const selectedWallet = wallets.find((w) => w.id === walletId);
     if (!selectedWallet) {
-      console.error("❌ Selected wallet not found:", walletId);
+      console.error("❌ Selected wallet not found in Redux state");
       return;
     }
 
-    setSwitchingWallet(walletId);
+    // Get current wallet for event emission
+    const currentWalletAddress = activeWallet?.address;
+
+    // Set switching state
+    setIsSwitchingWallet(true);
+
+    // Clear any existing timeout
+    if (switchingTimeoutRef.current) {
+      clearTimeout(switchingTimeoutRef.current);
+    }
 
     try {
-      dispatch(setActiveWallet(walletId));
-      dispatch(clearTokens());
+      console.log(
+        "🔄 RealtimeWalletSwitcher - Emitting wallet switch start event",
+        {
+          from: currentWalletAddress,
+          to: selectedWallet.address,
+        }
+      );
 
-      const [dbResult, tokensResult, balanceResult] = await Promise.allSettled([
-        dispatch(setActiveWalletInDB(walletId)),
+      // NEW: Emit wallet switch start event BEFORE any other actions
+      window.dispatchEvent(
+        new CustomEvent("walletSwitchStart", {
+          detail: {
+            fromWallet: currentWalletAddress,
+            toWallet: selectedWallet.address,
+            source: "wallet-switcher",
+          },
+        })
+      );
+
+      // Step 1: Set active wallet locally first
+      dispatch(setActiveWallet(walletId));
+
+      // Step 2: Clear existing tokens to show loading state
+      dispatch(clearTokens());
+      console.log("🧹 Cleared existing tokens");
+
+      // Step 3: Sync with database (for compatibility)
+      await dispatch(setActiveWalletInDB(walletId));
+      console.log("💾 Synced with database");
+
+      // Step 4: Load fresh data for the new wallet
+      console.log("📡 Loading fresh data for:", selectedWallet.address);
+
+      const [tokensResult, balanceResult] = await Promise.all([
         dispatch(fetchWalletTokens(selectedWallet.address)),
         dispatch(updateWalletBalance(selectedWallet.address)),
       ]);
 
-      if (onWalletSelect) {
-        onWalletSelect(walletId).catch((error) => {
-          console.warn("⚠️ onWalletSelect callback failed:", error);
-        });
+      const tokensSuccess =
+        tokensResult.type === "wallet/fetchWalletTokens/fulfilled";
+      const balanceSuccess =
+        balanceResult.type === "wallet/updateWalletBalance/fulfilled";
+
+      if (tokensSuccess && balanceSuccess) {
+        console.log("✅ Wallet data loaded successfully");
+      } else {
+        console.warn("⚠️ Some wallet data may not have loaded properly");
       }
 
+      // Step 5: Notify parent component if provided
+      if (onWalletSelect) {
+        try {
+          await onWalletSelect(walletId);
+          console.log("✅ Parent onWalletSelect callback completed");
+        } catch (error) {
+          console.warn("⚠️ onWalletSelect callback failed:", error);
+        }
+      }
+
+      // Step 6: Force refresh dashboard if available
+      if (refreshAllWallets) {
+        setTimeout(() => {
+          refreshAllWallets();
+        }, 500);
+      }
+
+      // NEW: Emit wallet switch completion event after a short delay
+      setTimeout(() => {
+        console.log(
+          "✅ RealtimeWalletSwitcher - Emitting wallet switch complete event"
+        );
+        window.dispatchEvent(
+          new CustomEvent("walletSwitchComplete", {
+            detail: {
+              walletAddress: selectedWallet.address,
+              walletId: selectedWallet.id,
+              source: "wallet-switcher",
+            },
+          })
+        );
+      }, 100);
+
+      // Close the modal
       handleClose();
     } catch (error) {
       console.error("❌ Failed to switch wallet:", error);
+
+      // Emit error event
+      window.dispatchEvent(
+        new CustomEvent("walletSwitchError", {
+          detail: {
+            error: error,
+            walletId: walletId,
+            source: "wallet-switcher",
+          },
+        })
+      );
     } finally {
-      setTimeout(() => {
-        setSwitchingWallet(null);
-      }, 100);
+      // Reset switching state after a delay to ensure all components have updated
+      switchingTimeoutRef.current = setTimeout(() => {
+        setIsSwitchingWallet(false);
+        switchingTimeoutRef.current = null;
+      }, 1000);
     }
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (switchingTimeoutRef.current) {
+        clearTimeout(switchingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle copy wallet address
   const handleCopyAddress = async (e: React.MouseEvent, wallet: any) => {
@@ -399,268 +504,49 @@ export default function RealtimeWalletSwitcher({
     }
   };
 
-  // Handle rename wallet
-  const handleRenameWallet = (e: React.MouseEvent, wallet: any) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("✏️ Rename wallet:", wallet.name);
-
-    setShowRenameInput(wallet.id);
-    setNewWalletName(wallet.name);
-  };
-
-  // Save wallet rename
-  const saveWalletRename = async (walletId: string) => {
-    if (!newWalletName.trim()) {
-      setError("Wallet name cannot be empty");
-      return;
-    }
-
-    setSavingRename(true);
-
-    try {
-      const response = await fetch("/api/wallets/rename", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          walletId: walletId,
-          newName: newWalletName.trim(),
-        }),
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to rename wallet");
-      }
-
-      const responseData = await response.json();
-      console.log("✅ Wallet renamed successfully:", responseData);
-
-      const trimmedName = newWalletName.trim();
-      updateLocalWalletName(walletId, trimmedName);
-
-      setRenameFeedback(walletId);
-      setShowRenameInput(null);
-      setNewWalletName("");
-      setError("");
-
-      setTimeout(() => {
-        setRenameFeedback("");
-      }, 3000);
-
-      // Background verification process
-      const verifyAndClearOverride = async (attempt = 1, maxAttempts = 5) => {
-        console.log(`🔍 Verification attempt ${attempt}/${maxAttempts}`);
-
-        try {
-          await dispatch(fetchWallets());
-
-          if (refreshAllWallets) {
-            await refreshAllWallets();
-            await new Promise((resolve) => setTimeout(resolve, 300));
-          }
-
-          const currentWallet = realtimeBalances.find((w) => w.id === walletId);
-          console.log(`🔍 Real data check:`, {
-            expected: trimmedName,
-            actual: currentWallet?.name,
-            matches: currentWallet?.name === trimmedName,
-          });
-
-          if (currentWallet && currentWallet.name === trimmedName) {
-            console.log(
-              "✅ Real data confirmed updated! Clearing local override."
-            );
-            clearLocalWalletName(walletId);
-            return true;
-          } else {
-            if (attempt < maxAttempts) {
-              const delay = Math.min(2000 * attempt, 10000);
-              console.log(
-                `⏳ Real data not ready yet, retrying in ${delay}ms...`
-              );
-              setTimeout(() => {
-                verifyAndClearOverride(attempt + 1, maxAttempts);
-              }, delay);
-            } else {
-              console.warn(
-                "⚠️ Max verification attempts reached. Keeping local override permanently."
-              );
-            }
-            return false;
-          }
-        } catch (error) {
-          console.error(`❌ Verification attempt ${attempt} failed:`, error);
-          if (attempt < maxAttempts) {
-            setTimeout(() => {
-              verifyAndClearOverride(attempt + 1, maxAttempts);
-            }, 3000);
-          }
-          return false;
-        }
-      };
-
-      setTimeout(() => {
-        verifyAndClearOverride();
-      }, 2000);
-    } catch (error: any) {
-      console.error("❌ Error renaming wallet:", error);
-      setError(error.message || "Failed to rename wallet");
-    } finally {
-      setSavingRename(false);
-    }
-  };
-
-  // Cancel wallet rename
-  const cancelWalletRename = () => {
-    setShowRenameInput(null);
-    setNewWalletName("");
-    setError("");
-  };
-
-  // UPDATED: Handle show credentials - go to verification step first
+  // Handle show credentials
   const handleShowCredentials = (e: React.MouseEvent, wallet: any) => {
     e.preventDefault();
     e.stopPropagation();
     console.log("🔑 Show credentials for wallet:", wallet.name);
 
     setSelectedWalletForCredentials(wallet);
-    setCredentialsStep(isGoogleOnlyUser ? "email_verify" : "verify");
-    setError("");
-  };
 
-  // Send email verification for Google users
-  const sendEmailVerification = async () => {
-    if (!userProfile?.gmail) {
-      setError("Email not available");
-      return;
-    }
-
-    setSendingEmail(true);
-    setError("");
-
-    try {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedEmailCode(code);
-
-      const emailData: EmailData = {
-        to_email: userProfile.gmail,
-        to_name: userProfile.displayName || "User",
-        reset_code: code,
-        app_name: "Blockpal - Wallet Access",
-      };
-
-      const emailSent = await sendPasswordResetEmail(emailData);
-
-      if (!emailSent) {
-        throw new Error("Failed to send verification email");
+    // For additional wallets, get credentials directly from localStorage
+    if (wallet.isAdditional) {
+      const additionalWallets = SecureWalletStorage.getAdditionalWallets();
+      const additionalWallet = additionalWallets.find(
+        (w) => w.id === wallet.id
+      );
+      if (additionalWallet) {
+        setCredentials({
+          privateKey: additionalWallet.privateKey,
+          mnemonic: additionalWallet.mnemonic,
+        });
+        setCredentialsStep("select_credential");
+      } else {
+        setError("Additional wallet credentials not found");
       }
+    } else {
+      // For primary wallet, check if credentials are in localStorage
+      const primaryCredentials =
+        SecureWalletStorage.getPrimaryWalletCredentials();
 
-      console.log("✅ Verification email sent successfully");
-      console.log("🔑 Code for testing:", code);
-    } catch (error: any) {
-      console.error("❌ Error sending verification email:", error);
-      setError("Failed to send verification email. Please try again.");
-    } finally {
-      setSendingEmail(false);
-    }
-  };
-
-  // Handle email verification
-  const handleEmailVerification = async () => {
-    if (!emailCode.trim() || emailCode.length !== 6) {
-      setError("Please enter the 6-digit code");
-      return;
-    }
-
-    if (emailCode !== generatedEmailCode) {
-      setError("Invalid verification code");
-      return;
-    }
-
-    console.log("✅ Email verification successful");
-    setError("");
-    await fetchWalletCredentials("GOOGLE_USER_VERIFIED");
-  };
-
-  // Handle password verification
-  const handlePasswordVerification = async () => {
-    if (!password.trim()) {
-      setError("Password is required");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/profile/verify-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError("Incorrect password. Please try again.");
-        setLoading(false);
-        return;
+      if (primaryCredentials) {
+        setCredentials({
+          privateKey: primaryCredentials.privateKey,
+          mnemonic: primaryCredentials.mnemonic,
+        });
+        setCredentialsStep("select_credential");
+      } else {
+        setCredentialsStep(isGoogleOnlyUser ? "email_verify" : "verify");
       }
-
-      await fetchWalletCredentials(password);
-    } catch (error: any) {
-      console.error("❌ Error verifying password:", error);
-      setError("Network error occurred. Please try again.");
-      setLoading(false);
-    }
-  };
-
-  // UPDATED: Fetch wallet credentials and go to selection step
-  const fetchWalletCredentials = async (authValue: string) => {
-    if (!selectedWalletForCredentials) {
-      setError("No wallet selected");
-      return;
     }
 
     setError("");
-
-    try {
-      const response = await fetch("/api/wallets/private-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          walletAddress: selectedWalletForCredentials.address,
-          password: authValue,
-        }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Failed to retrieve wallet credentials");
-        return;
-      }
-
-      setCredentials({
-        privateKey: data.privateKey,
-        mnemonic: data.mnemonic,
-      });
-
-      // UPDATED: Go to selection step instead of display
-      setCredentialsStep("select_credential");
-    } catch (error: any) {
-      console.error("❌ Error fetching wallet credentials:", error);
-      setError("Network error occurred. Please try again.");
-    } finally {
-      setLoading(false);
-    }
   };
 
-  // NEW: Handle credential type selection
+  // Handle credential selection
   const handleCredentialSelection = (credentialType: CredentialType) => {
     setSelectedCredentialType(credentialType);
     setCredentialsStep("display");
@@ -677,7 +563,7 @@ export default function RealtimeWalletSwitcher({
     }
   };
 
-  // NEW: Download credentials
+  // Download credentials
   const downloadCredentials = () => {
     if (!credentials || !selectedWalletForCredentials) return;
 
@@ -745,7 +631,10 @@ Keep this information safe and secure!`;
 
   // Handle wallet creation
   const handleWalletCreated = () => {
-    dispatch(fetchWallets());
+    // NEW: Refresh wallet list when a new wallet is created
+    console.log("🔄 Refreshing wallet list after wallet creation...");
+    dispatch(refreshWalletList());
+
     setWalletModalOpen(false);
     setTimeout(() => {
       handleClose();
@@ -783,6 +672,12 @@ Keep this information safe and secure!`;
 
   if (!isOpen) return null;
 
+  console.log("🎨 RealtimeWalletSwitcher render:", {
+    walletsCount: wallets.length,
+    activeWallet: activeWallet?.id,
+    isSwitchingWallet,
+  });
+
   return (
     <>
       {/* Backdrop */}
@@ -811,7 +706,7 @@ Keep this information safe and secure!`;
             </button>
           ) : (
             <h3 className="text-white font-semibold text-sm font-satoshi">
-              Wallet Manager
+              Wallet Manager ({wallets.length})
             </h3>
           )}
 
@@ -829,11 +724,12 @@ Keep this information safe and secure!`;
             {/* Wallets List */}
             <div className="px-3 py-2 max-h-[280px] overflow-y-auto scrollbar-hide">
               <div className="space-y-1.5">
-                {realtimeBalances.map((wallet, index) => {
+                {wallets.map((wallet, index) => {
                   const isActive = activeWallet?.id === wallet.id;
-                  const isSwitching = switchingWallet === wallet.id;
+                  const isSwitchingThisWallet =
+                    switchingWallet === wallet.id || isSwitchingWallet;
 
-                  if (isSwitching) {
+                  if (isSwitchingThisWallet) {
                     return <WalletSkeleton key={`${wallet.id}-skeleton`} />;
                   }
 
@@ -852,64 +748,48 @@ Keep this information safe and secure!`;
                           <span className="text-white text-xs font-bold font-satoshi">
                             {getWalletLetters(wallet.name)}
                           </span>
+                          {/* Additional wallet indicator */}
+                          {(wallet as any).isAdditional && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#E2AF19] rounded-full flex items-center justify-center">
+                              <Plus size={8} className="text-black" />
+                            </div>
+                          )}
                         </div>
 
                         {/* Divider */}
                         <div className="w-px h-3 bg-[#6E6E6E] mx-2.5 flex-shrink-0"></div>
 
-                        {/* Wallet Info - Clickable for switching OR Rename Input */}
-                        {showRenameInput === wallet.id ? (
-                          <Input
-                            type="text"
-                            value={newWalletName}
-                            onChange={(e) => setNewWalletName(e.target.value)}
-                            className="flex-1 text-xs p-1.5 h-7"
-                            placeholder="Enter wallet name"
-                            autoFocus
-                            disabled={savingRename}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                saveWalletRename(wallet.id);
-                              } else if (e.key === "Escape") {
-                                cancelWalletRename();
-                              }
-                            }}
-                          />
-                        ) : (
-                          <button
-                            onClick={() => handleSelectWallet(wallet.id)}
-                            disabled={isSwitching || switchingWallet !== null}
-                            className={`flex-1 min-w-0 overflow-hidden text-left hover:opacity-80 transition-opacity disabled:cursor-not-allowed ${
-                              switchingWallet !== null && !isSwitching
-                                ? "opacity-50"
-                                : ""
-                            }`}
-                          >
-                            <div className="text-white font-medium text-xs font-satoshi truncate flex items-center">
-                              {localWalletNames[wallet.id] || wallet.name}
-                              {copyFeedback === wallet.id && (
-                                <span className="text-[#E2AF19] ml-2 flex items-center">
-                                  <Check size={12} className="mr-1" />
-                                  Copied!
-                                </span>
-                              )}
-                              {renameFeedback === wallet.id && (
-                                <span className="text-[#E2AF19] ml-2 flex items-center">
-                                  <Check size={12} className="mr-1" />
-                                  Renamed!
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-gray-400 text-[10px] font-satoshi truncate">
-                              {wallet.address
-                                ? `${wallet.address.slice(
-                                    0,
-                                    6
-                                  )}...${wallet.address.slice(-4)}`
-                                : "Loading..."}
-                            </div>
-                          </button>
-                        )}
+                        {/* Wallet Info - Clickable for switching */}
+                        <button
+                          onClick={() => handleSelectWallet(wallet.id)}
+                          disabled={isSwitchingThisWallet}
+                          className={`flex-1 min-w-0 overflow-hidden text-left hover:opacity-80 transition-opacity disabled:cursor-not-allowed ${
+                            isSwitchingThisWallet ? "opacity-50" : ""
+                          }`}
+                        >
+                          <div className="text-white font-medium text-xs font-satoshi truncate flex items-center">
+                            {localWalletNames[wallet.id] || wallet.name}
+                            {(wallet as any).isAdditional && (
+                              <span className="ml-1 text-[#E2AF19] text-[10px]">
+                                +
+                              </span>
+                            )}
+                            {copyFeedback === wallet.id && (
+                              <span className="text-[#E2AF19] ml-2 flex items-center">
+                                <Check size={12} className="mr-1" />
+                                Copied!
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-gray-400 text-[10px] font-satoshi truncate">
+                            {wallet.address
+                              ? `${wallet.address.slice(
+                                  0,
+                                  6
+                                )}...${wallet.address.slice(-4)}`
+                              : "Loading..."}
+                          </div>
+                        </button>
 
                         {/* Wallet Action Buttons */}
                         <div className="flex items-center gap-1 ml-2">
@@ -921,36 +801,6 @@ Keep this information safe and secure!`;
                           >
                             <Copy size={14} />
                           </button>
-
-                          {/* Rename Button OR Save Button */}
-                          {showRenameInput === wallet.id ? (
-                            <button
-                              onClick={() => saveWalletRename(wallet.id)}
-                              disabled={savingRename || !newWalletName.trim()}
-                              className={`transition-colors p-1 hover:bg-[#2C2C2C] rounded ${
-                                savingRename || !newWalletName.trim()
-                                  ? "text-gray-600 cursor-not-allowed"
-                                  : "text-[#E2AF19] hover:text-[#E2AF19]"
-                              }`}
-                              title={
-                                savingRename ? "Saving..." : "Save wallet name"
-                              }
-                            >
-                              {savingRename ? (
-                                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-[#E2AF19]"></div>
-                              ) : (
-                                <Check size={14} />
-                              )}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={(e) => handleRenameWallet(e, wallet)}
-                              className="text-gray-400 hover:text-[#E2AF19] transition-colors p-1 hover:bg-[#2C2C2C] rounded"
-                              title="Rename wallet"
-                            >
-                              <Edit3 size={14} />
-                            </button>
-                          )}
 
                           {/* Credentials Button */}
                           <button
@@ -988,132 +838,12 @@ Keep this information safe and secure!`;
           </>
         )}
 
-        {/* Password Verification Step */}
-        {credentialsStep === "verify" && (
-          <div className="p-3 space-y-3">
-            <div className="text-center">
-              <div className="w-10 h-10 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                <Shield size={20} className="text-[#E2AF19]" />
-              </div>
-              <h4 className="text-white font-semibold font-satoshi text-sm mb-1">
-                Verify Your Password
-              </h4>
-              <p className="text-gray-400 text-xs font-satoshi">
-                Enter your account password to view wallet credentials
-              </p>
-            </div>
-
-            {error && (
-              <div className="p-2 bg-red-900/20 border border-red-500/50 rounded-lg">
-                <p className="text-red-400 text-xs font-satoshi">{error}</p>
-              </div>
-            )}
-
-            <Input
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError("");
-              }}
-              className="font-satoshi text-sm"
-              autoFocus
-              disabled={loading}
-            />
-
-            <Button
-              onClick={handlePasswordVerification}
-              disabled={loading || !password.trim()}
-              className="w-full text-sm"
-            >
-              {loading ? "Verifying..." : "Verify Password"}
-            </Button>
-          </div>
-        )}
-
-        {/* Email Verification Step */}
-        {credentialsStep === "email_verify" && (
-          <div className="p-3 space-y-3">
-            <div className="text-center">
-              <div className="w-10 h-10 bg-[#E2AF19]/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                <Mail size={20} className="text-[#E2AF19]" />
-              </div>
-              <h4 className="text-white font-semibold font-satoshi text-sm mb-1">
-                Verify Your Email
-              </h4>
-              <p className="text-gray-400 text-xs font-satoshi">
-                We'll send a verification code to your email
-              </p>
-            </div>
-
-            {error && (
-              <div className="p-2 bg-red-900/20 border border-red-500/50 rounded-lg">
-                <p className="text-red-400 text-xs font-satoshi">{error}</p>
-              </div>
-            )}
-
-            {!generatedEmailCode ? (
-              <Button
-                onClick={sendEmailVerification}
-                disabled={sendingEmail}
-                className="w-full text-sm"
-              >
-                {sendingEmail ? "Sending Code..." : "Send Verification Code"}
-              </Button>
-            ) : (
-              <div className="space-y-3">
-                <div className="text-center">
-                  <p className="text-gray-400 text-xs font-satoshi">
-                    Code sent to <strong>{userProfile?.gmail}</strong>
-                  </p>
-                </div>
-
-                <Input
-                  type="text"
-                  placeholder="000000"
-                  value={emailCode}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, "").slice(0, 6);
-                    setEmailCode(value);
-                    setError("");
-                  }}
-                  className="font-satoshi text-center text-lg tracking-widest"
-                  maxLength={6}
-                  autoFocus
-                />
-
-                <Button
-                  onClick={handleEmailVerification}
-                  disabled={emailCode.length !== 6}
-                  className="w-full text-sm"
-                >
-                  Verify Code
-                </Button>
-
-                <div className="text-center">
-                  <button
-                    onClick={sendEmailVerification}
-                    className="text-[#E2AF19] hover:opacity-80 text-xs font-satoshi"
-                    disabled={sendingEmail}
-                  >
-                    {sendingEmail ? "Sending..." : "Send again"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* NEW: Credential Selection Step */}
+        {/* Credential Selection Step */}
         {credentialsStep === "select_credential" &&
           credentials &&
           selectedWalletForCredentials && (
             <div className="p-3 space-y-3">
               <div className="text-center">
-                {/* <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <CheckCircle size={20} className="text-[#E2AF19]" />
-                </div> */}
                 <h4 className="text-white font-semibold font-satoshi text-sm mb-1">
                   {selectedWalletForCredentials.name}
                 </h4>
@@ -1121,20 +851,6 @@ Keep this information safe and secure!`;
                   Choose which credential to view
                 </p>
               </div>
-
-              {/* Security Warning */}
-              {/* <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2">
-                <div className="flex items-start">
-                  <AlertTriangle
-                    size={12}
-                    className="text-red-400 mr-1.5 flex-shrink-0 mt-0.5"
-                  />
-                  <p className="text-red-400 text-xs font-satoshi">
-                    Never share these credentials. Anyone with this information
-                    can control your wallet.
-                  </p>
-                </div>
-              </div> */}
 
               {/* Credential Options */}
               <div className="space-y-2">
@@ -1224,20 +940,6 @@ Keep this information safe and secure!`;
                 </p>
               </div>
 
-              {/* Security Warning */}
-              {/* <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2">
-                <div className="flex items-start">
-                  <AlertTriangle
-                    size={12}
-                    className="text-red-400 mr-1.5 flex-shrink-0 mt-0.5"
-                  />
-                  <p className="text-red-400 text-xs font-satoshi">
-                    Keep this information secure and private. Never share it
-                    with anyone.
-                  </p>
-                </div>
-              </div> */}
-
               {/* Credential Display */}
               <div className="bg-[#0F0F0F] rounded-lg p-2 border border-[#2C2C2C]">
                 <div className="flex items-center justify-between mb-1">
@@ -1299,21 +1001,6 @@ Keep this information safe and secure!`;
                 </div>
               </div>
 
-              {/* Wallet Info */}
-              {/* <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-2">
-                <div className="space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-400 text-xs font-satoshi">
-                      Address:
-                    </span>
-                    <span className="text-blue-300 text-xs font-satoshi font-mono">
-                      {selectedWalletForCredentials.address.slice(0, 8)}...
-                      {selectedWalletForCredentials.address.slice(-6)}
-                    </span>
-                  </div>
-                </div>
-              </div> */}
-
               {/* Action Buttons */}
               <div className="flex gap-2">
                 <Button
@@ -1332,7 +1019,7 @@ Keep this information safe and secure!`;
           )}
       </div>
 
-      {/* Wallet Welcome Modal */}
+      {/* Wallet Welcome Modal for Additional Wallets */}
       {walletModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -1349,6 +1036,7 @@ Keep this information safe and secure!`;
               onClose={handleWalletModalClose}
               userName={user?.displayName || user?.name || "User"}
               onWalletCreated={handleWalletCreated}
+              isAdditionalWallet={true} // NEW: Pass flag to indicate this is for additional wallets
             />
           </div>
         </div>

@@ -1,8 +1,8 @@
-// src/components/dashboard/WalletWelcomeModal.tsx - FIXED FOR WALLET-FIRST AUTH
+// src/components/dashboard/WalletWelcomeModal.tsx - FIXED FOR ADDITIONAL WALLETS
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "@/store";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/store";
 import { createWalletUser, verifyWalletUser } from "@/store/slices/authSlice";
 import {
   SecureWalletStorage,
@@ -36,6 +36,19 @@ interface WalletWelcomeModalProps {
   userName?: string;
   onWalletCreated: () => void;
   onWalletExists?: (walletData: any) => void;
+  isAdditionalWallet?: boolean; // NEW: Flag to indicate this is for adding additional wallets
+}
+
+interface WalletData {
+  address: string;
+  privateKey: string;
+  mnemonic?: string;
+}
+
+interface CredentialsData {
+  username: string;
+  password: string;
+  confirmPassword: string;
 }
 
 type Step =
@@ -46,13 +59,8 @@ type Step =
   | "create-wallet"
   | "wallet-created"
   | "existing-wallet-login"
-  | "register-credentials";
-
-interface WalletData {
-  address: string;
-  privateKey: string;
-  mnemonic?: string;
-}
+  | "register-credentials"
+  | "additional-wallet-created"; // NEW: Step for additional wallet creation
 
 export default function WalletWelcomeModal({
   isOpen,
@@ -60,9 +68,11 @@ export default function WalletWelcomeModal({
   userName = "User",
   onWalletCreated,
   onWalletExists,
+  isAdditionalWallet = false, // NEW: Default to false
 }: WalletWelcomeModalProps) {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
+  const { user } = useSelector((state: RootState) => state.auth);
   const modalRef = useRef<HTMLDivElement>(null);
 
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
@@ -84,7 +94,7 @@ export default function WalletWelcomeModal({
   );
 
   // Registration states
-  const [registrationData, setRegistrationData] = useState({
+  const [registrationData, setRegistrationData] = useState<CredentialsData>({
     username: "",
     password: "",
     confirmPassword: "",
@@ -146,8 +156,14 @@ export default function WalletWelcomeModal({
     onClose();
   };
 
-  // Check if wallet exists in database as primary wallet
+  // Check if wallet exists in database as primary wallet (only for first wallet)
   const checkWalletExists = async (walletAddress: string) => {
+    if (isAdditionalWallet) {
+      // For additional wallets, we don't need to check if it's a primary wallet
+      // We just need to validate the wallet
+      return { exists: false };
+    }
+
     try {
       const response = await fetch("/api/auth/check-primary-wallet", {
         method: "POST",
@@ -184,7 +200,14 @@ export default function WalletWelcomeModal({
       };
 
       setGeneratedWallet(walletData);
-      setCurrentStep("wallet-created");
+
+      // For additional wallets, go directly to creation step
+      if (isAdditionalWallet) {
+        setCurrentStep("additional-wallet-created");
+      } else {
+        setCurrentStep("wallet-created");
+      }
+
       console.log("✅ Wallet generated successfully");
     } catch (err: any) {
       console.error("Wallet generation error:", err);
@@ -226,12 +249,18 @@ export default function WalletWelcomeModal({
         mnemonic: recoveryPhrase,
       };
 
+      // For additional wallets, go directly to creation
+      if (isAdditionalWallet) {
+        setGeneratedWallet(walletData);
+        setCurrentStep("additional-wallet-created");
+        return;
+      }
+
       // Check if wallet exists as primary wallet
       const checkResult = await checkWalletExists(wallet.address);
 
       if (checkResult.exists) {
         console.log("🔍 Existing primary wallet detected");
-        // Wallet exists, go to login flow
         setExistingWalletData(walletData);
         setLoginData({
           username: checkResult.username,
@@ -240,7 +269,6 @@ export default function WalletWelcomeModal({
         setCurrentStep("existing-wallet-login");
       } else {
         console.log("🆕 New wallet, proceeding to registration");
-        // New wallet, proceed to registration
         setGeneratedWallet(walletData);
         setCurrentStep("register-credentials");
       }
@@ -277,12 +305,18 @@ export default function WalletWelcomeModal({
         privateKey: wallet.privateKey,
       };
 
+      // For additional wallets, go directly to creation
+      if (isAdditionalWallet) {
+        setGeneratedWallet(walletData);
+        setCurrentStep("additional-wallet-created");
+        return;
+      }
+
       // Check if wallet exists as primary wallet
       const checkResult = await checkWalletExists(wallet.address);
 
       if (checkResult.exists) {
         console.log("🔍 Existing primary wallet detected");
-        // Wallet exists, go to login flow
         setExistingWalletData(walletData);
         setLoginData({
           username: checkResult.username,
@@ -291,7 +325,6 @@ export default function WalletWelcomeModal({
         setCurrentStep("existing-wallet-login");
       } else {
         console.log("🆕 New wallet, proceeding to registration");
-        // New wallet, proceed to registration
         setGeneratedWallet(walletData);
         setCurrentStep("register-credentials");
       }
@@ -303,7 +336,54 @@ export default function WalletWelcomeModal({
     }
   };
 
-  // Handle user registration
+  // NEW: Handle additional wallet creation
+  const handleAdditionalWalletCreation = async () => {
+    if (!generatedWallet) {
+      setError("No wallet data available");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      console.log("➕ Creating additional wallet...");
+
+      // Store wallet in localStorage with unique identifier
+      const additionalWallets = JSON.parse(
+        localStorage.getItem("additionalWallets") || "[]"
+      );
+
+      const newAdditionalWallet = {
+        id: `wallet-${Date.now()}`,
+        name: newWalletName || walletName || "Additional Wallet",
+        address: generatedWallet.address,
+        privateKey: generatedWallet.privateKey,
+        mnemonic: generatedWallet.mnemonic,
+        createdAt: new Date().toISOString(),
+        isAdditional: true,
+      };
+
+      additionalWallets.push(newAdditionalWallet);
+      localStorage.setItem(
+        "additionalWallets",
+        JSON.stringify(additionalWallets)
+      );
+
+      console.log("✅ Additional wallet stored in localStorage");
+
+      // Notify parent component
+      onWalletCreated();
+      handleClose();
+    } catch (error: any) {
+      console.error("❌ Additional wallet creation error:", error);
+      setError("Failed to create additional wallet");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle user registration (for primary wallet only)
   const handleRegisterUser = async () => {
     const { username, password, confirmPassword } = registrationData;
 
@@ -368,7 +448,7 @@ export default function WalletWelcomeModal({
     }
   };
 
-  // Handle existing user login
+  // Handle existing user login (for primary wallet only)
   const handleExistingUserLogin = async () => {
     if (!loginData.password) {
       setError("Please enter your password");
@@ -386,7 +466,6 @@ export default function WalletWelcomeModal({
     try {
       console.log("🔐 Verifying existing wallet user...");
 
-      // Dispatch verification action
       const result = await dispatch(
         verifyWalletUser({
           walletAddress: existingWalletData.address,
@@ -415,7 +494,7 @@ export default function WalletWelcomeModal({
     }
   };
 
-  // Handle save generated wallet
+  // Handle save generated wallet (for primary wallet)
   const handleSaveGeneratedWallet = () => {
     if (!generatedWallet) return;
     setCurrentStep("register-credentials");
@@ -458,16 +537,19 @@ export default function WalletWelcomeModal({
   };
 
   // Render functions for each step
-  const renderWelcomeStep = () => (
+  const renderWelcome = () => (
     <div className="text-center">
       <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-6">
         <Wallet size={32} className="text-black" />
       </div>
+
       <h2 className="text-xl font-bold text-white font-mayeka mb-1.5">
-        Welcome to Blockpal
+        {isAdditionalWallet ? "Add Another Wallet" : "Welcome to Blockpal"}
       </h2>
       <p className="text-gray-400 font-satoshi mb-6">
-        Choose how you'd like to get started
+        {isAdditionalWallet
+          ? "Import an existing wallet or create a new one"
+          : "Choose how you'd like to get started"}
       </p>
 
       <div className="space-y-3">
@@ -500,6 +582,73 @@ export default function WalletWelcomeModal({
     </div>
   );
 
+  // NEW: Render additional wallet created step
+  const renderAdditionalWalletCreated = () => (
+    <div className="text-center">
+      <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
+        <CheckCircle size={24} className="text-white" />
+      </div>
+      <h2 className="text-xl font-bold text-white font-mayeka mb-1.5">
+        Wallet Ready!
+      </h2>
+      <p className="text-gray-400 font-satoshi mb-4">
+        Your additional wallet has been created successfully.
+      </p>
+
+      {generatedWallet && (
+        <div className="bg-[#0F0F0F] rounded-lg p-3 mb-4 text-left">
+          <h3 className="text-white font-semibold mb-2 font-satoshi">
+            Wallet Information
+          </h3>
+          <div className="space-y-2 text-xs">
+            <div>
+              <label className="text-gray-400 font-satoshi">Address:</label>
+              <div className="text-white font-mono text-xs mt-0.5 break-all">
+                {generatedWallet.address}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+            <p className="text-blue-400 text-xs font-satoshi">
+              💾 This wallet will be stored securely in your browser alongside
+              your primary wallet.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <Input
+          type="text"
+          placeholder="Enter wallet name (optional)"
+          value={newWalletName}
+          onChange={(e) => setNewWalletName(e.target.value)}
+          className="font-satoshi"
+        />
+
+        <Button
+          onClick={handleAdditionalWalletCreation}
+          className="w-full"
+          size="lg"
+          disabled={loading}
+        >
+          {loading ? "Adding Wallet..." : "Add Wallet"}
+        </Button>
+      </div>
+
+      {error && (
+        <div className="mt-4 bg-red-900/20 border border-red-500/50 rounded-lg p-2.5">
+          <p className="text-red-400 text-xs font-satoshi">{error}</p>
+        </div>
+      )}
+    </div>
+  );
+
+  // ... (keep all other existing render functions: renderCreateWallet, renderImportOptions, etc.)
+  // Just modify them to check for isAdditionalWallet where needed
+
+  // Render create wallet step
   const renderCreateWallet = () => (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -541,6 +690,7 @@ export default function WalletWelcomeModal({
     </div>
   );
 
+  // Render import options step
   const renderImportOptions = () => (
     <div>
       <div className="flex items-center justify-between mb-6 px-3 py-0">
@@ -584,6 +734,7 @@ export default function WalletWelcomeModal({
     </div>
   );
 
+  // Render import recovery phrase step
   const renderImportRecoveryPhrase = () => (
     <div>
       <div className="flex items-center mb-4">
@@ -670,6 +821,7 @@ export default function WalletWelcomeModal({
     </div>
   );
 
+  // Render import private key step
   const renderImportPrivateKey = () => (
     <div>
       <div className="flex items-center mb-4">
@@ -735,6 +887,7 @@ export default function WalletWelcomeModal({
     </div>
   );
 
+  // Render existing wallet login step
   const renderExistingWalletLogin = () => (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -817,6 +970,7 @@ export default function WalletWelcomeModal({
     </div>
   );
 
+  // Render register credentials step
   const renderRegisterCredentials = () => (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -935,6 +1089,7 @@ export default function WalletWelcomeModal({
     </div>
   );
 
+  // Render wallet created step
   const renderWalletCreated = () => (
     <div className="text-center">
       <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -999,7 +1154,7 @@ export default function WalletWelcomeModal({
   );
 
   const stepComponents = {
-    welcome: renderWelcomeStep,
+    welcome: renderWelcome,
     "create-wallet": renderCreateWallet,
     "import-options": renderImportOptions,
     "import-recovery-phrase": renderImportRecoveryPhrase,
@@ -1007,6 +1162,7 @@ export default function WalletWelcomeModal({
     "existing-wallet-login": renderExistingWalletLogin,
     "register-credentials": renderRegisterCredentials,
     "wallet-created": renderWalletCreated,
+    "additional-wallet-created": renderAdditionalWalletCreated,
   };
 
   return (
@@ -1018,7 +1174,7 @@ export default function WalletWelcomeModal({
         className="relative bg-black/95 border border-[#2C2C2C] rounded-[16px] w-full max-w-md max-h-[90vh] overflow-hidden shadow-xl"
       >
         <div className="p-4 max-h-[80vh] overflow-y-auto scrollbar-hide">
-          {stepComponents[currentStep]()}
+          {stepComponents[currentStep]?.() || renderWelcome()}
         </div>
       </div>
     </div>
