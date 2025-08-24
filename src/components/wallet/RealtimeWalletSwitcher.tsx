@@ -343,6 +343,7 @@ export default function RealtimeWalletSwitcher({
   };
 
   // ENHANCED: Wallet selection with proper switching for additional wallets
+  // Enhanced handleSelectWallet function for RealtimeWalletSwitcher.tsx
   const handleSelectWallet = async (walletId: string) => {
     console.log("🎯 RealtimeWalletSwitcher - Wallet selected:", walletId);
 
@@ -352,10 +353,45 @@ export default function RealtimeWalletSwitcher({
       return;
     }
 
-    // Find the selected wallet
-    const selectedWallet = wallets.find((w) => w.id === walletId);
+    // IMPORTANT: Refresh wallet list first to ensure we have latest data
+    dispatch(refreshWalletList());
+
+    // Find the selected wallet (after refresh)
+    const allWallets =
+      wallets.length > 0
+        ? wallets
+        : (() => {
+            // Force reload wallets from localStorage if Redux state is empty
+            const primary = SecureWalletStorage.getPrimaryWalletCredentials();
+            const additional = SecureWalletStorage.getAdditionalWallets();
+
+            const loadedWallets = [];
+            if (primary) {
+              loadedWallets.push({
+                id: "primary",
+                name: "Primary Wallet",
+                address: primary.address,
+                balance: 0,
+                isActive: false,
+              });
+            }
+
+            additional.forEach((wallet) => {
+              loadedWallets.push({
+                id: wallet.id,
+                name: wallet.name,
+                address: wallet.address,
+                balance: 0,
+                isActive: false,
+              });
+            });
+
+            return loadedWallets;
+          })();
+
+    const selectedWallet = allWallets.find((w) => w.id === walletId);
     if (!selectedWallet) {
-      console.error("❌ Selected wallet not found in Redux state");
+      console.error("❌ Selected wallet not found:", walletId);
       return;
     }
 
@@ -371,15 +407,13 @@ export default function RealtimeWalletSwitcher({
     }
 
     try {
-      console.log(
-        "🔄 RealtimeWalletSwitcher - Emitting wallet switch start event",
-        {
-          from: currentWalletAddress,
-          to: selectedWallet.address,
-        }
-      );
+      console.log("🔄 Starting wallet switch process", {
+        from: currentWalletAddress?.slice(0, 10) + "...",
+        to: selectedWallet.address.slice(0, 10) + "...",
+        walletName: selectedWallet.name,
+      });
 
-      // NEW: Emit wallet switch start event BEFORE any other actions
+      // STEP 1: Emit wallet switch start event
       window.dispatchEvent(
         new CustomEvent("walletSwitchStart", {
           detail: {
@@ -390,37 +424,56 @@ export default function RealtimeWalletSwitcher({
         })
       );
 
-      // Step 1: Set active wallet locally first
+      // STEP 2: Update Redux state immediately for UI responsiveness
       dispatch(setActiveWallet(walletId));
 
-      // Step 2: Clear existing tokens to show loading state
+      // STEP 3: Clear existing tokens to show loading state
       dispatch(clearTokens());
       console.log("🧹 Cleared existing tokens");
 
-      // Step 3: Sync with database (for compatibility)
-      await dispatch(setActiveWalletInDB(walletId));
-      console.log("💾 Synced with database");
+      // STEP 4: Store preference in localStorage
+      localStorage.setItem("activeWalletId", walletId);
 
-      // Step 4: Load fresh data for the new wallet
-      console.log("📡 Loading fresh data for:", selectedWallet.address);
+      // STEP 5: Sync with database (compatibility)
+      try {
+        await dispatch(setActiveWalletInDB(walletId));
+        console.log("💾 Synced with database");
+      } catch (error) {
+        console.warn("⚠️ Database sync failed, but continuing:", error);
+      }
 
-      const [tokensResult, balanceResult] = await Promise.all([
+      // STEP 6: Load fresh data for the new wallet
+      console.log(
+        "📡 Loading fresh data for:",
+        selectedWallet.address.slice(0, 10) + "..."
+      );
+
+      const [tokensResult, balanceResult] = await Promise.allSettled([
         dispatch(fetchWalletTokens(selectedWallet.address)),
         dispatch(updateWalletBalance(selectedWallet.address)),
       ]);
 
+      // Check results
       const tokensSuccess =
-        tokensResult.type === "wallet/fetchWalletTokens/fulfilled";
+        tokensResult.status === "fulfilled" &&
+        tokensResult.value.type === "wallet/fetchWalletTokens/fulfilled";
       const balanceSuccess =
-        balanceResult.type === "wallet/updateWalletBalance/fulfilled";
+        balanceResult.status === "fulfilled" &&
+        balanceResult.value.type === "wallet/updateWalletBalance/fulfilled";
 
-      if (tokensSuccess && balanceSuccess) {
-        console.log("✅ Wallet data loaded successfully");
+      if (tokensSuccess) {
+        console.log("✅ Tokens loaded successfully");
       } else {
-        console.warn("⚠️ Some wallet data may not have loaded properly");
+        console.warn("⚠️ Token loading failed:", tokensResult);
       }
 
-      // Step 5: Notify parent component if provided
+      if (balanceSuccess) {
+        console.log("✅ Balance updated successfully");
+      } else {
+        console.warn("⚠️ Balance update failed:", balanceResult);
+      }
+
+      // STEP 7: Notify parent component if provided
       if (onWalletSelect) {
         try {
           await onWalletSelect(walletId);
@@ -430,28 +483,42 @@ export default function RealtimeWalletSwitcher({
         }
       }
 
-      // Step 6: Force refresh dashboard if available
-      if (refreshAllWallets) {
-        setTimeout(() => {
-          refreshAllWallets();
-        }, 500);
+      // STEP 8: Update dashboard services
+      // Stop current dashboard monitoring
+      if (typeof window !== "undefined" && window.realtimeDashboardService) {
+        window.realtimeDashboardService.stopMonitoring();
       }
 
-      // NEW: Emit wallet switch completion event after a short delay
+      // Force refresh real-time services with new wallet
       setTimeout(() => {
-        console.log(
-          "✅ RealtimeWalletSwitcher - Emitting wallet switch complete event"
-        );
+        if (refreshAllWallets) {
+          refreshAllWallets();
+        }
+
+        // Restart dashboard monitoring for new wallet
+        if (typeof window !== "undefined" && window.realtimeDashboardService) {
+          window.realtimeDashboardService.startMonitoring(
+            selectedWallet.address
+          );
+        }
+      }, 1000);
+
+      // STEP 9: Emit wallet switch completion event
+      setTimeout(() => {
+        console.log("✅ Emitting wallet switch complete event");
         window.dispatchEvent(
           new CustomEvent("walletSwitchComplete", {
             detail: {
               walletAddress: selectedWallet.address,
               walletId: selectedWallet.id,
+              walletName: selectedWallet.name,
               source: "wallet-switcher",
             },
           })
         );
       }, 100);
+
+      console.log("✅ Wallet switch completed successfully");
 
       // Close the modal
       handleClose();
@@ -468,12 +535,17 @@ export default function RealtimeWalletSwitcher({
           },
         })
       );
+
+      // Reset to previous wallet if switch failed
+      if (currentWalletAddress && activeWallet) {
+        dispatch(setActiveWallet(activeWallet.id));
+      }
     } finally {
       // Reset switching state after a delay to ensure all components have updated
       switchingTimeoutRef.current = setTimeout(() => {
         setIsSwitchingWallet(false);
         switchingTimeoutRef.current = null;
-      }, 1000);
+      }, 2000); // Increased delay for additional wallet switching
     }
   };
 

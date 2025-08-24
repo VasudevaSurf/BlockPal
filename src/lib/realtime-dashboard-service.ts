@@ -1,4 +1,4 @@
-// src/lib/realtime-dashboard-service.ts - Enhanced Real-time dashboard service (NOTIFICATIONS DISABLED)
+// src/lib/realtime-dashboard-service.ts - FIXED VERSION
 import { EventEmitter } from "events";
 
 export interface DashboardData {
@@ -19,12 +19,12 @@ export interface DashboardData {
 }
 
 export interface RealtimeDashboardConfig {
-  pollInterval: number; // in milliseconds
-  backgroundRefreshInterval: number; // in milliseconds for background updates
+  pollInterval: number;
+  backgroundRefreshInterval: number;
   maxRetries: number;
   enableBackgroundRefresh: boolean;
-  enableVisibilityDetection: boolean; // Pause when tab is not visible
-  enableNotifications: boolean; // NEW: Control notifications
+  enableVisibilityDetection: boolean;
+  enableNotifications: boolean;
 }
 
 export class RealtimeDashboardService extends EventEmitter {
@@ -35,14 +35,16 @@ export class RealtimeDashboardService extends EventEmitter {
   private isPolling = false;
   private isVisible = true;
   private retryCount = 0;
+  private consecutiveErrors = 0;
+  private maxConsecutiveErrors = 3;
 
   private config: RealtimeDashboardConfig = {
-    pollInterval: 15000, // 15 seconds for active refresh
-    backgroundRefreshInterval: 30000, // 30 seconds for background refresh
-    maxRetries: 3,
+    pollInterval: 15000,
+    backgroundRefreshInterval: 30000,
+    maxRetries: 2, // REDUCED: Lower retry count
     enableBackgroundRefresh: true,
     enableVisibilityDetection: true,
-    enableNotifications: false, // DISABLED: Turn off notifications by default
+    enableNotifications: false,
   };
 
   constructor(config?: Partial<RealtimeDashboardConfig>) {
@@ -51,7 +53,6 @@ export class RealtimeDashboardService extends EventEmitter {
       this.config = { ...this.config, ...config };
     }
 
-    // Set up visibility change detection
     if (
       this.config.enableVisibilityDetection &&
       typeof document !== "undefined"
@@ -60,31 +61,35 @@ export class RealtimeDashboardService extends EventEmitter {
     }
   }
 
-  // Start real-time monitoring for active wallet
   startMonitoring(walletAddress: string) {
+    if (this.activeWalletAddress === walletAddress) {
+      console.log("🔄 Already monitoring this wallet, skipping");
+      return;
+    }
+
     console.log(
-      "🚀 Starting real-time dashboard monitoring for wallet:",
-      walletAddress
+      "🚀 Starting dashboard monitoring for:",
+      walletAddress.slice(0, 10) + "..."
     );
 
     this.activeWalletAddress = walletAddress;
+    this.consecutiveErrors = 0; // Reset error count
     this.stopMonitoring();
 
-    // Initial fetch
-    this.fetchDashboardData();
+    // Initial fetch with delay to avoid conflicts
+    setTimeout(() => {
+      this.fetchDashboardData();
+    }, 1000);
 
-    // Start main polling
     this.startPolling();
 
-    // Start background refresh if enabled
     if (this.config.enableBackgroundRefresh) {
       this.startBackgroundRefresh();
     }
   }
 
-  // Stop all monitoring
   stopMonitoring() {
-    console.log("🛑 Stopping real-time dashboard monitoring");
+    console.log("🛑 Stopping dashboard monitoring");
 
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
@@ -97,24 +102,20 @@ export class RealtimeDashboardService extends EventEmitter {
     }
 
     this.isPolling = false;
+    this.retryCount = 0;
   }
 
-  // Setup visibility detection to pause/resume monitoring
   private setupVisibilityDetection() {
     const handleVisibilityChange = () => {
       this.isVisible = !document.hidden;
-      console.log(
-        `👁️ Tab visibility changed: ${this.isVisible ? "visible" : "hidden"}`
-      );
 
       if (this.isVisible && this.activeWalletAddress) {
-        // Tab became visible - resume monitoring and do immediate refresh
+        this.consecutiveErrors = 0; // Reset errors when tab becomes visible
         this.fetchDashboardData();
         if (!this.isPolling) {
           this.startPolling();
         }
       } else if (!this.isVisible) {
-        // Tab became hidden - keep background refresh only
         if (this.pollInterval) {
           clearInterval(this.pollInterval);
           this.pollInterval = null;
@@ -126,59 +127,81 @@ export class RealtimeDashboardService extends EventEmitter {
     document.addEventListener("visibilitychange", handleVisibilityChange);
   }
 
-  // Start main polling (active when tab is visible)
   private startPolling() {
     if (this.isPolling || !this.activeWalletAddress) return;
 
     this.isPolling = true;
-    console.log(
-      `⏰ Starting active dashboard polling every ${this.config.pollInterval}ms`
-    );
+    console.log(`⏰ Starting polling every ${this.config.pollInterval}ms`);
 
     this.pollInterval = setInterval(() => {
-      if (this.isVisible) {
+      if (
+        this.isVisible &&
+        this.consecutiveErrors < this.maxConsecutiveErrors
+      ) {
         this.fetchDashboardData();
       }
     }, this.config.pollInterval);
   }
 
-  // Start background refresh (continues even when tab is hidden)
   private startBackgroundRefresh() {
     if (this.backgroundInterval || !this.activeWalletAddress) return;
 
-    console.log(
-      `🔄 Starting background refresh every ${this.config.backgroundRefreshInterval}ms`
-    );
-
     this.backgroundInterval = setInterval(() => {
-      // Background refresh runs regardless of visibility
-      this.fetchDashboardData(true);
+      if (this.consecutiveErrors < this.maxConsecutiveErrors) {
+        this.fetchDashboardData(true);
+      }
     }, this.config.backgroundRefreshInterval);
   }
 
-  // Fetch dashboard data
   private async fetchDashboardData(isBackground = false) {
     if (!this.activeWalletAddress) return;
 
+    // FIXED: Skip if too many consecutive errors
+    if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
+      console.log("⚠️ Too many errors, skipping dashboard fetch");
+      return;
+    }
+
     try {
-      const [tokensResponse, balanceResponse] = await Promise.all([
+      // FIXED: Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const [tokensResponse, balanceResponse] = await Promise.allSettled([
         fetch(`/api/wallets/tokens?walletAddress=${this.activeWalletAddress}`, {
           credentials: "include",
+          signal: controller.signal,
         }),
         fetch(
           `/api/wallets/balance?walletAddress=${this.activeWalletAddress}`,
           {
             credentials: "include",
+            signal: controller.signal,
           }
         ),
       ]);
 
-      if (!tokensResponse.ok || !balanceResponse.ok) {
-        throw new Error("Failed to fetch dashboard data");
+      clearTimeout(timeoutId);
+
+      // FIXED: Handle partial failures gracefully
+      let tokensData = { tokens: [], totalValue: 0 };
+      let balanceData = { balance: 0 };
+
+      if (tokensResponse.status === "fulfilled" && tokensResponse.value.ok) {
+        try {
+          tokensData = await tokensResponse.value.json();
+        } catch {
+          console.log("⚠️ Failed to parse tokens response, using defaults");
+        }
       }
 
-      const tokensData = await tokensResponse.json();
-      const balanceData = await balanceResponse.json();
+      if (balanceResponse.status === "fulfilled" && balanceResponse.value.ok) {
+        try {
+          balanceData = await balanceResponse.value.json();
+        } catch {
+          console.log("⚠️ Failed to parse balance response, using default");
+        }
+      }
 
       const newDashboardData: DashboardData = {
         walletBalance: balanceData.balance || 0,
@@ -193,15 +216,12 @@ export class RealtimeDashboardService extends EventEmitter {
         const previousData = this.dashboardData;
         this.dashboardData = newDashboardData;
 
-        console.log(
-          `💰 Dashboard data updated${
-            isBackground ? " (background)" : ""
-          }: $${newDashboardData.totalValue.toFixed(2)} (${
-            newDashboardData.tokens.length
-          } tokens)`
-        );
+        if (!isBackground) {
+          console.log(
+            `💰 Dashboard updated: $${newDashboardData.totalValue.toFixed(2)}`
+          );
+        }
 
-        // Emit update event
         this.emit("dashboard_updated", {
           data: newDashboardData,
           previousData,
@@ -210,148 +230,117 @@ export class RealtimeDashboardService extends EventEmitter {
             ? newDashboardData.totalValue - previousData.totalValue
             : 0,
         });
-
-        // COMMENTED OUT: Disable specific change event notifications
-        // These events are what trigger the pop-up notifications
-        if (this.config.enableNotifications && previousData) {
-          // if (newDashboardData.totalValue > previousData.totalValue) {
-          //   this.emit("portfolio_increased", {
-          //     data: newDashboardData,
-          //     increase: newDashboardData.totalValue - previousData.totalValue,
-          //   });
-          // } else if (newDashboardData.totalValue < previousData.totalValue) {
-          //   this.emit("portfolio_decreased", {
-          //     data: newDashboardData,
-          //     decrease: previousData.totalValue - newDashboardData.totalValue,
-          //   });
-          // }
-          // if (newDashboardData.tokens.length !== previousData.tokens.length) {
-          //   this.emit("token_count_changed", {
-          //     data: newDashboardData,
-          //     previousCount: previousData.tokens.length,
-          //     newCount: newDashboardData.tokens.length,
-          //   });
-          // }
-        }
-      } else if (!isBackground) {
-        console.log("📊 Dashboard data unchanged");
       }
 
-      // Reset retry count on success
+      // FIXED: Reset counters on success
       this.retryCount = 0;
-    } catch (error) {
-      console.error(`❌ Error fetching dashboard data:`, error);
-      this.retryCount++;
+      this.consecutiveErrors = 0;
+    } catch (error: any) {
+      this.consecutiveErrors++;
 
-      if (this.retryCount <= this.config.maxRetries) {
+      // FIXED: Only log errors occasionally to reduce noise
+      if (this.consecutiveErrors <= 2) {
         console.log(
-          `🔄 Retrying dashboard fetch (${this.retryCount}/${this.config.maxRetries})`
+          `⚠️ Dashboard fetch error (${this.consecutiveErrors}/${this.maxConsecutiveErrors}):`,
+          error.message
         );
-        setTimeout(() => this.fetchDashboardData(isBackground), 5000);
-      } else {
-        console.error("❌ Max retries reached for dashboard fetch");
-        // COMMENTED OUT: Disable error notifications too
-        // this.emit("fetch_error", { error, retryCount: this.retryCount });
+      }
+
+      // FIXED: Exponential backoff for retries
+      if (this.retryCount < this.config.maxRetries && !isBackground) {
+        this.retryCount++;
+        const backoffDelay = Math.min(
+          5000 * Math.pow(2, this.retryCount - 1),
+          30000
+        );
+
+        setTimeout(() => {
+          if (this.activeWalletAddress) {
+            this.fetchDashboardData(isBackground);
+          }
+        }, backoffDelay);
+      }
+
+      // FIXED: Stop aggressive polling if too many errors
+      if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
+        console.log(
+          "🛑 Too many consecutive errors, pausing dashboard monitoring"
+        );
+        this.stopMonitoring();
+
+        // Try to restart after a longer delay
+        setTimeout(() => {
+          if (this.activeWalletAddress) {
+            this.consecutiveErrors = 0;
+            this.startMonitoring(this.activeWalletAddress);
+          }
+        }, 60000); // 1 minute delay
       }
     }
   }
 
-  // Check if data has meaningfully changed
   private hasDataChanged(newData: DashboardData): boolean {
     if (!this.dashboardData) return true;
 
     const oldData = this.dashboardData;
 
-    // Check if total value changed significantly (more than $0.01)
+    // Check significant changes only
     if (Math.abs(newData.totalValue - oldData.totalValue) > 0.01) {
       return true;
     }
 
-    // Check if wallet balance changed significantly
     if (Math.abs(newData.walletBalance - oldData.walletBalance) > 0.01) {
       return true;
     }
 
-    // Check if token count changed
     if (newData.tokens.length !== oldData.tokens.length) {
       return true;
-    }
-
-    // Check if any individual token balance changed significantly
-    for (const newToken of newData.tokens) {
-      const oldToken = oldData.tokens.find((t) => t.id === newToken.id);
-      if (!oldToken) {
-        return true; // New token
-      }
-
-      if (Math.abs(newToken.value - oldToken.value) > 0.01) {
-        return true; // Token value changed
-      }
-
-      if (Math.abs(newToken.balance - oldToken.balance) > 0.000001) {
-        return true; // Token balance changed
-      }
-
-      if (Math.abs(newToken.price - oldToken.price) > 0.000001) {
-        return true; // Token price changed
-      }
     }
 
     return false;
   }
 
-  // Get current dashboard data
   getData(): DashboardData | null {
     return this.dashboardData;
   }
 
-  // Force refresh dashboard data
   async refreshDashboard(): Promise<void> {
     if (!this.activeWalletAddress) {
       throw new Error("No active wallet to refresh");
     }
 
-    console.log("🔄 Force refreshing dashboard data");
+    console.log("🔄 Force refreshing dashboard");
+    this.consecutiveErrors = 0; // Reset error count for manual refresh
     await this.fetchDashboardData();
   }
 
-  // Update wallet address being monitored
   updateWallet(walletAddress: string) {
     if (this.activeWalletAddress === walletAddress) return;
 
-    console.log("🔄 Switching dashboard monitoring to wallet:", walletAddress);
+    console.log(
+      "🔄 Switching dashboard monitoring to:",
+      walletAddress.slice(0, 10) + "..."
+    );
     this.startMonitoring(walletAddress);
   }
 
-  // Update configuration
   updateConfig(config: Partial<RealtimeDashboardConfig>) {
-    const oldConfig = { ...this.config };
     this.config = { ...this.config, ...config };
+    console.log("⚙️ Dashboard config updated");
 
-    console.log("⚙️ Dashboard service config updated:", config);
-
-    // Restart monitoring if intervals changed
-    if (
-      config.pollInterval &&
-      config.pollInterval !== oldConfig.pollInterval &&
-      this.activeWalletAddress
-    ) {
+    if (config.pollInterval && this.activeWalletAddress) {
       this.startMonitoring(this.activeWalletAddress);
     }
   }
 
-  // Enable/disable notifications
   enableNotifications(enabled: boolean) {
     this.config.enableNotifications = enabled;
-    console.log(`🔔 Notifications ${enabled ? "enabled" : "disabled"}`);
   }
 
-  // Check if monitoring is active
   isActive(): boolean {
     return this.isPolling || !!this.backgroundInterval;
   }
 
-  // Get monitoring status
   getStatus() {
     return {
       isPolling: this.isPolling,
@@ -362,6 +351,7 @@ export class RealtimeDashboardService extends EventEmitter {
       backgroundInterval: this.config.backgroundRefreshInterval,
       lastUpdate: this.dashboardData?.lastUpdated || null,
       retryCount: this.retryCount,
+      consecutiveErrors: this.consecutiveErrors,
       dataAge: this.dashboardData
         ? Date.now() - this.dashboardData.lastUpdated.getTime()
         : null,
@@ -369,7 +359,6 @@ export class RealtimeDashboardService extends EventEmitter {
     };
   }
 
-  // Cleanup when service is destroyed
   destroy() {
     this.stopMonitoring();
     this.removeAllListeners();
@@ -380,12 +369,12 @@ export class RealtimeDashboardService extends EventEmitter {
   }
 }
 
-// Export singleton instance with notifications disabled
+// Export with better configuration
 export const realtimeDashboardService = new RealtimeDashboardService({
-  pollInterval: 10000, // 10 seconds - faster for better real-time experience
-  backgroundRefreshInterval: 15000, // 15 seconds for background
+  pollInterval: 20000, // INCREASED: Less aggressive polling
+  backgroundRefreshInterval: 30000,
   enableBackgroundRefresh: true,
   enableVisibilityDetection: true,
-  maxRetries: 3,
-  enableNotifications: false, // DISABLED: Turn off all pop-up notifications
+  maxRetries: 2, // REDUCED: Fewer retries
+  enableNotifications: false,
 });

@@ -77,12 +77,38 @@ export default function AuthPage() {
     }
   }, []);
 
+  // Enhanced checkExistingWallet function for src/app/auth/page.tsx
   const checkExistingWallet = async () => {
     const storedWallet = localStorage.getItem("primaryWallet");
     if (!storedWallet) return;
 
     try {
       const walletInfo = JSON.parse(storedWallet);
+      console.log(
+        "🔍 Found stored wallet info:",
+        walletInfo.address?.slice(0, 10) + "..."
+      );
+
+      // ENHANCED: Validate stored wallet data completeness
+      const hasPrivateKey = localStorage.getItem("walletPrivateKey");
+      if (!hasPrivateKey) {
+        console.warn("⚠️ Missing private key, clearing incomplete wallet data");
+        localStorage.removeItem("primaryWallet");
+        return;
+      }
+
+      // ENHANCED: Check for additional wallets too
+      const additionalWallets = JSON.parse(
+        localStorage.getItem("additionalWallets") || "[]"
+      );
+      console.log("📋 Found", additionalWallets.length, "additional wallets");
+
+      // Log wallet summary
+      console.log("💼 Wallet Summary:", {
+        primary: walletInfo.address?.slice(0, 10) + "...",
+        additional: additionalWallets.length,
+        totalWallets: 1 + additionalWallets.length,
+      });
 
       // Check if this wallet exists in database as primary wallet
       const response = await fetch("/api/auth/check-primary-wallet", {
@@ -94,18 +120,38 @@ export default function AuthPage() {
       const data = await response.json();
 
       if (data.exists) {
-        // Wallet exists in DB, show password prompt
-        setWalletData(walletInfo);
+        console.log(
+          "✅ Primary wallet exists in database for user:",
+          data.username
+        );
+
+        // Set wallet data for existing user flow
+        setWalletData({
+          address: walletInfo.address,
+          privateKey: hasPrivateKey,
+          mnemonic: localStorage.getItem("walletMnemonic"),
+        });
+
         setCurrentStep("existing-user");
       } else {
-        // Wallet not in DB, clear localStorage and start fresh
+        console.warn(
+          "⚠️ Primary wallet not found in database, clearing local data"
+        );
+        // Clear all wallet data if not in database
         localStorage.removeItem("primaryWallet");
         localStorage.removeItem("walletPrivateKey");
         localStorage.removeItem("walletMnemonic");
+        localStorage.removeItem("additionalWallets");
+        localStorage.removeItem("activeWalletId");
       }
     } catch (error) {
-      console.error("Error checking existing wallet:", error);
-      localStorage.clear();
+      console.error("❌ Error checking existing wallet:", error);
+      // Clear potentially corrupted data
+      localStorage.removeItem("primaryWallet");
+      localStorage.removeItem("walletPrivateKey");
+      localStorage.removeItem("walletMnemonic");
+      localStorage.removeItem("additionalWallets");
+      localStorage.removeItem("activeWalletId");
     }
   };
 
