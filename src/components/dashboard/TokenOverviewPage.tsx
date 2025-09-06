@@ -1,9 +1,7 @@
-// src/components/dashboard/TokenOverviewPage.tsx - FIXED CHART FETCHING
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { useSelector } from "react-redux";
 import {
   Copy,
   ExternalLink,
@@ -23,12 +21,10 @@ import {
   MoreHorizontal,
   QrCode,
 } from "lucide-react";
-import { RootState } from "@/store";
-import SimpleTransferModal from "@/components/transfer/SimpleTransferModal";
-import TransactionHistory from "@/components/transactions/TransactionHistory";
+// import SimpleTransferModal from "@/components/transfer/SimpleTransferModal";
+// import TransactionHistory from "@/components/transactions/TransactionHistory";
 import UserQRCodeModal from "@/components/profile/UserQRCodeModal";
 import { SkeletonTokenOverview } from "@/components/ui/Skeleton";
-import { RealtimePriceDisplay } from "@/components/realtime/RealtimePriceService";
 import {
   AreaChart,
   Area,
@@ -38,6 +34,86 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+
+// Mock token data
+const mockTokens = [
+  {
+    id: "eth-native",
+    name: "Ethereum",
+    symbol: "ETH",
+    contractAddress: "native",
+    decimals: 18,
+    balance: "1.25843",
+    priceData: {
+      id: "ethereum",
+      current_price: 3200.45,
+      price_change_percentage_24h: 2.5,
+      market_cap: 385000000000,
+      total_volume: 12500000000,
+      description:
+        "Ethereum is a global, open-source platform for decentralized applications. In Ethereum, you can write code that controls digital value, runs exactly as programmed, and is accessible anywhere in the world.",
+      image: "/tokens/eth.png",
+      homepage: "https://ethereum.org",
+      whitepaper: "https://ethereum.org/whitepaper/",
+      blockchain_site: "https://etherscan.io",
+      telegram_channel: "ethereum",
+      twitter_screen_name: "ethereum",
+    },
+  },
+  {
+    id: "usdt-token",
+    name: "Tether USD",
+    symbol: "USDT",
+    contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    decimals: 6,
+    balance: "1000.50",
+    priceData: {
+      id: "tether",
+      current_price: 1.0,
+      price_change_percentage_24h: 0.1,
+      market_cap: 95000000000,
+      total_volume: 45000000000,
+      description:
+        "Tether is a blockchain-enabled platform designed to facilitate the use of fiat currencies in a digital manner. Tether works to disrupt the conventional financial system via a more modern approach to money.",
+      image: "/tokens/usdt.png",
+      homepage: "https://tether.to",
+      blockchain_site:
+        "https://etherscan.io/token/0xdac17f958d2ee523a2206206994597c13d831ec7",
+      twitter_screen_name: "Tether_to",
+      platforms: {
+        ethereum: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      },
+    },
+  },
+  {
+    id: "usdc-token",
+    name: "USD Coin",
+    symbol: "USDC",
+    contractAddress: "0xA0b86a33E6417f5a10c4C9a6bd1a0d7AF0DB58a7",
+    decimals: 6,
+    balance: "2500.75",
+    priceData: {
+      id: "usd-coin",
+      current_price: 1.0,
+      price_change_percentage_24h: -0.05,
+      market_cap: 35000000000,
+      total_volume: 8500000000,
+      description:
+        "USD Coin is a fully collateralized US dollar stablecoin, built with Centre's open-source framework. USDC is issued by regulated financial institutions, backed by fully reserved assets, redeemable on a 1:1 basis for US dollars.",
+      image: "/tokens/usdc.png",
+      homepage: "https://www.centre.io",
+      blockchain_site:
+        "https://etherscan.io/token/0xa0b86a33e6417f5a10c4c9a6bd1a0d7af0db58a7",
+      twitter_screen_name: "centre_io",
+      platforms: {
+        ethereum: "0xA0b86a33E6417f5a10c4C9a6bd1a0d7AF0DB58a7",
+      },
+    },
+  },
+];
+
+// Mock wallet address
+const mockWalletAddress = "0x742d35Cc6634C0532925a3b8d4Ae7F6eC1e7F5c7";
 
 interface TokenInfo {
   name: string;
@@ -60,7 +136,6 @@ interface TokenInfo {
     twitter_screen_name?: string;
     subreddit_url?: string;
     official_forum_url?: string;
-    // Add coingecko contract if available
     platforms?: {
       ethereum?: string;
     };
@@ -82,14 +157,10 @@ const TIME_PERIODS = [
   { label: "1Y", value: "365", days: 365 },
 ];
 
-// CoinGecko API key - you should move this to environment variables
-const COINGECKO_API_KEY = "CG-xCH4APq7mHESUuEFzDU5GTSy";
-
 export default function TokenOverviewPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const { activeWallet } = useSelector((state: RootState) => state.wallet);
 
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [priceData, setPriceData] = useState<PricePoint[]>([]);
@@ -115,7 +186,7 @@ export default function TokenOverviewPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const contractAddress = params.tokenId as string;
-  const walletAddress = searchParams.get("wallet") || activeWallet?.address;
+  const walletAddress = searchParams.get("wallet") || mockWalletAddress;
 
   const formatDateForChart = (date: Date, days: number) => {
     const monthNames = [
@@ -134,26 +205,22 @@ export default function TokenOverviewPage() {
     ];
 
     if (days <= 1) {
-      // For 1 hour and 1 day: show time (5-minute intervals from CoinGecko)
       return date.toLocaleTimeString("en-US", {
         hour: "numeric",
         minute: "2-digit",
       });
     } else if (days <= 7) {
-      // For 1 week: show date and time (hourly intervals from CoinGecko)
       return `${
         monthNames[date.getMonth()]
       } ${date.getDate()} ${date.getHours()}:00`;
     } else if (days <= 90) {
-      // For up to 90 days: show date (hourly intervals from CoinGecko)
       return `${monthNames[date.getMonth()]} ${date.getDate()}`;
     } else {
-      // For 1 year: show month day (daily intervals from CoinGecko)
       return `${monthNames[date.getMonth()]} ${date.getDate()}`;
     }
   };
 
-  // Fetch token info
+  // Mock token info fetching
   const fetchTokenInfo = useCallback(
     async (showLoader = false) => {
       if (!contractAddress || !walletAddress) return;
@@ -161,24 +228,18 @@ export default function TokenOverviewPage() {
       try {
         if (showLoader) setLoading(true);
 
-        const timestamp = Date.now();
-        const response = await fetch(
-          `/api/tokens/${contractAddress}?walletAddress=${walletAddress}&t=${timestamp}`,
-          {
-            credentials: "include",
-            cache: "no-cache",
-            headers: {
-              "Cache-Control": "no-cache",
-              Pragma: "no-cache",
-            },
-          }
+        // Find mock token data
+        const mockToken = mockTokens.find(
+          (token) =>
+            token.contractAddress.toLowerCase() ===
+              contractAddress.toLowerCase() ||
+            token.symbol.toLowerCase() === contractAddress.toLowerCase()
         );
 
-        if (response.ok) {
-          const data = await response.json();
-          setTokenInfo(data.tokenInfo);
+        if (mockToken) {
+          setTokenInfo(mockToken);
         } else {
-          console.error("Failed to fetch token info");
+          console.error("Token not found in mock data");
         }
       } catch (error) {
         console.error("Error fetching token info:", error);
@@ -189,91 +250,55 @@ export default function TokenOverviewPage() {
     [contractAddress, walletAddress]
   );
 
-  // FIXED: Fetch chart data directly from CoinGecko API like index.js
-  const fetchTokenData = async (days: string) => {
+  // Generate mock chart data
+  const generateMockChartData = (days: string) => {
     if (!tokenInfo?.priceData) return;
 
     setChartLoading(true);
-    try {
-      const daysNum = parseFloat(days);
 
-      // Get the contract address for CoinGecko
-      let coingeckoContract: string | null = null;
+    // Simulate API delay
+    setTimeout(() => {
+      try {
+        const daysNum = parseFloat(days);
+        const basePrice = tokenInfo.priceData!.current_price;
+        const dataPoints =
+          daysNum <= 1 ? 24 : daysNum <= 7 ? daysNum * 24 : daysNum;
 
-      // Check if we have the ethereum platform address
-      if (tokenInfo.priceData.platforms?.ethereum) {
-        coingeckoContract = tokenInfo.priceData.platforms.ethereum;
-      } else if (
-        tokenInfo.contractAddress !== "native" &&
-        tokenInfo.contractAddress !== "ETH"
-      ) {
-        coingeckoContract = tokenInfo.contractAddress;
-      }
+        const mockData: PricePoint[] = [];
+        const now = Date.now();
+        const intervalMs = (daysNum * 24 * 60 * 60 * 1000) / dataPoints;
 
-      let response;
-      let apiUrl;
+        for (let i = 0; i < dataPoints; i++) {
+          const timestamp = now - (dataPoints - i - 1) * intervalMs;
+          const date = new Date(timestamp);
 
-      // Use the same logic as index.js
-      if (coingeckoContract) {
-        // For ERC-20 tokens, use contract endpoint
-        if (daysNum === 365) {
-          const to = Math.floor(Date.now() / 1000);
-          const from = to - 365 * 24 * 60 * 60;
+          // Generate realistic price variation
+          const volatility = tokenInfo.symbol === "ETH" ? 0.05 : 0.02; // ETH more volatile than stablecoins
+          const randomChange = (Math.random() - 0.5) * volatility;
+          const trendFactor = Math.sin((i / dataPoints) * Math.PI * 2) * 0.03; // Sine wave trend
+          const price = basePrice * (1 + randomChange + trendFactor);
 
-          apiUrl = `https://api.coingecko.com/api/v3/coins/ethereum/contract/${coingeckoContract}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
-        } else {
-          apiUrl = `https://api.coingecko.com/api/v3/coins/ethereum/contract/${coingeckoContract}/market_chart?vs_currency=usd&days=${days}`;
+          mockData.push({
+            time: date,
+            displayTime: formatDateForChart(date, daysNum),
+            price: Math.max(0, price),
+            fullDate: date.toLocaleString(),
+            index: i,
+          });
         }
-      } else if (tokenInfo.priceData.id) {
-        // For native tokens or when we have coin id, use coin endpoint
-        if (daysNum === 365) {
-          const to = Math.floor(Date.now() / 1000);
-          const from = to - 365 * 24 * 60 * 60;
 
-          apiUrl = `https://api.coingecko.com/api/v3/coins/${tokenInfo.priceData.id}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
-        } else {
-          apiUrl = `https://api.coingecko.com/api/v3/coins/${tokenInfo.priceData.id}/market_chart?vs_currency=usd&days=${days}`;
-        }
-      } else {
-        console.error("No valid identifier for fetching chart data");
-        return;
-      }
-
-      // Fetch directly from CoinGecko with API key
-      response = await fetch(apiUrl, {
-        headers: {
-          "x-cg-demo-api-key": COINGECKO_API_KEY,
-        },
-      });
-
-      const data = await response.json();
-
-      if (data.prices) {
-        // Process the data exactly like index.js
-        const processedData = data.prices;
-
-        const formattedData = processedData.map(
-          ([timestamp, price]: [number, number], index: number) => ({
-            time: new Date(timestamp),
-            displayTime: formatDateForChart(new Date(timestamp), daysNum),
-            price: parseFloat(price.toString()),
-            fullDate: new Date(timestamp).toLocaleString(),
-            index: index,
-          })
-        );
-
-        setPriceData(formattedData);
+        setPriceData(mockData);
 
         // Calculate price change percentage
-        if (formattedData.length > 0) {
-          const firstPrice = formattedData[0].price;
-          const lastPrice = formattedData[formattedData.length - 1].price;
+        if (mockData.length > 0) {
+          const firstPrice = mockData[0].price;
+          const lastPrice = mockData[mockData.length - 1].price;
           const change = ((lastPrice - firstPrice) / firstPrice) * 100;
           setPriceChange(change);
         }
 
         // Find high and low
-        const prices = formattedData.map((item: PricePoint) => item.price);
+        const prices = mockData.map((item: PricePoint) => item.price);
         const maxPrice = Math.max(...prices);
         const minPrice = Math.min(...prices);
 
@@ -281,92 +306,21 @@ export default function TokenOverviewPage() {
         const padding = (maxPrice - minPrice) * 0.1;
         setYAxisDomain([Math.max(0, minPrice - padding), maxPrice + padding]);
 
-        const highIndex = formattedData.findIndex(
+        const highIndex = mockData.findIndex(
           (item: PricePoint) => item.price === maxPrice
         );
-        const lowIndex = formattedData.findIndex(
+        const lowIndex = mockData.findIndex(
           (item: PricePoint) => item.price === minPrice
         );
 
         setAllTimeHigh({ index: highIndex, price: maxPrice });
         setAllTimeLow({ index: lowIndex, price: minPrice });
+      } catch (error) {
+        console.error("Error generating mock chart data:", error);
+      } finally {
+        setChartLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching token data:", error);
-
-      // Fallback to your API if direct CoinGecko fails
-      try {
-        const fallbackUrl = `/api/tokens/chart?tokenId=${tokenInfo.priceData.id}&days=${days}`;
-        const fallbackResponse = await fetch(fallbackUrl, {
-          credentials: "include",
-          cache: "no-cache",
-        });
-
-        if (fallbackResponse.ok) {
-          const data = await fallbackResponse.json();
-
-          if (data.chartData && data.chartData.prices) {
-            const processedData = data.chartData.prices;
-            const daysNum = parseFloat(days);
-
-            const formattedData = processedData.map(
-              (point: any, index: number) => {
-                const timestamp = Array.isArray(point)
-                  ? point[0]
-                  : point.timestamp;
-                const price = Array.isArray(point) ? point[1] : point.price;
-                const timestampMs =
-                  timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-
-                return {
-                  time: new Date(timestampMs),
-                  displayTime: formatDateForChart(
-                    new Date(timestampMs),
-                    daysNum
-                  ),
-                  price: parseFloat(price),
-                  fullDate: new Date(timestampMs).toLocaleString(),
-                  index: index,
-                };
-              }
-            );
-
-            setPriceData(formattedData);
-
-            if (formattedData.length > 0) {
-              const firstPrice = formattedData[0].price;
-              const lastPrice = formattedData[formattedData.length - 1].price;
-              const change = ((lastPrice - firstPrice) / firstPrice) * 100;
-              setPriceChange(change);
-            }
-
-            const prices = formattedData.map((item: PricePoint) => item.price);
-            const maxPrice = Math.max(...prices);
-            const minPrice = Math.min(...prices);
-
-            const padding = (maxPrice - minPrice) * 0.1;
-            setYAxisDomain([
-              Math.max(0, minPrice - padding),
-              maxPrice + padding,
-            ]);
-
-            const highIndex = formattedData.findIndex(
-              (item: PricePoint) => item.price === maxPrice
-            );
-            const lowIndex = formattedData.findIndex(
-              (item: PricePoint) => item.price === minPrice
-            );
-
-            setAllTimeHigh({ index: highIndex, price: maxPrice });
-            setAllTimeLow({ index: lowIndex, price: minPrice });
-          }
-        }
-      } catch (fallbackError) {
-        console.error("Fallback API also failed:", fallbackError);
-      }
-    } finally {
-      setChartLoading(false);
-    }
+    }, 800);
   };
 
   useEffect(() => {
@@ -377,7 +331,7 @@ export default function TokenOverviewPage() {
 
   useEffect(() => {
     if (tokenInfo?.priceData) {
-      fetchTokenData(selectedTimeframe);
+      generateMockChartData(selectedTimeframe);
     }
   }, [tokenInfo?.priceData, selectedTimeframe]);
 
@@ -536,7 +490,36 @@ export default function TokenOverviewPage() {
     return "simple_erc20";
   };
 
-  // Previous style TimePeriodButtons component with animation
+  // Mock price display component
+  const MockPriceDisplay = () => {
+    if (!tokenInfo?.priceData) return null;
+
+    return (
+      <div className="flex-1">
+        <div className="text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
+          $
+          {tokenInfo.priceData.current_price.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 6,
+          })}
+        </div>
+        <div className="flex items-center gap-2">
+          <div
+            className={`text-sm font-satoshi ${
+              tokenInfo.priceData.price_change_percentage_24h >= 0
+                ? "text-green-400"
+                : "text-red-400"
+            }`}
+          >
+            {formatPercentage(tokenInfo.priceData.price_change_percentage_24h)}
+          </div>
+          <div className="text-gray-400 text-sm font-satoshi">24h</div>
+        </div>
+      </div>
+    );
+  };
+
+  // Time period buttons component
   const TimePeriodButtons = ({ className = "" }: { className?: string }) => (
     <div className={`flex gap-1 items-center ${className}`}>
       <div
@@ -624,7 +607,6 @@ export default function TokenOverviewPage() {
   const tokenBalance = parseFloat(tokenInfo.balance);
   const tokenValue = tokenBalance * (tokenInfo.priceData?.current_price || 0);
 
-  // Rest of your component remains the same...
   return (
     <>
       <style jsx global>{`
@@ -682,24 +664,14 @@ export default function TokenOverviewPage() {
               </div>
             </div>
 
-            {/* Real-time Price Section with TimePeriodButtons */}
+            {/* Price Section with TimePeriodButtons */}
             <div className="flex items-end justify-between">
-              <RealtimePriceDisplay
-                tokenAddress={tokenInfo.contractAddress}
-                tokenSymbol={tokenInfo.symbol}
-                tokenBalance={parseFloat(tokenInfo.balance)}
-                fallbackPrice={tokenInfo.priceData?.current_price || 0}
-                fallbackChange={
-                  tokenInfo.priceData?.price_change_percentage_24h || 0
-                }
-                showSparkline={false}
-                className="flex-1"
-              />
+              <MockPriceDisplay />
               <TimePeriodButtons className="ml-2" />
             </div>
           </div>
 
-          {/* Compact Uniswap-style Chart for Mobile */}
+          {/* Chart for Mobile */}
           <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
             <div className="mb-2.5">
               <h3 className="text-base font-semibold text-white font-satoshi">
@@ -786,7 +758,6 @@ export default function TokenOverviewPage() {
             )}
           </div>
 
-          {/* Rest of mobile layout remains the same... */}
           {/* Balance Section */}
           <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
             <div className="flex items-center justify-between mb-2.5">
@@ -847,23 +818,16 @@ export default function TokenOverviewPage() {
           {/* Transaction History */}
           <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
             <div className="max-h-44 overflow-y-auto scrollbar-hide">
-              <TransactionHistory
-                key={refreshKey}
-                walletAddress={walletAddress}
-                tokenFilter={getTokenFilterForTransactions()}
-                transactionTypeFilter={getTransactionTypeFilter()}
-                limit={20}
-                showFilter={false}
-                compact={true}
-                className="min-h-0"
-                isTokenOverview={true}
-                useDatabase={false}
-              />
+              <div className="p-4 text-center">
+                <div className="text-gray-400 text-sm font-satoshi">
+                  Transaction history will appear here
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Desktop Layout remains exactly the same but with fixed chart */}
+        {/* Desktop Layout */}
         <div className="hidden xl:flex gap-3 flex-1 min-h-0">
           <div className="flex-1 flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto space-y-3 scrollbar-hide">
@@ -932,23 +896,13 @@ export default function TokenOverviewPage() {
                   </div>
                 </div>
 
-                {/* Real-time Price Section with TimePeriodButtons */}
+                {/* Price Section with TimePeriodButtons */}
                 <div className="flex items-end justify-between mb-3.5">
-                  <RealtimePriceDisplay
-                    tokenAddress={tokenInfo.contractAddress}
-                    tokenSymbol={tokenInfo.symbol}
-                    tokenBalance={parseFloat(tokenInfo.balance)}
-                    fallbackPrice={tokenInfo.priceData?.current_price || 0}
-                    fallbackChange={
-                      tokenInfo.priceData?.price_change_percentage_24h || 0
-                    }
-                    showSparkline={true}
-                    className="flex-1"
-                  />
+                  <MockPriceDisplay />
                   <TimePeriodButtons className="ml-4" />
                 </div>
 
-                {/* Compact Uniswap-style Chart */}
+                {/* Chart */}
                 <div className="mb-4">
                   {chartLoading ? (
                     <div className="h-64 flex items-center justify-center">
@@ -1055,7 +1009,7 @@ export default function TokenOverviewPage() {
                   )}
                 </div>
 
-                {/* Rest of desktop layout remains the same... */}
+                {/* Token Stats */}
                 {tokenInfo.priceData && (
                   <div className="flex items-center justify-between w-full text-xs mt-4">
                     <div className="bg-[#2C2C2C] px-2.5 py-2 rounded-full">
@@ -1169,7 +1123,7 @@ export default function TokenOverviewPage() {
             </div>
           </div>
 
-          {/* Sidebar - Rest remains the same */}
+          {/* Sidebar */}
           <div className="w-[390px] flex-shrink-0 h-full">
             <div className="bg-black rounded-[14px] border border-[#2C2C2C] h-full flex flex-col p-3">
               <div className="flex items-center mb-3">
@@ -1242,17 +1196,11 @@ export default function TokenOverviewPage() {
 
               <div className="flex-1 min-h-0 flex flex-col">
                 <div className="flex-1 overflow-y-auto pr-1.5 scrollbar-hide">
-                  <TransactionHistory
-                    walletAddress={walletAddress}
-                    tokenFilter={getTokenFilterForTransactions()}
-                    transactionTypeFilter={getTransactionTypeFilter()}
-                    limit={50}
-                    showFilter={false}
-                    compact={true}
-                    className="flex-1 min-h-0"
-                    isTokenOverview={true}
-                    useDatabase={false}
-                  />
+                  <div className="p-4 text-center">
+                    <div className="text-gray-400 text-sm font-satoshi">
+                      Transaction history will appear here
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1261,25 +1209,11 @@ export default function TokenOverviewPage() {
       </div>
 
       {tokenInfo && (
-        <SimpleTransferModal
-          isOpen={transferModalOpen}
-          onClose={() => setTransferModalOpen(false)}
-          tokenInfo={{
-            name: tokenInfo.name,
-            symbol: tokenInfo.symbol,
-            contractAddress: tokenInfo.contractAddress,
-            decimals: tokenInfo.decimals,
-            balance: tokenInfo.balance,
-            priceData: tokenInfo.priceData || undefined,
-          }}
-          walletAddress={walletAddress || ""}
+        <UserQRCodeModal
+          isOpen={qrModalOpen}
+          onClose={() => setQrModalOpen(false)}
         />
       )}
-
-      <UserQRCodeModal
-        isOpen={qrModalOpen}
-        onClose={() => setQrModalOpen(false)}
-      />
     </>
   );
 }

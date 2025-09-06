@@ -1,4 +1,4 @@
-// src/components/ChatSidebar.tsx
+// src/components/ChatSidebar.tsx - BACKEND REMOVED, UI PRESERVED
 "use client";
 
 import { useState, useEffect } from "react";
@@ -11,6 +11,7 @@ import {
   Search,
   History,
   Archive,
+  AlertTriangle,
 } from "lucide-react";
 
 interface ChatSession {
@@ -46,7 +47,7 @@ export default function ChatSidebar({
 
   useEffect(() => {
     if (isOpen) {
-      loadSessions();
+      loadMockSessions();
     }
   }, [isOpen]);
 
@@ -63,42 +64,111 @@ export default function ChatSidebar({
     }
   }, [searchQuery, sessions]);
 
-  const loadSessions = async () => {
+  // MODIFIED: Load mock sessions instead of API call
+  const loadMockSessions = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/ai-chat/sessions", {
-        credentials: "include",
-      });
+      console.log("📋 Loading mock chat sessions...");
 
-      if (response.ok) {
-        const data = await response.json();
-        setSessions(data.sessions || []);
-      } else {
-        console.error("Failed to load sessions");
+      // Simulate loading delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Try to load from localStorage first
+      const savedSessions = localStorage.getItem("demo-chat-sessions");
+      let mockSessions: ChatSession[] = [];
+
+      if (savedSessions) {
+        try {
+          const parsed = JSON.parse(savedSessions);
+          mockSessions = parsed.map((session: any) => ({
+            ...session,
+            lastActivity: new Date(session.lastActivity),
+            createdAt: new Date(session.createdAt),
+          }));
+          console.log("✅ Loaded saved demo sessions:", mockSessions.length);
+        } catch (error) {
+          console.warn("⚠️ Error parsing saved sessions, using defaults");
+        }
       }
+
+      // If no saved sessions, create some demo ones
+      if (mockSessions.length === 0) {
+        const now = new Date();
+        mockSessions = [
+          {
+            id: "demo-1",
+            title: "Crypto Portfolio Analysis",
+            lastMessage: "Can you analyze my wallet performance?",
+            lastActivity: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
+            messageCount: 8,
+            createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+          },
+          {
+            id: "demo-2",
+            title: "DeFi Strategy Discussion",
+            lastMessage: "What's the best yield farming strategy?",
+            lastActivity: new Date(now.getTime() - 24 * 60 * 60 * 1000), // 1 day ago
+            messageCount: 12,
+            createdAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+          },
+          {
+            id: "demo-3",
+            title: "Smart Contract Help",
+            lastMessage: "Review this contract for security issues",
+            lastActivity: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+            messageCount: 15,
+            createdAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+          },
+          {
+            id: "demo-4",
+            title: "Market Trends Q&A",
+            lastMessage: "Explain the recent Bitcoin price movement",
+            lastActivity: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
+            messageCount: 6,
+            createdAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+          },
+        ];
+
+        // Save demo sessions to localStorage
+        localStorage.setItem(
+          "demo-chat-sessions",
+          JSON.stringify(mockSessions)
+        );
+        console.log("✅ Created and saved demo sessions");
+      }
+
+      setSessions(mockSessions);
     } catch (error) {
-      console.error("Error loading sessions:", error);
+      console.error("❌ Error loading mock sessions:", error);
+      setSessions([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // MODIFIED: Mock session deletion (local only)
   const deleteSession = async (sessionId: string) => {
     try {
-      const response = await fetch(`/api/ai-chat/sessions/${sessionId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      console.log("🗑️ Deleting demo session:", sessionId);
 
-      if (response.ok) {
-        setSessions(sessions.filter((s) => s.id !== sessionId));
-        // If deleting current session, start new chat
-        if (sessionId === activeSessionId) {
-          onNewChat();
-        }
+      // Remove from local state
+      const updatedSessions = sessions.filter((s) => s.id !== sessionId);
+      setSessions(updatedSessions);
+
+      // Update localStorage
+      localStorage.setItem(
+        "demo-chat-sessions",
+        JSON.stringify(updatedSessions)
+      );
+
+      // If deleting current session, start new chat
+      if (sessionId === activeSessionId) {
+        onNewChat();
       }
+
+      console.log("✅ Demo session deleted successfully");
     } catch (error) {
-      console.error("Error deleting session:", error);
+      console.error("❌ Error deleting demo session:", error);
     }
   };
 
@@ -163,6 +233,16 @@ export default function ChatSidebar({
           isOpen ? "translate-x-0" : "-translate-x-full"
         } lg:relative lg:translate-x-0`}
       >
+        {/* Demo Mode Banner */}
+        <div className="bg-yellow-900/20 border-b border-yellow-500/30 px-4 py-2">
+          <div className="flex items-center">
+            <AlertTriangle size={14} className="text-yellow-400 mr-2" />
+            <span className="text-yellow-400 text-xs font-satoshi">
+              Demo Mode: Local sessions only
+            </span>
+          </div>
+        </div>
+
         {/* Header */}
         <div className="p-4 border-b border-[#2c2c2c]">
           <div className="flex items-center justify-between mb-4">
@@ -183,7 +263,7 @@ export default function ChatSidebar({
             className="w-full flex items-center justify-center gap-2 p-3 bg-[#E2AF19] text-black rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi font-medium"
           >
             <Plus size={16} />
-            New Chat
+            New Demo Chat
           </button>
 
           {/* Search */}
@@ -194,7 +274,7 @@ export default function ChatSidebar({
             />
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder="Search demo conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#0f0f0f] text-white placeholder-gray-400 pl-10 pr-4 py-2 rounded-lg border border-[#2c2c2c] focus:border-[#E2AF19] focus:outline-none text-sm font-satoshi"
@@ -215,8 +295,8 @@ export default function ChatSidebar({
               <MessageSquare size={24} className="mx-auto mb-2 opacity-50" />
               <p className="text-sm font-satoshi">
                 {searchQuery
-                  ? "No matching conversations"
-                  : "No conversations yet"}
+                  ? "No matching demo conversations"
+                  : "No demo conversations yet"}
               </p>
               <p className="text-xs mt-1">
                 {searchQuery
@@ -305,7 +385,7 @@ export default function ChatSidebar({
         <div className="p-4 border-t border-[#2c2c2c]">
           <div className="flex items-center gap-2 text-xs text-gray-400 font-satoshi">
             <History size={12} />
-            <span>{sessions.length} conversations</span>
+            <span>{sessions.length} demo conversations</span>
           </div>
         </div>
       </div>

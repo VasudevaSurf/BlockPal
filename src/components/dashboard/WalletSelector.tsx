@@ -4,17 +4,33 @@ import { useSelector, useDispatch } from "react-redux";
 import { X, Plus } from "lucide-react";
 import { RootState } from "@/store";
 import { closeWalletSelector } from "@/store/slices/uiSlice";
-import { setActiveWallet } from "@/store/slices/walletSlice";
 import Button from "@/components/ui/Button";
+
+// Mock wallet data
+const mockWallets = [
+  {
+    id: "1",
+    name: "Main Wallet",
+    address: "0x1234567890123456789012345678901234567890",
+    balance: 12847.65,
+    isActive: true,
+  },
+  {
+    id: "2",
+    name: "Trading Wallet",
+    address: "0x9876543210987654321098765432109876543210",
+    balance: 3250.4,
+    isActive: false,
+  },
+];
 
 export default function WalletSelector() {
   const dispatch = useDispatch();
-  const { wallets, activeWallet } = useSelector(
-    (state: RootState) => state.wallet
-  );
+  const { user } = useSelector((state: RootState) => state.auth);
 
   const handleSelectWallet = (walletId: string) => {
-    dispatch(setActiveWallet(walletId));
+    // Mock wallet selection
+    console.log("Selected wallet:", walletId);
     dispatch(closeWalletSelector());
   };
 
@@ -37,7 +53,7 @@ export default function WalletSelector() {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-dark-500 rounded-lg p-6 w-full max-w-md mx-4">
+      <div className="bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-6 w-full max-w-md mx-4">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-white">Select Wallet</h2>
           <button
@@ -49,14 +65,14 @@ export default function WalletSelector() {
         </div>
 
         <div className="space-y-3 mb-6">
-          {wallets.map((wallet, index) => (
+          {mockWallets.map((wallet, index) => (
             <button
               key={wallet.id}
               onClick={() => handleSelectWallet(wallet.id)}
               className={`w-full flex items-center p-4 rounded-lg transition-colors ${
                 wallet.isActive
-                  ? "bg-primary-500 text-black"
-                  : "bg-dark-400 hover:bg-dark-300 text-white"
+                  ? "bg-[#E2AF19] text-black"
+                  : "bg-[#2C2C2C] hover:bg-[#3C3C3C] text-white"
               }`}
             >
               <div
@@ -69,7 +85,9 @@ export default function WalletSelector() {
                     wallet.isActive ? "text-black opacity-70" : "text-gray-400"
                   }`}
                 >
-                  {wallet.address}
+                  {`${wallet.address.slice(0, 8)}...${wallet.address.slice(
+                    -6
+                  )}`}
                 </div>
               </div>
               <div className="text-right">

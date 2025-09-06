@@ -1,4 +1,4 @@
-// src/components/friends/EnhancedFriendsSearch.tsx - COMPACT VERSION
+// src/components/friends/EnhancedFriendsSearch.tsx - FRONTEND ONLY VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -47,10 +47,38 @@ interface EnhancedFriendsSearchProps {
   friends: Friend[];
   friendRequests: FriendRequest[];
   sentRequests: SentRequest[];
-  onSendFriendRequest: (username: string) => Promise<void>;
+  onSendFriendRequest: (username: string) => void; // Removed Promise<void>
   loading: boolean;
   currentUsername?: string;
 }
+
+// Mock users for search suggestions
+const mockUsers: User[] = [
+  {
+    _id: "1",
+    username: "alice_crypto",
+    displayName: "Alice Johnson",
+    walletAddress: "0x1234567890123456789012345678901234567890",
+  },
+  {
+    _id: "2",
+    username: "bob_trader",
+    displayName: "Bob Smith",
+    walletAddress: "0x9876543210987654321098765432109876543210",
+  },
+  {
+    _id: "3",
+    username: "charlie_dev",
+    displayName: "Charlie Brown",
+    walletAddress: "0x5555666677778888999900001111222233334444",
+  },
+  {
+    _id: "4",
+    username: "diana_web3",
+    displayName: "Diana Prince",
+    walletAddress: "0xAAAABBBBCCCCDDDDEEEEFFFF0000111122223333",
+  },
+];
 
 export default function EnhancedFriendsSearch({
   friends,
@@ -100,19 +128,17 @@ export default function EnhancedFriendsSearch({
     try {
       setSearchLoading(true);
 
-      const response = await fetch(
-        `/api/users/search?q=${encodeURIComponent(query)}`,
-        { credentials: "include" }
+      // Mock search - filter mock users based on query
+      const filteredUsers = mockUsers.filter(
+        (user) =>
+          !isCurrentUser(user.username) &&
+          (user.username.toLowerCase().includes(query.toLowerCase()) ||
+            user.displayName?.toLowerCase().includes(query.toLowerCase()))
       );
-
-      let apiUsers: User[] = [];
-      if (response.ok) {
-        const data = await response.json();
-        apiUsers = data.users || [];
-      }
 
       const userRelationships = new Map<string, SearchSuggestion>();
 
+      // Check existing friends
       friends.forEach((friend) => {
         if (
           !isCurrentUser(friend.username) &&
@@ -126,6 +152,7 @@ export default function EnhancedFriendsSearch({
         }
       });
 
+      // Check incoming friend requests
       friendRequests.forEach((request) => {
         const user = request.requesterData;
         if (
@@ -142,6 +169,7 @@ export default function EnhancedFriendsSearch({
         }
       });
 
+      // Check outgoing friend requests
       sentRequests.forEach((request) => {
         const user = request.receiverData;
         if (
@@ -158,7 +186,8 @@ export default function EnhancedFriendsSearch({
         }
       });
 
-      apiUsers.forEach((user) => {
+      // Add filtered mock users who don't have existing relationships
+      filteredUsers.forEach((user) => {
         if (
           !userRelationships.has(user.username) &&
           !isCurrentUser(user.username) &&
@@ -277,7 +306,7 @@ export default function EnhancedFriendsSearch({
 
     if (suggestion.relationshipType === "none") {
       try {
-        await onSendFriendRequest(suggestion.username);
+        onSendFriendRequest(suggestion.username);
         setSearchQuery("");
         setShowSuggestions(false);
         setSelectedIndex(-1);
@@ -298,7 +327,7 @@ export default function EnhancedFriendsSearch({
       }
 
       try {
-        await onSendFriendRequest(searchQuery);
+        onSendFriendRequest(searchQuery);
         setSearchQuery("");
       } catch (error) {
         console.error("Error sending friend request to wallet address:", error);
@@ -454,7 +483,6 @@ export default function EnhancedFriendsSearch({
                             <span className="text-white font-satoshi text-xs truncate">
                               {suggestion.displayName || suggestion.username}
                             </span>
-                            {/* {relationshipDisplay.icon} */}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className="text-gray-400 font-satoshi text-xs truncate">
@@ -462,9 +490,7 @@ export default function EnhancedFriendsSearch({
                             </span>
                             <span
                               className={`text-xs font-satoshi ${relationshipDisplay.color}`}
-                            >
-                              {/* {relationshipDisplay.label} */}
-                            </span>
+                            ></span>
                           </div>
                         </div>
                       </div>

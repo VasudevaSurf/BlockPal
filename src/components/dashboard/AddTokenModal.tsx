@@ -4,7 +4,7 @@ import { X, Plus, Search, AlertCircle } from "lucide-react";
 interface AddTokenModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddToken: (contractAddress: string) => Promise<void>;
+  onAddToken: (contractAddress: string) => void; // Remove Promise<void>
 }
 
 export default function AddTokenModal({
@@ -33,13 +33,14 @@ export default function AddTokenModal({
     setError("");
 
     try {
-      await onAddToken(contractAddress);
+      // Just call the callback without backend logic
+      onAddToken(contractAddress);
       setSuccess(true);
       setTimeout(() => {
         handleClose();
       }, 1500);
     } catch (err: any) {
-      setError(err.message || "Failed to add token");
+      setError("Failed to add token");
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +95,7 @@ export default function AddTokenModal({
                     add to your dashboard.
                   </p>
                   <p className="text-xs">
-                    The token will be displayed even if you have zero balance.
+                    The token will be displayed in your portfolio.
                   </p>
                 </div>
               </div>
@@ -202,7 +203,7 @@ export default function AddTokenModal({
           {/* Info Text */}
           <div className="mt-4 text-center">
             <p className="text-xs text-gray-500 font-satoshi">
-              Token metadata will be fetched from CoinGecko or Alchemy
+              Token information will be displayed in your dashboard
             </p>
           </div>
         </div>

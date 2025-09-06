@@ -33,7 +33,6 @@ import UsernameInput from "@/components/ui/UsernameInput";
 import { UserSuggestion } from "@/hooks/useUsernameSearch";
 import { SkeletonScheduledPayments } from "@/components/ui/Skeleton";
 import { DateTimePicker } from "@/components/ui/DateTimePicker";
-import { usePaymentAcknowledgments } from "@/hooks/usePaymentAcknowledgments";
 
 interface ScheduledPayment {
   id: string;
@@ -96,7 +95,7 @@ interface PaymentPreview {
   smartContractOptimized: boolean;
 }
 
-// FIXED: Supported tokens configuration with proper images
+// Supported tokens configuration with proper images
 const SUPPORTED_TOKENS = [
   {
     symbol: "ETH",
@@ -121,7 +120,7 @@ const SUPPORTED_TOKENS = [
   },
 ];
 
-// FIXED: Token icon component with better fallback handling
+// Token icon component with better fallback handling
 const TokenIcon = ({
   token,
   size = "w-4 h-4",
@@ -189,7 +188,7 @@ const TokenIcon = ({
   );
 };
 
-// UPDATED: UTC as default timezone
+// UTC as default timezone
 const timezones = [
   { idx: 1, name: "UTC (Coordinated Universal Time)", tz: "UTC" },
   { idx: 2, name: "IST (India Standard Time)", tz: "Asia/Kolkata" },
@@ -219,8 +218,6 @@ export default function ScheduledPaymentsPage() {
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
   const [isTimezoneDropdownOpen, setIsTimezoneDropdownOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
-  const { checkForNewPaymentAcknowledgments, triggerImmediateCheck } =
-    usePaymentAcknowledgments();
 
   // State management
   const [scheduledPayments, setScheduledPayments] = useState<
@@ -261,7 +258,7 @@ export default function ScheduledPaymentsPage() {
   const [isEditRecurringDropdownOpen, setIsEditRecurringDropdownOpen] =
     useState(false);
 
-  // FIXED: Process supported tokens with user balances
+  // Process supported tokens with user balances
   const getSupportedTokensWithBalances = () => {
     console.log("🔍 Processing supported tokens with user balances...");
     console.log("📋 User tokens from Redux:", tokens);
@@ -307,6 +304,67 @@ export default function ScheduledPaymentsPage() {
   // Get the processed supported tokens
   const supportedTokensWithBalances = getSupportedTokensWithBalances();
 
+  // Mock data for demonstration
+  const mockScheduledPayments: ScheduledPayment[] = [
+    {
+      id: "1",
+      scheduleId: "schedule_1",
+      walletAddress: "0x1234567890123456789012345678901234567890",
+      tokenSymbol: "ETH",
+      tokenName: "Ethereum",
+      contractAddress: "native",
+      recipient: "0x9876543210987654321098765432109876543210",
+      amount: "0.5",
+      frequency: "weekly",
+      status: "active",
+      scheduledFor: "2025-01-15T10:00:00.000Z",
+      nextExecution: "2025-01-22T10:00:00.000Z",
+      executionCount: 0,
+      maxExecutions: -1,
+      description: "Weekly payment for freelancer",
+      createdAt: "2025-01-08T10:00:00.000Z",
+    },
+    {
+      id: "2",
+      scheduleId: "schedule_2",
+      walletAddress: "0x1234567890123456789012345678901234567890",
+      tokenSymbol: "USDC",
+      tokenName: "USD Coin",
+      contractAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      recipient: "0x1111222233334444555566667777888899990000",
+      amount: "100",
+      frequency: "once",
+      status: "completed",
+      scheduledFor: "2025-01-05T14:30:00.000Z",
+      executionCount: 1,
+      maxExecutions: 1,
+      description: "One-time payment",
+      createdAt: "2025-01-01T10:00:00.000Z",
+      lastExecutionAt: "2025-01-05T14:30:00.000Z",
+      lastTransactionHash:
+        "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+    },
+    {
+      id: "3",
+      scheduleId: "schedule_3",
+      walletAddress: "0x1234567890123456789012345678901234567890",
+      tokenSymbol: "USDT",
+      tokenName: "Tether USD",
+      contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      recipient: "0x2222333344445555666677778888999900001111",
+      amount: "50",
+      frequency: "monthly",
+      status: "failed",
+      scheduledFor: "2025-01-10T09:00:00.000Z",
+      executionCount: 0,
+      maxExecutions: -1,
+      description: "Monthly subscription",
+      createdAt: "2025-01-01T10:00:00.000Z",
+      lastError: "Insufficient funds for gas",
+      failedAt: "2025-01-10T09:00:00.000Z",
+    },
+  ];
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -339,7 +397,7 @@ export default function ScheduledPaymentsPage() {
     isEditRecurringDropdownOpen,
   ]);
 
-  // FIXED: Initialize with ETH as default token
+  // Initialize with ETH as default token
   useEffect(() => {
     if (supportedTokensWithBalances.length > 0 && !selectedToken) {
       const ethToken = supportedTokensWithBalances.find(
@@ -352,93 +410,34 @@ export default function ScheduledPaymentsPage() {
     }
   }, [supportedTokensWithBalances.length, selectedToken]);
 
-  // Fetch scheduled payments
-  useEffect(() => {
-    if (activeWallet?.address) {
-      fetchScheduledPayments();
-    }
-  }, [activeWallet?.address, activeTab]);
-
+  // Load mock data
   useEffect(() => {
     if (activeWallet?.address) {
       loadInitialData();
     }
-  }, [activeWallet?.address]);
+  }, [activeWallet?.address, activeTab]);
 
   const loadInitialData = async () => {
     try {
       setInitialLoading(true);
       await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      // Set mock data based on active tab
+      if (activeTab === "active") {
+        setScheduledPayments(
+          mockScheduledPayments.filter((p) => p.status === "active")
+        );
+      } else {
+        setScheduledPayments(
+          mockScheduledPayments.filter(
+            (p) => p.status === "completed" || p.status === "failed"
+          )
+        );
+      }
     } catch (error) {
       console.error("Error loading initial data:", error);
     } finally {
       setInitialLoading(false);
-    }
-  };
-
-  const fetchScheduledPayments = async () => {
-    if (!activeWallet?.address) return;
-
-    try {
-      setLoading(true);
-
-      if (activeTab === "active") {
-        const response = await fetch(
-          `/api/scheduled-payments?status=active&walletAddress=${activeWallet.address}`,
-          {
-            credentials: "include",
-          }
-        );
-
-        const data = await response.json();
-
-        if (response.ok) {
-          setScheduledPayments(data.scheduledPayments || []);
-        } else {
-          setError(data.error || "Failed to fetch scheduled payments");
-        }
-      } else {
-        console.log("🔍 Fetching history (all payments) for filtering...");
-
-        const response = await fetch(
-          `/api/scheduled-payments?status=all&walletAddress=${activeWallet.address}`,
-          {
-            credentials: "include",
-          }
-        );
-
-        const data = await response.json();
-
-        if (response.ok) {
-          const allPayments = data.scheduledPayments || [];
-          console.log("📊 All payments received:", allPayments.length);
-
-          const historyPayments = allPayments.filter(
-            (payment: ScheduledPayment) =>
-              payment.status === "completed" || payment.status === "failed"
-          );
-
-          console.log("📋 History payments filtered:", {
-            total: allPayments.length,
-            completed: allPayments.filter(
-              (p: ScheduledPayment) => p.status === "completed"
-            ).length,
-            failed: allPayments.filter(
-              (p: ScheduledPayment) => p.status === "failed"
-            ).length,
-            historyTotal: historyPayments.length,
-          });
-
-          setScheduledPayments(historyPayments);
-        } else {
-          setError(data.error || "Failed to fetch scheduled payments");
-        }
-      }
-    } catch (error: any) {
-      setError("Failed to fetch scheduled payments");
-      console.error("Error fetching scheduled payments:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -513,138 +512,20 @@ export default function ScheduledPaymentsPage() {
         return;
       }
 
-      const scheduledDateTime = new Date(
-        `${editFormData.date}T${editFormData.time}:00`
-      );
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      if (isNaN(scheduledDateTime.getTime())) {
-        setError("Invalid date or time format");
-        return;
-      }
-
-      if (scheduledDateTime <= new Date()) {
-        setError("Scheduled time must be in the future");
-        return;
-      }
-
-      const originalToken = supportedTokensWithBalances.find(
-        (t) =>
-          t.symbol === editingPayment.tokenSymbol ||
-          t.contractAddress === editingPayment.contractAddress
-      );
-
-      const tokenInfo = originalToken
-        ? {
-            name: originalToken.name,
-            symbol: originalToken.symbol,
-            contractAddress: originalToken.contractAddress,
-            decimals: originalToken.decimals,
-            isETH: originalToken.symbol === "ETH",
-            balance: originalToken.balance,
-            price: originalToken.price,
-            icon: originalToken.icon,
-          }
-        : {
-            name: editingPayment.tokenName,
-            symbol: editingPayment.tokenSymbol,
-            contractAddress: editingPayment.contractAddress,
-            decimals: editingPayment.tokenSymbol === "ETH" ? 18 : 6,
-            isETH: editingPayment.tokenSymbol === "ETH",
-          };
-
-      console.log("🔍 Token info for update:", {
-        originalTokenFound: !!originalToken,
-        tokenInfo,
-      });
-
-      console.log(
-        `🗑️ Cancelling existing payment: ${editingPayment.scheduleId}`
-      );
-
-      const cancelResponse = await fetch(
-        `/api/scheduled-payments/${editingPayment.scheduleId}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: "cancel",
-            status: "cancelled",
-          }),
-          credentials: "include",
-        }
-      );
-
-      if (!cancelResponse.ok) {
-        const cancelError = await cancelResponse.json();
-        throw new Error(
-          cancelError.error || "Failed to cancel existing payment"
-        );
-      }
-
-      console.log("✅ Existing payment cancelled successfully");
-
-      const frequency = editRecurringEnabled ? editFormData.frequency : "once";
-
-      const createBody = {
-        action: "create",
-        tokenInfo: tokenInfo,
-        fromAddress: editingPayment.walletAddress,
-        recipient: editingPayment.recipient,
-        amount: editFormData.amount,
-        scheduledFor: scheduledDateTime.toISOString(),
-        frequency,
-        timezone: editSelectedTimezone.tz,
-        description: editFormData.description,
-      };
-
-      console.log(
-        "📡 Sending recreate request with proper token info:",
-        createBody
-      );
-
-      const createResponse = await fetch("/api/scheduled-payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(createBody),
-        credentials: "include",
-      });
-
-      if (!createResponse.ok) {
-        const errorData = await createResponse.json();
-        console.error("❌ Create failed:", errorData);
-        throw new Error(errorData.error || "Failed to create updated payment");
-      }
-
-      const createResult = await createResponse.json();
-      console.log("✅ Payment updated successfully (recreated):", createResult);
+      console.log("✅ Payment updated successfully (simulated)");
 
       setShowEditModal(false);
       setEditingPayment(null);
       setIsEditing(false);
 
-      console.log("🔔 Triggering acknowledgment check for payment update...");
-      checkForNewPaymentAcknowledgments();
-
-      setTimeout(() => {
-        console.log("🔔 Secondary acknowledgment check for payment update...");
-        triggerImmediateCheck();
-      }, 3000);
-
-      fetchScheduledPayments();
-
-      console.log("✅ Payment update completed successfully");
+      // Refresh data
+      loadInitialData();
     } catch (error: any) {
       console.error("❌ Error updating payment:", error);
       setError("Failed to update payment: " + error.message);
-
-      console.log(
-        "🔔 Triggering acknowledgment check for payment update error..."
-      );
-      triggerImmediateCheck();
     } finally {
       setUpdating(false);
     }
@@ -662,28 +543,14 @@ export default function ScheduledPaymentsPage() {
     try {
       setLoading(true);
 
-      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      const data = await response.json();
-
-      if (response.ok) {
-        console.log("✅ Payment deleted successfully");
-        triggerImmediateCheck();
-        fetchScheduledPayments();
-      } else {
-        setError(data.error || "Failed to delete payment");
-        triggerImmediateCheck();
-      }
+      console.log("✅ Payment deleted successfully (simulated)");
+      loadInitialData();
     } catch (error: any) {
       console.error("❌ Error deleting payment:", error);
       setError("Failed to delete payment");
-      triggerImmediateCheck();
     } finally {
       setLoading(false);
     }
@@ -697,32 +564,14 @@ export default function ScheduledPaymentsPage() {
     try {
       setLoading(true);
 
-      const response = await fetch(`/api/scheduled-payments/${scheduleId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "cancel",
-          status: "cancelled",
-        }),
-        credentials: "include",
-      });
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      const data = await response.json();
-
-      if (response.ok) {
-        console.log("✅ Payment cancelled successfully");
-        triggerImmediateCheck();
-        fetchScheduledPayments();
-      } else {
-        setError(data.error || "Failed to cancel payment");
-        triggerImmediateCheck();
-      }
+      console.log("✅ Payment cancelled successfully (simulated)");
+      loadInitialData();
     } catch (error: any) {
       console.error("❌ Error cancelling payment:", error);
       setError("Failed to cancel payment");
-      triggerImmediateCheck();
     } finally {
       setLoading(false);
     }
@@ -836,41 +685,29 @@ export default function ScheduledPaymentsPage() {
         ? selectedUser.walletAddress
         : formData.recipient;
 
-      const requestBody = {
-        action: "preview",
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // Mock preview data
+      const mockPreview: PaymentPreview = {
         tokenInfo: selectedToken,
-        fromAddress: activeWallet.address,
         recipient: recipientAddress,
         amount: formData.amount,
-        scheduledFor: scheduledDateTime.toISOString(),
+        scheduledFor: scheduledDateTime,
         frequency,
-        timezone: selectedTimezone.tz,
+        nextExecutions: [scheduledDateTime],
+        estimatedGas: "21000",
+        gasCostETH: "0.001",
+        gasCostUSD: "3.50",
+        taxETH: "0.0001",
+        taxUSD: "0.35",
+        totalCostETH: "0.0011",
+        totalCostUSD: "3.85",
+        approvalRequired: selectedToken.symbol !== "ETH",
+        smartContractOptimized: true,
       };
 
-      console.log("📡 Sending smart contract preview request:", {
-        ...requestBody,
-        selectedUser: selectedUser
-          ? `@${selectedUser.username}`
-          : "Direct address",
-        scheduledFor: scheduledDateTime.toISOString(),
-      });
-
-      const response = await fetch("/api/scheduled-payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create preview");
-      }
-
-      setPreview(data.preview);
+      setPreview(mockPreview);
       setShowPreview(true);
       console.log("✅ Smart contract preview created successfully");
     } catch (err: any) {
@@ -890,51 +727,16 @@ export default function ScheduledPaymentsPage() {
     setError("");
 
     try {
-      const scheduledDateTime = new Date(
-        `${formData.date}T${formData.time}:00`
-      );
-      const frequency = recurringEnabled ? recurringFrequency : "once";
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      const recipientAddress = selectedUser
-        ? selectedUser.walletAddress
-        : formData.recipient;
-
-      const createBody = {
-        action: "create",
-        tokenInfo: selectedToken,
-        fromAddress: activeWallet.address,
-        recipient: recipientAddress,
-        amount: formData.amount,
-        scheduledFor: scheduledDateTime.toISOString(),
-        frequency,
-        timezone: selectedTimezone.tz,
-        description: formData.description,
+      const mockResult = {
+        scheduleId: "sched_" + Math.random().toString(36).substr(2, 9),
+        nextExecution: preview.scheduledFor.toISOString(),
+        contractAddress: "0x" + Math.random().toString(16).substr(2, 40),
       };
 
-      console.log("📡 Sending smart contract create request:", {
-        ...createBody,
-        selectedUser: selectedUser
-          ? `@${selectedUser.username}`
-          : "Direct address",
-        scheduledFor: scheduledDateTime.toISOString(),
-      });
-
-      const response = await fetch("/api/scheduled-payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(createBody),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create scheduled payment");
-      }
-
-      setResult(data);
+      setResult(mockResult);
       setShowResult(true);
       setShowPreview(false);
 
@@ -951,17 +753,13 @@ export default function ScheduledPaymentsPage() {
 
       console.log("✅ Smart contract scheduled payment created successfully");
 
-      checkForNewPaymentAcknowledgments();
-
+      // Refresh data
       setTimeout(() => {
-        triggerImmediateCheck();
-      }, 5000);
-
-      fetchScheduledPayments();
+        loadInitialData();
+      }, 1000);
     } catch (err: any) {
       console.error("❌ Create error:", err);
       setError(err.message || "Failed to create scheduled payment");
-      triggerImmediateCheck();
     } finally {
       setCreating(false);
     }
@@ -977,7 +775,7 @@ export default function ScheduledPaymentsPage() {
     }
   };
 
-  const formatDateTime = (dateString: string) => {
+  const formatDateTime = (dateString: string | Date) => {
     return new Date(dateString).toLocaleString();
   };
 
@@ -1111,25 +909,8 @@ export default function ScheduledPaymentsPage() {
     if (activeTab === "active") {
       return payment.status === "active";
     } else {
-      const isHistoryPayment =
-        payment.status === "completed" || payment.status === "failed";
-      if (payment.status === "failed") {
-        console.log("🔍 Found failed payment:", {
-          scheduleId: payment.scheduleId,
-          status: payment.status,
-          failedAt: payment.failedAt,
-          lastError: payment.lastError,
-          isHistoryPayment,
-        });
-      }
-      return isHistoryPayment;
+      return payment.status === "completed" || payment.status === "failed";
     }
-  });
-
-  console.log("📊 Filtered payments for", activeTab, ":", {
-    total: scheduledPayments.length,
-    filtered: filteredPayments.length,
-    statuses: scheduledPayments.map((p) => p.status),
   });
 
   const getFailureReason = (payment: ScheduledPayment): string => {
@@ -1209,7 +990,7 @@ export default function ScheduledPaymentsPage() {
 
               {/* Token, Amount, and Timezone Row */}
               <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 md:grid-cols-3 md:space-y-0">
-                {/* FIXED: Token Selector */}
+                {/* Token Selector */}
                 <div className="relative token-dropdown w-full sm:col-span-1">
                   <button
                     onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
@@ -1228,7 +1009,7 @@ export default function ScheduledPaymentsPage() {
                     <ChevronDown size={14} className="text-gray-400" />
                   </button>
 
-                  {/* FIXED: Token Dropdown - Only show supported tokens */}
+                  {/* Token Dropdown */}
                   {isTokenDropdownOpen && (
                     <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-lg max-h-40 overflow-y-auto scrollbar-hide">
                       {supportedTokensWithBalances.map((token) => (
@@ -1602,7 +1383,7 @@ export default function ScheduledPaymentsPage() {
                 />
               </div>
 
-              {/* FIXED: Token Selector */}
+              {/* Token Selector */}
               <div className="col-span-2 relative token-dropdown">
                 <button
                   onClick={() => setIsTokenDropdownOpen(!isTokenDropdownOpen)}
@@ -1621,7 +1402,7 @@ export default function ScheduledPaymentsPage() {
                   <ChevronDown size={12} className="text-gray-400" />
                 </button>
 
-                {/* FIXED: Token dropdown - Only show supported tokens */}
+                {/* Token dropdown */}
                 {isTokenDropdownOpen && (
                   <div className="absolute top-full left-0 right-0 z-40 mt-1 bg-black border border-[#2C2C2C] rounded-xl shadow-xl max-h-40 overflow-y-auto scrollbar-hide">
                     {supportedTokensWithBalances.map((token) => (
@@ -1711,9 +1492,9 @@ export default function ScheduledPaymentsPage() {
               </div>
             </div>
 
-            {/* Desktop Layout - Form Row 2 - Date with Time and Recurring Toggle - CHANGED: Added timeProps for 24-hour format */}
+            {/* Desktop Layout - Form Row 2 */}
             <div className="grid grid-cols-12 gap-3 mb-3 items-center">
-              {/* Date with Time Input - Takes up 3 columns */}
+              {/* Date with Time Input */}
               <div className="col-span-3">
                 <DateTimePicker
                   dateValue={formData.date}
@@ -1726,14 +1507,14 @@ export default function ScheduledPaymentsPage() {
                   }
                   placeholder="Select date & time"
                   className="font-satoshi h-[44px]"
-                  timeProps={{ step: "1" }} // Force 24-hour format
+                  timeProps={{ step: "1" }}
                 />
               </div>
 
-              {/* Spacer - Takes up 4 columns */}
+              {/* Spacer */}
               <div className="col-span-4"></div>
 
-              {/* Recurring Toggle - Takes up 5 columns at the end */}
+              {/* Recurring Toggle */}
               <div className="col-span-5 flex items-center justify-end h-[44px]">
                 <div className="flex items-center space-x-2">
                   <Repeat size={14} className="text-gray-400 mr-1.5" />
@@ -1758,7 +1539,7 @@ export default function ScheduledPaymentsPage() {
                         value={recurringFrequency}
                         onChange={(e) => {
                           setRecurringFrequency(e.target.value);
-                          setIsRecurringDropdownOpen(false); // Add this line
+                          setIsRecurringDropdownOpen(false);
                         }}
                         onFocus={() => setIsRecurringDropdownOpen(true)}
                         onBlur={() => setIsRecurringDropdownOpen(false)}
@@ -1804,7 +1585,7 @@ export default function ScheduledPaymentsPage() {
             </div>
           </div>
 
-          {/* Transaction History - Desktop - CHANGED: Completed to History */}
+          {/* Transaction History - Desktop */}
           <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 flex-1 flex flex-col min-h-0">
             {/* Header with Radio Options */}
             <div className="flex items-center justify-between mb-4">
@@ -1829,7 +1610,6 @@ export default function ScheduledPaymentsPage() {
                     className="text-white font-satoshi text-xs"
                   >
                     Active
-                    {/* ({activeCount}) */}
                   </label>
                 </div>
 
@@ -1848,7 +1628,6 @@ export default function ScheduledPaymentsPage() {
                     className="text-white font-satoshi text-xs"
                   >
                     History
-                    {/* ({historyCount}) */}
                   </label>
                 </div>
               </div>
@@ -1942,7 +1721,7 @@ export default function ScheduledPaymentsPage() {
                           {payment.amount} {payment.tokenSymbol}
                         </div>
 
-                        {/* CHANGED: Show different content based on tab and status */}
+                        {/* Show different content based on tab and status */}
                         <div className="text-white font-satoshi text-xs">
                           {activeTab === "active" ? (
                             payment.nextExecution ? (
@@ -2016,7 +1795,7 @@ export default function ScheduledPaymentsPage() {
           </div>
         </div>
 
-        {/* Edit Payment Modal - REMOVED: Danger Zone section */}
+        {/* Edit Payment Modal */}
         {showEditModal && editingPayment && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-lg max-h-[90vh] overflow-hidden">
@@ -2116,7 +1895,7 @@ export default function ScheduledPaymentsPage() {
                         }
                         placeholder="Select date & time"
                         className="font-satoshi"
-                        timeProps={{ step: "1" }} // Force 24-hour format
+                        timeProps={{ step: "1" }}
                       />
                     </div>
 
@@ -2506,7 +2285,7 @@ export default function ScheduledPaymentsPage() {
             display: none;
           }
 
-          /* CHANGED: Force 24-hour time format */
+          /* Force 24-hour time format */
           input[type="time"] {
             -webkit-appearance: none;
             -moz-appearance: textfield;

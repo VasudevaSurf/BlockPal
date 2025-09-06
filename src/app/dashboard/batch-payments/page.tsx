@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSelector } from "react-redux";
 import {
   Bell,
   HelpCircle,
@@ -18,12 +17,53 @@ import {
   GripHorizontal,
   Trash2,
 } from "lucide-react";
-import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import UsernameInput from "@/components/ui/UsernameInput";
 import { UserSuggestion } from "@/hooks/useUsernameSearch";
 import TransactionHistory from "@/components/transactions/TransactionHistory";
+
+// Mock data - replace backend calls
+const mockTokens = [
+  {
+    id: "eth",
+    name: "Ethereum",
+    symbol: "ETH",
+    balance: 1.25843,
+    price: 3200.45,
+    icon: "/tokens/eth.png",
+    logoUrl: "/tokens/eth.png",
+    contractAddress: "native",
+    decimals: 18,
+  },
+  {
+    id: "usdt",
+    name: "Tether USD",
+    symbol: "USDT",
+    balance: 1000.5,
+    price: 1.0,
+    icon: "/tokens/usdt.png",
+    logoUrl: "/tokens/usdt.png",
+    contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    decimals: 6,
+  },
+  {
+    id: "usdc",
+    name: "USD Coin",
+    symbol: "USDC",
+    balance: 2500.75,
+    price: 1.0,
+    icon: "/tokens/usdc.png",
+    logoUrl: "/tokens/usdc.png",
+    contractAddress: "0xA0b86a33E6417f5a10c4C9a6bd1a0d7AF0DB58a7",
+    decimals: 6,
+  },
+];
+
+const mockWallet = {
+  address: "0x742d35Cc6634C0532925a3b8d4Ae7F6eC1e7F5c7",
+  name: "My Wallet",
+};
 
 interface BatchPayment {
   id: string;
@@ -46,10 +86,11 @@ const isValidImageUrl = (url: string | null | undefined): boolean => {
     return false;
   }
   return (
-    url.startsWith("http") &&
-    (url.includes("coingecko") ||
-      url.includes("coinbase") ||
-      url.includes("cdn"))
+    url.startsWith("http") ||
+    url.startsWith("/") ||
+    url.includes("coingecko") ||
+    url.includes("coinbase") ||
+    url.includes("cdn")
   );
 };
 
@@ -109,36 +150,6 @@ const getRandomTokenBgColor = (symbol: string) => {
   }
   const index = Math.abs(hash) % colors.length;
   return colors[index];
-};
-
-const getTokenBackgroundColor = (symbol: string, contractAddress?: string) => {
-  const colors: Record<string, string> = {
-    ETH: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
-    ETHEREUM: "bg-gradient-to-br from-blue-500/20 to-blue-600/30",
-    SOL: "bg-gradient-to-br from-purple-500/20 to-purple-600/30",
-    BTC: "bg-gradient-to-br from-orange-500/20 to-orange-600/30",
-    SUI: "bg-gradient-to-br from-cyan-500/20 to-cyan-600/30",
-    XRP: "bg-gradient-to-br from-gray-500/20 to-gray-600/30",
-    ADA: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
-    AVAX: "bg-gradient-to-br from-red-500/20 to-red-600/30",
-    TON: "bg-gradient-to-br from-blue-400/20 to-blue-500/30",
-    DOT: "bg-gradient-to-br from-pink-500/20 to-pink-600/30",
-    USDT: "bg-gradient-to-br from-green-500/20 to-green-600/30",
-    USDC: "bg-gradient-to-br from-blue-600/20 to-blue-700/30",
-    YAI: "bg-gradient-to-br from-yellow-500/20 to-yellow-600/30",
-    LINK: "bg-gradient-to-br from-blue-700/20 to-blue-800/30",
-  };
-
-  // Special handling for ETH/native token
-  if (
-    symbol === "ETH" ||
-    contractAddress === "native" ||
-    symbol === "ETHEREUM"
-  ) {
-    return colors.ETH || "bg-gradient-to-br from-blue-500/20 to-blue-600/30";
-  }
-
-  return colors[symbol] || "bg-gradient-to-br from-gray-500/20 to-gray-600/30";
 };
 
 const getTokenLetter = (symbol: string, contractAddress?: string) => {
@@ -206,7 +217,6 @@ const TokenIconWithBg = ({
   );
 };
 
-// UPDATED TokenIcon component - no background for images
 const TokenIcon = ({
   token,
   size = "w-3 h-3",
@@ -231,7 +241,6 @@ const TokenIcon = ({
     );
   }
 
-  // Show fallback icon with solid color background
   return (
     <div
       className={`${size} ${getTokenIcon(
@@ -247,11 +256,11 @@ const TokenIcon = ({
 };
 
 export default function BatchPaymentsPage() {
-  const { activeWallet, tokens } = useSelector(
-    (state: RootState) => state.wallet
-  );
+  // Use mock data instead of Redux store
+  const activeWallet = mockWallet;
+  const tokens = mockTokens;
 
-  // FILTER TOKENS TO ONLY SHOW USDT, USDC, AND ETH
+  // Filter tokens to only show USDT, USDC, and ETH
   const allowedTokens = tokens.filter((token) => {
     const symbolUpper = token.symbol?.toUpperCase();
     return (
@@ -270,28 +279,23 @@ export default function BatchPaymentsPage() {
   const [batchPayments, setBatchPayments] = useState<BatchPayment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  const [preview, setPreview] = useState<any>(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const [executing, setExecuting] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [showResult, setShowResult] = useState(false);
   const [copied, setCopied] = useState<string>("");
   const [isTokenDropdownOpen, setIsTokenDropdownOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserSuggestion | null>(null);
+
+  // UI-only states (no backend integration)
+  const [showPreview, setShowPreview] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState<any>(null);
 
   const [batchPanelHeight, setBatchPanelHeight] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
 
-  // FIXED: Add transaction refresh trigger
-  const [transactionRefreshKey, setTransactionRefreshKey] = useState(0);
-
-  // Updated useEffect to use filtered tokens
   useEffect(() => {
     if (allowedTokens.length > 0 && !selectedToken) {
-      // Try to select ETH first, otherwise select the first available token
       const ethToken = allowedTokens.find(
         (t) =>
           t.symbol?.toUpperCase() === "ETH" ||
@@ -458,6 +462,7 @@ export default function BatchPaymentsPage() {
     setBatchPayments(batchPayments.filter((payment) => payment.id !== id));
   };
 
+  // Mock preview creation - UI only
   const createPreview = async () => {
     if (batchPayments.length < 2) {
       setError("Minimum 2 transfers required for batch processing");
@@ -472,162 +477,36 @@ export default function BatchPaymentsPage() {
     setLoading(true);
     setError("");
 
-    try {
-      const response = await fetch("/api/transfer/batch", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "preview",
-          payments: batchPayments,
-          fromAddress: activeWallet.address,
-        }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create preview");
-      }
-
-      setPreview(data.preview);
-      setShowPreview(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to create preview");
-    } finally {
+    // Simulate loading
+    setTimeout(() => {
       setLoading(false);
-    }
+      setShowPreview(true);
+    }, 1000);
   };
 
-  const parseErrorMessage = (error: string): string => {
-    if (error.includes("insufficient funds")) {
-      return "Insufficient funds for this transaction. Please check your wallet balance and try again.";
-    }
-    if (error.includes("gas")) {
-      return "Not enough ETH to pay for transaction fees. Please add more ETH to your wallet.";
-    }
-    if (error.includes("execution reverted")) {
-      return "Transaction failed. Please check token balances and try again.";
-    }
-    if (error.includes("nonce too low")) {
-      return "Transaction failed due to network issues. Please try again.";
-    }
-    if (error.includes("replacement transaction underpriced")) {
-      return "Transaction is pending. Please wait before sending another transaction.";
-    }
-    if (error.includes("network error") || error.includes("timeout")) {
-      return "Network connection error. Please check your internet and try again.";
-    }
-    if (error.includes("user denied") || error.includes("user rejected")) {
-      return "Transaction was cancelled by user.";
-    }
+  // Mock batch execution - UI only
+  const executeBatch = () => {
+    setShowPreview(false);
+    setProcessing(true);
 
-    return "Transaction failed. Please try again or contact support if the issue persists.";
-  };
-
-  const executeBatch = async () => {
-    if (!preview) return;
-
-    setExecuting(true);
-    setError("");
-
-    try {
-      const response = await fetch(`/api/wallets/private-key`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          walletAddress: activeWallet?.address,
-        }),
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const privateKey = prompt(
-          "Please enter your wallet private key to execute the batch transfer:"
-        );
-
-        if (!privateKey) {
-          setShowPreview(false);
-          setResult({
-            success: false,
-            error: "Private key is required for transaction execution",
-          });
-          setShowResult(true);
-          setExecuting(false);
-          return;
-        }
-
-        await executeBatchWithKey(privateKey);
-      } else {
-        const keyData = await response.json();
-
-        if (keyData.success && keyData.privateKey) {
-          await executeBatchWithKey(keyData.privateKey);
-        } else {
-          throw new Error("Failed to retrieve wallet credentials");
-        }
-      }
-    } catch (err: any) {
-      setShowPreview(false);
-      setResult({
-        success: false,
-        error: parseErrorMessage(err.message || "Transaction failed"),
-      });
-      setShowResult(true);
-      setExecuting(false);
-    }
-  };
-
-  const executeBatchWithKey = async (privateKey: string) => {
-    try {
-      setShowPreview(false);
-      setProcessing(true);
-      setExecuting(false);
-
-      const response = await fetch("/api/transfer/batch", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "execute",
-          payments: batchPayments,
-          privateKey: privateKey,
-          fromAddress: activeWallet?.address,
-        }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Batch execution failed");
-      }
-
+    // Simulate processing time
+    setTimeout(() => {
       setProcessing(false);
-      setResult(data.result);
-      setShowResult(true);
-      setBatchPayments([]);
 
-      // FIXED: Trigger transaction history refresh
-      console.log(
-        "✅ Batch transaction completed, refreshing transaction history"
-      );
-      setTransactionRefreshKey((prev) => prev + 1);
-    } catch (err: any) {
-      setProcessing(false);
+      // Generate mock transaction hash
+      const mockTxHash = `0x${Math.random().toString(16).substring(2, 66)}`;
+
       setResult({
-        success: false,
-        error: parseErrorMessage(err.message || "Transaction failed"),
+        success: true,
+        transactionHash: mockTxHash,
+        totalTransfers: batchPayments.length,
+        executionTimeSeconds: 12,
+        explorerUrl: `https://etherscan.io/tx/${mockTxHash}`,
       });
+
       setShowResult(true);
-    } finally {
-      setExecuting(false);
-    }
+      setBatchPayments([]); // Clear batch after "successful" execution
+    }, 3000);
   };
 
   const copyToClipboard = async (text: string, type: string) => {
@@ -642,7 +521,6 @@ export default function BatchPaymentsPage() {
 
   const resetBatch = () => {
     setBatchPayments([]);
-    setPreview(null);
     setShowPreview(false);
     setResult(null);
     setShowResult(false);
@@ -650,19 +528,10 @@ export default function BatchPaymentsPage() {
     setSelectedUser(null);
   };
 
-  // FIXED: Close result modal and refresh transaction history
   const handleCloseResult = () => {
     setShowResult(false);
     setResult(null);
-    // Trigger another refresh when closing result modal
-    console.log("🔄 Closing result modal, triggering transaction refresh");
-    setTransactionRefreshKey((prev) => prev + 1);
   };
-
-  const totalAmount = batchPayments.reduce(
-    (sum, payment) => sum + parseFloat(payment.amount),
-    0
-  );
 
   const getRecipientDisplay = (payment: BatchPayment) => {
     if (payment.selectedUser) {
@@ -707,7 +576,7 @@ export default function BatchPaymentsPage() {
       )}
 
       <div className="flex flex-col xl:hidden gap-2 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-        {/* Mobile layout code remains the same */}
+        {/* Mobile layout - Add Payment Form */}
         <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
           <h2 className="text-sm font-semibold text-white mb-2 font-satoshi">
             Add Payment
@@ -814,7 +683,7 @@ export default function BatchPaymentsPage() {
           </div>
         </div>
 
-        {/* Batch summary and queue sections remain the same */}
+        {/* Mobile Batch Summary and Queue */}
         {batchPayments.length > 0 && (
           <>
             <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
@@ -858,7 +727,7 @@ export default function BatchPaymentsPage() {
               </div>
             </div>
 
-            {/* Batch payments queue section */}
+            {/* Mobile Payments Queue */}
             <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-2.5 flex-shrink-0">
               <h3 className="text-sm font-semibold text-white mb-1.5 font-satoshi">
                 Payments Queue ({batchPayments.length})
@@ -923,25 +792,21 @@ export default function BatchPaymentsPage() {
           </>
         )}
 
+        {/* Mobile Mock Transaction History */}
         <div className="bg-black rounded-[12px] border border-[#2C2C2C] flex-shrink-0 overflow-hidden">
           <div className="p-1.5 h-full max-h-[250px] flex flex-col">
             <div className="h-full overflow-hidden">
-              <TransactionHistory
-                walletAddress={activeWallet?.address}
-                transactionTypeFilter={null} // Don't filter by type - show all transactions
-                tokenFilter={null} // Don't filter by token - show all transactions
-                limit={50}
-                title="Recent Transactions"
-                showRefresh={true}
-                className="h-full overflow-hidden"
-                useDatabase={true} // Use database only for batch payments page
-              />
+              <div className="p-4 text-center">
+                <div className="text-gray-400 text-sm font-satoshi">
+                  Transaction history will appear here after authentication
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Desktop layout */}
+      {/* Desktop Layout */}
       <div
         className="hidden xl:flex flex-col gap-0 flex-1 min-h-0 relative"
         ref={containerRef}
@@ -951,7 +816,7 @@ export default function BatchPaymentsPage() {
           className="bg-black rounded-[16px] border border-[#2C2C2C] p-2.5 flex flex-col min-h-0 overflow-hidden"
           style={{ height: `${batchPanelHeight}%` }}
         >
-          {/* Desktop batch form and payments list - keeping existing code */}
+          {/* Desktop Form Header */}
           <div className="grid grid-cols-11 gap-1 mb-1.5 flex-shrink-0">
             <div className="col-span-6">
               <UsernameInput
@@ -1054,6 +919,7 @@ export default function BatchPaymentsPage() {
 
           <div className="border-t border-[#2C2C2C] mb-1.5 flex-shrink-0 -mx-2.5"></div>
 
+          {/* Desktop Table Header */}
           <div className="bg-[#0F0F0F] rounded-lg mb-1 flex-shrink-0">
             <div className="grid grid-cols-4 gap-1 px-1.5 py-1.5">
               <div className="text-gray-400 text-xs font-satoshi text-left">
@@ -1071,6 +937,7 @@ export default function BatchPaymentsPage() {
             </div>
           </div>
 
+          {/* Desktop Payments List */}
           <div className="overflow-y-auto scrollbar-hide mb-2 flex-1 min-h-0">
             {batchPayments.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
@@ -1143,6 +1010,7 @@ export default function BatchPaymentsPage() {
             )}
           </div>
 
+          {/* Desktop Action Buttons */}
           {batchPayments.length > 0 && (
             <div className="flex justify-end space-x-1 mt-2 flex-shrink-0">
               <button
@@ -1187,31 +1055,28 @@ export default function BatchPaymentsPage() {
           </div>
         </div>
 
-        {/* FIXED: Desktop Transaction History with proper filtering and refresh key */}
+        {/* Desktop Mock Transaction History */}
         <div
           className="bg-black rounded-[16px] border border-[#2C2C2C] flex flex-col min-h-0 overflow-hidden"
           style={{ height: `${100 - batchPanelHeight}%` }}
         >
           <div className="p-2.5 h-full flex flex-col overflow-hidden">
-            <div className="h-full overflow-hidden">
-              <TransactionHistory
-                key={`desktop-${transactionRefreshKey}`} // Force refresh when key changes
-                walletAddress={activeWallet?.address}
-                transactionTypeFilter={null} // Don't filter by type - show all transactions
-                tokenFilter={null} // Don't filter by token - show all transactions
-                limit={100}
-                title="Transaction History"
-                showRefresh={true}
-                className="h-full overflow-hidden"
-                useDatabase={true} // Use database only for batch payments page
-              />
+            <div className="h-full overflow-hidden flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-gray-400 text-sm font-satoshi mb-2">
+                  Transaction History
+                </div>
+                <div className="text-gray-500 text-xs font-satoshi">
+                  Connect wallet to view transaction history
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Rest of the modals remain the same... */}
-      {showPreview && preview && (
+      {/* Preview Modal (UI Only) */}
+      {showPreview && (
         <>
           <div
             className="fixed inset-0 z-40 bg-white/10"
@@ -1249,7 +1114,7 @@ export default function BatchPaymentsPage() {
                           Transfer Mode
                         </div>
                         <div className="text-white font-bold font-satoshi">
-                          {preview.transferMode}
+                          Batch Transfer
                         </div>
                       </div>
                       <div>
@@ -1257,7 +1122,7 @@ export default function BatchPaymentsPage() {
                           Total Transfers
                         </div>
                         <div className="text-white font-bold font-satoshi">
-                          {preview.transfers.length}
+                          {batchPayments.length}
                         </div>
                       </div>
                       <div>
@@ -1265,7 +1130,10 @@ export default function BatchPaymentsPage() {
                           Total Value
                         </div>
                         <div className="text-white font-bold font-satoshi">
-                          ${preview.totalUSDValue.toFixed(2)}
+                          $
+                          {batchPayments
+                            .reduce((sum, p) => sum + p.usdValue, 0)
+                            .toFixed(2)}
                         </div>
                       </div>
                       <div>
@@ -1273,7 +1141,7 @@ export default function BatchPaymentsPage() {
                           Network
                         </div>
                         <div className="text-white font-bold font-satoshi">
-                          {preview.network}
+                          Ethereum
                         </div>
                       </div>
                     </div>
@@ -1287,12 +1155,11 @@ export default function BatchPaymentsPage() {
                       />
                       <div>
                         <p className="text-yellow-400 text-xs font-satoshi font-medium mb-0.5">
-                          Transaction Confirmation Required
+                          Demo Mode
                         </p>
                         <p className="text-yellow-400 text-xs font-satoshi">
-                          This will execute a real batch transfer on the
-                          blockchain. Please verify all details before
-                          proceeding.
+                          This is a frontend demo. No real transactions will be
+                          executed.
                         </p>
                       </div>
                     </div>
@@ -1311,17 +1178,9 @@ export default function BatchPaymentsPage() {
                   </Button>
                   <Button
                     onClick={executeBatch}
-                    disabled={executing}
                     className="flex-1 font-satoshi"
                   >
-                    {executing ? (
-                      <>
-                        <RefreshCw size={12} className="mr-1 animate-spin" />
-                        Executing...
-                      </>
-                    ) : (
-                      "Execute Batch"
-                    )}
+                    Execute Demo
                   </Button>
                 </div>
               </div>
@@ -1340,22 +1199,18 @@ export default function BatchPaymentsPage() {
               <div className="p-6 text-center">
                 <div className="w-16 h-16 mx-auto mb-4 relative">
                   <div className="w-16 h-16 rounded-full border-4 border-[#2C2C2C] flex items-center justify-center">
-                    <div className="w-8 h-8 bg-[#E2AF19] rounded relative">
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                        <CheckCircle size={20} className="text-black" />
-                      </div>
-                    </div>
+                    <RefreshCw
+                      size={24}
+                      className="text-[#E2AF19] animate-spin"
+                    />
                   </div>
-                  <div className="absolute inset-0 border-2 border-[#E2AF19]/30 rounded-full"></div>
-                  <div className="absolute inset-2 border border-[#E2AF19]/20 rounded-full"></div>
                 </div>
 
                 <h3 className="text-white text-xl font-bold font-mayeka mb-2">
-                  Processing
+                  Processing Demo
                 </h3>
                 <p className="text-gray-400 text-sm font-satoshi leading-relaxed">
-                  Transaction in progress! Blockchain validation is underway.
-                  This may take a few minutes.
+                  Simulating batch transfer processing...
                 </p>
               </div>
             </div>
@@ -1363,7 +1218,7 @@ export default function BatchPaymentsPage() {
         </>
       )}
 
-      {/* FIXED: Result Modal with refresh trigger */}
+      {/* Result Modal */}
       {showResult && result && (
         <>
           <div
@@ -1376,14 +1231,10 @@ export default function BatchPaymentsPage() {
               <div className="flex items-center justify-between p-3 border-b border-[#2C2C2C]">
                 <div>
                   <h2 className="text-lg font-bold text-white font-mayeka">
-                    {result.success
-                      ? "Batch Transfer Successful!"
-                      : "Batch Transfer Failed"}
+                    Demo Successful!
                   </h2>
                   <p className="text-gray-400 text-xs font-satoshi mt-0.5">
-                    {result.success
-                      ? "Your batch transfer has been completed"
-                      : "Something went wrong"}
+                    Frontend demo completed successfully
                   </p>
                 </div>
                 <button
@@ -1395,95 +1246,75 @@ export default function BatchPaymentsPage() {
               </div>
 
               <div className="p-3 max-h-[60vh] overflow-y-auto scrollbar-hide">
-                {result.success ? (
-                  <div className="space-y-3">
-                    <div className="text-center">
-                      <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
-                        <CheckCircle size={20} className="text-white" />
-                      </div>
-                    </div>
-
-                    <div className="bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C]">
-                      <h4 className="text-white font-semibold font-satoshi mb-1.5">
-                        Transaction Details
-                      </h4>
-                      <div className="space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-400">
-                            Transaction Hash:
-                          </span>
-                          <div className="flex items-center">
-                            <span className="text-white mr-1 font-mono text-xs">
-                              {result.transactionHash?.slice(0, 10)}...
-                              {result.transactionHash?.slice(-8)}
-                            </span>
-                            <button
-                              onClick={() =>
-                                copyToClipboard(result.transactionHash!, "hash")
-                              }
-                              className="text-gray-400 hover:text-white transition-colors"
-                            >
-                              <Copy size={10} />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">
-                            Total Transfers:
-                          </span>
-                          <span className="text-white">
-                            {result.totalTransfers}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Execution Time:</span>
-                          <span className="text-white">
-                            {result.executionTimeSeconds}s
-                          </span>
-                        </div>
-                      </div>
-
-                      {copied === "hash" && (
-                        <p className="text-green-400 text-xs font-satoshi mt-1">
-                          Hash copied!
-                        </p>
-                      )}
+                <div className="space-y-3">
+                  <div className="text-center">
+                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <CheckCircle size={20} className="text-white" />
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="text-center">
-                      <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-2">
-                        <X size={20} className="text-white" />
+
+                  <div className="bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C]">
+                    <h4 className="text-white font-semibold font-satoshi mb-1.5">
+                      Demo Details
+                    </h4>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">
+                          Mock Transaction Hash:
+                        </span>
+                        <div className="flex items-center">
+                          <span className="text-white mr-1 font-mono text-xs">
+                            {result.transactionHash?.slice(0, 10)}...
+                            {result.transactionHash?.slice(-8)}
+                          </span>
+                          <button
+                            onClick={() =>
+                              copyToClipboard(result.transactionHash!, "hash")
+                            }
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <Copy size={10} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Total Transfers:</span>
+                        <span className="text-white">
+                          {result.totalTransfers}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Demo Time:</span>
+                        <span className="text-white">
+                          {result.executionTimeSeconds}s
+                        </span>
                       </div>
                     </div>
 
-                    <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2.5">
-                      <p className="text-red-400 text-xs font-satoshi">
-                        {result.error}
+                    {copied === "hash" && (
+                      <p className="text-green-400 text-xs font-satoshi mt-1">
+                        Hash copied!
                       </p>
-                    </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="p-3 border-t border-[#2C2C2C] bg-[#0F0F0F]">
                 <div className="flex space-x-1.5">
-                  {result.success && result.explorerUrl && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => window.open(result.explorerUrl, "_blank")}
-                      className="flex-1 font-satoshi"
-                    >
-                      <ExternalLink size={12} className="mr-1" />
-                      View on Explorer
-                    </Button>
-                  )}
+                  <Button
+                    variant="secondary"
+                    onClick={() => window.open(result.explorerUrl, "_blank")}
+                    className="flex-1 font-satoshi"
+                  >
+                    <ExternalLink size={12} className="mr-1" />
+                    View Demo
+                  </Button>
                   <Button
                     onClick={handleCloseResult}
                     className="flex-1 font-satoshi"
                   >
-                    {result.success ? "Done" : "Close"}
+                    Done
                   </Button>
                 </div>
               </div>

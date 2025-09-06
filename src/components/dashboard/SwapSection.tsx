@@ -1,13 +1,47 @@
-// src/components/dashboard/SwapSection.tsx - INTERACTIVE SWAP WITH SETTINGS DROPDOWN
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSelector } from "react-redux";
 import { ArrowUpDown, ChevronDown, Settings } from "lucide-react";
-import { RootState } from "@/store";
 import TokenSelectorModal from "@/components/swap/TokenSelectorModal";
 import SwapPreviewModal from "@/components/swap/SwapPreviewModal";
 import { SkeletonSwapSection } from "@/components/ui/Skeleton";
+
+// Mock token data
+const mockTokens = [
+  {
+    symbol: "ETH",
+    name: "Ethereum",
+    contractAddress: "native",
+    decimals: 18,
+    balance: 1.25843,
+    value: 4027.45,
+    logoUrl: "/tokens/eth.png",
+    price: 3200.45,
+    icon: "/tokens/eth.png",
+  },
+  {
+    symbol: "USDT",
+    name: "Tether USD",
+    contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    decimals: 6,
+    balance: 1000.5,
+    value: 1000.5,
+    logoUrl: "/tokens/usdt.png",
+    price: 1.0,
+    icon: "/tokens/usdt.png",
+  },
+  {
+    symbol: "USDC",
+    name: "USD Coin",
+    contractAddress: "0xA0b86a33E6417f5a10c4C9a6bd1a0d7AF0DB58a7",
+    decimals: 6,
+    balance: 2500.75,
+    value: 2500.75,
+    logoUrl: "/tokens/usdc.png",
+    price: 1.0,
+    icon: "/tokens/usdc.png",
+  },
+];
 
 interface Token {
   symbol: string;
@@ -41,9 +75,8 @@ interface SwapQuote {
 }
 
 export default function SwapSection() {
-  const { activeWallet, tokens } = useSelector(
-    (state: RootState) => state.wallet
-  );
+  // Use mock data instead of Redux
+  const tokens = mockTokens;
 
   // State
   const [sellToken, setSellToken] = useState<Token | null>(null);
@@ -95,68 +128,73 @@ export default function SwapSection() {
           decimals: ethToken.decimals || 18,
           balance: ethToken.balance,
           value: ethToken.value,
-          logoUrl: ethToken.icon,
+          logoUrl: ethToken.logoUrl,
           price: ethToken.price,
         });
       }
     }
   }, [tokens, sellToken]);
 
-  // Get quote when amounts change
+  // Mock quote generation when amounts change
   useEffect(() => {
     if (sellToken && buyToken && sellAmount && parseFloat(sellAmount) > 0) {
-      getQuote();
+      getMockQuote();
     } else {
       setBuyAmount("");
       setQuote(null);
     }
   }, [sellToken, buyToken, sellAmount]);
 
-  const getQuote = async () => {
-    if (!sellToken || !buyToken || !sellAmount || !activeWallet) return;
+  const getMockQuote = async () => {
+    if (!sellToken || !buyToken || !sellAmount) return;
 
     setQuoteLoading(true);
     setError("");
 
-    try {
-      const response = await fetch("/api/swap/quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sellToken:
-            sellToken.contractAddress === "native"
-              ? "ETH"
-              : sellToken.contractAddress,
-          buyToken:
-            buyToken.contractAddress === "native"
-              ? "ETH"
-              : buyToken.contractAddress,
+    // Simulate API delay
+    setTimeout(() => {
+      try {
+        // Mock exchange rate calculation
+        const sellAmountNum = parseFloat(sellAmount);
+        const mockExchangeRate = buyToken.price / sellToken.price;
+        const buyAmountNum = sellAmountNum * mockExchangeRate;
+
+        // Create mock quote
+        const mockQuote: SwapQuote = {
+          sellToken: sellToken.symbol,
+          buyToken: buyToken.symbol,
           sellAmount: (
-            parseFloat(sellAmount) * Math.pow(10, sellToken.decimals)
+            sellAmountNum * Math.pow(10, sellToken.decimals)
           ).toString(),
-          takerAddress: activeWallet.address,
-        }),
-        credentials: "include",
-      });
+          buyAmount: (
+            buyAmountNum * Math.pow(10, buyToken.decimals)
+          ).toString(),
+          price: mockExchangeRate.toString(),
+          guaranteedPrice: (mockExchangeRate * 0.97).toString(),
+          to: "0x0000000000000000000000000000000000000000",
+          data: "0x",
+          value: "0",
+          gas: "150000",
+          gasPrice: "20000000000",
+          protocolFee: "0",
+          minimumProtocolFee: "0",
+          buyTokenAddress: buyToken.contractAddress,
+          sellTokenAddress: sellToken.contractAddress,
+          allowanceTarget: "0x0000000000000000000000000000000000000000",
+          sources: [],
+        };
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to get quote");
+        setQuote(mockQuote);
+        setBuyAmount(buyAmountNum.toFixed(6));
+      } catch (error: any) {
+        console.error("Mock quote error:", error);
+        setError("Failed to get quote");
+        setBuyAmount("");
+        setQuote(null);
+      } finally {
+        setQuoteLoading(false);
       }
-
-      setQuote(data.quote);
-      const buyAmountFormatted =
-        parseFloat(data.quote.buyAmount) / Math.pow(10, buyToken.decimals);
-      setBuyAmount(buyAmountFormatted.toFixed(6));
-    } catch (error: any) {
-      console.error("Quote error:", error);
-      setError(error.message);
-      setBuyAmount("");
-      setQuote(null);
-    } finally {
-      setQuoteLoading(false);
-    }
+    }, 800);
   };
 
   const handleSellTokenSelect = (token: Token) => {
@@ -367,7 +405,7 @@ export default function SwapSection() {
                   />
                   <div className="text-gray-400 text-[10px] lg:text-xs font-satoshi mt-0.5">
                     {sellToken && sellAmount
-                      ? `${(parseFloat(sellAmount) * sellToken.price).toFixed(
+                      ? `$${(parseFloat(sellAmount) * sellToken.price).toFixed(
                           2
                         )}`
                       : "$0"}
@@ -461,7 +499,7 @@ export default function SwapSection() {
           </div>
         )}
 
-        {/* Rate Display with Slippage Info */}
+        {/* Rate Display */}
         {quote && sellToken && buyToken && (
           <div className="text-center mb-2">
             <div className="text-gray-400 text-xs font-satoshi">
@@ -469,9 +507,6 @@ export default function SwapSection() {
               {(parseFloat(buyAmount) / parseFloat(sellAmount)).toFixed(6)}{" "}
               {buyToken.symbol}
             </div>
-            {/* <div className="text-gray-500 text-[10px] font-satoshi mt-1">
-              Slippage: {slippage}%
-            </div> */}
           </div>
         )}
 
@@ -484,7 +519,7 @@ export default function SwapSection() {
           {quoteLoading ? "Getting Quote..." : "Swap"}
         </button>
 
-        {/* Blockpal Info Section - Original content */}
+        {/* Blockpal Info Section */}
         <div className="flex-1 flex justify-center min-h-0 overflow-hidden">
           <div className="flex flex-col items-center justify-center space-y-5">
             <img
@@ -599,7 +634,7 @@ export default function SwapSection() {
         `}</style>
       </div>
 
-      {/* Token Selector Modals */}
+      {/* Token Selector Modals - Use mock data */}
       <TokenSelectorModal
         isOpen={sellTokenSelectorOpen}
         onClose={() => setSellTokenSelectorOpen(false)}
@@ -611,7 +646,7 @@ export default function SwapSection() {
           decimals: t.decimals || 18,
           balance: t.balance,
           value: t.value,
-          logoUrl: t.icon,
+          logoUrl: t.logoUrl,
           price: t.price,
         }))}
         title="Select Token"
@@ -622,13 +657,22 @@ export default function SwapSection() {
         isOpen={buyTokenSelectorOpen}
         onClose={() => setBuyTokenSelectorOpen(false)}
         onSelect={handleBuyTokenSelect}
-        tokens={[]}
+        tokens={tokens.map((t) => ({
+          symbol: t.symbol,
+          name: t.name,
+          contractAddress: t.contractAddress || "native",
+          decimals: t.decimals || 18,
+          balance: t.balance,
+          value: t.value,
+          logoUrl: t.logoUrl,
+          price: t.price,
+        }))}
         title="Select Token"
         showBalances={false}
         allowCustomToken={true}
       />
 
-      {/* Preview Modal - Original with settings form */}
+      {/* Preview Modal - Demo functionality */}
       <SwapPreviewModal
         isOpen={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}
@@ -639,10 +683,11 @@ export default function SwapSection() {
         quote={quote}
         onConfirm={() => {
           setPreviewModalOpen(false);
-          // Reset form after successful swap
+          // Reset form after demo swap
           setSellAmount("");
           setBuyAmount("");
           setQuote(null);
+          console.log("Demo swap completed!");
         }}
       />
     </>

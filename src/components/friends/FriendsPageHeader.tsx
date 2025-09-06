@@ -1,43 +1,79 @@
-// src/components/friends/FriendsPageHeader.tsx - COMPACT VERSION
+// src/components/friends/FriendsPageHeader.tsx - FRONTEND ONLY VERSION
 "use client";
 
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { Bell, HelpCircle } from "lucide-react";
 import { RootState } from "@/store";
-import NotificationCenter from "@/components/notifications/NotificationCenter";
 
 interface FriendsPageHeaderProps {
-  activeWallet: any;
+  activeWallet?: any;
 }
+
+// Simple notification modal for UI demonstration
+const NotificationModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+}> = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-black border border-[#2C2C2C] rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-white">Notifications</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition-colors text-xl"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+            <div className="text-white text-sm font-medium mb-1">
+              Welcome to Friends!
+            </div>
+            <div className="text-gray-400 text-xs">
+              Start connecting with other users
+            </div>
+          </div>
+
+          <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
+            <div className="text-white text-sm font-medium mb-1">
+              Friend Request Received
+            </div>
+            <div className="text-gray-400 text-xs">
+              @alice_crypto wants to be your friend
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full mt-4 bg-[#E2AF19] text-black py-2 rounded-lg hover:bg-[#D4A853] transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export default function FriendsPageHeader({
   activeWallet,
 }: FriendsPageHeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount] = useState(2); // Mock unread count
 
-  useEffect(() => {
-    fetchUnreadCount();
-
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchUnreadCount = async () => {
-    try {
-      const response = await fetch("/api/notifications?unreadOnly=true", {
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUnreadCount(data.unreadCount || 0);
-      }
-    } catch (error) {
-      console.error("Error fetching unread count:", error);
-    }
+  // Mock wallet data if none provided
+  const mockWallet = {
+    name: "Main Wallet",
+    address: "0x1234567890123456789012345678901234567890",
   };
+
+  const displayWallet = activeWallet || mockWallet;
 
   return (
     <>
@@ -64,15 +100,15 @@ export default function FriendsPageHeader({
               ></div>
             </div>
             <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate">
-              {activeWallet?.name || "Wallet 1"}
+              {displayWallet?.name || "Wallet 1"}
             </span>
             <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mr-1.5 lg:mr-2 hidden sm:block"></div>
             <span className="text-gray-400 text-xs sm:text-xs font-satoshi mr-1.5 lg:mr-2 hidden sm:block truncate">
-              {activeWallet?.address
-                ? `${activeWallet.address.slice(
+              {displayWallet?.address
+                ? `${displayWallet.address.slice(
                     0,
                     6
-                  )}...${activeWallet.address.slice(-4)}`
+                  )}...${displayWallet.address.slice(-4)}`
                 : "No wallet"}
             </span>
           </div>
@@ -99,7 +135,7 @@ export default function FriendsPageHeader({
         </div>
       </div>
 
-      <NotificationCenter
+      <NotificationModal
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />

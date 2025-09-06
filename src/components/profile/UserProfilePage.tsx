@@ -1,4 +1,4 @@
-// src/components/profile/UserProfilePage.tsx - UPDATED WITH PRIVATE KEY MODAL
+// src/components/profile/UserProfilePage.tsx - BACKEND REMOVED, AUTH PRESERVED
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,7 +29,7 @@ import {
   Lock,
   ChevronDown,
   QrCode,
-  Key, // Add Key import for wallet credentials
+  Key,
 } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { logoutUser } from "@/store/slices/authSlice";
@@ -38,7 +38,7 @@ import Input from "@/components/ui/Input";
 import TwoFactorSetupModal from "./TwoFactorSetupModal";
 import ProfilePictureUpload from "./ProfilePictureUpload";
 import UserQRCodeModal from "./UserQRCodeModal";
-import PrivateKeyModal from "./PrivateKeyModal"; // Add Private Key Modal import
+import PrivateKeyModal from "./PrivateKeyModal";
 import { Skeleton, SkeletonCard } from "@/components/ui/Skeleton";
 
 interface UserProfile {
@@ -190,10 +190,8 @@ function SettingsSectionSkeleton() {
 export default function UserProfilePage() {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { wallets, activeWallet } = useSelector(
-    (state: RootState) => state.wallet
-  );
 
+  // MODIFIED: Use mock data instead of backend
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -201,7 +199,7 @@ export default function UserProfilePage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
-  const [showPrivateKeyModal, setShowPrivateKeyModal] = useState(false); // Add Private Key modal state
+  const [showPrivateKeyModal, setShowPrivateKeyModal] = useState(false);
 
   // 2FA Modal State
   const [show2FAModal, setShow2FAModal] = useState(false);
@@ -214,78 +212,92 @@ export default function UserProfilePage() {
   });
   const [copied, setCopied] = useState<string>("");
 
+  // MODIFIED: Use mock data instead of API calls
   useEffect(() => {
-    fetchUserProfile();
+    loadMockProfile();
   }, []);
 
-  const fetchUserProfile = async () => {
+  // MODIFIED: Mock profile data instead of API call
+  const loadMockProfile = async () => {
     try {
       setLoading(true);
-      console.log("📡 Fetching user profile...");
+      console.log("📡 Loading mock profile data...");
 
-      const response = await fetch("/api/profile", {
-        credentials: "include",
-        headers: {
-          "Cache-Control": "no-cache",
+      // Simulate loading delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Mock profile data based on authenticated user
+      const mockProfile: UserProfile = {
+        username: user?.username || "demo_user",
+        displayName: user?.displayName || "Demo User",
+        gmail: user?.email || "demo@example.com",
+        avatar:
+          user?.avatar ||
+          "https://api.dicebear.com/7.x/initials/svg?seed=DemoUser",
+        accountCreated: "Jan 2024",
+        totalTransactions: 0,
+        scheduledPayments: 0,
+        friendsCount: 0,
+        preferences: {
+          notifications: true,
+          pushNotifications: false,
+          emailNotifications: true,
+          friendRequests: "everyone",
+          currency: "USD",
         },
-      });
+        twoFactorEnabled: false,
+        authProvider: user?.authProvider || "email",
+        hasPassword: true,
+        hasGoogleAuth: user?.authProvider === "google",
+      };
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log("✅ Profile loaded with avatar:", data.profile.avatar);
-        setProfile(data.profile);
-      } else {
-        console.error("❌ Failed to fetch profile:", response.status);
-      }
+      console.log("✅ Mock profile loaded:", mockProfile);
+      setProfile(mockProfile);
     } catch (error) {
-      console.error("💥 Error fetching profile:", error);
+      console.error("💥 Error loading mock profile:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Enhanced avatar update handler
+  // MODIFIED: Mock avatar update
   const handleAvatarUpdate = async (newAvatarUrl: string) => {
-    console.log("🖼️ Avatar update received:", newAvatarUrl);
+    console.log("🖼️ Mock avatar update received:", newAvatarUrl);
 
     if (profile) {
       const updatedProfile = {
         ...profile,
         avatar: newAvatarUrl,
       };
-      console.log("🔄 Updating profile state with new avatar");
+      console.log("🔄 Updating profile state with new avatar (demo mode)");
       setProfile(updatedProfile);
     }
-
-    try {
-      console.log("🔄 Refreshing profile data to ensure consistency...");
-      await fetchUserProfile();
-      console.log("✅ Profile data refreshed successfully");
-    } catch (error) {
-      console.error("❌ Error refreshing profile:", error);
-    }
   };
 
+  // MODIFIED: Mock profile save
   const handleSaveProfile = async () => {
     try {
-      const response = await fetch("/api/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editedProfile),
-        credentials: "include",
-      });
+      console.log("💾 Saving profile (demo mode):", editedProfile);
 
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data.profile);
+      // Simulate save delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      if (profile) {
+        const updatedProfile = {
+          ...profile,
+          ...editedProfile,
+        };
+        setProfile(updatedProfile);
         setEditing(false);
         setEditedProfile({});
+        console.log("✅ Profile saved (demo mode)");
       }
     } catch (error) {
-      console.error("Error updating profile:", error);
+      console.error("Error updating profile (demo mode):", error);
     }
   };
 
+  // MODIFIED: Keep password change but make it demo
   const handlePasswordChange = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       alert("New passwords don't match");
@@ -293,40 +305,32 @@ export default function UserProfilePage() {
     }
 
     try {
-      const response = await fetch("/api/profile/password", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword,
-        }),
-        credentials: "include",
-      });
+      console.log("🔐 Password change (demo mode)");
 
-      if (response.ok) {
-        setShowPasswordModal(false);
-        setPasswordData({
-          currentPassword: "",
-          newPassword: "",
-          confirmPassword: "",
-        });
-        alert("Password updated successfully");
-      } else {
-        alert("Failed to update password");
-      }
+      // Simulate password change delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setShowPasswordModal(false);
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      alert("Password updated successfully (demo mode)");
     } catch (error) {
-      console.error("Error updating password:", error);
+      console.error("Error updating password (demo mode):", error);
+      alert("Failed to update password in demo mode");
     }
   };
 
-  // 2FA Toggle Handler
+  // MODIFIED: Mock 2FA toggle
   const handleToggle2FA = async () => {
     if (!profile) {
       console.log("❌ No profile available");
       return;
     }
 
-    console.log("🔒 2FA Toggle clicked", {
+    console.log("🔒 2FA Toggle clicked (demo mode)", {
       currentlyEnabled: profile.twoFactorEnabled,
       willEnable: !profile.twoFactorEnabled,
     });
@@ -335,29 +339,25 @@ export default function UserProfilePage() {
     setShow2FAModal(true);
   };
 
-  // 2FA Complete Handler
+  // MODIFIED: Mock 2FA complete
   const handle2FAComplete = async () => {
-    console.log("🎉 2FA Setup completed, refreshing profile...");
-    await fetchUserProfile();
+    console.log("🎉 2FA Setup completed (demo mode)");
+    // In demo mode, just close the modal
   };
 
+  // REMOVED: Notification toggle (backend dependent)
   const handleNotificationToggle = async (type: string, value: boolean) => {
-    try {
-      const response = await fetch("/api/profile/notifications", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [type]: value }),
-        credentials: "include",
-      });
+    console.log(`🔔 Notification toggle (demo mode): ${type} = ${value}`);
 
-      if (response.ok) {
-        const data = await response.json();
-        setProfile((prev) =>
-          prev ? { ...prev, preferences: data.preferences } : null
-        );
-      }
-    } catch (error) {
-      console.error("Error updating notifications:", error);
+    if (profile) {
+      const updatedProfile = {
+        ...profile,
+        preferences: {
+          ...profile.preferences,
+          [type]: value,
+        },
+      };
+      setProfile(updatedProfile);
     }
   };
 
@@ -556,7 +556,7 @@ export default function UserProfilePage() {
           {/* Account Statistics - Mobile */}
           <div className="bg-black rounded-[12px] border border-[#2C2C2C] p-3 flex-shrink-0">
             <h3 className="text-base font-semibold text-white mb-3 font-satoshi">
-              Account Statistics
+              Account Statistics (Demo)
             </h3>
 
             <div className="grid grid-cols-2 gap-3">
@@ -604,7 +604,7 @@ export default function UserProfilePage() {
                   </span>
                 </div>
                 <div className="text-white text-base font-bold font-satoshi">
-                  {wallets.length}
+                  0
                 </div>
               </div>
             </div>
@@ -675,28 +675,26 @@ export default function UserProfilePage() {
                 </button>
               </div>
 
-              {/* NEW: Wallet Credentials Section - Mobile */}
-              {/* {activeWallet && (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Key size={14} className="text-gray-400 mr-2" />
-                    <div>
-                      <span className="text-white font-satoshi text-sm">
-                        Wallet Credentials
-                      </span>
-                      <div className="text-gray-400 text-xs font-satoshi">
-                        Private key & recovery phrase
-                      </div>
+              {/* Wallet Credentials Section - Mobile (Demo) */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Key size={14} className="text-gray-400 mr-2" />
+                  <div>
+                    <span className="text-white font-satoshi text-sm">
+                      Wallet Credentials
+                    </span>
+                    <div className="text-gray-400 text-xs font-satoshi">
+                      Private key & recovery phrase
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowPrivateKeyModal(true)}
-                    className="bg-[#E2AF19] text-black px-2.5 py-1 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
-                  >
-                    View
-                  </button>
                 </div>
-              )} */}
+                <button
+                  onClick={() => setShowPrivateKeyModal(true)}
+                  className="bg-[#E2AF19] text-black px-2.5 py-1 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                >
+                  View
+                </button>
+              </div>
             </div>
           </div>
 
@@ -860,7 +858,7 @@ export default function UserProfilePage() {
             {/* Account Statistics - Desktop */}
             <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4">
               <h3 className="text-lg font-semibold text-white mb-4 font-satoshi">
-                Account Statistics
+                Account Statistics (Demo)
               </h3>
 
               <div className="grid grid-cols-4 gap-3">
@@ -906,7 +904,7 @@ export default function UserProfilePage() {
                     className="text-[#E2AF19] mx-auto mb-1.5"
                   />
                   <div className="text-white text-lg font-bold font-satoshi mb-0.5">
-                    {wallets.length}
+                    0
                   </div>
                   <div className="text-gray-400 text-sm font-satoshi">
                     Wallets
@@ -983,28 +981,26 @@ export default function UserProfilePage() {
                   </button>
                 </div>
 
-                {/* NEW: Wallet Credentials Section - Desktop */}
-                {/* {activeWallet && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Key size={18} className="text-gray-400 mr-2" />
-                      <div>
-                        <span className="text-white font-satoshi">
-                          Wallet Credentials
-                        </span>
-                        <div className="text-gray-400 text-sm font-satoshi">
-                          View private key and recovery phrase
-                        </div>
+                {/* Wallet Credentials Section - Desktop (Demo) */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Key size={18} className="text-gray-400 mr-2" />
+                    <div>
+                      <span className="text-white font-satoshi">
+                        Wallet Credentials
+                      </span>
+                      <div className="text-gray-400 text-sm font-satoshi">
+                        View private key and recovery phrase
                       </div>
                     </div>
-                    <button
-                      onClick={() => setShowPrivateKeyModal(true)}
-                      className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
-                    >
-                      View
-                    </button>
                   </div>
-                )} */}
+                  <button
+                    onClick={() => setShowPrivateKeyModal(true)}
+                    className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                  >
+                    View
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1059,7 +1055,7 @@ export default function UserProfilePage() {
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-white font-satoshi">
-                  Change Password
+                  Change Password (Demo)
                 </h3>
                 <button
                   onClick={() => setShowPasswordModal(false)}
@@ -1107,6 +1103,13 @@ export default function UserProfilePage() {
                   className="font-satoshi"
                 />
 
+                <div className="p-2.5 bg-yellow-900/20 border border-yellow-500/50 rounded-lg">
+                  <p className="text-yellow-400 text-xs font-satoshi">
+                    <strong>Demo Mode:</strong> Password changes are simulated
+                    only.
+                  </p>
+                </div>
+
                 <div className="flex gap-2 pt-3">
                   <button
                     onClick={() => setShowPasswordModal(false)}
@@ -1132,7 +1135,7 @@ export default function UserProfilePage() {
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-white font-satoshi">
-                  Contact Support
+                  Contact Support (Demo)
                 </h3>
                 <button
                   onClick={() => setShowContactModal(false)}
@@ -1154,6 +1157,13 @@ export default function UserProfilePage() {
                   rows={3}
                 />
 
+                <div className="p-2.5 bg-yellow-900/20 border border-yellow-500/50 rounded-lg">
+                  <p className="text-yellow-400 text-xs font-satoshi">
+                    <strong>Demo Mode:</strong> Support messages are not
+                    actually sent.
+                  </p>
+                </div>
+
                 <div className="flex gap-2 pt-3">
                   <button
                     onClick={() => setShowContactModal(false)}
@@ -1164,7 +1174,9 @@ export default function UserProfilePage() {
                   <button
                     onClick={() => {
                       setShowContactModal(false);
-                      alert("Support request submitted successfully!");
+                      alert(
+                        "Support request submitted successfully! (Demo mode)"
+                      );
                     }}
                     className="flex-1 px-3 py-1.5 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
                   >
@@ -1201,19 +1213,15 @@ export default function UserProfilePage() {
           onClose={() => setShowQRModal(false)}
         />
 
-        {/* NEW: Private Key Modal */}
+        {/* Private Key Modal */}
         <PrivateKeyModal
           isOpen={showPrivateKeyModal}
           onClose={() => setShowPrivateKeyModal(false)}
-          walletData={
-            activeWallet
-              ? {
-                  id: activeWallet.id,
-                  name: activeWallet.name,
-                  address: activeWallet.address,
-                }
-              : null
-          }
+          walletData={{
+            id: "demo-wallet",
+            name: "Demo Wallet",
+            address: "0x1234567890abcdef1234567890abcdef12345678",
+          }}
           userProfile={{
             email: profile.gmail,
             displayName: profile.displayName,

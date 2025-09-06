@@ -7,12 +7,10 @@ import { usePathname } from "next/navigation";
 import { RootState } from "@/store";
 import Sidebar from "@/components/dashboard/Sidebar";
 import WalletSelector from "@/components/dashboard/WalletSelector";
-import GlobalPaymentExecutor from "@/components/payments/GlobalPaymentExecutor";
 import NavigationLoadingIndicator from "@/components/ui/NavigationLoadingIndicator";
 import GlobalDashboardHeader from "@/components/dashboard/GlobalDashboardHeader";
 import { NavigationLoadingProvider } from "@/contexts/NavigationLoadingContext";
 import { Menu, X } from "lucide-react";
-import PaymentAcknowledgments from "@/components/payments/PaymentAcknowledgments";
 
 export default function DashboardLayout({
   children,
@@ -98,10 +96,6 @@ export default function DashboardLayout({
             {children}
           </div>
         </main>
-
-        {/* Global Payment Executor - Floating Button */}
-        <GlobalPaymentExecutor />
-        <PaymentAcknowledgments />
 
         {walletSelectorOpen && <WalletSelector />}
 

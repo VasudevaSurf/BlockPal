@@ -1,39 +1,11 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - ENHANCED VERSION with wallet switch events
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import {
-  Bell,
-  User,
-  LogOut,
-  ChevronDown,
-  Radio,
-  TrendingUp,
-  TrendingDown,
-  HelpCircle,
-  Wifi,
-  WifiOff,
-  RefreshCw,
-  Clock,
-  X,
-  ArrowLeft,
-} from "lucide-react";
+import { Bell, User, LogOut, ChevronDown, ArrowLeft } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
-import {
-  fetchWallets,
-  setActiveWallet,
-  setActiveWalletInDB,
-  getActiveWalletFromDB,
-  fetchWalletTokens,
-  updateWalletBalance,
-  clearTokens,
-} from "@/store/slices/walletSlice";
-import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
-import RealtimeWalletSwitcher from "@/components/wallet/RealtimeWalletSwitcher";
-import NotificationPanel from "@/components/notifications/NotificationPanel";
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -54,8 +26,7 @@ const getPageTitle = (
     case "/dashboard/scheduled-payments":
       return {
         title: "LoopX",
-        subtitle:
-          "Automated payments with smart contract security and automatic tax handling",
+        subtitle: "Automated payments with smart contract security",
       };
     case "/dashboard/batch-payments":
       return {
@@ -78,12 +49,6 @@ const getPageTitle = (
         subtitle: "Manage your account settings and preferences",
       };
     default:
-      if (pathname.startsWith("/dashboard/token/")) {
-        return {
-          title: "Token Overview",
-          subtitle: "Detailed token analysis and portfolio insights",
-        };
-      }
       return {
         title: "Dashboard",
         subtitle: "Welcome back",
@@ -103,126 +68,21 @@ export default function GlobalDashboardHeader({
     loading: authLoading,
     user,
   } = useSelector((state: RootState) => state.auth);
-  const {
-    wallets,
-    activeWallet,
-    loading: walletLoading,
-  } = useSelector((state: RootState) => state.wallet);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Real-time dashboard hook
-  const {
-    data: realtimeData,
-    isMonitoring,
-    lastUpdated,
-    changeAmount,
-    hasChanges,
-    notifications: realtimeNotifications = [],
-    refreshDashboard,
-    status,
-    isDataStale,
-    getTimeSinceUpdate,
-  } = useRealtimeDashboard();
+  // Mock wallet data for UI
+  const [selectedWallet] = useState({
+    name: "Main Wallet",
+    address: "0x1234...5678",
+    balance: 2500.0,
+  });
 
-  // Wallet switcher state and ref
-  const [walletSwitcherOpen, setWalletSwitcherOpen] = useState(false);
-  const walletButtonRef = useRef<HTMLButtonElement>(null);
-  const [showRealtimeStatus, setShowRealtimeStatus] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [nextUpdateCountdown, setNextUpdateCountdown] = useState<number>(0);
 
-  // Database notifications state
-  const [databaseNotifications, setDatabaseNotifications] = useState<any[]>([]);
-  const [dbNotificationsLoading, setDbNotificationsLoading] = useState(false);
-
-  // Use refs to track if we've already made initial calls
   const authChecked = useRef(false);
-  const walletsLoaded = useRef(false);
-  const activeWalletSynced = useRef(false);
-  const notificationsFetched = useRef(false);
-
-  // NEW: Track wallet switching state to prevent multiple simultaneous switches
-  const [isSwitchingWallet, setIsSwitchingWallet] = useState(false);
-  const switchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check if we're on a token overview page
   const isTokenOverviewPage = pathname.startsWith("/dashboard/token/");
-
-  // Function to truncate wallet name to show only first 2 words
-  const truncateWalletName = (name: string): string => {
-    if (!name || typeof name !== "string") {
-      return "Loading...";
-    }
-
-    const words = name.trim().split(/\s+/);
-
-    // If 2 or fewer words, return as is
-    if (words.length <= 2) {
-      return name;
-    }
-
-    // If more than 2 words, return first 2 words + "..."
-    return words.slice(0, 2).join(" ") + "...";
-  };
-
-  // Calculate countdown to next update
-  useEffect(() => {
-    if (!isMonitoring || !lastUpdated) return;
-
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const timeSinceLastUpdate = now - lastUpdated.getTime();
-      const timeToNextUpdate = 10000 - (timeSinceLastUpdate % 10000);
-      setNextUpdateCountdown(Math.ceil(timeToNextUpdate / 1000));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isMonitoring, lastUpdated]);
-
-  // Fetch database notifications periodically
-  useEffect(() => {
-    if (isAuthenticated && user && !notificationsFetched.current) {
-      fetchDatabaseNotifications();
-      notificationsFetched.current = true;
-
-      const interval = setInterval(() => {
-        fetchDatabaseNotifications();
-      }, 30000);
-
-      return () => clearInterval(interval);
-    }
-  }, [isAuthenticated, user]);
-
-  const fetchDatabaseNotifications = async () => {
-    try {
-      setDbNotificationsLoading(true);
-      const response = await fetch("/api/notifications?limit=20", {
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDatabaseNotifications(data.notifications || []);
-        console.log(
-          "📫 Database notifications fetched:",
-          data.notifications?.length || 0
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching database notifications:", error);
-    } finally {
-      setDbNotificationsLoading(false);
-    }
-  };
-
-  // Calculate total unread notification count
-  const getTotalUnreadCount = () => {
-    const realtimeUnreadCount = realtimeNotifications.length;
-    const databaseUnreadCount = databaseNotifications.filter(
-      (n) => !n.isRead
-    ).length;
-    return realtimeUnreadCount + databaseUnreadCount;
-  };
 
   // Get page-specific title and subtitle
   const pageInfo = getPageTitle(pathname);
@@ -237,44 +97,6 @@ export default function GlobalDashboardHeader({
       dispatch(checkAuthStatus());
     }
   }, [dispatch, isAuthenticated, authLoading]);
-
-  // Wallets loading effect
-  useEffect(() => {
-    if (isAuthenticated && user && !walletsLoaded.current) {
-      walletsLoaded.current = true;
-      dispatch(fetchWallets());
-    }
-  }, [isAuthenticated, user, dispatch]);
-
-  // Active wallet sync effect
-  useEffect(() => {
-    if (
-      isAuthenticated &&
-      user &&
-      wallets.length > 0 &&
-      !activeWalletSynced.current
-    ) {
-      activeWalletSynced.current = true;
-      dispatch(getActiveWalletFromDB()).then((result) => {
-        if (result.type === "wallet/getActiveWalletFromDB/fulfilled") {
-          const { activeWalletId } = result.payload as any;
-          if (activeWalletId) {
-            dispatch(setActiveWallet(activeWalletId));
-          } else if (wallets.length > 0) {
-            const firstWallet = wallets[0];
-            dispatch(setActiveWallet(firstWallet.id));
-            dispatch(setActiveWalletInDB(firstWallet.id));
-          }
-        } else {
-          if (wallets.length > 0 && !activeWallet) {
-            const firstWallet = wallets[0];
-            dispatch(setActiveWallet(firstWallet.id));
-            dispatch(setActiveWalletInDB(firstWallet.id));
-          }
-        }
-      });
-    }
-  }, [isAuthenticated, user, wallets, activeWallet, dispatch]);
 
   // Handle back button click
   const handleBackClick = () => {
@@ -291,20 +113,7 @@ export default function GlobalDashboardHeader({
     try {
       // Clear any local storage
       if (typeof window !== "undefined") {
-        localStorage.removeItem("activeWalletId");
-        localStorage.removeItem("auth-token");
-
-        // Clear any other cached data
-        const keys = Object.keys(localStorage);
-        keys.forEach((key) => {
-          if (
-            key.startsWith("wallet-") ||
-            key.startsWith("token-") ||
-            key.startsWith("blockpal-")
-          ) {
-            localStorage.removeItem(key);
-          }
-        });
+        localStorage.clear();
       }
 
       // Dispatch logout action
@@ -315,204 +124,6 @@ export default function GlobalDashboardHeader({
       router.push("/auth");
     }
   };
-
-  // ENHANCED: Wallet selection with proper event emission and switching state
-  const handleWalletSelect = async (walletId: string) => {
-    console.log("🎯 Header - Wallet selected:", walletId);
-
-    // Prevent multiple simultaneous wallet switches
-    if (isSwitchingWallet) {
-      console.log("⚠️ Already switching wallets, ignoring request");
-      return;
-    }
-
-    // Find the selected wallet
-    const selectedWallet = wallets.find((w) => w.id === walletId);
-    if (!selectedWallet) {
-      console.error("❌ Selected wallet not found");
-      return;
-    }
-
-    // Get current wallet for event emission
-    const currentWalletAddress = activeWallet?.address;
-
-    // Set switching state
-    setIsSwitchingWallet(true);
-
-    // Clear any existing timeout
-    if (switchingTimeoutRef.current) {
-      clearTimeout(switchingTimeoutRef.current);
-    }
-
-    try {
-      console.log("🔄 Header - Emitting wallet switch start event", {
-        from: currentWalletAddress,
-        to: selectedWallet.address,
-      });
-
-      // NEW: Emit wallet switch start event BEFORE any other actions
-      window.dispatchEvent(
-        new CustomEvent("walletSwitchStart", {
-          detail: {
-            fromWallet: currentWalletAddress,
-            toWallet: selectedWallet.address,
-            source: "header",
-          },
-        })
-      );
-
-      // Step 1: Set active wallet locally first
-      dispatch(setActiveWallet(walletId));
-
-      // Step 2: Clear existing tokens to show loading state
-      dispatch(clearTokens());
-      console.log("🧹 Cleared existing tokens");
-
-      // Step 3: Sync with database
-      await dispatch(setActiveWalletInDB(walletId));
-      console.log("💾 Synced with database");
-
-      // Step 4: Load fresh data for the new wallet
-      console.log("📡 Loading fresh data for:", selectedWallet.address);
-
-      const [tokensResult, balanceResult] = await Promise.all([
-        dispatch(fetchWalletTokens(selectedWallet.address)),
-        dispatch(updateWalletBalance(selectedWallet.address)),
-      ]);
-
-      const tokensSuccess =
-        tokensResult.type === "wallet/fetchWalletTokens/fulfilled";
-      const balanceSuccess =
-        balanceResult.type === "wallet/updateWalletBalance/fulfilled";
-
-      if (tokensSuccess && balanceSuccess) {
-        console.log("✅ Wallet data loaded successfully");
-      } else {
-        console.warn("⚠️ Some wallet data may not have loaded properly");
-      }
-
-      // Force refresh dashboard if available
-      if (refreshDashboard) {
-        setTimeout(() => {
-          refreshDashboard();
-        }, 500);
-      }
-
-      // NEW: Emit wallet switch completion event after a short delay
-      setTimeout(() => {
-        console.log("✅ Header - Emitting wallet switch complete event");
-        window.dispatchEvent(
-          new CustomEvent("walletSwitchComplete", {
-            detail: {
-              walletAddress: selectedWallet.address,
-              source: "header",
-            },
-          })
-        );
-      }, 100);
-    } catch (error) {
-      console.error("❌ Failed to switch wallet:", error);
-
-      // Emit error event
-      window.dispatchEvent(
-        new CustomEvent("walletSwitchError", {
-          detail: {
-            error: error,
-            walletId: walletId,
-            source: "header",
-          },
-        })
-      );
-    } finally {
-      // Reset switching state after a delay to ensure all components have updated
-      switchingTimeoutRef.current = setTimeout(() => {
-        setIsSwitchingWallet(false);
-        switchingTimeoutRef.current = null;
-      }, 1000);
-    }
-  };
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (switchingTimeoutRef.current) {
-        clearTimeout(switchingTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Handle wallet button click
-  const handleWalletButtonClick = () => {
-    console.log("🎯 Wallet button clicked, current state:", walletSwitcherOpen);
-    setWalletSwitcherOpen(!walletSwitcherOpen);
-  };
-
-  // Get wallet color - always use dark grey
-  const getWalletColor = () => {
-    return "bg-gradient-to-br from-gray-600/80 to-gray-700/90";
-  };
-
-  // Generate letters from wallet name
-  const getWalletLetters = (walletName: string): string => {
-    if (!walletName || typeof walletName !== "string") {
-      return "W"; // Default fallback
-    }
-
-    const words = walletName.trim().split(/\s+/);
-
-    if (words.length >= 2) {
-      // If 2 or more words, take first letter of each of the first two words
-      return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
-    } else if (words.length === 1 && words[0].length >= 2) {
-      // If one word with 2+ characters, take first 2 letters
-      return words[0].substring(0, 2).toUpperCase();
-    } else if (words.length === 1 && words[0].length === 1) {
-      // If one word with 1 character, just use that character
-      return words[0].toUpperCase();
-    } else {
-      // Fallback
-      return "W";
-    }
-  };
-
-  // Get active wallet display data with real-time information
-  const getActiveWalletDisplayData = () => {
-    if (realtimeData && isMonitoring) {
-      return {
-        name: activeWallet?.name || "Loading...",
-        address: activeWallet?.address || "",
-        balance: realtimeData.totalValue,
-        changeAmount: hasChanges ? changeAmount : undefined,
-        hasRealtimeData: true,
-      };
-    }
-
-    return {
-      name: activeWallet?.name || "Loading...",
-      address: activeWallet?.address || "",
-      balance: activeWallet?.balance || 0,
-      changeAmount: undefined,
-      hasRealtimeData: false,
-    };
-  };
-
-  const activeWalletData = getActiveWalletDisplayData();
-
-  // Format time since last update
-  const formatTimeSince = () => {
-    if (!lastUpdated) return null;
-    const timeSince = getTimeSinceUpdate();
-    if (!timeSince) return null;
-
-    const seconds = Math.floor(timeSince / 1000);
-    if (seconds < 60) return `${seconds}s ago`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ago`;
-  };
-
-  const totalUnreadCount = getTotalUnreadCount();
 
   // Don't render if not authenticated
   if (!isAuthenticated) {
@@ -525,7 +136,7 @@ export default function GlobalDashboardHeader({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 flex-shrink-0 gap-3 sm:gap-0">
         <div>
           <div className="flex items-center">
-            {/* Back button - only show on Token Overview pages */}
+            {/* Back button - only show on specific pages */}
             {isTokenOverviewPage && (
               <button
                 onClick={handleBackClick}
@@ -542,52 +153,28 @@ export default function GlobalDashboardHeader({
         </div>
 
         <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4">
-          {/* Wallet Selector with Real-time Data */}
-          {wallets.length > 0 && (
-            <button
-              ref={walletButtonRef}
-              onClick={handleWalletButtonClick}
-              disabled={isSwitchingWallet} // NEW: Disable during switching
-              className={`flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] hover:border-[#E2AF19] transition-colors group ${
-                isSwitchingWallet ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-              title={activeWalletData.name} // Show full name on hover
-            >
-              <div
-                className={`w-6 h-6 lg:w-7 lg:h-7 ${getWalletColor()} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
-              >
-                <span className="text-white text-xs font-bold font-satoshi">
-                  {getWalletLetters(activeWalletData.name)}
-                </span>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate group-hover:text-[#E2AF19] transition-colors block">
-                  {isSwitchingWallet
-                    ? "Switching..."
-                    : truncateWalletName(activeWalletData.name)}
-                </span>
-              </div>
-
-              <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mr-1.5 lg:mr-2 hidden sm:block"></div>
-
-              <span className="text-gray-400 text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
-                {activeWalletData.address
-                  ? `${activeWalletData.address.slice(
-                      0,
-                      6
-                    )}...${activeWalletData.address.slice(-4)}`
-                  : "Loading..."}
+          {/* Wallet Display (Static for UI) */}
+          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px]">
+            <div className="w-6 h-6 lg:w-7 lg:h-7 bg-gradient-to-br from-gray-600/80 to-gray-700/90 rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0">
+              <span className="text-white text-xs font-bold font-satoshi">
+                MW
               </span>
+            </div>
 
-              <ChevronDown
-                size={12}
-                className={`text-gray-400 group-hover:text-[#E2AF19] transition-all lg:w-3 lg:h-3 ${
-                  walletSwitcherOpen ? "rotate-180" : ""
-                } ${isSwitchingWallet ? "animate-spin" : ""}`}
-              />
-            </button>
-          )}
+            <div className="flex-1 min-w-0">
+              <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate block">
+                {selectedWallet.name}
+              </span>
+            </div>
+
+            <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mr-1.5 lg:mr-2 hidden sm:block"></div>
+
+            <span className="text-gray-400 text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
+              {selectedWallet.address}
+            </span>
+
+            <ChevronDown size={12} className="text-gray-400 lg:w-3 lg:h-3" />
+          </div>
 
           {/* Action Icons Container */}
           <div className="flex items-center space-x-2 relative">
@@ -598,20 +185,10 @@ export default function GlobalDashboardHeader({
                 className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
               >
                 <Bell size={14} className="text-gray-400 lg:w-4 lg:h-4" />
-                {totalUnreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-satoshi">
-                    {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
-                  </span>
-                )}
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-satoshi">
+                  3
+                </span>
               </button>
-
-              {/* Notification Panel */}
-              {notificationsOpen && (
-                <NotificationPanel
-                  isOpen={notificationsOpen}
-                  onClose={() => setNotificationsOpen(false)}
-                />
-              )}
 
               <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
 
@@ -644,16 +221,6 @@ export default function GlobalDashboardHeader({
 
       {/* Page-specific content below header */}
       {children}
-
-      {/* Wallet Switcher Dropdown */}
-      {wallets.length > 0 && (
-        <RealtimeWalletSwitcher
-          isOpen={walletSwitcherOpen}
-          onClose={() => setWalletSwitcherOpen(false)}
-          onWalletSelect={handleWalletSelect}
-          triggerRef={walletButtonRef}
-        />
-      )}
     </>
   );
 }

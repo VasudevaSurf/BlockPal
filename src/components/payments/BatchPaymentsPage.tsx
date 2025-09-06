@@ -1,4 +1,3 @@
-// src/app/dashboard/batch-payments/page.tsx
 "use client";
 
 import { useEffect } from "react";

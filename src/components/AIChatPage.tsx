@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx - Updated for right-side chat history with hamburger menu
+// src/components/AIChatPage.tsx - BACKEND REMOVED, UI PRESERVED
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -13,6 +13,7 @@ import {
   X,
   Plus,
   MessageCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { RootState } from "@/store";
 import { SkeletonAIChat } from "@/components/ui/Skeleton";
@@ -79,7 +80,7 @@ export default function AIChatPage() {
           {
             id: "welcome",
             type: "assistant",
-            content: `🤖 **Welcome to BlockPal AI!**\n\nI'm your crypto assistant. I can help with analysis, smart contracts, and market insights.\n\nWhat would you like to explore today?`,
+            content: `🤖 **Welcome to BlockPal AI Demo!**\n\nThis is a demo version of our AI chat interface. The AI functionality is currently disabled, but you can explore the UI and see how conversations would work.\n\n**Demo Features:**\n• Chat interface demonstration\n• Message history and persistence\n• Conversation management\n• Copy functionality\n\nType \`demo\` to see a sample AI response, or \`help\` for available demo commands.`,
             timestamp: new Date(),
           },
         ]);
@@ -241,6 +242,37 @@ export default function AIChatPage() {
     });
   };
 
+  // MODIFIED: Demo responses instead of API calls
+  const getDemoResponse = (input: string): string => {
+    const lowerInput = input.toLowerCase().trim();
+
+    if (lowerInput === "demo") {
+      return `🔷 **Demo AI Response**\n\nThis is a sample AI response showing how the chat interface would work with real AI functionality.\n\n**Features demonstrated:**\n• Markdown formatting with **bold** and *italic* text\n• Code snippets like \`console.log('Hello')\`\n• Structured responses\n• Real-time typing animation\n\nThe actual AI would provide cryptocurrency analysis, market insights, and blockchain information.`;
+    }
+
+    if (lowerInput === "help") {
+      return `🔷 **BlockPal AI Demo Commands**\n\n**Available Demo Commands:**\n• \`demo\` - Show sample AI response\n• \`help\` - Show this help message\n• \`clear\` - Clear conversation\n• \`features\` - List planned AI features\n• \`status\` - Show system status\n\n**Note:** This is a demo interface. Real AI functionality is disabled.`;
+    }
+
+    if (lowerInput === "features") {
+      return `🔷 **Planned AI Features**\n\n**Analysis:**\n• Portfolio analysis and insights\n• Transaction history review\n• Token price predictions\n• Risk assessment\n\n**Tools:**\n• Gas price optimization\n• Smart contract analysis\n• Market trend analysis\n• Trading recommendations\n\n**Currently:** Demo mode only - AI backend disabled`;
+    }
+
+    if (lowerInput === "status") {
+      return `🔷 **System Status**\n\n**✅ Working:**\n• Chat interface\n• Message persistence\n• Conversation history\n• UI interactions\n\n**❌ Disabled:**\n• AI backend processing\n• Real-time analysis\n• External API calls\n• Blockchain data fetching\n\n**Status:** Demo mode active`;
+    }
+
+    // Default response for any other input
+    const responses = [
+      `🤖 **Demo Response**\n\nI received your message: "${input}"\n\nIn the full version, I would provide detailed crypto analysis and insights. For now, try these demo commands: \`demo\`, \`help\`, \`features\`, or \`status\`.`,
+      `🔷 **AI Analysis (Demo)**\n\nYour query about "${input}" would normally trigger:\n• Market data lookup\n• Technical analysis\n• Personalized recommendations\n\nCurrently showing demo responses only.`,
+      `⚡ **BlockPal AI (Demo Mode)**\n\nProcessing "${input}"...\n\nIn production, this would connect to:\n• Real-time market data\n• Blockchain analytics\n• Portfolio tracking\n\nDemo mode: Try \`help\` for available commands.`,
+    ];
+
+    return responses[Math.floor(Math.random() * responses.length)];
+  };
+
+  // MODIFIED: Handle demo responses instead of API calls
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isTyping) return;
 
@@ -258,6 +290,15 @@ export default function AIChatPage() {
 
     if (!sessionId) setSessionId(Date.now().toString());
 
+    // Handle clear command
+    if (currentInput.toLowerCase().trim() === "clear") {
+      setMessages([]);
+      setSessionId("");
+      setIsTyping(false);
+      setSidebarOpen(false);
+      return;
+    }
+
     const processingId = (Date.now() + 1).toString();
     setMessages((prev) => [
       ...prev,
@@ -272,49 +313,15 @@ export default function AIChatPage() {
     ]);
 
     try {
-      if (currentInput.toLowerCase().trim() === "clear") {
-        setMessages([]);
-        setSessionId("");
-        setIsTyping(false);
-        setSidebarOpen(false);
-        return;
-      }
+      console.log("🤖 Processing demo message:", currentInput);
 
-      if (currentInput.toLowerCase().trim() === "help") {
-        setMessages((prev) => prev.filter((msg) => !msg.processing));
-        const helpId = (Date.now() + 2).toString();
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: helpId,
-            type: "assistant",
-            content: "",
-            timestamp: new Date(),
-            typing: true,
-          },
-        ]);
+      // Simulate processing delay
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 + Math.random() * 1000)
+      );
 
-        const helpText = `🔷 **BlockPal AI Features**\n\n**Analysis:**\n• \`analyze wallet 0x...\` - Portfolio analysis\n• \`check transaction 0x...\` - Transaction details\n• \`token info SYMBOL\` - Price & market data\n\n**Tools:**\n• \`gas prices\` - Current network fees\n• \`trending tokens\` - Hot cryptocurrencies\n• \`clear\` - Reset conversation\n\nReady to help with your crypto needs!`;
-
-        await typeMessage(helpText, helpId);
-        setIsTyping(false);
-        return;
-      }
-
-      const response = await fetch("/api/ai-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: currentInput,
-          sessionId: sessionId,
-        }),
-        credentials: "include",
-      });
-
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
-
-      const data = await response.json();
-      if (data.sessionId && !sessionId) setSessionId(data.sessionId);
+      // Get demo response
+      const demoResponse = getDemoResponse(currentInput);
 
       setMessages((prev) => prev.filter((msg) => !msg.processing));
       const aiId = (Date.now() + 2).toString();
@@ -329,8 +336,11 @@ export default function AIChatPage() {
         },
       ]);
 
-      await typeMessage(data.response, aiId);
+      await typeMessage(demoResponse, aiId);
+      console.log("✅ Demo response completed");
     } catch (error) {
+      console.error("❌ Error in demo response:", error);
+
       setMessages((prev) => prev.filter((msg) => !msg.processing));
       const errorId = (Date.now() + 2).toString();
       setMessages((prev) => [
@@ -345,7 +355,7 @@ export default function AIChatPage() {
       ]);
 
       await typeMessage(
-        `❌ Error: ${error.message}\n\nPlease try again.`,
+        `❌ **Demo Error**\n\nSomething went wrong with the demo response. This would normally show a proper error message.\n\nTry typing \`help\` for available demo commands.`,
         errorId
       );
     } finally {
@@ -397,7 +407,7 @@ export default function AIChatPage() {
       {
         id: "welcome-new",
         type: "assistant",
-        content: `🤖 **New Chat Started!**\n\nReady to help with crypto analysis. What would you like to explore?`,
+        content: `🤖 **New Demo Chat Started!**\n\nThis is a fresh conversation in demo mode. The AI backend is disabled, but you can explore the interface.\n\nTry these demo commands:\n• \`demo\` - Sample AI response\n• \`help\` - Available commands\n• \`features\` - Planned AI features`,
         timestamp: new Date(),
       },
     ]);
@@ -437,6 +447,16 @@ export default function AIChatPage() {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Demo Mode Banner */}
+        <div className="flex-shrink-0 bg-yellow-900/20 border-b border-yellow-500/30 px-4 py-2">
+          <div className="flex items-center justify-center">
+            <AlertTriangle size={16} className="text-yellow-400 mr-2" />
+            <span className="text-yellow-400 text-sm font-satoshi">
+              Demo Mode: AI functionality disabled - UI demonstration only
+            </span>
+          </div>
+        </div>
+
         {/* Chat Sub-Header - Only for mobile to show hamburger menu */}
         <div className="lg:hidden flex-shrink-0 p-3 border-b border-[#2C2C2C]/30 bg-gradient-to-r from-[#0F0F0F] to-[#1a1a1a]">
           <div className="flex items-center justify-end">
@@ -475,7 +495,7 @@ export default function AIChatPage() {
                             className="text-[#E2AF19] animate-spin"
                           />
                           <span className="text-[#F9EFD1] text-sm">
-                            Processing...
+                            Processing demo response...
                           </span>
                         </div>
                       ) : (
@@ -536,7 +556,7 @@ export default function AIChatPage() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask about crypto analysis, smart contracts, or market trends..."
+              placeholder="Try demo commands: 'demo', 'help', 'features', 'status'..."
               className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-12 pl-4 py-3 min-h-[52px] max-h-32 text-sm border border-[#2C2C2C] focus:border-[#E2AF19] transition-colors rounded-2xl"
               rows={1}
               disabled={isTyping}
@@ -565,7 +585,7 @@ export default function AIChatPage() {
                   />
                 ))}
               </div>
-              <span className="text-gray-400 text-xs">AI thinking...</span>
+              <span className="text-gray-400 text-xs">Demo AI thinking...</span>
             </div>
           )}
         </div>
@@ -592,7 +612,7 @@ export default function AIChatPage() {
                 <span className="text-white font-satoshi font-bold text-lg">
                   Chat History
                 </span>
-                <p className="text-gray-400 text-xs">Your conversations</p>
+                <p className="text-gray-400 text-xs">Demo conversations</p>
               </div>
             </div>
             <button
@@ -610,7 +630,7 @@ export default function AIChatPage() {
               className="w-full bg-gradient-to-r from-[#E2AF19] to-[#D4A853] text-black p-3 rounded-xl font-satoshi font-medium hover:scale-[1.02] transition-all flex items-center justify-center space-x-2"
             >
               <Plus size={16} />
-              <span>New Chat</span>
+              <span>New Demo Chat</span>
             </button>
           </div>
 
@@ -629,13 +649,13 @@ export default function AIChatPage() {
                   <div className="flex items-center space-x-2 mb-1">
                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                     <span className="text-white text-sm font-medium">
-                      Current Chat
+                      Current Demo Chat
                     </span>
                   </div>
                   <p className="text-gray-400 text-xs line-clamp-2">
                     {messages
                       .find((m) => m.type === "user")
-                      ?.content?.slice(0, 60) || "New conversation"}
+                      ?.content?.slice(0, 60) || "New demo conversation"}
                     ...
                   </p>
                   <div className="flex items-center space-x-2 mt-2 text-gray-500 text-xs">
@@ -658,7 +678,7 @@ export default function AIChatPage() {
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <span className="text-gray-300 text-sm font-medium line-clamp-1">
-                          {conversation.title || "Untitled Chat"}
+                          {conversation.title || "Untitled Demo Chat"}
                         </span>
                         <p className="text-gray-400 text-xs line-clamp-2 mt-1">
                           {conversation.lastMessage || "No messages"}
@@ -693,7 +713,7 @@ export default function AIChatPage() {
                   <div className="text-center py-8">
                     <Brain className="text-gray-500 mx-auto mb-3" size={32} />
                     <p className="text-gray-500 text-sm">
-                      No conversations yet
+                      No demo conversations yet
                     </p>
                     <p className="text-gray-600 text-xs mt-1">
                       Start chatting to see history

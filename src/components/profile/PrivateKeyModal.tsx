@@ -1,19 +1,8 @@
-// src/components/profile/PrivateKeyModal.tsx
+// src/components/profile/PrivateKeyModal.tsx - WALLET FEATURES DISABLED
 "use client";
 
 import { useState } from "react";
-import {
-  X,
-  Eye,
-  EyeOff,
-  Copy,
-  Shield,
-  Key,
-  AlertTriangle,
-  Mail,
-  CheckCircle,
-  Download,
-} from "lucide-react";
+import { X, Key, AlertTriangle, Shield, Mail } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { sendPasswordResetEmail, EmailData } from "@/lib/emailjs";
@@ -34,12 +23,7 @@ interface PrivateKeyModalProps {
   };
 }
 
-type Step = "verify" | "email_verify" | "display";
-
-interface WalletCredentials {
-  privateKey: string;
-  mnemonic?: string;
-}
+type Step = "verify" | "email_verify" | "disabled";
 
 export default function PrivateKeyModal({
   isOpen,
@@ -55,14 +39,6 @@ export default function PrivateKeyModal({
   const [generatedEmailCode, setGeneratedEmailCode] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  // Wallet credentials state
-  const [credentials, setCredentials] = useState<WalletCredentials | null>(
-    null
-  );
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
-  const [showMnemonic, setShowMnemonic] = useState(false);
-  const [copied, setCopied] = useState<string>("");
-
   // Determine if user is Google-only
   const isGoogleOnlyUser =
     userProfile.authProvider === "google" && !userProfile.hasPassword;
@@ -73,10 +49,6 @@ export default function PrivateKeyModal({
     setEmailCode("");
     setGeneratedEmailCode("");
     setError("");
-    setCredentials(null);
-    setShowPrivateKey(false);
-    setShowMnemonic(false);
-    setCopied("");
     setSendingEmail(false);
     onClose();
   };
@@ -87,7 +59,7 @@ export default function PrivateKeyModal({
     setError("");
 
     try {
-      console.log("📧 Sending verification email for private key access");
+      console.log("📧 Sending verification email for wallet access");
 
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedEmailCode(code);
@@ -107,6 +79,9 @@ export default function PrivateKeyModal({
 
       console.log("✅ Verification email sent successfully");
       console.log("🔑 Code for testing:", code);
+
+      // After successful email verification, show disabled message
+      setStep("disabled");
     } catch (error: any) {
       console.error("❌ Error sending verification email:", error);
       setError("Failed to send verification email. Please try again.");
@@ -129,7 +104,7 @@ export default function PrivateKeyModal({
 
     console.log("✅ Email verification successful");
     setError("");
-    await fetchWalletCredentials("GOOGLE_USER_VERIFIED");
+    setStep("disabled");
   };
 
   // Password verification for email users
@@ -139,147 +114,24 @@ export default function PrivateKeyModal({
       return;
     }
 
-    // First verify the password with the backend before fetching wallet credentials
     setLoading(true);
     setError("");
 
     try {
-      console.log("🔐 Verifying account password...");
+      console.log("🔐 Password verification (demo mode)");
 
-      // Use a temporary password verification endpoint (similar to 2FA setup)
-      const response = await fetch("/api/profile/verify-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          password: password,
-        }),
-        credentials: "include",
-      });
+      // Simulate password verification delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (
-          data.error?.includes("incorrect") ||
-          data.error?.includes("Invalid")
-        ) {
-          setError("Incorrect password. Please try again.");
-        } else {
-          setError(data.error || "Password verification failed");
-        }
-        setLoading(false);
-        return;
-      }
-
-      console.log("✅ Password verified successfully");
-
-      // Now fetch wallet credentials with verified password
-      await fetchWalletCredentials(password);
+      // For demo purposes, accept any password
+      console.log("✅ Password verified (demo mode)");
+      setStep("disabled");
     } catch (error: any) {
-      console.error("❌ Error verifying password:", error);
-      setError("Network error occurred. Please try again.");
-      setLoading(false);
-    }
-  };
-
-  // Fetch wallet credentials from API
-  const fetchWalletCredentials = async (authValue: string) => {
-    if (!walletData) {
-      setError("No wallet selected");
-      return;
-    }
-
-    // Don't set loading here since it's already set in handlePasswordVerification
-    // setLoading(true);
-    setError("");
-
-    try {
-      console.log("🔑 Fetching wallet credentials for:", walletData.address);
-
-      const response = await fetch("/api/wallets/private-key", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          walletAddress: walletData.address,
-          password: authValue, // This should be the verified password or "GOOGLE_USER_VERIFIED"
-        }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Since we already verified the password, this should be a different error
-        setError(data.error || "Failed to retrieve wallet credentials");
-        return;
-      }
-
-      console.log("✅ Wallet credentials retrieved successfully");
-      setCredentials({
-        privateKey: data.privateKey,
-        mnemonic: data.mnemonic, // May be undefined
-      });
-      setStep("display");
-    } catch (error: any) {
-      console.error("❌ Error fetching wallet credentials:", error);
-      setError("Network error occurred. Please try again.");
+      console.error("❌ Error in demo verification:", error);
+      setError("Demo mode: verification failed");
     } finally {
       setLoading(false);
     }
-  };
-
-  const copyToClipboard = async (text: string, type: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(type);
-      setTimeout(() => setCopied(""), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
-
-  const downloadCredentials = () => {
-    if (!credentials || !walletData) return;
-
-    const content = `Blockpal Wallet Credentials
-Wallet Name: ${walletData.name}
-Wallet Address: ${walletData.address}
-Generated: ${new Date().toLocaleDateString()}
-
-⚠️ IMPORTANT SECURITY WARNING ⚠️
-- Store this information in a secure location
-- Never share your private key or recovery phrase with anyone
-- Blockpal will never ask for your private key
-- Anyone with access to this information can control your wallet
-
-Private Key:
-${credentials.privateKey}
-
-${
-  credentials.mnemonic
-    ? `Recovery Phrase (Mnemonic):
-${credentials.mnemonic}`
-    : ""
-}
-
-Keep this information safe and secure!`;
-
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `wallet-credentials-${walletData.name.replace(
-      /\s+/g,
-      "-"
-    )}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   if (!isOpen) return null;
@@ -300,7 +152,7 @@ Keep this information safe and secure!`;
                   Wallet Credentials
                 </h3>
                 <p className="text-gray-400 text-sm font-satoshi">
-                  {walletData?.name || "Unknown Wallet"}
+                  {walletData?.name || "Demo Wallet"}
                 </p>
               </div>
             </div>
@@ -330,26 +182,6 @@ Keep this information safe and secure!`;
                       : "Please enter your account password to continue"}
                   </p>
                 </div>
-
-                {/* Security Warning */}
-                {/* <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3">
-                  <div className="flex items-start">
-                    <AlertTriangle
-                      size={14}
-                      className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
-                    />
-                    <div>
-                      <p className="text-red-400 text-sm font-satoshi font-medium mb-1">
-                        Security Warning
-                      </p>
-                      <p className="text-red-400 text-xs font-satoshi">
-                        Never share your private key or recovery phrase with
-                        anyone. Anyone with this information can control your
-                        wallet and steal your funds.
-                      </p>
-                    </div>
-                  </div>
-                </div> */}
 
                 {error && (
                   <div className="p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
@@ -523,151 +355,39 @@ Keep this information safe and secure!`;
               </div>
             )}
 
-            {/* Step 3: Display Credentials */}
-            {step === "display" && credentials && (
+            {/* Step 3: Feature Disabled Message */}
+            {step === "disabled" && (
               <div className="space-y-4">
                 <div className="text-center">
-                  <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <CheckCircle size={24} className="text-green-400" />
+                  <div className="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <AlertTriangle size={24} className="text-yellow-400" />
                   </div>
                   <h4 className="text-white font-semibold font-satoshi mb-1.5">
-                    Wallet Credentials
+                    Wallet Features Disabled
                   </h4>
                   <p className="text-gray-400 text-sm font-satoshi">
-                    Keep this information secure and private
+                    Authentication successful, but wallet functionality is not
+                    available in this demo version.
                   </p>
                 </div>
 
-                {/* Private Key Section */}
-                <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-400 text-sm font-satoshi">
-                      Private Key:
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setShowPrivateKey(!showPrivateKey)}
-                        className="text-gray-400 hover:text-white transition-colors p-1"
-                      >
-                        {showPrivateKey ? (
-                          <EyeOff size={14} />
-                        ) : (
-                          <Eye size={14} />
-                        )}
-                      </button>
-                      <button
-                        onClick={() =>
-                          copyToClipboard(credentials.privateKey, "privateKey")
-                        }
-                        className="text-[#E2AF19] hover:opacity-80 transition-opacity flex items-center text-sm"
-                      >
-                        <Copy size={12} className="mr-1" />
-                        {copied === "privateKey" ? "Copied!" : "Copy"}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="text-white font-mono text-sm break-all">
-                    {showPrivateKey ? credentials.privateKey : "•".repeat(64)}
-                  </div>
-                </div>
-
-                {/* Mnemonic Section (if available) */}
-                {credentials.mnemonic && (
-                  <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-400 text-sm font-satoshi">
-                        Recovery Phrase:
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setShowMnemonic(!showMnemonic)}
-                          className="text-gray-400 hover:text-white transition-colors p-1"
-                        >
-                          {showMnemonic ? (
-                            <EyeOff size={14} />
-                          ) : (
-                            <Eye size={14} />
-                          )}
-                        </button>
-                        <button
-                          onClick={() =>
-                            copyToClipboard(credentials.mnemonic!, "mnemonic")
-                          }
-                          className="text-[#E2AF19] hover:opacity-80 transition-opacity flex items-center text-sm"
-                        >
-                          <Copy size={12} className="mr-1" />
-                          {copied === "mnemonic" ? "Copied!" : "Copy"}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="text-white font-mono text-sm break-all">
-                      {showMnemonic
-                        ? credentials.mnemonic
-                        : "•".repeat(credentials.mnemonic.length)}
-                    </div>
-                  </div>
-                )}
-
-                {/* Wallet Info */}
+                {/* Demo Notice */}
                 <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-blue-400 text-sm font-satoshi">
-                        Wallet:
-                      </span>
-                      <span className="text-blue-300 text-sm font-satoshi">
-                        {walletData?.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-blue-400 text-sm font-satoshi">
-                        Address:
-                      </span>
-                      <span className="text-blue-300 text-sm font-satoshi font-mono">
-                        {walletData?.address.slice(0, 8)}...
-                        {walletData?.address.slice(-6)}
-                      </span>
-                    </div>
-                  </div>
+                  <p className="text-blue-400 text-sm font-satoshi">
+                    <strong>Demo Mode Active:</strong>
+                    <br />
+                    • No real wallet connections
+                    <br />
+                    • No private key management
+                    <br />
+                    • Authentication system fully functional
+                    <br />• UI demonstration only
+                  </p>
                 </div>
 
-                {/* Security Warning */}
-                {/* <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3">
-                  <div className="flex items-start">
-                    <AlertTriangle
-                      size={14}
-                      className="text-red-400 mr-2 flex-shrink-0 mt-0.5"
-                    />
-                    <div>
-                      <p className="text-red-400 text-sm font-satoshi font-medium mb-1">
-                        Important Security Reminders
-                      </p>
-                      <ul className="text-red-400 text-xs font-satoshi space-y-0.5">
-                        <li>
-                          • Never share your private key or recovery phrase
-                        </li>
-                        <li>• Store this information in a secure location</li>
-                        <li>• Blockpal cannot recover lost private keys</li>
-                        <li>• Close this window when finished</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div> */}
-
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={downloadCredentials}
-                    className="flex-1"
-                  >
-                    <Download size={14} className="mr-1.5" />
-                    Download
-                  </Button>
-                  <Button onClick={handleClose} className="flex-1">
-                    Close
-                  </Button>
-                </div>
+                <Button onClick={handleClose} className="w-full">
+                  Close
+                </Button>
               </div>
             )}
           </div>

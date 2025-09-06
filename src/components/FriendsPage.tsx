@@ -1,4 +1,4 @@
-// src/components/FriendsPage.tsx - FIXED: Token dropdown showing only USDC, USDT, ETH
+// src/components/FriendsPage.tsx - BACKEND REMOVED, UI PRESERVED
 "use client";
 
 import { useState, useEffect } from "react";
@@ -76,8 +76,8 @@ interface FundRequest {
   fulfilledBy?: string;
 }
 
-// FIXED: Only show these three tokens
-const ALLOWED_TOKENS = [
+// Demo tokens for UI demonstration
+const DEMO_TOKENS = [
   {
     id: "ethereum",
     symbol: "ETH",
@@ -85,6 +85,9 @@ const ALLOWED_TOKENS = [
     contractAddress: "native",
     decimals: 18,
     icon: "https://assets.coingecko.com/coins/images/279/large/ethereum.png",
+    balance: "0.00",
+    balanceFormatted: "0.00",
+    hasBalance: false,
   },
   {
     id: "usdc",
@@ -93,6 +96,9 @@ const ALLOWED_TOKENS = [
     contractAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     decimals: 6,
     icon: "https://assets.coingecko.com/coins/images/6319/large/usdc.png",
+    balance: "0.00",
+    balanceFormatted: "0.00",
+    hasBalance: false,
   },
   {
     id: "tether",
@@ -101,49 +107,29 @@ const ALLOWED_TOKENS = [
     contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
     decimals: 6,
     icon: "https://assets.coingecko.com/coins/images/325/large/Tether.png",
+    balance: "0.00",
+    balanceFormatted: "0.00",
+    hasBalance: false,
   },
 ];
 
 // Helper function to parse user-friendly error messages
 const parseErrorMessage = (error: string): string => {
-  if (error.includes("insufficient funds")) {
-    return "Insufficient funds for this request. Please check your wallet balance.";
+  if (error.includes("demo") || error.includes("disabled")) {
+    return "Demo mode: This feature is not available in the demonstration version.";
   }
-  if (error.includes("gas")) {
-    return "Not enough ETH to pay for transaction fees.";
-  }
-  if (error.includes("execution reverted")) {
-    return "Transaction failed. Please check token balances and try again.";
-  }
-  if (error.includes("nonce too low")) {
-    return "Network issue detected. Please try again.";
-  }
-  if (error.includes("network error") || error.includes("timeout")) {
-    return "Network connection error. Please check your internet and try again.";
-  }
-  if (error.includes("user denied") || error.includes("user rejected")) {
-    return "Transaction was cancelled.";
-  }
-  if (error.includes("cannot send to yourself") || error.includes("self")) {
-    return "You cannot send requests to yourself.";
-  }
-
-  // For any other technical errors, return a generic user-friendly message
-  return "Request failed. Please try again or contact support if the issue persists.";
+  return "This feature is disabled in demo mode.";
 };
 
 export default function FriendsPage() {
-  const { activeWallet, tokens } = useSelector(
-    (state: RootState) => state.wallet
-  );
-
-  // FIXED: Get current user from auth state
   const { user } = useSelector((state: RootState) => state.auth);
   const currentUsername = user?.username;
 
   const [activeTab, setActiveTab] = useState<
     "Friends" | "Requests" | "FundRequests"
   >("Friends");
+
+  // MODIFIED: Use mock data instead of real data
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<SentRequest[]>([]);
@@ -177,23 +163,9 @@ export default function FriendsPage() {
   // Track copied state for clipboard actions
   const [copied, setCopied] = useState<string | null>(null);
 
-  // FIXED: Get available tokens with user balances
+  // MODIFIED: Get demo tokens instead of real tokens
   const getAvailableTokensWithBalances = () => {
-    return ALLOWED_TOKENS.map((allowedToken) => {
-      // Find the user's token that matches this allowed token
-      const userToken = tokens.find(
-        (t) => t.symbol.toUpperCase() === allowedToken.symbol.toUpperCase()
-      );
-
-      return {
-        ...allowedToken,
-        balance: userToken?.balance || "0",
-        balanceFormatted: userToken?.balanceFormatted || "0",
-        hasBalance: userToken
-          ? parseFloat(userToken.balanceFormatted || "0") > 0
-          : false,
-      };
-    });
+    return DEMO_TOKENS;
   };
 
   // Copy to clipboard helper
@@ -205,7 +177,7 @@ export default function FriendsPage() {
     });
   };
 
-  // Enhanced token utilities (same as TokenList)
+  // Enhanced token utilities
   const getTokenIcon = (symbol: string, contractAddress?: string) => {
     const colors: Record<string, string> = {
       ETH: "bg-blue-500",
@@ -226,7 +198,7 @@ export default function FriendsPage() {
     return letters[symbol.toUpperCase()] || symbol.charAt(0);
   };
 
-  // FIXED: Enhanced token rendering for fund request modal
+  // Enhanced token rendering for fund request modal
   const renderTokenOption = (token: any, isSelected: boolean = false) => {
     const symbol = token?.symbol || "ETH";
     const balance = token?.balanceFormatted || "0";
@@ -301,46 +273,49 @@ export default function FriendsPage() {
     }
   }, [showTokenDropdown]);
 
+  // MODIFIED: Load mock data instead of API calls
   const loadInitialData = async () => {
     try {
       setInitialLoading(true);
+      console.log("👥 Loading demo friends data...");
+
+      // Simulate loading delay
       await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // Load demo data based on active tab
       if (activeTab === "Friends") {
-        await loadFriends();
-        await loadSentRequests();
+        await loadMockFriends();
+        await loadMockSentRequests();
       } else if (activeTab === "Requests") {
-        await loadFriendRequests();
+        await loadMockFriendRequests();
       } else if (activeTab === "FundRequests") {
-        await loadFundRequests();
+        await loadMockFundRequests();
       }
+
+      console.log("✅ Demo friends data loaded");
     } catch (error) {
-      console.error("Error loading initial data:", error);
+      console.error("Error loading demo data:", error);
     } finally {
       setInitialLoading(false);
     }
   };
 
-  const fetchUnreadCount = async () => {
+  // MODIFIED: Mock unread count
+  const fetchMockUnreadCount = async () => {
     try {
-      const response = await fetch("/api/notifications?unreadOnly=true", {
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUnreadCount(data.unreadCount || 0);
-      }
+      // Demo unread count
+      setUnreadCount(0);
     } catch (error) {
-      console.error("Error fetching unread count:", error);
+      console.error("Error fetching demo unread count:", error);
     }
   };
 
   // Load initial data
   useEffect(() => {
     loadInitialData();
-    fetchUnreadCount();
+    fetchMockUnreadCount();
 
-    const interval = setInterval(fetchUnreadCount, 30000);
+    const interval = setInterval(fetchMockUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -348,111 +323,236 @@ export default function FriendsPage() {
   useEffect(() => {
     if (!initialLoading) {
       if (activeTab === "Friends") {
-        loadFriends();
-        loadSentRequests();
+        loadMockFriends();
+        loadMockSentRequests();
       } else if (activeTab === "Requests") {
-        loadFriendRequests();
+        loadMockFriendRequests();
       } else if (activeTab === "FundRequests") {
-        loadFundRequests();
+        loadMockFundRequests();
       }
     }
   }, [activeTab, initialLoading]);
 
-  const loadFriends = async () => {
+  // MODIFIED: Load mock friends
+  const loadMockFriends = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/friends?type=friends", {
-        credentials: "include",
-      });
+      console.log("👥 Loading mock friends...");
 
-      if (response.ok) {
-        const data = await response.json();
-        setFriends(data.friends || []);
-      } else {
-        setError("Failed to load friends");
+      // Simulate loading delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Load from localStorage or create demo data
+      const savedFriends = localStorage.getItem("demo-friends");
+      let mockFriends: Friend[] = [];
+
+      if (savedFriends) {
+        try {
+          mockFriends = JSON.parse(savedFriends);
+        } catch (error) {
+          console.warn("Error parsing saved friends, using defaults");
+        }
       }
+
+      // If no saved friends, create some demo ones
+      if (mockFriends.length === 0) {
+        mockFriends = [
+          {
+            _id: "demo-friend-1",
+            username: "alice_crypto",
+            displayName: "Alice Johnson",
+            gmail: "alice@example.com",
+            walletAddress: "0x742d35Cc6bfE32c4E130c2C982e5b46C123456789",
+          },
+          {
+            _id: "demo-friend-2",
+            username: "bob_trader",
+            displayName: "Bob Smith",
+            gmail: "bob@example.com",
+            walletAddress: "0x8ba1f109551bD432803012645Hac189451023456",
+          },
+          {
+            _id: "demo-friend-3",
+            username: "charlie_defi",
+            displayName: "Charlie Brown",
+            gmail: "charlie@example.com",
+            walletAddress: "0x123456789abcdef123456789abcdef1234567890",
+          },
+        ];
+
+        localStorage.setItem("demo-friends", JSON.stringify(mockFriends));
+      }
+
+      setFriends(mockFriends);
+      console.log("✅ Mock friends loaded:", mockFriends.length);
     } catch (error) {
-      setError("Failed to load friends");
+      console.error("Error loading mock friends:", error);
+      setError("Failed to load demo friends");
     } finally {
       setLoading(false);
     }
   };
 
-  const loadFriendRequests = async () => {
+  // MODIFIED: Load mock friend requests
+  const loadMockFriendRequests = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/friends?type=requests", {
-        credentials: "include",
-      });
+      console.log("📨 Loading mock friend requests...");
 
-      if (response.ok) {
-        const data = await response.json();
-        setFriendRequests(data.requests || []);
-      } else {
-        setError("Failed to load friend requests");
-      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const mockRequests: FriendRequest[] = [
+        {
+          _id: "demo-request-1",
+          requesterUsername: "eve_hodler",
+          receiverUsername: currentUsername || "demo_user",
+          status: "pending",
+          requestedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          requesterData: {
+            _id: "demo-user-4",
+            username: "eve_hodler",
+            displayName: "Eve Wilson",
+            gmail: "eve@example.com",
+          },
+        },
+        {
+          _id: "demo-request-2",
+          requesterUsername: "frank_nft",
+          receiverUsername: currentUsername || "demo_user",
+          status: "pending",
+          requestedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          requesterData: {
+            _id: "demo-user-5",
+            username: "frank_nft",
+            displayName: "Frank Davis",
+            gmail: "frank@example.com",
+          },
+        },
+      ];
+
+      setFriendRequests(mockRequests);
+      console.log("✅ Mock friend requests loaded:", mockRequests.length);
     } catch (error) {
-      setError("Failed to load friend requests");
+      console.error("Error loading mock friend requests:", error);
+      setError("Failed to load demo friend requests");
     } finally {
       setLoading(false);
     }
   };
 
-  const loadSentRequests = async () => {
+  // MODIFIED: Load mock sent requests
+  const loadMockSentRequests = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/friends?type=sent-requests", {
-        credentials: "include",
-      });
+      console.log("📤 Loading mock sent requests...");
 
-      if (response.ok) {
-        const data = await response.json();
-        setSentRequests(data.sentRequests || []);
-      } else {
-        setError("Failed to load sent requests");
-      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const mockSentRequests: SentRequest[] = [
+        {
+          _id: "demo-sent-1",
+          requesterUsername: currentUsername || "demo_user",
+          receiverUsername: "grace_validator",
+          status: "pending",
+          requestedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+          receiverData: {
+            _id: "demo-user-6",
+            username: "grace_validator",
+            displayName: "Grace Lee",
+            gmail: "grace@example.com",
+          },
+        },
+      ];
+
+      setSentRequests(mockSentRequests);
+      console.log("✅ Mock sent requests loaded:", mockSentRequests.length);
     } catch (error) {
-      setError("Failed to load sent requests");
+      console.error("Error loading mock sent requests:", error);
+      setError("Failed to load demo sent requests");
     } finally {
       setLoading(false);
     }
   };
 
-  const loadFundRequests = async () => {
+  // MODIFIED: Load mock fund requests
+  const loadMockFundRequests = async () => {
     try {
       setLoading(true);
+      console.log("💰 Loading mock fund requests...");
 
-      const response = await fetch("/api/friends/fund-request?type=received", {
-        credentials: "include",
-      });
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      if (response.ok) {
-        const data = await response.json();
-        const requests = data.fundRequests || [];
+      const now = new Date();
+      const mockFundRequests: FundRequest[] = [
+        {
+          _id: "demo-fund-1",
+          requestId: "req_demo_1",
+          requesterUsername: "alice_crypto",
+          recipientUsername: currentUsername || "demo_user",
+          tokenSymbol: "ETH",
+          amount: "0.5",
+          message: "For gas fees to deploy my NFT collection",
+          status: "pending",
+          requestedAt: new Date(
+            now.getTime() - 2 * 60 * 60 * 1000
+          ).toISOString(),
+          expiresAt: new Date(
+            now.getTime() + 22 * 60 * 60 * 1000
+          ).toISOString(),
+        },
+        {
+          _id: "demo-fund-2",
+          requestId: "req_demo_2",
+          requesterUsername: "bob_trader",
+          recipientUsername: currentUsername || "demo_user",
+          tokenSymbol: "USDC",
+          amount: "100",
+          message: "Lunch money for blockchain conference",
+          status: "fulfilled",
+          requestedAt: new Date(
+            now.getTime() - 3 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          expiresAt: new Date(
+            now.getTime() - 2 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          respondedAt: new Date(
+            now.getTime() - 2 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          transactionHash:
+            "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          fulfilledBy: currentUsername || "demo_user",
+        },
+        {
+          _id: "demo-fund-3",
+          requestId: "req_demo_3",
+          requesterUsername: "charlie_defi",
+          recipientUsername: currentUsername || "demo_user",
+          tokenSymbol: "USDT",
+          amount: "50",
+          message: "Help with staking pool entry",
+          status: "expired",
+          requestedAt: new Date(
+            now.getTime() - 10 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          expiresAt: new Date(
+            now.getTime() - 8 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+        },
+      ];
 
-        const validatedRequests = requests.map((request: FundRequest) => {
-          const isExpired = new Date() > new Date(request.expiresAt);
-          if (isExpired && request.status === "pending") {
-            return { ...request, status: "expired" as const };
-          }
-          return request;
-        });
-
-        setFundRequests(validatedRequests);
-      } else {
-        setError("Failed to load fund requests");
-      }
+      setFundRequests(mockFundRequests);
+      console.log("✅ Mock fund requests loaded:", mockFundRequests.length);
     } catch (error) {
-      setError("Failed to load fund requests");
+      console.error("Error loading mock fund requests:", error);
+      setError("Failed to load demo fund requests");
     } finally {
       setLoading(false);
     }
   };
 
-  // FIXED: Enhanced friend request validation
+  // MODIFIED: Mock friend request sending
   const sendFriendRequest = async (username: string) => {
     try {
-      // FIXED: Check if trying to send request to self
       if (username === currentUsername) {
         setError("You cannot send a friend request to yourself.");
         return;
@@ -462,37 +562,26 @@ export default function FriendsPage() {
       setError("");
       setSuccessMessage("");
 
-      const response = await fetch("/api/friends", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "send_request",
-          targetUsername: username,
-        }),
-        credentials: "include",
-      });
+      console.log("📤 Demo: Sending friend request to", username);
 
-      const data = await response.json();
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      if (response.ok) {
-        // Refresh sent requests to update search suggestions
-        loadSentRequests();
-        // Show success message
-        setSuccessMessage(`Friend request sent to @${username}!`);
-        // Auto-hide success message after 3 seconds
-        setTimeout(() => setSuccessMessage(""), 3000);
-      } else {
-        setError(
-          parseErrorMessage(data.error || "Failed to send friend request")
-        );
-      }
+      // Show demo success message
+      setSuccessMessage(
+        `Demo: Friend request sent to @${username}! (Not actually sent)`
+      );
+      setTimeout(() => setSuccessMessage(""), 3000);
+
+      console.log("✅ Demo friend request 'sent'");
     } catch (error) {
-      setError("Failed to send friend request");
+      setError("Demo mode: Friend request feature disabled");
     } finally {
       setLoading(false);
     }
   };
 
+  // MODIFIED: Mock friend request handling
   const handleFriendRequest = async (
     username: string,
     action: "accept" | "decline"
@@ -502,68 +591,83 @@ export default function FriendsPage() {
       setError("");
       setSuccessMessage("");
 
-      const response = await fetch("/api/friends", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: action === "accept" ? "accept_request" : "decline_request",
-          targetUsername: username,
-        }),
-        credentials: "include",
-      });
+      console.log(`📝 Demo: ${action}ing friend request from`, username);
 
-      if (response.ok) {
-        loadFriendRequests();
-        loadSentRequests();
-        if (action === "accept") {
-          loadFriends();
-          setSuccessMessage(`You are now friends with @${username}!`);
-        } else {
-          setSuccessMessage(`Friend request from @${username} declined.`);
-        }
-        // Auto-hide success message after 3 seconds
-        setTimeout(() => setSuccessMessage(""), 3000);
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      // Remove from friend requests locally
+      setFriendRequests((prev) =>
+        prev.filter((req) => req.requesterUsername !== username)
+      );
+
+      if (action === "accept") {
+        // Add to friends locally
+        const newFriend: Friend = {
+          _id: `demo-friend-${Date.now()}`,
+          username: username,
+          displayName: username
+            .replace("_", " ")
+            .replace(/\b\w/g, (l) => l.toUpperCase()),
+          gmail: `${username}@example.com`,
+        };
+
+        setFriends((prev) => {
+          const updated = [...prev, newFriend];
+          localStorage.setItem("demo-friends", JSON.stringify(updated));
+          return updated;
+        });
+
+        setSuccessMessage(
+          `Demo: You are now friends with @${username}! (Local only)`
+        );
       } else {
-        setError(`Failed to ${action} friend request`);
+        setSuccessMessage(
+          `Demo: Friend request from @${username} declined. (Local only)`
+        );
       }
+
+      setTimeout(() => setSuccessMessage(""), 3000);
+      console.log(`✅ Demo friend request ${action}ed`);
     } catch (error) {
-      console.error("Error handling friend request:", error);
-      setError(`Failed to ${action} friend request`);
+      console.error(`Error handling demo friend request:`, error);
+      setError(`Demo mode: Failed to ${action} friend request`);
     } finally {
       setLoading(false);
     }
   };
 
+  // MODIFIED: Mock friend removal
   const removeFriend = async (username: string) => {
     try {
       setLoading(true);
       setError("");
       setSuccessMessage("");
 
-      const response = await fetch("/api/friends", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "remove_friend",
-          targetUsername: username,
-        }),
-        credentials: "include",
-      });
+      console.log("🗑️ Demo: Removing friend", username);
 
-      if (response.ok) {
-        loadFriends();
-        setShowRemoveConfirmation(false);
-        setFriendToRemove(null);
-        // Show success message
-        setSuccessMessage(`@${username} has been removed from your friends.`);
-        // Auto-hide success message after 3 seconds
-        setTimeout(() => setSuccessMessage(""), 3000);
-      } else {
-        setError("Failed to remove friend");
-      }
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      // Remove from friends locally
+      const updatedFriends = friends.filter(
+        (friend) => friend.username !== username
+      );
+      setFriends(updatedFriends);
+      localStorage.setItem("demo-friends", JSON.stringify(updatedFriends));
+
+      setShowRemoveConfirmation(false);
+      setFriendToRemove(null);
+
+      setSuccessMessage(
+        `Demo: @${username} has been removed from your friends. (Local only)`
+      );
+      setTimeout(() => setSuccessMessage(""), 3000);
+
+      console.log("✅ Demo friend removed");
     } catch (error) {
-      console.error("Error removing friend:", error);
-      setError("Failed to remove friend");
+      console.error("Error removing demo friend:", error);
+      setError("Demo mode: Failed to remove friend");
     } finally {
       setLoading(false);
     }
@@ -574,9 +678,8 @@ export default function FriendsPage() {
     setShowRemoveConfirmation(true);
   };
 
-  // FIXED: Enhanced fund request validation
+  // MODIFIED: Mock fund request opening
   const openFundRequestModal = (friend: Friend) => {
-    // FIXED: Check if trying to request funds from self
     if (friend.username === currentUsername) {
       setError("You cannot request funds from yourself.");
       return;
@@ -593,19 +696,13 @@ export default function FriendsPage() {
     });
   };
 
-  // FIXED: Enhanced fund request validation
+  // MODIFIED: Mock fund request sending
   const sendFundRequest = async () => {
-    if (
-      !selectedFriend ||
-      !fundRequestData.amount ||
-      !activeWallet?.address ||
-      !currentUsername
-    ) {
-      setError("Missing required information or no active wallet selected");
+    if (!selectedFriend || !fundRequestData.amount || !currentUsername) {
+      setError("Missing required information for demo request");
       return;
     }
 
-    // FIXED: Additional check to prevent self fund requests
     if (selectedFriend.username === currentUsername) {
       setError("You cannot request funds from yourself.");
       return;
@@ -616,44 +713,31 @@ export default function FriendsPage() {
       setError("");
       setSuccessMessage("");
 
-      const response = await fetch("/api/friends/fund-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          friendUsername: selectedFriend.username,
-          tokenSymbol: fundRequestData.tokenSymbol,
-          amount: fundRequestData.amount,
-          message: fundRequestData.message,
-          requesterWalletAddress: activeWallet.address,
-        }),
-        credentials: "include",
+      console.log("💰 Demo: Sending fund request", {
+        to: selectedFriend.username,
+        amount: fundRequestData.amount,
+        token: fundRequestData.tokenSymbol,
       });
 
-      const data = await response.json();
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 1200));
 
-      if (response.ok) {
-        setShowFundRequestModal(false);
-        setSelectedFriend(null);
-        setFundRequestData({
-          tokenSymbol: "ETH",
-          amount: "",
-          message: "",
-        });
-        // Show success message
-        setSuccessMessage(
-          `Fund request for ${fundRequestData.amount} ${fundRequestData.tokenSymbol} sent to @${selectedFriend.username}!`
-        );
-        // Auto-hide success message after 4 seconds (longer for fund requests)
-        setTimeout(() => setSuccessMessage(""), 4000);
-      } else {
-        setError(
-          parseErrorMessage(data.error || "Failed to send fund request")
-        );
-      }
-    } catch (error: any) {
-      setError(
-        parseErrorMessage(error.message || "Failed to send fund request")
+      setShowFundRequestModal(false);
+      setSelectedFriend(null);
+      setFundRequestData({
+        tokenSymbol: "ETH",
+        amount: "",
+        message: "",
+      });
+
+      setSuccessMessage(
+        `Demo: Fund request for ${fundRequestData.amount} ${fundRequestData.tokenSymbol} sent to @${selectedFriend.username}! (Not actually sent)`
       );
+      setTimeout(() => setSuccessMessage(""), 4000);
+
+      console.log("✅ Demo fund request 'sent'");
+    } catch (error: any) {
+      setError("Demo mode: Fund request feature disabled");
     } finally {
       setLoading(false);
     }
@@ -729,10 +813,11 @@ export default function FriendsPage() {
 
     if (!statusInfo.canAction) {
       if (request.status === "fulfilled" && request.transactionHash) {
-        window.open(
-          `https://etherscan.io/tx/${request.transactionHash}`,
-          "_blank"
+        // Show demo message instead of opening real explorer
+        setSuccessMessage(
+          "Demo: This would open the transaction in a blockchain explorer"
         );
+        setTimeout(() => setSuccessMessage(""), 3000);
         return;
       } else {
         return;
@@ -749,6 +834,16 @@ export default function FriendsPage() {
 
   return (
     <>
+      {/* Demo Mode Banner */}
+      <div className="bg-yellow-900/20 border-b border-yellow-500/30 px-4 py-2 mb-4">
+        <div className="flex items-center justify-center">
+          <AlertTriangle size={16} className="text-yellow-400 mr-2" />
+          <span className="text-yellow-400 text-sm font-satoshi">
+            Demo Mode: Friends functionality disabled - UI demonstration only
+          </span>
+        </div>
+      </div>
+
       {/* ADDED: Backdrop for all modals and dropdowns */}
       {(showFundRequestModal ||
         selectedFundRequest ||
@@ -814,7 +909,7 @@ export default function FriendsPage() {
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  Friends
+                  Demo Friends
                 </button>
                 <button
                   onClick={() => setActiveTab("Requests")}
@@ -824,7 +919,7 @@ export default function FriendsPage() {
                       : "text-gray-400 hover:text-white border-[#2C2C2C]"
                   }`}
                 >
-                  Requests
+                  Demo Requests
                 </button>
                 <button
                   onClick={() => setActiveTab("FundRequests")}
@@ -834,7 +929,7 @@ export default function FriendsPage() {
                       : "text-gray-400 hover:text-white border-[#2C2C2C]"
                   }`}
                 >
-                  Fund Requests
+                  Demo Fund Requests
                 </button>
               </div>
 
@@ -861,7 +956,7 @@ export default function FriendsPage() {
                     <div className="text-center py-6">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
                       <p className="text-gray-400 font-satoshi">
-                        Loading friends...
+                        Loading demo friends...
                       </p>
                     </div>
                   ) : friends.length === 0 ? (
@@ -873,7 +968,7 @@ export default function FriendsPage() {
                         />
                       </div>
                       <p className="text-gray-400 font-satoshi text-sm">
-                        Search for friends using the search box above
+                        Demo friends will appear here
                       </p>
                     </div>
                   ) : (
@@ -903,7 +998,7 @@ export default function FriendsPage() {
                                 onClick={() => openFundRequestModal(friend)}
                                 className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex-1 flex items-center justify-center"
                               >
-                                Request Funds
+                                Demo Request
                               </button>
                               <button
                                 onClick={() => handleRemoveFriend(friend)}
@@ -940,7 +1035,7 @@ export default function FriendsPage() {
                                 onClick={() => openFundRequestModal(friend)}
                                 className="bg-[#E2AF19] text-black px-3 py-1.5 rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors text-sm flex items-center"
                               >
-                                Request Funds
+                                Demo Request
                               </button>
                               <button
                                 onClick={() => handleRemoveFriend(friend)}
@@ -967,7 +1062,7 @@ export default function FriendsPage() {
                     <div className="text-center py-6">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
                       <p className="text-gray-400 font-satoshi">
-                        Loading requests...
+                        Loading demo requests...
                       </p>
                     </div>
                   ) : friendRequests.length === 0 ? (
@@ -979,10 +1074,10 @@ export default function FriendsPage() {
                         />
                       </div>
                       <h3 className="text-white text-sm lg:text-base font-satoshi mb-2">
-                        No friend requests
+                        No demo friend requests
                       </h3>
                       <p className="text-gray-400 font-satoshi text-sm">
-                        Friend requests will appear here
+                        Demo friend requests will appear here
                       </p>
                     </div>
                   ) : (
@@ -1057,7 +1152,7 @@ export default function FriendsPage() {
                     <div className="text-center py-6">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19] mx-auto mb-2"></div>
                       <p className="text-gray-400 font-satoshi">
-                        Loading fund requests...
+                        Loading demo fund requests...
                       </p>
                     </div>
                   ) : fundRequests.length === 0 ? (
@@ -1069,10 +1164,10 @@ export default function FriendsPage() {
                         />
                       </div>
                       <h3 className="text-white text-sm lg:text-base font-satoshi mb-2">
-                        No fund requests
+                        No demo fund requests
                       </h3>
                       <p className="text-gray-400 font-satoshi text-sm">
-                        Fund requests from friends will appear here
+                        Demo fund requests will appear here
                       </p>
                     </div>
                   ) : (
@@ -1080,7 +1175,7 @@ export default function FriendsPage() {
                       const statusInfo = getFundRequestStatusInfo(request);
                       return (
                         <div key={request._id}>
-                          {/* Fund request cards remain the same... */}
+                          {/* Mobile and Desktop layouts remain the same but with demo data */}
                           <div className="block lg:hidden">
                             <div
                               className={`bg-[#0F0F0F] rounded-lg p-3 mb-2 border border-[#2C2C2C] transition-all ${
@@ -1161,13 +1256,13 @@ export default function FriendsPage() {
 
                                 {statusInfo.canAction ? (
                                   <div className="text-[#E2AF19] text-xs font-satoshi">
-                                    Tap to respond
+                                    Tap for demo response
                                   </div>
                                 ) : request.status === "fulfilled" &&
                                   request.transactionHash ? (
                                   <div className="text-green-400 text-xs font-satoshi flex items-center">
                                     <ExternalLink size={10} className="mr-1" />
-                                    View Transaction
+                                    Demo Transaction
                                   </div>
                                 ) : (
                                   <div
@@ -1183,7 +1278,7 @@ export default function FriendsPage() {
                                   <div className="mt-2 p-2 bg-green-900/20 border border-green-500/50 rounded">
                                     <div className="flex items-center justify-between">
                                       <span className="text-green-400 text-xs font-satoshi">
-                                        Tx:{" "}
+                                        Demo Tx:{" "}
                                         {request.transactionHash.slice(0, 10)}
                                         ...{request.transactionHash.slice(-8)}
                                       </span>
@@ -1202,7 +1297,7 @@ export default function FriendsPage() {
                                     </div>
                                     {copied === `tx-${request._id}` && (
                                       <p className="text-green-400 text-xs font-satoshi mt-1">
-                                        Transaction hash copied!
+                                        Demo transaction hash copied!
                                       </p>
                                     )}
                                   </div>
@@ -1260,22 +1355,25 @@ export default function FriendsPage() {
 
                                 {statusInfo.canAction ? (
                                   <div className="text-[#E2AF19] text-sm font-satoshi">
-                                    Click to respond
+                                    Click for demo
                                   </div>
                                 ) : request.status === "fulfilled" &&
                                   request.transactionHash ? (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      window.open(
-                                        `https://etherscan.io/tx/${request.transactionHash}`,
-                                        "_blank"
+                                      setSuccessMessage(
+                                        "Demo: Would open blockchain explorer"
+                                      );
+                                      setTimeout(
+                                        () => setSuccessMessage(""),
+                                        3000
                                       );
                                     }}
                                     className="text-green-400 text-sm font-satoshi hover:opacity-80 transition-opacity flex items-center"
                                   >
                                     <ExternalLink size={12} className="mr-1" />
-                                    Explorer
+                                    Demo Explorer
                                   </button>
                                 ) : (
                                   <div
@@ -1305,7 +1403,7 @@ export default function FriendsPage() {
           </div>
         </div>
 
-        {/* Fund Request Modal - FIXED with only ETH, USDC, USDT */}
+        {/* Fund Request Modal - Demo Version */}
         {showFundRequestModal && selectedFriend && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
             <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
@@ -1322,36 +1420,34 @@ export default function FriendsPage() {
                   <ArrowLeft size={18} />
                 </button>
                 <h3 className="flex-1 text-center text-base font-semibold text-white font-satoshi">
-                  Request Funds
+                  Demo Fund Request
                 </h3>
                 {/* Invisible spacer to center the title */}
                 <div className="w-4"></div>
               </div>
 
               <div className="mb-3">
-                {/* Warning if no active wallet */}
-                {!activeWallet && (
-                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-3">
-                    <div className="flex items-start">
-                      <AlertTriangle
-                        size={14}
-                        className="text-red-400 mr-2 mt-0.5 flex-shrink-0"
-                      />
-                      <div>
-                        <p className="text-red-400 text-sm font-satoshi font-medium">
-                          No Active Wallet Selected
-                        </p>
-                        <p className="text-red-400 text-xs font-satoshi">
-                          Please select an active wallet to receive funds.
-                        </p>
-                      </div>
+                {/* Demo Warning */}
+                <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-2 mb-3">
+                  <div className="flex items-start">
+                    <AlertTriangle
+                      size={14}
+                      className="text-yellow-400 mr-2 mt-0.5 flex-shrink-0"
+                    />
+                    <div>
+                      <p className="text-yellow-400 text-sm font-satoshi font-medium">
+                        Demo Mode Active
+                      </p>
+                      <p className="text-yellow-400 text-xs font-satoshi">
+                        This request will not actually be sent.
+                      </p>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="space-y-3">
-                {/* FIXED: Token Dropdown with only allowed tokens */}
+                {/* Token Dropdown with demo tokens */}
                 <div className="relative" data-token-dropdown>
                   <button
                     type="button"
@@ -1370,7 +1466,6 @@ export default function FriendsPage() {
 
                   {showTokenDropdown && (
                     <div className="absolute top-full left-0 right-0 z-[60] mt-1.5 bg-black border border-[#2C2C2C] rounded-lg shadow-2xl overflow-hidden">
-                      {/* FIXED: Show only allowed tokens */}
                       {getAvailableTokensWithBalances().map((token) => (
                         <button
                           key={token.symbol}
@@ -1407,7 +1502,7 @@ export default function FriendsPage() {
 
                 {/* Message Input */}
                 <textarea
-                  placeholder="Message (optional) - What's this request for?"
+                  placeholder="Message (optional) - What's this demo request for?"
                   value={fundRequestData.message}
                   onChange={(e) =>
                     setFundRequestData({
@@ -1423,12 +1518,10 @@ export default function FriendsPage() {
                 <div className="pt-3">
                   <button
                     onClick={sendFundRequest}
-                    disabled={
-                      loading || !fundRequestData.amount || !activeWallet
-                    }
+                    disabled={loading || !fundRequestData.amount}
                     className="w-full px-3 py-2.5 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? "Sending..." : "Send Request"}
+                    {loading ? "Sending Demo..." : "Send Demo Request"}
                   </button>
                 </div>
               </div>
@@ -1436,21 +1529,68 @@ export default function FriendsPage() {
           </div>
         )}
 
-        {/* Rest of the modals remain the same... */}
+        {/* Demo Fund Request Modal */}
         {selectedFundRequest && (
-          <FundRequestModal
-            isOpen={!!selectedFundRequest}
-            onClose={() => setSelectedFundRequest(null)}
-            fundRequest={selectedFundRequest}
-            onFulfilled={() => {
-              setSelectedFundRequest(null);
-              loadFundRequests();
-            }}
-            onDeclined={() => {
-              setSelectedFundRequest(null);
-              loadFundRequests();
-            }}
-          />
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-3">
+            <div className="bg-black border border-[#2C2C2C] rounded-[16px] w-full max-w-md p-4">
+              <div className="flex items-center mb-4">
+                <button
+                  onClick={() => setSelectedFundRequest(null)}
+                  className="text-gray-400 hover:text-white transition-colors mr-3"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <h3 className="flex-1 text-center text-base font-semibold text-white font-satoshi">
+                  Demo Fund Request
+                </h3>
+                <div className="w-4"></div>
+              </div>
+
+              <div className="text-center mb-4">
+                <p className="text-gray-300 font-satoshi text-sm mb-1">
+                  Demo request from @{selectedFundRequest.requesterUsername}
+                </p>
+                <p className="text-[#E2AF19] font-bold text-lg">
+                  {selectedFundRequest.amount} {selectedFundRequest.tokenSymbol}
+                </p>
+                {selectedFundRequest.message && (
+                  <p className="text-gray-400 text-sm mt-2 italic">
+                    "{selectedFundRequest.message}"
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-3 mb-4">
+                <p className="text-yellow-400 text-sm font-satoshi">
+                  <strong>Demo Mode:</strong> Fund request actions are disabled
+                  in the demonstration version.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setSuccessMessage("Demo: Fund request would be declined");
+                    setTimeout(() => setSuccessMessage(""), 3000);
+                    setSelectedFundRequest(null);
+                  }}
+                  className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg font-satoshi font-medium hover:bg-red-700 transition-colors"
+                >
+                  Demo Decline
+                </button>
+                <button
+                  onClick={() => {
+                    setSuccessMessage("Demo: Fund request would be fulfilled");
+                    setTimeout(() => setSuccessMessage(""), 3000);
+                    setSelectedFundRequest(null);
+                  }}
+                  className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg font-satoshi font-medium hover:bg-green-700 transition-colors"
+                >
+                  Demo Fulfill
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Remove Friend Confirmation Modal */}

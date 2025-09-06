@@ -1,8 +1,7 @@
-// src/components/friends/FundRequestModal.tsx - FIXED VERSION
+// src/components/friends/FundRequestModal.tsx - FRONTEND ONLY VERSION
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
 import {
   X,
   Send,
@@ -10,18 +9,14 @@ import {
   CheckCircle,
   AlertTriangle,
   Copy,
-  RefreshCw,
   Clock,
   DollarSign,
   User,
   Zap,
   XCircle,
   Ban,
-  ChevronDown,
 } from "lucide-react";
-import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 
 interface FundRequestModalProps {
   isOpen: boolean;
@@ -64,27 +59,35 @@ interface RequesterInfo {
   displayName?: string;
 }
 
-const parseErrorMessage = (error: string): string => {
-  if (error.includes("insufficient funds")) {
-    return "Insufficient funds for this transfer. Please check your wallet balance.";
-  }
-  if (error.includes("gas")) {
-    return "Not enough ETH to pay for transaction fees.";
-  }
-  if (error.includes("execution reverted")) {
-    return "Transaction failed. Please check token balances and try again.";
-  }
-  if (error.includes("nonce too low")) {
-    return "Network issue detected. Please try again.";
-  }
-  if (error.includes("network error") || error.includes("timeout")) {
-    return "Network connection error. Please check your internet and try again.";
-  }
-  if (error.includes("user denied") || error.includes("user rejected")) {
-    return "Transaction was cancelled.";
-  }
+// Mock token data
+const mockTokens = [
+  {
+    symbol: "ETH",
+    name: "Ethereum",
+    contractAddress: "native",
+    decimals: 18,
+    balance: 2.5,
+    balanceFormatted: "2.5000",
+    value: 8750.25,
+    icon: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+    price: 3500.1,
+  },
+  {
+    symbol: "USDT",
+    name: "Tether USD",
+    contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    decimals: 6,
+    balance: 1500.0,
+    balanceFormatted: "1500.0000",
+    value: 1500.0,
+    icon: "https://assets.coingecko.com/coins/images/325/small/Tether.png",
+    price: 1.0,
+  },
+];
 
-  return "Transfer failed. Please try again or contact support if the issue persists.";
+const mockActiveWallet = {
+  address: "0x1234567890123456789012345678901234567890",
+  name: "Main Wallet",
 };
 
 export default function FundRequestModal({
@@ -94,10 +97,6 @@ export default function FundRequestModal({
   onFulfilled,
   onDeclined,
 }: FundRequestModalProps) {
-  const { activeWallet, tokens } = useSelector(
-    (state: RootState) => state.wallet
-  );
-
   const [step, setStep] = useState<
     "review" | "sending" | "success" | "error" | "completed"
   >("review");
@@ -113,8 +112,6 @@ export default function FundRequestModal({
   const [loadingRequester, setLoadingRequester] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(fundRequest.status);
 
-  const [showTokenDropdown, setShowTokenDropdown] = useState(false);
-
   const isProcessed = [
     "fulfilled",
     "declined",
@@ -128,7 +125,7 @@ export default function FundRequestModal({
   }
 
   const getTokenInfo = () => {
-    const token = tokens.find((t) => t.symbol === fundRequest.tokenSymbol);
+    const token = mockTokens.find((t) => t.symbol === fundRequest.tokenSymbol);
     return token || null;
   };
 
@@ -255,57 +252,13 @@ export default function FundRequestModal({
   };
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const dropdown = document.querySelector("[data-token-dropdown]");
-      if (dropdown && !dropdown.contains(event.target as Node)) {
-        setShowTokenDropdown(false);
-      }
-    };
-
-    if (showTokenDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showTokenDropdown]);
-
-  const fetchCurrentStatus = async () => {
-    try {
-      const response = await fetch(
-        `/api/friends/fund-request/${fundRequest.requestId}`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const latestStatus = data.fundRequest?.status || fundRequest.status;
-
-        setCurrentStatus(latestStatus);
-
-        if (latestStatus !== fundRequest.status) {
-          if (latestStatus === "fulfilled" || latestStatus === "declined") {
-            setStep("completed");
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching current status:", error);
-    }
-  };
-
-  useEffect(() => {
     if (isOpen) {
       setStep("review");
       setTransferResult(null);
       setError("");
       setRequesterInfo(null);
       setCurrentStatus(fundRequest.status);
-      setShowTokenDropdown(false);
-      setLoading(false); // FIXED: Reset loading state
-
-      fetchCurrentStatus();
+      setLoading(false);
 
       if (isProcessed) {
         setStep("completed");
@@ -318,72 +271,15 @@ export default function FundRequestModal({
           displayName: fundRequest.requesterUsername,
         });
       } else {
-        fetchRequesterInfo();
+        // Mock requester info
+        setRequesterInfo({
+          username: fundRequest.requesterUsername,
+          walletAddress: "0x9876543210987654321098765432109876543210",
+          displayName: fundRequest.requesterUsername,
+        });
       }
     }
   }, [isOpen, fundRequest]);
-
-  const fetchRequesterInfo = async () => {
-    try {
-      setLoadingRequester(true);
-
-      const response = await fetch(
-        `/api/users/by-username/${fundRequest.requesterUsername}`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (response.ok) {
-        const userData = await response.json();
-
-        if (userData.walletAddress) {
-          setRequesterInfo({
-            username: userData.username,
-            walletAddress: userData.walletAddress,
-            displayName: userData.displayName,
-          });
-        } else {
-          setError("Requester doesn't have a wallet address configured");
-        }
-      } else {
-        await fetchRequesterFromFriends();
-      }
-    } catch (error) {
-      setError("Could not find requester's wallet address");
-    } finally {
-      setLoadingRequester(false);
-    }
-  };
-
-  const fetchRequesterFromFriends = async () => {
-    try {
-      const response = await fetch("/api/friends?type=friends", {
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const friend = data.friends?.find(
-          (f: any) => f.username === fundRequest.requesterUsername
-        );
-
-        if (friend && friend.walletAddress) {
-          setRequesterInfo({
-            username: friend.username,
-            walletAddress: friend.walletAddress,
-            displayName: friend.displayName,
-          });
-        } else {
-          setError(
-            "Could not find requester's wallet address. They may need to add their wallet to their profile."
-          );
-        }
-      }
-    } catch (error) {
-      setError("Could not find requester's wallet address");
-    }
-  };
 
   const copyToClipboard = async (text: string, type: string) => {
     try {
@@ -396,8 +292,6 @@ export default function FundRequestModal({
   };
 
   const handleDecline = async () => {
-    await fetchCurrentStatus();
-
     if (!canTakeAction) {
       setError(`Cannot decline: Fund request is already ${currentStatus}`);
       return;
@@ -406,163 +300,70 @@ export default function FundRequestModal({
     try {
       setLoading(true);
 
-      const response = await fetch(
-        `/api/friends/fund-request/${fundRequest.requestId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "decline",
-          }),
-          credentials: "include",
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
+      // Simulate API call
+      setTimeout(() => {
         setCurrentStatus("declined");
         setStep("completed");
         onDeclined?.();
-      } else {
-        if (
-          data.error?.includes("already processed") ||
-          data.error?.includes("not found")
-        ) {
-          setError("This fund request has already been processed");
-          setCurrentStatus("declined");
-          setStep("completed");
-        } else {
-          setError(
-            parseErrorMessage(data.error || "Failed to decline request")
-          );
-        }
-      }
+        setLoading(false);
+      }, 1000);
     } catch (error: any) {
-      setError(parseErrorMessage(error.message || "Failed to decline request"));
-    } finally {
+      setError("Failed to decline request");
       setLoading(false);
     }
   };
 
   const handleFulfill = async () => {
-    await fetchCurrentStatus();
-
     if (!canTakeAction) {
       setError(`Cannot fulfill: Fund request is already ${currentStatus}`);
       return;
     }
 
     const tokenInfo = getTokenInfo();
-    if (!tokenInfo || !activeWallet) {
-      setError("Token not found in wallet or no active wallet");
+    if (!tokenInfo) {
+      setError("Token not found in wallet");
       return;
     }
 
-    let recipientWalletAddress = null;
-
-    if (fundRequest.requesterWalletAddress) {
-      recipientWalletAddress = fundRequest.requesterWalletAddress;
-    } else if (requesterInfo?.walletAddress) {
-      recipientWalletAddress = requesterInfo.walletAddress;
-    } else {
-      setError("Could not determine requester's wallet address");
-      return;
-    }
-
-    // FIXED: Better balance checking with proper error handling
     const userBalance = parseFloat(tokenInfo.balanceFormatted || "0");
     const requestedAmount = parseFloat(fundRequest.amount || "0");
-
-    console.log(
-      `🔍 Balance check: User has ${userBalance} ${fundRequest.tokenSymbol}, requesting ${requestedAmount}`
-    );
 
     if (userBalance < requestedAmount) {
       const errorMsg = `Insufficient ${fundRequest.tokenSymbol} balance. You have ${userBalance} ${fundRequest.tokenSymbol} but need ${requestedAmount} ${fundRequest.tokenSymbol}.`;
       setError(errorMsg);
-      setStep("error"); // FIXED: Set step to error instead of staying in sending
-      setLoading(false); // FIXED: Reset loading state
+      setStep("error");
+      setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      setError(""); // Clear any previous errors
+      setError("");
       setStep("sending");
 
-      console.log("🚀 Starting transfer with Enhanced API...");
+      // Simulate transfer process
+      setTimeout(() => {
+        // Mock successful transfer
+        const mockResult: TransferResult = {
+          success: true,
+          transactionHash:
+            "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+          gasUsed: 21000,
+          explorerUrl:
+            "https://etherscan.io/tx/0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+          actualCostUSD: "$2.45",
+          actualCostETH: "0.0007 ETH",
+        };
 
-      const transferResponse = await fetch("/api/transfer/simple", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "execute",
-          tokenInfo: {
-            name: tokenInfo.name,
-            symbol: tokenInfo.symbol,
-            contractAddress: tokenInfo.contractAddress,
-            decimals: tokenInfo.decimals,
-            isETH:
-              tokenInfo.contractAddress === "native" ||
-              tokenInfo.symbol === "ETH",
-          },
-          recipientAddress: recipientWalletAddress,
-          amount: fundRequest.amount,
-          fromAddress: activeWallet.address,
-          useStoredKey: true,
-        }),
-        credentials: "include",
-      });
-
-      const transferData = await transferResponse.json();
-      console.log("📡 Transfer API response:", transferData);
-
-      if (transferData.success && transferData.result) {
-        console.log("✅ Transfer successful, updating fund request status...");
-        setTransferResult(transferData.result);
+        setTransferResult(mockResult);
         setStep("success");
-
-        const updateResponse = await fetch(
-          `/api/friends/fund-request/${fundRequest.requestId}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "fulfill",
-              transactionHash: transferData.result.transactionHash,
-            }),
-            credentials: "include",
-          }
-        );
-
-        if (updateResponse.ok) {
-          setCurrentStatus("fulfilled");
-          onFulfilled?.();
-        } else {
-          const updateData = await updateResponse.json();
-          if (updateData.error?.includes("already processed")) {
-            setError("This fund request was already processed by someone else");
-            setCurrentStatus("fulfilled");
-            setStep("completed");
-          }
-        }
-      } else {
-        console.error("❌ Transfer failed:", transferData.error);
-        const errorMsg = parseErrorMessage(
-          transferData.error || "Transfer failed"
-        );
-        setError(errorMsg);
-        setStep("error");
-      }
+        setCurrentStatus("fulfilled");
+        onFulfilled?.();
+        setLoading(false);
+      }, 3000);
     } catch (error: any) {
-      console.error("❌ Transfer exception:", error);
-      const errorMsg = parseErrorMessage(
-        error.message || "Failed to fulfill request"
-      );
-      setError(errorMsg);
+      setError("Failed to fulfill request");
       setStep("error");
-    } finally {
       setLoading(false);
     }
   };
@@ -656,7 +457,7 @@ export default function FundRequestModal({
           </div>
 
           <div className="p-4">
-            {/* Error state for insufficient funds - FIXED */}
+            {/* Error state */}
             {step === "error" && (
               <div className="space-y-4">
                 <div className="text-center">
@@ -706,7 +507,7 @@ export default function FundRequestModal({
               </div>
             )}
 
-            {/* Rest of the existing modal content stays the same... */}
+            {/* Completed state */}
             {(step === "completed" || isProcessed) && (
               <div className="space-y-4">
                 {(() => {
@@ -732,7 +533,6 @@ export default function FundRequestModal({
                   );
                 })()}
 
-                {/* Request details */}
                 <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -767,37 +567,6 @@ export default function FundRequestModal({
                           currentStatus.slice(1)}
                       </span>
                     </div>
-                    {fundRequest.respondedAt && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Responded:
-                        </span>
-                        <span className="text-white text-xs font-satoshi">
-                          {new Date(
-                            fundRequest.respondedAt
-                          ).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                    {fundRequest.transactionHash && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-xs font-satoshi">
-                          Transaction:
-                        </span>
-                        <button
-                          onClick={() =>
-                            window.open(
-                              `https://etherscan.io/tx/${fundRequest.transactionHash}`,
-                              "_blank"
-                            )
-                          }
-                          className="text-[#E2AF19] text-xs font-satoshi hover:opacity-80 transition-opacity flex items-center"
-                        >
-                          <ExternalLink size={10} className="mr-1" />
-                          View on Explorer
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -807,6 +576,7 @@ export default function FundRequestModal({
               </div>
             )}
 
+            {/* Review state */}
             {step === "review" && canTakeAction && (
               <div className="space-y-4">
                 <div className="bg-[#0F0F0F] rounded-lg p-3 border border-[#2C2C2C]">
@@ -885,36 +655,22 @@ export default function FundRequestModal({
                         </span>
                         <div className="flex items-center">
                           <span className="text-white text-xs font-satoshi font-mono mr-1.5">
-                            {activeWallet?.address
-                              ? `${activeWallet.address.slice(
-                                  0,
-                                  8
-                                )}...${activeWallet.address.slice(-6)}`
-                              : "No wallet selected"}
+                            {mockActiveWallet.address.slice(0, 8)}...
+                            {mockActiveWallet.address.slice(-6)}
                           </span>
-                          {activeWallet?.address && (
-                            <button
-                              onClick={() =>
-                                copyToClipboard(activeWallet.address, "sender")
-                              }
-                              className="text-gray-400 hover:text-white transition-colors"
-                            >
-                              <Copy size={12} />
-                            </button>
-                          )}
+                          <button
+                            onClick={() =>
+                              copyToClipboard(
+                                mockActiveWallet.address,
+                                "sender"
+                              )
+                            }
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <Copy size={12} />
+                          </button>
                         </div>
                       </div>
-
-                      {loadingRequester && !requesterWalletAddress && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-400 text-xs font-satoshi">
-                            To (Requester):
-                          </span>
-                          <span className="text-gray-400 text-xs font-satoshi">
-                            Loading...
-                          </span>
-                        </div>
-                      )}
 
                       {requesterWalletAddress && (
                         <div className="flex justify-between items-center">
@@ -998,42 +754,6 @@ export default function FundRequestModal({
                   </div>
                 )}
 
-                {!tokenInfo && (
-                  <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-3">
-                    <div className="flex items-start">
-                      <AlertTriangle
-                        size={14}
-                        className="text-yellow-400 mr-1.5 mt-0.5 flex-shrink-0"
-                      />
-                      <div>
-                        <p className="text-yellow-400 text-xs font-satoshi font-medium mb-1">
-                          Token Not Found
-                        </p>
-                        <p className="text-yellow-400 text-xs font-satoshi">
-                          You don't have any {fundRequest.tokenSymbol} in your
-                          wallet.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {!loadingRequester && !requesterWalletAddress && (
-                  <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3">
-                    <div className="flex items-start">
-                      <AlertTriangle
-                        size={14}
-                        className="text-red-400 mr-1.5 mt-0.5 flex-shrink-0"
-                      />
-                      <p className="text-red-400 text-xs font-satoshi">
-                        Could not find wallet address for @
-                        {fundRequest.requesterUsername}. They may need to add
-                        their wallet to their profile.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 {error && (
                   <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2.5">
                     <div className="flex items-start">
@@ -1055,11 +775,7 @@ export default function FundRequestModal({
                     disabled={loading || !canTakeAction}
                     className="flex-1"
                   >
-                    {loading
-                      ? "Processing..."
-                      : !canTakeAction
-                      ? "Cannot Decline"
-                      : "Decline"}
+                    {loading ? "Processing..." : "Decline"}
                   </Button>
                   <Button
                     onClick={handleFulfill}
@@ -1067,19 +783,12 @@ export default function FundRequestModal({
                       loading ||
                       !canTakeAction ||
                       !tokenInfo ||
-                      hasInsufficientBalance ||
-                      loadingRequester ||
-                      !requesterWalletAddress ||
-                      !activeWallet?.address
+                      hasInsufficientBalance
                     }
                     className="flex-1"
                   >
                     {loading
                       ? "Processing..."
-                      : loadingRequester
-                      ? "Loading..."
-                      : !canTakeAction
-                      ? "Cannot Send"
                       : hasInsufficientBalance
                       ? "Insufficient Balance"
                       : `Send ${fundRequest.tokenSymbol}`}
@@ -1088,42 +797,7 @@ export default function FundRequestModal({
               </div>
             )}
 
-            {step === "review" && !canTakeAction && (
-              <div className="space-y-4">
-                {(() => {
-                  const statusDisplay = getStatusDisplay();
-                  if (!statusDisplay) return null;
-
-                  return (
-                    <div
-                      className={`${statusDisplay.bgColor} border ${statusDisplay.borderColor} rounded-lg p-3`}
-                    >
-                      <div className="flex items-start">
-                        {statusDisplay.icon}
-                        <div className="ml-2.5">
-                          <p
-                            className={`${statusDisplay.color} text-xs font-satoshi font-medium mb-0.5`}
-                          >
-                            {statusDisplay.title}
-                          </p>
-                          <p
-                            className={`${statusDisplay.color} text-xs font-satoshi`}
-                          >
-                            {statusDisplay.message}. No further action can be
-                            taken on this request.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <Button onClick={onClose} className="w-full">
-                  Close
-                </Button>
-              </div>
-            )}
-
+            {/* Sending state */}
             {step === "sending" && (
               <div className="text-center py-6">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#E2AF19] mx-auto mb-3"></div>
@@ -1142,6 +816,7 @@ export default function FundRequestModal({
               </div>
             )}
 
+            {/* Success state */}
             {step === "success" && transferResult && (
               <div className="space-y-4">
                 <div className="text-center">
@@ -1245,6 +920,43 @@ export default function FundRequestModal({
                     Done
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* Non-actionable review state */}
+            {step === "review" && !canTakeAction && (
+              <div className="space-y-4">
+                {(() => {
+                  const statusDisplay = getStatusDisplay();
+                  if (!statusDisplay) return null;
+
+                  return (
+                    <div
+                      className={`${statusDisplay.bgColor} border ${statusDisplay.borderColor} rounded-lg p-3`}
+                    >
+                      <div className="flex items-start">
+                        {statusDisplay.icon}
+                        <div className="ml-2.5">
+                          <p
+                            className={`${statusDisplay.color} text-xs font-satoshi font-medium mb-0.5`}
+                          >
+                            {statusDisplay.title}
+                          </p>
+                          <p
+                            className={`${statusDisplay.color} text-xs font-satoshi`}
+                          >
+                            {statusDisplay.message}. No further action can be
+                            taken on this request.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <Button onClick={onClose} className="w-full">
+                  Close
+                </Button>
               </div>
             )}
           </div>
