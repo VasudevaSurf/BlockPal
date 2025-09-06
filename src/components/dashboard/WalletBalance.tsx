@@ -132,35 +132,6 @@ export default function WalletBalance() {
         <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
           {formatBalance(walletData.balance)}
         </div>
-
-        {/* 24h Change Display */}
-        <div className="flex items-center text-xs gap-2">
-          <span
-            className={`font-satoshi ${
-              walletData.change24h >= 0 ? "text-green-400" : "text-red-400"
-            }`}
-          >
-            {walletData.change24h >= 0 ? "+" : ""}$
-            {Math.abs(walletData.change24h).toFixed(2)}
-          </span>
-          <span
-            className={`font-satoshi ${
-              walletData.changePercentage >= 0
-                ? "text-green-400"
-                : "text-red-400"
-            }`}
-          >
-            ({formatPercentage(walletData.changePercentage)})
-          </span>
-          <span className="text-gray-500 font-satoshi">24h</span>
-        </div>
-
-        <div className="flex items-center">
-          <span className="text-xs text-gray-500 font-satoshi">
-            {walletData.tokenCount}{" "}
-            {walletData.tokenCount === 1 ? "token" : "tokens"}
-          </span>
-        </div>
       </div>
     </div>
   );

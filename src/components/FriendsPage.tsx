@@ -24,7 +24,6 @@ import { RootState } from "@/store";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FundRequestModal from "@/components/friends/FundRequestModal";
-import NotificationCenter from "@/components/notifications/NotificationCenter";
 import EnhancedFriendsSearch from "@/components/friends/EnhancedFriendsSearch";
 import { SkeletonFriendsPage } from "@/components/ui/Skeleton";
 import FriendsIcon from "./icons/FriendsIcon";
@@ -834,16 +833,6 @@ export default function FriendsPage() {
 
   return (
     <>
-      {/* Demo Mode Banner */}
-      <div className="bg-yellow-900/20 border-b border-yellow-500/30 px-4 py-2 mb-4">
-        <div className="flex items-center justify-center">
-          <AlertTriangle size={16} className="text-yellow-400 mr-2" />
-          <span className="text-yellow-400 text-sm font-satoshi">
-            Demo Mode: Friends functionality disabled - UI demonstration only
-          </span>
-        </div>
-      </div>
-
       {/* ADDED: Backdrop for all modals and dropdowns */}
       {(showFundRequestModal ||
         selectedFundRequest ||
@@ -1643,12 +1632,6 @@ export default function FriendsPage() {
             </div>
           </div>
         )}
-
-        {/* Notification Center */}
-        <NotificationCenter
-          isOpen={showNotifications}
-          onClose={() => setShowNotifications(false)}
-        />
 
         <style jsx global>{`
           .scrollbar-hide {
