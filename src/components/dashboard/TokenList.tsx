@@ -184,19 +184,6 @@ export default function TokenList() {
             >
               <Plus size={16} className="lg:w-5 lg:h-5" />
             </button>
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
-              title="Refresh token data"
-            >
-              <RefreshCw
-                size={16}
-                className={`lg:w-5 lg:h-5 transition-transform ${
-                  isRefreshing ? "animate-spin" : ""
-                }`}
-              />
-            </button>
           </div>
         </div>
 

@@ -72,8 +72,8 @@ export default function GlobalDashboardHeader({
 
   // Mock wallet data for UI
   const [selectedWallet] = useState({
-    name: "Main Wallet",
-    address: "0x1234...5678",
+    name: "Ethereum",
+    address: "0xAD7a4hw64...R8J6153",
     balance: 2500.0,
   });
 
@@ -154,22 +154,24 @@ export default function GlobalDashboardHeader({
 
         <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4">
           {/* Wallet Display (Static for UI) */}
-          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px]">
-            <div className="w-6 h-6 lg:w-7 lg:h-7 bg-gradient-to-br from-gray-600/80 to-gray-700/90 rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0">
-              <span className="text-white text-xs font-bold font-satoshi">
-                MW
-              </span>
+          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] gap-1.5">
+            <div className="flex items-center flex-1 min-w-0 bg-[#0F0F0F] rounded-[100px] p-[4px] mr-2">
+              <div className="w-6 h-6 lg:w-7 lg:h-7 bg-gradient-to-br from-gray-600/80 to-gray-700/90 rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0">
+                <span className="text-white text-xs font-bold font-satoshi">
+                  MW
+                </span>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate block">
+                  {selectedWallet.name}
+                </span>
+              </div>
             </div>
 
-            <div className="flex-1 min-w-0">
-              <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate block">
-                {selectedWallet.name}
-              </span>
-            </div>
+            {/* <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mr-1.5 lg:mr-2 hidden sm:block"></div> */}
 
-            <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mr-1.5 lg:mr-2 hidden sm:block"></div>
-
-            <span className="text-gray-400 text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
+            <span className="text-[#EDEDED] text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
               {selectedWallet.address}
             </span>
 

@@ -7,7 +7,6 @@
 import { store } from "@/store";
 import { clearWalletState } from "@/store/slices/walletSlice";
 import { resetUIState } from "@/store/slices/uiSlice";
-import { dashboardServiceV2 } from "@/lib/dashboard-service-v2";
 
 class AppCleanupService {
   private static instance: AppCleanupService;
@@ -52,7 +51,7 @@ class AppCleanupService {
     this.clearBrowserStorage();
 
     // 3. Clear service caches
-    this.clearServiceCaches();
+    // this.clearServiceCaches();
 
     // 4. Stop any running intervals/timers
     this.stopBackgroundProcesses();
@@ -167,29 +166,29 @@ class AppCleanupService {
   /**
    * Clear service caches
    */
-  private clearServiceCaches() {
-    console.log("🗑️ Clearing service caches");
+  // private clearServiceCaches() {
+  //   console.log("🗑️ Clearing service caches");
 
-    // Clear dashboard service cache
-    if (dashboardServiceV2) {
-      // Clear all wallet data from dashboard service
-      const walletsToClean = Array.from(
-        { length: 10 },
-        (_, i) => `0x${i.toString(16).padStart(40, "0")}`
-      );
+  //   // Clear dashboard service cache
+  //   if (dashboardServiceV2) {
+  //     // Clear all wallet data from dashboard service
+  //     const walletsToClean = Array.from(
+  //       { length: 10 },
+  //       (_, i) => `0x${i.toString(16).padStart(40, "0")}`
+  //     );
 
-      walletsToClean.forEach((wallet) => {
-        try {
-          dashboardServiceV2.clearUserData(wallet);
-        } catch (error) {
-          // Ignore errors for non-existent wallets
-        }
-      });
-    }
+  //     walletsToClean.forEach((wallet) => {
+  //       try {
+  //         dashboardServiceV2.clearUserData(wallet);
+  //       } catch (error) {
+  //         // Ignore errors for non-existent wallets
+  //       }
+  //     });
+  //   }
 
-    // Clear browser caches if available
-    this.clearBrowserCaches();
-  }
+  //   // Clear browser caches if available
+  //   this.clearBrowserCaches();
+  // }
 
   /**
    * Clear browser caches (Service Worker, Cache API)
