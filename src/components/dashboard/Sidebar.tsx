@@ -1,9 +1,10 @@
-// src/components/dashboard/Sidebar.tsx - UPDATED VERSION with Connect Wallet button
+// src/components/dashboard/Sidebar.tsx - UPDATED VERSION with minimize toggle
 "use client";
 
+import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, usePathname } from "next/navigation";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw, Menu } from "lucide-react";
 import { RootState } from "@/store";
 import { toggleTheme } from "@/store/slices/uiSlice";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
@@ -42,36 +43,36 @@ const menuItems = [
     href: "/dashboard/ai-chat",
     comingSoon: false,
   },
-  {
-    icon: DashboardIcon, // You may want to add specific icons for these
-    label: "Hiber",
-    href: "/dashboard/coming-soon",
-    comingSoon: true,
-  },
-  {
-    icon: DashboardIcon, // You may want to add specific icons for these
-    label: "Cipher",
-    href: "/dashboard/coming-soon",
-    comingSoon: true,
-  },
-  {
-    icon: DashboardIcon, // You may want to add specific icons for these
-    label: "Anchor",
-    href: "/dashboard/coming-soon",
-    comingSoon: true,
-  },
-  {
-    icon: DashboardIcon, // You may want to add specific icons for these
-    label: "InfluX",
-    href: "/dashboard/coming-soon",
-    comingSoon: true,
-  },
-  {
-    icon: DashboardIcon, // You may want to add specific icons for these
-    label: "Connect",
-    href: "/dashboard/coming-soon",
-    comingSoon: true,
-  },
+  // {
+  //   icon: DashboardIcon, // You may want to add specific icons for these
+  //   label: "Hiber",
+  //   href: "/dashboard/coming-soon",
+  //   comingSoon: true,
+  // },
+  // {
+  //   icon: DashboardIcon, // You may want to add specific icons for these
+  //   label: "Cipher",
+  //   href: "/dashboard/coming-soon",
+  //   comingSoon: true,
+  // },
+  // {
+  //   icon: DashboardIcon, // You may want to add specific icons for these
+  //   label: "Anchor",
+  //   href: "/dashboard/coming-soon",
+  //   comingSoon: true,
+  // },
+  // {
+  //   icon: DashboardIcon, // You may want to add specific icons for these
+  //   label: "InfluX",
+  //   href: "/dashboard/coming-soon",
+  //   comingSoon: true,
+  // },
+  // {
+  //   icon: DashboardIcon, // You may want to add specific icons for these
+  //   label: "Connect",
+  //   href: "/dashboard/coming-soon",
+  //   comingSoon: true,
+  // },
   {
     icon: FriendsIcon,
     label: "Friends",
@@ -115,6 +116,9 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
   const { user } = useSelector((state: RootState) => state.auth);
   const { wallets } = useSelector((state: RootState) => state.wallet);
   const { isLoading, startLoading } = useNavigationLoading();
+
+  // State for sidebar minimization
+  const [isMinimized, setIsMinimized] = useState(false);
 
   // Check if user has wallets
   const hasWallets = wallets && wallets.length > 0;
@@ -170,9 +174,15 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
     // or navigate to wallet connection page
   };
 
+  const toggleMinimized = () => {
+    setIsMinimized(!isMinimized);
+  };
+
   return (
     <div
-      className="relative w-full lg:w-64 flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden"
+      className={`relative flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden transition-all duration-300 ease-in-out ${
+        isMinimized ? "w-16 lg:w-20" : "w-full lg:w-64"
+      }`}
       style={{ borderRadius: "16px" }}
     >
       {/* Top Gradient Blur */}
@@ -209,15 +219,45 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
       {/* Logo Section */}
       <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
-        <div className="flex items-center mb-3 lg:mb-6">
-          <img
-            src="/blockName.png"
-            alt="Blockpal"
-            className="brightness-110 h-5 lg:h-6"
-            style={{
-              width: "auto",
-            }}
-          />
+        <div className="flex items-center justify-between">
+          {isMinimized ? (
+            /* Mini Logo when minimized */
+            <button
+              onClick={toggleMinimized}
+              className="w-full flex justify-center"
+              title="Expand sidebar"
+            >
+              <img
+                src="/minLogo.png"
+                alt="Blockpal Mini"
+                className="brightness-110 h-6 lg:h-8"
+                style={{
+                  width: "auto",
+                }}
+              />
+            </button>
+          ) : (
+            /* Full logo and hamburger when expanded */
+            <>
+              <img
+                src="/blockName.png"
+                alt="Blockpal"
+                className="brightness-110 h-5 lg:h-6"
+                style={{
+                  width: "auto",
+                }}
+              />
+
+              {/* Hamburger Menu Button */}
+              <button
+                onClick={toggleMinimized}
+                className="p-1.5 lg:p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors text-gray-400 hover:text-white"
+                title="Minimize sidebar"
+              >
+                <Menu size={16} className="lg:w-5 lg:h-5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -236,7 +276,11 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 key={item.label}
                 onClick={(e) => handleNavigation(item.href, item.comingSoon, e)}
                 disabled={isLoading}
-                className={`w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
+                className={`w-full flex items-center rounded-lg text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
+                  isMinimized
+                    ? "px-2 lg:px-3 py-2 lg:py-3 justify-center"
+                    : "px-3 lg:px-4 py-2 lg:py-3"
+                } ${
                   isActive && !item.comingSoon
                     ? "bg-[#E2AF19] text-black font-medium"
                     : item.comingSoon
@@ -245,17 +289,22 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                     ? "text-gray-500 cursor-not-allowed opacity-50"
                     : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
                 } ${isLoading ? "pointer-events-none" : ""}`}
+                title={isMinimized ? item.label : undefined}
               >
                 <item.icon
                   size={16}
-                  className="mr-3 flex-shrink-0"
+                  className={`${isMinimized ? "" : "mr-3"} flex-shrink-0`}
                   filled={isActive && !item.comingSoon}
                 />
-                <span
-                  className={isActive && !item.comingSoon ? "font-medium" : ""}
-                >
-                  {item.label}
-                </span>
+                {!isMinimized && (
+                  <span
+                    className={
+                      isActive && !item.comingSoon ? "font-medium" : ""
+                    }
+                  >
+                    {item.label}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -267,12 +316,27 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         <button
           onClick={handleConnectWallet}
           disabled={isLoading}
-          className="w-full flex items-center justify-center px-3 py-1.5 rounded-[12px] bg-[#E2AF19] text-black font-medium font-satoshi text-xs transition-all duration-200 hover:bg-[#D4A118] active:bg-[#C69516] disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`w-full flex items-center rounded-[12px] bg-[#E2AF19] text-black font-medium font-satoshi text-xs transition-all duration-200 hover:bg-[#D4A118] active:bg-[#C69516] disabled:opacity-50 disabled:cursor-not-allowed ${
+            isMinimized
+              ? "px-2 py-1.5 justify-center"
+              : "px-3 py-1.5 justify-center"
+          }`}
+          title={isMinimized ? "Connect Wallet" : undefined}
         >
           <WalletIcon />
-          <span className="ml-2">Connect Wallet</span>
+          {!isMinimized && <span className="ml-2">Connect Wallet</span>}
         </button>
       </div>
+
+      <style jsx>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }
