@@ -110,20 +110,6 @@ export default function WalletBalance() {
           >
             <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
           </button>
-
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Refresh wallet data"
-          >
-            <RefreshCw
-              size={14}
-              className={`transition-transform ${
-                isRefreshing ? "animate-spin" : ""
-              }`}
-            />
-          </button>
         </div>
       </div>
 

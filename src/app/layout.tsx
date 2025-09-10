@@ -1,14 +1,17 @@
+// src/app/layout.tsx - UPDATED with WalletProvider
 "use client";
 
 import "./globals.css";
 import { Provider } from "react-redux";
 import { store } from "@/store";
+import { WalletProvider } from "@/components/wallet/WalletProvider";
 import {
   mayekaBoldDemo,
   mayekaDemiBoldDemo,
   mayeka,
   satoshi,
 } from "@/lib/fonts";
+import WalletErrorBoundary from "@/components/wallet/WalletErrorBoundary";
 
 export default function RootLayout({
   children,
@@ -28,7 +31,6 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap"
           rel="stylesheet"
         />
-        {/* Note: Add your custom fonts (Mayeka Bold Demo, Satoshi) to public/fonts/ folder */}
         <style
           dangerouslySetInnerHTML={{
             __html: `
@@ -78,7 +80,11 @@ export default function RootLayout({
       <body
         className={`${mayekaBoldDemo.variable} ${mayekaDemiBoldDemo.variable} ${mayeka.variable} ${satoshi.variable} antialiased`}
       >
-        <Provider store={store}>{children}</Provider>
+        <Provider store={store}>
+          <WalletErrorBoundary>
+            <WalletProvider>{children}</WalletProvider>
+          </WalletErrorBoundary>
+        </Provider>
       </body>
     </html>
   );
