@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
-import { Bell, User, LogOut, ChevronDown, ArrowLeft } from "lucide-react";
+import { Bell, User, LogOut, ChevronDown, ArrowLeft, X } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
+import { useAccount, useNetwork, useSwitchNetwork } from "wagmi";
+import { chains } from "@/components/wallet/WalletProvider";
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -56,6 +58,46 @@ const getPageTitle = (
   }
 };
 
+// Chain data with colors and icons
+const chainData = [
+  {
+    id: 1,
+    name: "Ethereum",
+    color: "bg-blue-500",
+    icon: "Ξ",
+  },
+  {
+    id: 8453,
+    name: "Base",
+    color: "bg-blue-600",
+    icon: "B",
+  },
+  {
+    id: 137,
+    name: "Polygon",
+    color: "bg-purple-500",
+    icon: "◆",
+  },
+  {
+    id: 43114,
+    name: "Avalanche",
+    color: "bg-red-500",
+    icon: "A",
+  },
+  {
+    id: 42161,
+    name: "Arbitrum",
+    color: "bg-blue-400",
+    icon: "◉",
+  },
+  {
+    id: 56,
+    name: "BSC",
+    color: "bg-yellow-500",
+    icon: "B",
+  },
+];
+
 export default function GlobalDashboardHeader({
   title: propTitle,
   subtitle: propSubtitle,
@@ -70,7 +112,12 @@ export default function GlobalDashboardHeader({
   } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Mock wallet data for UI
+  // Wallet hooks
+  const { address, isConnected } = useAccount();
+  const { chain } = useNetwork();
+  const { switchNetwork } = useSwitchNetwork();
+
+  // Mock wallet data for UI (keep existing mock data)
   const [selectedWallet] = useState({
     name: "Ethereum",
     address: "0xAD7a4hw64...R8J6153",
@@ -78,8 +125,11 @@ export default function GlobalDashboardHeader({
   });
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [chainSelectorOpen, setChainSelectorOpen] = useState(false);
+  const [switchingChain, setSwitchingChain] = useState<number | null>(null);
 
   const authChecked = useRef(false);
+  const chainSelectorRef = useRef<HTMLDivElement>(null);
 
   // Check if we're on a token overview page
   const isTokenOverviewPage = pathname.startsWith("/dashboard/token/");
@@ -97,6 +147,24 @@ export default function GlobalDashboardHeader({
       dispatch(checkAuthStatus());
     }
   }, [dispatch, isAuthenticated, authLoading]);
+
+  // Close chain selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        chainSelectorRef.current &&
+        !chainSelectorRef.current.contains(event.target as Node)
+      ) {
+        setChainSelectorOpen(false);
+      }
+    };
+
+    if (chainSelectorOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [chainSelectorOpen]);
 
   // Handle back button click
   const handleBackClick = () => {
@@ -124,6 +192,37 @@ export default function GlobalDashboardHeader({
       router.push("/auth");
     }
   };
+
+  // Handle chain switch
+  const handleChainSwitch = async (chainId: number) => {
+    if (!switchNetwork || !isConnected) {
+      console.log(
+        "Cannot switch chain: wallet not connected or switchNetwork not available"
+      );
+      return;
+    }
+
+    if (chain?.id === chainId) {
+      setChainSelectorOpen(false);
+      return;
+    }
+
+    setSwitchingChain(chainId);
+
+    try {
+      await switchNetwork(chainId);
+      console.log(`Switched to chain ${chainId}`);
+    } catch (error) {
+      console.error("Failed to switch chain:", error);
+    } finally {
+      setSwitchingChain(null);
+      setChainSelectorOpen(false);
+    }
+  };
+
+  // Get current chain data
+  const currentChainData =
+    chainData.find((c) => c.id === chain?.id) || chainData[0];
 
   // Don't render if not authenticated
   if (!isAuthenticated) {
@@ -153,29 +252,154 @@ export default function GlobalDashboardHeader({
         </div>
 
         <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4">
-          {/* Wallet Display (Static for UI) */}
-          <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] gap-1.5">
-            <div className="flex items-center flex-1 min-w-0 bg-[#0F0F0F] rounded-[100px] p-[4px] mr-2">
-              <div className="w-6 h-6 lg:w-7 lg:h-7 bg-gradient-to-br from-gray-600/80 to-gray-700/90 rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0">
-                <span className="text-white text-xs font-bold font-satoshi">
-                  MW
-                </span>
+          {/* Wallet Display with Chain Selector */}
+          <div className="relative" ref={chainSelectorRef}>
+            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] gap-1.5">
+              <div className="flex items-center flex-1 min-w-0 bg-[#0F0F0F] rounded-[100px] p-[4px] mr-2">
+                {/* Chain Icon */}
+                <div
+                  className={`w-6 h-6 lg:w-7 lg:h-7 ${currentChainData.color} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
+                >
+                  <span className="text-white text-xs font-bold font-satoshi">
+                    {currentChainData.icon}
+                  </span>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate block">
+                    {isConnected ? currentChainData.name : selectedWallet.name}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex-1 min-w-0">
-                <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate block">
-                  {selectedWallet.name}
+              {/* Address and Dropdown Button */}
+              <button
+                onClick={() => setChainSelectorOpen(!chainSelectorOpen)}
+                className="flex items-center hover:opacity-80 transition-opacity"
+              >
+                <span className="text-[#EDEDED] text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
+                  {isConnected
+                    ? `${address?.slice(0, 6)}...${address?.slice(-4)}`
+                    : selectedWallet.address}
                 </span>
-              </div>
+
+                <ChevronDown
+                  size={12}
+                  className={`text-gray-400 lg:w-3 lg:h-3 transition-transform ${
+                    chainSelectorOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
             </div>
 
-            {/* <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mr-1.5 lg:mr-2 hidden sm:block"></div> */}
+            {/* Chain Selector Dropdown */}
+            {chainSelectorOpen && (
+              <>
+                {/* Backdrop */}
+                <div
+                  className="fixed inset-0 z-30 bg-black/20"
+                  onClick={() => setChainSelectorOpen(false)}
+                />
 
-            <span className="text-[#EDEDED] text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
-              {selectedWallet.address}
-            </span>
+                {/* Dropdown - Compact with scroll */}
+                <div className="absolute top-full right-0 mt-2 w-64 bg-black border border-[#2C2C2C] rounded-[12px] shadow-2xl z-40 overflow-hidden">
+                  {/* Header with centered title and back icon */}
+                  <div className="flex items-center justify-between p-3">
+                    <button
+                      onClick={() => setChainSelectorOpen(false)}
+                      className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded"
+                    >
+                      <ArrowLeft size={16} />
+                    </button>
+                    <h3 className="text-white font-semibold text-sm font-satoshi absolute left-1/2 transform -translate-x-1/2">
+                      Select Chain
+                    </h3>
+                    <button
+                      onClick={() => setChainSelectorOpen(false)}
+                      className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
 
-            <ChevronDown size={12} className="text-gray-400 lg:w-3 lg:h-3" />
+                  {/* Chain List - Scrollable with max height for 5 items */}
+                  <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
+                    <div className="p-2 space-y-1">
+                      {chainData.map((chainItem) => {
+                        const isCurrentChain =
+                          isConnected && chain?.id === chainItem.id;
+                        const isSwitching = switchingChain === chainItem.id;
+
+                        return (
+                          <button
+                            key={chainItem.id}
+                            onClick={() => handleChainSwitch(chainItem.id)}
+                            disabled={isSwitching || !isConnected}
+                            className={`w-full flex items-center justify-between p-2.5 rounded-[8px] transition-all hover:bg-[#1A1A1A] ${
+                              !isConnected
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-center">
+                              {/* Chain Icon - Smaller */}
+                              <div
+                                className={`w-7 h-7 ${chainItem.color} rounded-full mr-2.5 flex items-center justify-center`}
+                              >
+                                <span className="text-white text-sm font-bold font-satoshi">
+                                  {chainItem.icon}
+                                </span>
+                              </div>
+
+                              {/* Chain Name - Smaller */}
+                              <span
+                                className={`text-sm font-satoshi ${
+                                  isCurrentChain
+                                    ? "text-[#E2AF19]"
+                                    : "text-white"
+                                }`}
+                              >
+                                {chainItem.name}
+                              </span>
+                            </div>
+
+                            {/* Toggle Switch - Smaller */}
+                            <div
+                              className={`w-10 h-5 rounded-full transition-colors relative ${
+                                isCurrentChain ? "bg-[#E2AF19]" : "bg-[#2C2C2C]"
+                              }`}
+                            >
+                              <div
+                                className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${
+                                  isCurrentChain
+                                    ? "translate-x-5"
+                                    : "translate-x-0.5"
+                                }`}
+                              >
+                                {isSwitching && (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-2.5 h-2.5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Footer Note */}
+                  {!isConnected && (
+                    <div className="p-3 bg-[#0F0F0F]">
+                      <p className="text-gray-400 text-xs font-satoshi text-center">
+                        Connect your wallet to switch chains
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Action Icons Container */}
@@ -223,6 +447,24 @@ export default function GlobalDashboardHeader({
 
       {/* Page-specific content below header */}
       {children}
+
+      {/* Custom Scrollbar Styles */}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #0f0f0f;
+          border-radius: 2px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #2c2c2c;
+          border-radius: 2px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #404040;
+        }
+      `}</style>
     </>
   );
 }

@@ -1,18 +1,20 @@
-// src/components/wallet/WalletConnectButton.tsx - HYDRATION-SAFE VERSION
+// src/components/wallet/WalletConnectButton.tsx - UPDATED WITH BOX DESIGN
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useNetwork, useSwitchNetwork } from "wagmi";
+import { useAccount, useNetwork, useSwitchNetwork, useDisconnect } from "wagmi";
 import { useState, useEffect } from "react";
+import { Copy, LogOut, Check } from "lucide-react";
 import { chains } from "./WalletProvider";
 
 export default function WalletConnectButton() {
   const { address, isConnected } = useAccount();
   const { chain } = useNetwork();
   const { switchNetwork } = useSwitchNetwork();
-  const [showChainDropdown, setShowChainDropdown] = useState(false);
+  const { disconnect } = useDisconnect();
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Ensure component is mounted before accessing wallet state
   useEffect(() => {
@@ -25,6 +27,25 @@ export default function WalletConnectButton() {
       setConnectionError(null);
     }
   }, [mounted, isConnected, address]);
+
+  // Handle copy address
+  const handleCopyAddress = async () => {
+    if (!address) return;
+
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy address:", err);
+    }
+  };
+
+  // Handle disconnect
+  const handleDisconnect = () => {
+    disconnect();
+    setConnectionError(null);
+  };
 
   // Return a static button during SSR/hydration
   if (!mounted) {
@@ -59,27 +80,6 @@ export default function WalletConnectButton() {
       </button>
     );
   }
-
-  const chainStatus = chains.map((c) => ({
-    id: c.id,
-    name: c.name,
-    isConnected: chain?.id === c.id,
-  }));
-
-  // Handle network switch with error handling
-  const handleNetworkSwitch = async (chainId: number) => {
-    try {
-      setConnectionError(null);
-      if (switchNetwork) {
-        await switchNetwork(chainId);
-      }
-      setShowChainDropdown(false);
-    } catch (error: any) {
-      console.warn("Network switch error:", error);
-      setConnectionError("Failed to switch network");
-      setShowChainDropdown(false);
-    }
-  };
 
   return (
     <div className="wallet-container">
@@ -169,94 +169,75 @@ export default function WalletConnectButton() {
                   );
                 }
 
+                // NEW DESIGN: Connected wallet with clean box layout
                 return (
-                  <div className="w-full">
-                    <div className="bg-black border border-[#2C2C2C] rounded-[12px] p-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <button
-                          onClick={() => {
-                            setConnectionError(null);
-                            openAccountModal();
-                          }}
-                          type="button"
-                          className="text-white hover:text-[#E2AF19] transition-colors font-satoshi text-xs truncate"
-                        >
-                          {account.displayName}
-                        </button>
-                        <div className="flex items-center gap-1">
+                  <div className="w-full space-y-2">
+                    {/* Main wallet info box */}
+                    <div className="bg-black border border-[#2C2C2C] rounded-[12px] p-3">
+                      {/* Connection status */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
                           <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                          <span className="text-green-400 text-xs font-satoshi">
+                          <span className="text-green-400 text-xs font-satoshi font-medium">
                             Connected
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {/* Network indicator */}
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                          <span className="text-white text-xs font-satoshi">
+                            {chain.name}
                           </span>
                         </div>
                       </div>
 
-                      <div className="relative">
-                        <button
-                          onClick={() =>
-                            setShowChainDropdown(!showChainDropdown)
-                          }
-                          className="w-full flex items-center justify-between bg-[#0F0F0F] rounded-lg px-3 py-2 hover:bg-[#1A1A1A] transition-colors"
-                        >
-                          <div className="flex items-center">
-                            <div className="w-4 h-4 bg-blue-500 rounded-full mr-2"></div>
-                            <span className="text-white text-xs font-satoshi">
-                              {chain.name}
-                            </span>
-                          </div>
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 12 12"
-                            fill="none"
-                            className={`text-gray-400 transition-transform ${
-                              showChainDropdown ? "rotate-180" : ""
-                            }`}
-                          >
-                            <path
-                              d="M3 4.5L6 7.5L9 4.5"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </button>
-
-                        {showChainDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg py-1 z-50">
-                            {chainStatus.map((c) => (
-                              <button
-                                key={c.id}
-                                onClick={() => {
-                                  if (!c.isConnected) {
-                                    handleNetworkSwitch(c.id);
-                                  } else {
-                                    setShowChainDropdown(false);
-                                  }
-                                }}
-                                className="w-full flex items-center justify-between px-3 py-2 hover:bg-[#2C2C2C] transition-colors"
-                              >
-                                <div className="flex items-center">
-                                  <div
-                                    className={`w-3 h-3 rounded-full mr-2 ${
-                                      c.isConnected
-                                        ? "bg-green-400"
-                                        : "bg-gray-500"
-                                    }`}
-                                  ></div>
-                                  <span className="text-white text-xs font-satoshi">
-                                    {c.name}
-                                  </span>
-                                </div>
-                                {c.isConnected && (
-                                  <div className="w-2 h-2 bg-[#E2AF19] rounded-full"></div>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                      {/* Wallet name */}
+                      <div className="mb-2">
+                        <span className="text-white text-sm font-satoshi font-medium">
+                          {account.displayName}
+                        </span>
                       </div>
+
+                      {/* Wallet address */}
+                      <div className="text-gray-400 text-xs font-satoshi font-mono break-all">
+                        {account.address}
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Copy address button */}
+                      <button
+                        onClick={handleCopyAddress}
+                        className="bg-[#0F0F0F] border border-[#2C2C2C] rounded-[12px] px-3 py-2 hover:bg-[#1A1A1A] transition-colors flex items-center justify-center gap-2"
+                      >
+                        {copied ? (
+                          <>
+                            <Check size={12} className="text-green-400" />
+                            <span className="text-green-400 text-xs font-satoshi">
+                              Copied
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={12} className="text-gray-400" />
+                            <span className="text-gray-400 text-xs font-satoshi">
+                              Copy
+                            </span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Disconnect button */}
+                      <button
+                        onClick={handleDisconnect}
+                        className="bg-[#0F0F0F] border border-[#2C2C2C] rounded-[12px] px-3 py-2 hover:bg-red-900/20 hover:border-red-500/50 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <LogOut size={12} className="text-gray-400" />
+                        <span className="text-gray-400 text-xs font-satoshi">
+                          Disconnect
+                        </span>
+                      </button>
                     </div>
                   </div>
                 );
