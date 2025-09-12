@@ -1,24 +1,34 @@
+// src/components/dashboard/WalletBalance.tsx - UPDATED with real token integration
 "use client";
 
 import { useSelector } from "react-redux";
 import { useEffect, useState } from "react";
-import { Copy, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw, AlertCircle } from "lucide-react";
+import { useAccount, useNetwork, useBalance } from "wagmi";
 import { RootState } from "@/store";
 import { SkeletonWalletBalance } from "@/components/ui/Skeleton";
+import { tokenService } from "@/services/tokenService";
 
 export default function WalletBalance() {
   const { user, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
 
-  // Mock wallet data for UI
-  const [walletData] = useState({
-    address: "0x1234567890123456789012345678901234567890",
-    balance: 12847.65,
-    change24h: 342.18,
-    changePercentage: 2.74,
-    tokenCount: 8,
+  // Wallet integration
+  const { address, isConnected } = useAccount();
+  const { chain } = useNetwork();
+  const { data: balance } = useBalance({
+    address,
+    enabled: isConnected,
   });
+
+  // Component state
+  const [totalValue, setTotalValue] = useState(0);
+  const [tokenCount, setTokenCount] = useState(0);
+  const [change24h, setChange24h] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Copy feedback state
   const [copyState, setCopyState] = useState({
@@ -26,7 +36,58 @@ export default function WalletBalance() {
     isAnimating: false,
   });
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  // Fetch wallet data when connected
+  useEffect(() => {
+    if (isConnected && address && chain?.id) {
+      fetchWalletData();
+    } else {
+      // Reset state when disconnected
+      setTotalValue(0);
+      setTokenCount(0);
+      setChange24h(0);
+      setError("");
+      setLoading(false);
+    }
+  }, [isConnected, address, chain?.id]);
+
+  // Fetch wallet data from API
+  const fetchWalletData = async () => {
+    if (!address || !chain?.id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      console.log(
+        `📊 Fetching wallet data for ${address} on chain ${chain.id}`
+      );
+
+      const response = await tokenService.getWalletTokens(address, chain.id);
+
+      setTotalValue(response.totalValue);
+      setTokenCount(response.tokenCount);
+
+      // Calculate overall portfolio change (simplified)
+      const overallChange = response.tokens.reduce((acc, token) => {
+        return acc + token.change24h * (token.value / response.totalValue);
+      }, 0);
+      setChange24h(overallChange);
+
+      console.log(
+        `✅ Wallet data loaded: $${response.totalValue.toFixed(2)}, ${
+          response.tokenCount
+        } tokens`
+      );
+    } catch (err: any) {
+      console.error("❌ Error fetching wallet data:", err);
+      setError(err.message || "Failed to load wallet data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatBalance = (balance: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -57,21 +118,55 @@ export default function WalletBalance() {
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    if (!address) return;
+
     setIsRefreshing(true);
-    // Simulate refresh
-    setTimeout(() => {
+    try {
+      await tokenService.refreshWalletTokens(address);
+      await fetchWalletData();
+    } catch (err: any) {
+      console.error("❌ Error refreshing wallet data:", err);
+      setError("Failed to refresh wallet data");
+    } finally {
       setIsRefreshing(false);
-    }, 1000);
+    }
   };
 
   // Show skeleton during initial load
-  if (!isAuthenticated || !user) {
+  if (loading && (!isAuthenticated || !user)) {
     return <SkeletonWalletBalance />;
   }
 
+  // Show wallet not connected state
+  if (!isConnected || !address) {
+    return (
+      <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo">
+              Wallet Balance
+            </h2>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center text-center py-6">
+          <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+            <span className="text-gray-400 text-xl">🔌</span>
+          </div>
+          <h3 className="text-white text-base font-satoshi mb-1">
+            Connect Wallet
+          </h3>
+          <p className="text-gray-400 font-satoshi text-sm">
+            Connect your wallet to view your balance
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0 h-auto">
+    <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0">
       {/* Header - Responsive layout */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
         <div className="flex items-center gap-2">
@@ -87,37 +182,121 @@ export default function WalletBalance() {
               </span>
             </div>
           )}
+
+          {/* Chain indicator */}
+          {chain && (
+            <div className="flex items-center gap-1 bg-[#0F0F0F] px-2 py-1 rounded-full border border-[#2C2C2C]">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-white text-xs font-satoshi">
+                {chain.name}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Address and Copy Button */}
         <div className="flex items-center space-x-2">
           <span className="text-gray-400 text-xs sm:text-xs font-satoshi italic font-medium truncate max-w-[120px] sm:max-w-none tracking-wide">
-            {walletData.address
-              ? `${walletData.address.slice(0, 8)}...${walletData.address.slice(
-                  -6
-                )}`
-              : "No wallet selected"}
+            {address
+              ? `${address.slice(0, 8)}...${address.slice(-6)}`
+              : "No wallet connected"}
           </span>
 
           <button
-            onClick={() => copyToClipboard(walletData.address)}
+            onClick={() => copyToClipboard(address!)}
+            disabled={!address}
             className={`transition-all duration-300 ease-in-out px-2 py-0.5 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0 ${
               copyState.isCopied
                 ? "bg-[#E2AF19] text-black scale-105"
-                : "text-black hover:bg-[#D4A853] bg-[#E2AF19] bg-opacity-100"
+                : "text-black hover:bg-[#D4A853] bg-[#E2AF19] bg-opacity-100 disabled:opacity-50"
             }`}
-            disabled={copyState.isAnimating}
           >
             <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
+          </button>
+
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing || !address}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
+            title="Refresh wallet data"
+          >
+            <RefreshCw
+              size={14}
+              className={isRefreshing ? "animate-spin" : ""}
+            />
           </button>
         </div>
       </div>
 
-      {/* Balance Display */}
-      <div>
-        <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
-          {formatBalance(walletData.balance)}
+      {/* Error Display */}
+      {error && (
+        <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
+          <div className="flex items-start">
+            <AlertCircle size={14} className="text-red-400 mr-2 mt-0.5" />
+            <div>
+              <p className="text-red-400 text-sm font-satoshi">{error}</p>
+              <button
+                onClick={() => fetchWalletData()}
+                className="text-red-400 underline text-xs mt-1 font-satoshi"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Balance Display */}
+      <div className="space-y-2">
+        {/* Main Balance */}
+        <div className="flex items-end justify-between">
+          <div>
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
+              {formatBalance(totalValue)}
+            </div>
+            <div className="flex items-center gap-2">
+              {change24h !== 0 && (
+                <>
+                  <div
+                    className={`text-sm font-satoshi ${
+                      change24h >= 0 ? "text-green-400" : "text-red-400"
+                    }`}
+                  >
+                    {formatPercentage(change24h)}
+                  </div>
+                  <div className="text-gray-400 text-sm font-satoshi">24h</div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Token count */}
+          {tokenCount > 0 && (
+            <div className="text-right">
+              <div className="text-gray-400 text-xs font-satoshi">Tokens</div>
+              <div className="text-white text-sm font-satoshi font-medium">
+                {tokenCount}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Native Balance Display (if available) */}
+        {balance && (
+          <div className="text-gray-400 text-sm font-satoshi">
+            {parseFloat(balance.formatted).toFixed(4)} {balance.symbol}
+          </div>
+        )}
+
+        {/* Loading state */}
+        {loading && (
+          <div className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#E2AF19]"></div>
+            <span className="text-gray-400 text-sm font-satoshi">
+              Loading wallet data...
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

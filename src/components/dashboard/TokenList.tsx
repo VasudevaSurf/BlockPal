@@ -1,46 +1,16 @@
+// src/components/dashboard/TokenList.tsx - UPDATED with real token integration
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
+import { useAccount, useNetwork } from "wagmi";
 import { RootState } from "@/store";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
-import { RefreshCw, Plus, X } from "lucide-react";
+import { RefreshCw, Plus, X, AlertCircle } from "lucide-react";
 import { SkeletonTokenList } from "@/components/ui/Skeleton";
 import AddTokenModal from "@/components/dashboard/AddTokenModal";
-
-// Mock token data for UI
-const mockTokens = [
-  {
-    contractAddress: "native",
-    symbol: "ETH",
-    name: "Ethereum",
-    balance: 2.5,
-    value: 8750.25,
-    change24h: 5.2,
-    imageUrl:
-      "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
-  },
-  {
-    contractAddress: "0xa0b86a33e6d3d1ab0cbb4a9b8c8f5d7f8b8e1234",
-    symbol: "USDT",
-    name: "Tether USD",
-    balance: 1500.0,
-    value: 1500.0,
-    change24h: 0.1,
-    imageUrl: "https://assets.coingecko.com/coins/images/325/small/Tether.png",
-  },
-  {
-    contractAddress: "0xb0c5a33e6d3d1ab0cbb4a9b8c8f5d7f8b8e5678",
-    symbol: "UNI",
-    name: "Uniswap",
-    balance: 25.8,
-    value: 387.0,
-    change24h: -2.3,
-    imageUrl:
-      "https://assets.coingecko.com/coins/images/12504/small/uniswap-logo.png",
-  },
-];
+import { tokenService, TokenBalance } from "@/services/tokenService";
 
 // Token Image Component
 const TokenImage = ({
@@ -84,29 +54,87 @@ export default function TokenList() {
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
   const { isLoading: isNavigating, startLoading } = useNavigationLoading();
+
+  // Wallet integration
+  const { address, isConnected } = useAccount();
+  const { chain } = useNetwork();
+
+  // Component state
+  const [tokens, setTokens] = useState<TokenBalance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [addTokenModalOpen, setAddTokenModalOpen] = useState(false);
   const [removingToken, setRemovingToken] = useState<string | null>(null);
-  const [tokens, setTokens] = useState(mockTokens);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [totalValue, setTotalValue] = useState(0);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 6,
-    }).format(value);
-  };
+  // Fetch tokens when wallet or chain changes
+  useEffect(() => {
+    if (isConnected && address && chain?.id) {
+      fetchTokens();
+    } else {
+      // Fallback to mock data when not connected
+      setTokens([]);
+      setTotalValue(0);
+      setLoading(false);
+    }
+  }, [isConnected, address, chain?.id]);
 
-  const formatPercentage = (value: number) => {
-    const sign = value >= 0 ? "+" : "";
-    return `${sign}${value.toFixed(2)}%`;
-  };
-
-  const handleTokenClick = (token: any) => {
-    if (isNavigating) {
+  // Fetch tokens from API
+  const fetchTokens = async () => {
+    if (!address || !chain?.id) {
+      setLoading(false);
       return;
     }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      console.log(`📡 Fetching tokens for ${address} on chain ${chain.id}`);
+
+      const response = await tokenService.getWalletTokens(address, chain.id);
+
+      setTokens(response.tokens);
+      setTotalValue(response.totalValue);
+
+      console.log(
+        `✅ Loaded ${
+          response.tokens.length
+        } tokens, total value: $${response.totalValue.toFixed(2)}`
+      );
+    } catch (err: any) {
+      console.error("❌ Error fetching tokens:", err);
+      setError(err.message || "Failed to load tokens");
+
+      // Fallback to empty state on error
+      setTokens([]);
+      setTotalValue(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    if (!address) return;
+
+    setIsRefreshing(true);
+    try {
+      // Clear cache and refetch
+      await tokenService.refreshWalletTokens(address);
+      await fetchTokens();
+    } catch (err: any) {
+      console.error("❌ Error refreshing tokens:", err);
+      setError("Failed to refresh tokens");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Handle token click
+  const handleTokenClick = (token: TokenBalance) => {
+    if (isNavigating) return;
 
     try {
       const url = `/dashboard/token/${encodeURIComponent(
@@ -121,40 +149,26 @@ export default function TokenList() {
     }
   };
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    // Simulate refresh
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 1000);
-  };
-
+  // Handle add token (placeholder)
   const handleAddToken = (contractAddress: string) => {
-    // Mock adding token to list
-    const newToken = {
-      contractAddress,
-      symbol: "NEW",
-      name: "New Token",
-      balance: 0,
-      value: 0,
-      change24h: 0,
-      imageUrl: null,
-    };
-    setTokens([...tokens, newToken]);
+    console.log("➕ Add token:", contractAddress);
+    // You can implement custom token adding logic here
     setAddTokenModalOpen(false);
   };
 
+  // Handle remove token
   const handleRemoveToken = async (
     e: React.MouseEvent,
     contractAddress: string
   ) => {
     e.stopPropagation();
 
-    if (removingToken) return;
+    if (removingToken || contractAddress === "native") return;
 
     setRemovingToken(contractAddress);
     try {
-      // Mock removal
+      // For now, just remove from local state
+      // In a full implementation, you might want to save user preferences
       setTimeout(() => {
         setTokens(tokens.filter((t) => t.contractAddress !== contractAddress));
         setRemovingToken(null);
@@ -165,8 +179,44 @@ export default function TokenList() {
     }
   };
 
-  if (!user) {
+  // Format currency
+  const formatCurrency = (value: number) => {
+    return tokenService.formatCurrency(value);
+  };
+
+  // Format percentage
+  const formatPercentage = (value: number) => {
+    return tokenService.formatPercentage(value);
+  };
+
+  // Show loading state
+  if (loading) {
     return <SkeletonTokenList />;
+  }
+
+  // Show wallet not connected state
+  if (!isConnected || !address) {
+    return (
+      <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+        <div className="flex items-center justify-between mb-3 px-2">
+          <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo">
+            Token Holdings
+          </h2>
+        </div>
+
+        <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8 flex-1">
+          <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+            <span className="text-gray-400 text-base lg:text-lg">🔌</span>
+          </div>
+          <h3 className="text-white text-sm lg:text-base font-satoshi mb-1">
+            Connect your wallet
+          </h3>
+          <p className="text-gray-400 font-satoshi text-xs lg:text-sm">
+            Connect your wallet to see your token holdings
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -178,6 +228,19 @@ export default function TokenList() {
           </h2>
           <div className="flex items-center gap-2">
             <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh tokens"
+            >
+              <RefreshCw
+                size={16}
+                className={`lg:w-5 lg:h-5 ${
+                  isRefreshing ? "animate-spin" : ""
+                }`}
+              />
+            </button>
+            <button
               onClick={() => setAddTokenModalOpen(true)}
               className="p-1.5 text-[#E2AF19] hover:bg-[#2C2C2C] rounded-lg transition-colors"
               title="Add token"
@@ -187,9 +250,44 @@ export default function TokenList() {
           </div>
         </div>
 
+        {/* Error state */}
+        {error && (
+          <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
+            <div className="flex items-start">
+              <AlertCircle size={14} className="text-red-400 mr-2 mt-0.5" />
+              <div>
+                <p className="text-red-400 text-sm font-satoshi">{error}</p>
+                <button
+                  onClick={() => fetchTokens()}
+                  className="text-red-400 underline text-xs mt-1 font-satoshi"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Chain info */}
+        {chain && (
+          <div className="mb-3 p-2 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-blue-500 rounded-full mr-2"></div>
+                <span className="text-white text-sm font-satoshi">
+                  {chain.name}
+                </span>
+              </div>
+              <div className="text-gray-400 text-xs font-satoshi">
+                Total: {formatCurrency(totalValue)}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Token List */}
         {tokens.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8">
+          <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8 flex-1">
             <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
               <span className="text-gray-400 text-base lg:text-lg">🪙</span>
             </div>
@@ -197,13 +295,14 @@ export default function TokenList() {
               No tokens found
             </h3>
             <p className="text-gray-400 font-satoshi text-xs lg:text-sm mb-3">
-              Add tokens to track your portfolio
+              No token holdings found on {chain?.name}
             </p>
             <button
-              onClick={() => setAddTokenModalOpen(true)}
-              className="px-3 py-1.5 bg-[#E2AF19] text-black rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi text-sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="px-3 py-1.5 bg-[#E2AF19] text-black rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi text-sm disabled:opacity-50"
             >
-              Add Your First Token
+              {isRefreshing ? "Refreshing..." : "Refresh"}
             </button>
           </div>
         ) : (
@@ -222,7 +321,7 @@ export default function TokenList() {
                     }`}
                   >
                     {/* Remove button */}
-                    {token.contractAddress !== "native" && (
+                    {!token.isNative && (
                       <button
                         onClick={(e) =>
                           handleRemoveToken(e, token.contractAddress)
@@ -237,7 +336,7 @@ export default function TokenList() {
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center">
                         <TokenImage
-                          src={token.imageUrl}
+                          src={token.logoUrl}
                           alt={token.symbol}
                           symbol={token.symbol}
                           className="w-8 h-8 mr-2.5 flex-shrink-0"
@@ -247,7 +346,8 @@ export default function TokenList() {
                             {token.name}
                           </div>
                           <div className="text-gray-400 text-xs font-satoshi">
-                            {token.balance.toFixed(4)} {token.symbol}
+                            {tokenService.formatTokenAmount(token.balance, 4)}{" "}
+                            {token.symbol}
                           </div>
                         </div>
                       </div>
@@ -285,7 +385,7 @@ export default function TokenList() {
                     }`}
                   >
                     {/* Remove button */}
-                    {token.contractAddress !== "native" && (
+                    {!token.isNative && (
                       <button
                         onClick={(e) =>
                           handleRemoveToken(e, token.contractAddress)
@@ -299,7 +399,7 @@ export default function TokenList() {
 
                     <div className="flex items-center min-w-0 flex-1">
                       <TokenImage
-                        src={token.imageUrl}
+                        src={token.logoUrl}
                         alt={token.symbol}
                         symbol={token.symbol}
                         className="w-10 h-10 mr-2.5 flex-shrink-0"
@@ -307,9 +407,15 @@ export default function TokenList() {
                       <div className="min-w-0 flex-1">
                         <div className="text-white font-medium font-satoshi text-sm sm:text-sm flex items-center">
                           {token.name}
+                          {token.isNative && (
+                            <span className="ml-2 text-xs bg-[#E2AF19] text-black px-1.5 py-0.5 rounded">
+                              Native
+                            </span>
+                          )}
                         </div>
                         <div className="text-gray-400 text-xs font-satoshi">
-                          {token.balance.toFixed(4)} {token.symbol}
+                          {tokenService.formatTokenAmount(token.balance, 4)}{" "}
+                          {token.symbol}
                         </div>
                       </div>
                     </div>
