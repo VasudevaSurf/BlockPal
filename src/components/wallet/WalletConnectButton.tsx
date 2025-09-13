@@ -1,20 +1,22 @@
-// src/components/wallet/WalletConnectButton.tsx - UPDATED WITH BOX DESIGN
+// src/components/wallet/WalletConnectButton.tsx - UPDATED FOR WAGMI V2
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useNetwork, useSwitchNetwork, useDisconnect } from "wagmi";
+import { useAccount, useChainId, useDisconnect } from "wagmi"; // UPDATED: wagmi v2 hooks
 import { useState, useEffect } from "react";
 import { Copy, LogOut, Check } from "lucide-react";
 import { chains } from "./WalletProvider";
 
 export default function WalletConnectButton() {
   const { address, isConnected } = useAccount();
-  const { chain } = useNetwork();
-  const { switchNetwork } = useSwitchNetwork();
+  const chainId = useChainId(); // UPDATED: useChainId instead of useNetwork
   const { disconnect } = useDisconnect();
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Get current chain data
+  const currentChain = chains.find((c) => c.id === chainId);
 
   // Ensure component is mounted before accessing wallet state
   useEffect(() => {
@@ -169,7 +171,7 @@ export default function WalletConnectButton() {
                   );
                 }
 
-                // NEW DESIGN: Connected wallet with clean box layout
+                // Connected wallet with clean box layout
                 return (
                   <div className="w-full space-y-2">
                     {/* Main wallet info box */}
@@ -186,7 +188,7 @@ export default function WalletConnectButton() {
                           {/* Network indicator */}
                           <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                           <span className="text-white text-xs font-satoshi">
-                            {chain.name}
+                            {currentChain?.name || chain.name}
                           </span>
                         </div>
                       </div>

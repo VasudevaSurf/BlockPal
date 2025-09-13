@@ -1,7 +1,7 @@
-// src/hooks/useWalletIntegration.ts - SAFER VERSION
+// src/hooks/useWalletIntegration.ts - UPDATED FOR WAGMI V2
 "use client";
 
-import { useAccount, useBalance, useNetwork } from "wagmi";
+import { useAccount, useBalance, useChainId } from "wagmi"; // UPDATED: useChainId instead of useNetwork
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import {
@@ -10,10 +10,14 @@ import {
   initializeMockData,
   clearWalletState,
 } from "@/store/slices/walletSlice";
+import { chains } from "@/components/wallet/WalletProvider";
 
 export function useWalletIntegration() {
   const { address, isConnected, isConnecting, isDisconnected } = useAccount();
-  const { chain } = useNetwork();
+  const chainId = useChainId(); // UPDATED: useChainId instead of useNetwork
+
+  // Get current chain data from configured chains
+  const currentChain = chains.find((c) => c.id === chainId);
 
   // More conservative balance fetching with extensive error handling
   const {
@@ -23,11 +27,13 @@ export function useWalletIntegration() {
   } = useBalance({
     address,
     enabled: false, // Start disabled to prevent immediate RPC calls
-    retry: false,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
-    staleTime: 60 * 1000, // 1 minute
+    query: {
+      retry: false,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+      staleTime: 60 * 1000, // 1 minute
+    },
   });
 
   const dispatch = useDispatch();
@@ -71,7 +77,8 @@ export function useWalletIntegration() {
       isConnecting,
       isDisconnected,
       address: address?.slice(0, 10) + "...",
-      chain: chain?.name,
+      chainName: currentChain?.name,
+      chainId,
       mounted,
     });
 
@@ -81,7 +88,7 @@ export function useWalletIntegration() {
       // Create a wallet object from connected wallet
       const connectedWallet = {
         id: "connected-wallet",
-        name: `${chain?.name || "Ethereum"} Wallet`,
+        name: `${currentChain?.name || "Ethereum"} Wallet`,
         address: address,
         balance: 0, // Start with 0, will update when balance loads
         isActive: true,
@@ -112,7 +119,8 @@ export function useWalletIntegration() {
     isConnected,
     isDisconnected,
     address,
-    chain,
+    currentChain,
+    chainId,
     dispatch,
     isInitialized,
   ]);
@@ -163,7 +171,8 @@ export function useWalletIntegration() {
     isConnected: mounted ? isConnected : false,
     isConnecting: mounted ? isConnecting : false,
     address: mounted ? address : undefined,
-    chain: mounted ? chain : undefined,
+    chain: mounted ? currentChain : undefined,
+    chainId: mounted ? chainId : undefined,
     balance:
       mounted && balance && !balanceError ? parseFloat(balance.formatted) : 0,
     balanceSymbol: mounted && balance?.symbol ? balance.symbol : "ETH",

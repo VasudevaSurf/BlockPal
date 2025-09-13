@@ -1,26 +1,32 @@
-// src/components/dashboard/WalletBalance.tsx - UPDATED with real token integration
+// src/components/dashboard/WalletBalance.tsx - UPDATED FOR WAGMI V2
 "use client";
 
 import { useSelector } from "react-redux";
 import { useEffect, useState } from "react";
 import { Copy, RefreshCw, AlertCircle } from "lucide-react";
-import { useAccount, useNetwork, useBalance } from "wagmi";
+import { useAccount, useChainId, useBalance } from "wagmi"; // UPDATED: useChainId instead of useNetwork
 import { RootState } from "@/store";
 import { SkeletonWalletBalance } from "@/components/ui/Skeleton";
 import { tokenService } from "@/services/tokenService";
+import { chains } from "@/components/wallet/WalletProvider";
 
 export default function WalletBalance() {
   const { user, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
 
-  // Wallet integration
+  // Wallet integration - UPDATED for wagmi v2
   const { address, isConnected } = useAccount();
-  const { chain } = useNetwork();
+  const chainId = useChainId(); // UPDATED: useChainId instead of useNetwork
   const { data: balance } = useBalance({
     address,
-    enabled: isConnected,
+    query: {
+      enabled: isConnected,
+    },
   });
+
+  // Get current chain data
+  const currentChain = chains.find((c) => c.id === chainId);
 
   // Component state
   const [totalValue, setTotalValue] = useState(0);
@@ -38,7 +44,7 @@ export default function WalletBalance() {
 
   // Fetch wallet data when connected
   useEffect(() => {
-    if (isConnected && address && chain?.id) {
+    if (isConnected && address && chainId) {
       fetchWalletData();
     } else {
       // Reset state when disconnected
@@ -48,11 +54,11 @@ export default function WalletBalance() {
       setError("");
       setLoading(false);
     }
-  }, [isConnected, address, chain?.id]);
+  }, [isConnected, address, chainId]);
 
   // Fetch wallet data from API
   const fetchWalletData = async () => {
-    if (!address || !chain?.id) {
+    if (!address || !chainId) {
       setLoading(false);
       return;
     }
@@ -61,11 +67,9 @@ export default function WalletBalance() {
       setLoading(true);
       setError("");
 
-      console.log(
-        `📊 Fetching wallet data for ${address} on chain ${chain.id}`
-      );
+      console.log(`📊 Fetching wallet data for ${address} on chain ${chainId}`);
 
-      const response = await tokenService.getWalletTokens(address, chain.id);
+      const response = await tokenService.getWalletTokens(address, chainId);
 
       setTotalValue(response.totalValue);
       setTokenCount(response.tokenCount);
@@ -184,11 +188,11 @@ export default function WalletBalance() {
           )}
 
           {/* Chain indicator */}
-          {chain && (
+          {currentChain && (
             <div className="flex items-center gap-1 bg-[#0F0F0F] px-2 py-1 rounded-full border border-[#2C2C2C]">
               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
               <span className="text-white text-xs font-satoshi">
-                {chain.name}
+                {currentChain.name}
               </span>
             </div>
           )}

@@ -1,16 +1,17 @@
-// src/components/dashboard/TokenList.tsx - UPDATED with real token integration
+// src/components/dashboard/TokenList.tsx - UPDATED FOR WAGMI V2
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
-import { useAccount, useNetwork } from "wagmi";
+import { useAccount, useChainId } from "wagmi"; // UPDATED: useChainId instead of useNetwork
 import { RootState } from "@/store";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import { RefreshCw, Plus, X, AlertCircle } from "lucide-react";
 import { SkeletonTokenList } from "@/components/ui/Skeleton";
 import AddTokenModal from "@/components/dashboard/AddTokenModal";
 import { tokenService, TokenBalance } from "@/services/tokenService";
+import { chains } from "@/components/wallet/WalletProvider";
 
 // Token Image Component
 const TokenImage = ({
@@ -55,9 +56,12 @@ export default function TokenList() {
   const { user } = useSelector((state: RootState) => state.auth);
   const { isLoading: isNavigating, startLoading } = useNavigationLoading();
 
-  // Wallet integration
+  // Wallet integration - UPDATED for wagmi v2
   const { address, isConnected } = useAccount();
-  const { chain } = useNetwork();
+  const chainId = useChainId(); // UPDATED: useChainId instead of useNetwork
+
+  // Get current chain data
+  const currentChain = chains.find((c) => c.id === chainId);
 
   // Component state
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
@@ -70,7 +74,7 @@ export default function TokenList() {
 
   // Fetch tokens when wallet or chain changes
   useEffect(() => {
-    if (isConnected && address && chain?.id) {
+    if (isConnected && address && chainId) {
       fetchTokens();
     } else {
       // Fallback to mock data when not connected
@@ -78,11 +82,11 @@ export default function TokenList() {
       setTotalValue(0);
       setLoading(false);
     }
-  }, [isConnected, address, chain?.id]);
+  }, [isConnected, address, chainId]);
 
   // Fetch tokens from API
   const fetchTokens = async () => {
-    if (!address || !chain?.id) {
+    if (!address || !chainId) {
       setLoading(false);
       return;
     }
@@ -91,9 +95,9 @@ export default function TokenList() {
       setLoading(true);
       setError("");
 
-      console.log(`📡 Fetching tokens for ${address} on chain ${chain.id}`);
+      console.log(`📡 Fetching tokens for ${address} on chain ${chainId}`);
 
-      const response = await tokenService.getWalletTokens(address, chain.id);
+      const response = await tokenService.getWalletTokens(address, chainId);
 
       setTokens(response.tokens);
       setTotalValue(response.totalValue);
@@ -269,13 +273,13 @@ export default function TokenList() {
         )}
 
         {/* Chain info */}
-        {chain && (
+        {currentChain && (
           <div className="mb-3 p-2 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className="w-4 h-4 bg-blue-500 rounded-full mr-2"></div>
                 <span className="text-white text-sm font-satoshi">
-                  {chain.name}
+                  {currentChain.name}
                 </span>
               </div>
               <div className="text-gray-400 text-xs font-satoshi">
@@ -295,7 +299,7 @@ export default function TokenList() {
               No tokens found
             </h3>
             <p className="text-gray-400 font-satoshi text-xs lg:text-sm mb-3">
-              No token holdings found on {chain?.name}
+              No token holdings found on {currentChain?.name}
             </p>
             <button
               onClick={handleRefresh}

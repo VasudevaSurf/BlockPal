@@ -1,3 +1,4 @@
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED FOR WAGMI V2
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -6,7 +7,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { Bell, User, LogOut, ChevronDown, ArrowLeft, X } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
-import { useAccount, useNetwork, useSwitchNetwork } from "wagmi";
+import { useAccount, useChainId, useSwitchChain } from "wagmi"; // UPDATED: wagmi v2 hooks
 import { chains } from "@/components/wallet/WalletProvider";
 
 interface GlobalDashboardHeaderProps {
@@ -112,10 +113,48 @@ export default function GlobalDashboardHeader({
   } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Wallet hooks
+  // UPDATED: wagmi v2 hooks
   const { address, isConnected } = useAccount();
-  const { chain } = useNetwork();
-  const { switchNetwork } = useSwitchNetwork();
+  const chainId = useChainId();
+  const {
+    switchChain,
+    isPending: isSwitchingChain,
+    error: wagmiSwitchError,
+  } = useSwitchChain({
+    mutation: {
+      onError: (error, variables) => {
+        console.error("🚨 Chain switch error details:", {
+          error: error.message,
+          errorName: error.name,
+          errorCode: (error as any).code,
+          targetChain: variables.chainId,
+          currentChain: chainId,
+          stackTrace: error.stack,
+          fullError: error,
+        });
+        setSwitchingChain(null);
+        setSwitchError(error.message || "Failed to switch chain");
+      },
+      onSuccess: (data, variables) => {
+        console.log("✅ Chain switched successfully:", {
+          newChain: data.name,
+          chainId: data.id,
+          targetChain: variables.chainId,
+          previousChain: chainId,
+        });
+        setSwitchingChain(null);
+        setChainSelectorOpen(false);
+        setSwitchError(null);
+      },
+      onMutate: (variables) => {
+        console.log("🔄 Starting chain switch:", {
+          targetChain: variables.chainId,
+          currentChain: chainId,
+        });
+        setSwitchError(null);
+      },
+    },
+  });
 
   // Mock wallet data for UI (keep existing mock data)
   const [selectedWallet] = useState({
@@ -127,6 +166,8 @@ export default function GlobalDashboardHeader({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [chainSelectorOpen, setChainSelectorOpen] = useState(false);
   const [switchingChain, setSwitchingChain] = useState<number | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const authChecked = useRef(false);
   const chainSelectorRef = useRef<HTMLDivElement>(null);
@@ -140,6 +181,11 @@ export default function GlobalDashboardHeader({
   const displaySubtitle =
     propSubtitle !== "Welcome back" ? propSubtitle : pageInfo.subtitle;
 
+  // Ensure component is mounted before accessing wallet state
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Auth check effect - only run once
   useEffect(() => {
     if (!authChecked.current && !isAuthenticated && !authLoading) {
@@ -147,6 +193,22 @@ export default function GlobalDashboardHeader({
       dispatch(checkAuthStatus());
     }
   }, [dispatch, isAuthenticated, authLoading]);
+
+  // Clear error when component unmounts or auth changes
+  useEffect(() => {
+    return () => {
+      setSwitchError(null);
+      setSwitchingChain(null);
+    };
+  }, []);
+
+  // Clear error when wallet disconnects
+  useEffect(() => {
+    if (!isConnected) {
+      setSwitchError(null);
+      setSwitchingChain(null);
+    }
+  }, [isConnected]);
 
   // Close chain selector when clicking outside
   useEffect(() => {
@@ -193,41 +255,94 @@ export default function GlobalDashboardHeader({
     }
   };
 
-  // Handle chain switch
-  const handleChainSwitch = async (chainId: number) => {
-    if (!switchNetwork || !isConnected) {
-      console.log(
-        "Cannot switch chain: wallet not connected or switchNetwork not available"
-      );
+  // UPDATED: Handle chain switch with wagmi v2
+  const handleChainSwitch = async (targetChainId: number) => {
+    // Don't proceed if not mounted to avoid hydration issues
+    if (!mounted) {
+      console.warn("⚠️ Component not mounted, skipping chain switch");
+      setSwitchError("Please wait for the page to load completely");
       return;
     }
 
-    if (chain?.id === chainId) {
+    // Check if switchChain is available
+    if (!switchChain) {
+      console.warn("⚠️ switchChain function not available");
+      setSwitchError("Chain switching not supported by current wallet");
+      return;
+    }
+
+    // Check if wallet is connected
+    if (!isConnected || !address) {
+      console.log("⚠️ Wallet not connected, cannot switch chain");
+      setSwitchError("Please connect your wallet first");
+      return;
+    }
+
+    // Don't switch if already on the target chain
+    if (chainId === targetChainId) {
+      console.log("ℹ️ Already on target chain:", targetChainId);
       setChainSelectorOpen(false);
       return;
     }
 
-    setSwitchingChain(chainId);
+    // Don't allow multiple simultaneous switches
+    if (isSwitchingChain || switchingChain) {
+      console.log("⚠️ Chain switch already in progress");
+      setSwitchError("Chain switch already in progress");
+      return;
+    }
+
+    console.log(`🔄 Initiating chain switch to ${targetChainId}`);
+    setSwitchingChain(targetChainId);
+    setSwitchError(null);
 
     try {
-      await switchNetwork(chainId);
-      console.log(`Switched to chain ${chainId}`);
-    } catch (error) {
-      console.error("Failed to switch chain:", error);
-    } finally {
+      // UPDATED: wagmi v2 syntax
+      switchChain({ chainId: targetChainId });
+
+      console.log(`✅ Chain switch to ${targetChainId} initiated successfully`);
+    } catch (error: any) {
+      console.error(`❌ Chain switch to ${targetChainId} failed:`, error);
+
+      // Handle specific error types
+      let userMessage = "Failed to switch chain";
+
+      if (error.message?.includes("timeout")) {
+        userMessage = "Chain switch timed out. Please try again.";
+      } else if (
+        error.message?.includes("rejected") ||
+        error.message?.includes("denied")
+      ) {
+        userMessage = "Chain switch was cancelled by user";
+      } else if (error.message?.includes("Unrecognized chain")) {
+        userMessage = "This chain is not supported by your wallet";
+      } else if (error.message?.includes("does not support")) {
+        userMessage = "Your wallet doesn't support this chain";
+      } else if (error.code === 4902) {
+        userMessage = "Chain not added to wallet. Please add it manually.";
+      } else if (error.code === -32603) {
+        userMessage = "Wallet internal error. Please try again.";
+      } else if (error.message) {
+        userMessage = error.message;
+      }
+
+      setSwitchError(userMessage);
       setSwitchingChain(null);
-      setChainSelectorOpen(false);
     }
   };
 
-  // Get current chain data
-  const currentChainData =
-    chainData.find((c) => c.id === chain?.id) || chainData[0];
+  // Get current chain data with fallback
+  const currentChain =
+    mounted && isConnected ? chains.find((c) => c.id === chainId) : null;
+  const currentChainData = currentChain || chainData[0];
 
   // Don't render if not authenticated
   if (!isAuthenticated) {
     return null;
   }
+
+  // Don't render wallet-dependent parts until mounted
+  const showWalletInfo = mounted && isConnected;
 
   return (
     <>
@@ -267,7 +382,9 @@ export default function GlobalDashboardHeader({
 
                 <div className="flex-1 min-w-0">
                   <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate block">
-                    {isConnected ? currentChainData.name : selectedWallet.name}
+                    {showWalletInfo
+                      ? currentChainData.name
+                      : selectedWallet.name}
                   </span>
                 </div>
               </div>
@@ -276,10 +393,11 @@ export default function GlobalDashboardHeader({
               <button
                 onClick={() => setChainSelectorOpen(!chainSelectorOpen)}
                 className="flex items-center hover:opacity-80 transition-opacity"
+                disabled={!mounted}
               >
                 <span className="text-[#EDEDED] text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
-                  {isConnected
-                    ? `${address?.slice(0, 6)}...${address?.slice(-4)}`
+                  {showWalletInfo && address
+                    ? `${address.slice(0, 6)}...${address.slice(-4)}`
                     : selectedWallet.address}
                 </span>
 
@@ -293,7 +411,7 @@ export default function GlobalDashboardHeader({
             </div>
 
             {/* Chain Selector Dropdown */}
-            {chainSelectorOpen && (
+            {chainSelectorOpen && mounted && (
               <>
                 {/* Backdrop */}
                 <div
@@ -301,9 +419,9 @@ export default function GlobalDashboardHeader({
                   onClick={() => setChainSelectorOpen(false)}
                 />
 
-                {/* Dropdown - Compact with scroll */}
+                {/* Dropdown */}
                 <div className="absolute top-full right-0 mt-2 w-64 bg-black border border-[#2C2C2C] rounded-[12px] shadow-2xl z-40 overflow-hidden">
-                  {/* Header with centered title and back icon */}
+                  {/* Header */}
                   <div className="flex items-center justify-between p-3">
                     <button
                       onClick={() => setChainSelectorOpen(false)}
@@ -322,27 +440,29 @@ export default function GlobalDashboardHeader({
                     </button>
                   </div>
 
-                  {/* Chain List - Scrollable with max height for 5 items */}
+                  {/* Chain List */}
                   <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
                     <div className="p-2 space-y-1">
                       {chainData.map((chainItem) => {
                         const isCurrentChain =
-                          isConnected && chain?.id === chainItem.id;
+                          showWalletInfo && chainId === chainItem.id;
                         const isSwitching = switchingChain === chainItem.id;
 
                         return (
                           <button
                             key={chainItem.id}
                             onClick={() => handleChainSwitch(chainItem.id)}
-                            disabled={isSwitching || !isConnected}
+                            disabled={
+                              isSwitching || !isConnected || isSwitchingChain
+                            }
                             className={`w-full flex items-center justify-between p-2.5 rounded-[8px] transition-all hover:bg-[#1A1A1A] ${
                               !isConnected
                                 ? "opacity-50 cursor-not-allowed"
                                 : ""
-                            }`}
+                            } ${isSwitching ? "opacity-70" : ""}`}
                           >
                             <div className="flex items-center">
-                              {/* Chain Icon - Smaller */}
+                              {/* Chain Icon */}
                               <div
                                 className={`w-7 h-7 ${chainItem.color} rounded-full mr-2.5 flex items-center justify-center`}
                               >
@@ -351,7 +471,7 @@ export default function GlobalDashboardHeader({
                                 </span>
                               </div>
 
-                              {/* Chain Name - Smaller */}
+                              {/* Chain Name */}
                               <span
                                 className={`text-sm font-satoshi ${
                                   isCurrentChain
@@ -360,10 +480,15 @@ export default function GlobalDashboardHeader({
                                 }`}
                               >
                                 {chainItem.name}
+                                {isSwitching && (
+                                  <span className="ml-2 text-xs">
+                                    (Switching...)
+                                  </span>
+                                )}
                               </span>
                             </div>
 
-                            {/* Toggle Switch - Smaller */}
+                            {/* Toggle Switch */}
                             <div
                               className={`w-10 h-5 rounded-full transition-colors relative ${
                                 isCurrentChain ? "bg-[#E2AF19]" : "bg-[#2C2C2C]"
@@ -395,6 +520,33 @@ export default function GlobalDashboardHeader({
                       <p className="text-gray-400 text-xs font-satoshi text-center">
                         Connect your wallet to switch chains
                       </p>
+                    </div>
+                  )}
+
+                  {/* Error Display */}
+                  {switchError && (
+                    <div className="p-3 bg-red-900/20 border-t border-red-500/50">
+                      <div className="flex items-start">
+                        <div className="w-4 h-4 bg-red-500 rounded-full mr-2 mt-0.5 flex-shrink-0">
+                          <span className="text-white text-xs flex items-center justify-center w-full h-full">
+                            !
+                          </span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-red-400 text-xs font-satoshi font-medium mb-1">
+                            Chain Switch Failed
+                          </p>
+                          <p className="text-red-300 text-xs font-satoshi">
+                            {switchError}
+                          </p>
+                          <button
+                            onClick={() => setSwitchError(null)}
+                            className="text-red-400 hover:text-red-300 text-xs font-satoshi underline mt-1"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
