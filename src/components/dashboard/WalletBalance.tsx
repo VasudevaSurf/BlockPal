@@ -275,14 +275,14 @@ export default function WalletBalance() {
           </div>
 
           {/* Token count */}
-          {tokenCount > 0 && (
+          {/* {tokenCount > 0 && (
             <div className="text-right">
               <div className="text-gray-400 text-xs font-satoshi">Tokens</div>
               <div className="text-white text-sm font-satoshi font-medium">
                 {tokenCount}
               </div>
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Native Balance Display (if available) */}

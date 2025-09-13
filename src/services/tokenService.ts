@@ -1,4 +1,4 @@
-// src/services/tokenService.ts - FIXED VERSION with better error handling
+// src/services/tokenService.ts - Enhanced version with better error handling and debugging
 interface TokenBalance {
   id: string;
   symbol: string;
@@ -32,21 +32,32 @@ interface NativeBalanceResponse {
   nativeBalance: {
     balance: number;
     balanceWei: string;
+    price?: number;
+    value?: number;
   };
   lastUpdated: string;
 }
 
+interface PriceDebugInfo {
+  tokensWithPrice: number;
+  tokensWithoutPrice: number;
+  totalValue: number;
+  priceIssues: string[];
+}
+
 class TokenService {
   private baseURL: string;
+  private debugMode: boolean;
 
   constructor() {
     this.baseURL =
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api/tokens";
+    this.debugMode = process.env.NODE_ENV === "development";
     console.log("🔗 TokenService initialized with base URL:", this.baseURL);
   }
 
   /**
-   * FIXED: Get token balances with better error handling and debugging
+   * Enhanced token fetching with price debugging
    */
   async getWalletTokens(
     walletAddress: string,
@@ -66,11 +77,10 @@ class TokenService {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        signal: AbortSignal.timeout(45000), // Increased timeout
+        signal: AbortSignal.timeout(45000),
       });
 
       console.log("📡 Response status:", response.status, response.statusText);
-      console.log("📡 Response headers:", Object.fromEntries(response.headers));
 
       if (!response.ok) {
         let errorData;
@@ -84,7 +94,7 @@ class TokenService {
 
         console.error("❌ API Error Response:", errorData);
 
-        // Don't throw error for client - return empty result
+        // Return empty result for better UX
         console.warn("🔄 API error, returning empty result for UX");
         return {
           wallet: walletAddress,
@@ -114,7 +124,6 @@ class TokenService {
 
       if (!data.success) {
         console.error("❌ API returned error:", data.message);
-        // Don't throw - return empty result for better UX
         return {
           wallet: walletAddress,
           chainId,
@@ -125,7 +134,6 @@ class TokenService {
         };
       }
 
-      // FIXED: Better data validation
       const responseData = data.data || {};
       const tokens = Array.isArray(responseData.tokens)
         ? responseData.tokens
@@ -145,15 +153,29 @@ class TokenService {
         )} for wallet ${walletAddress}`
       );
 
+      // Enhanced price debugging
+      const priceDebug = this.debugPriceData(tokens);
+      if (this.debugMode) {
+        console.log("💰 Price Debug Info:", priceDebug);
+      }
+
+      // Log pricing issues if any
+      if (priceDebug.priceIssues.length > 0) {
+        console.warn("⚠️ Price issues detected:", priceDebug.priceIssues);
+      }
+
       // Log each token for debugging
       tokens.forEach((token, index) => {
         console.log(`🪙 Token ${index + 1}:`, {
           symbol: token.symbol,
           name: token.name,
           balance: token.balance,
+          price: token.price,
           value: token.value,
           isNative: token.isNative,
           contractAddress: token.contractAddress,
+          hasPrice: token.price > 0,
+          hasValue: token.value > 0,
         });
       });
 
@@ -165,13 +187,6 @@ class TokenService {
         tokenCount,
         lastUpdated: responseData.lastUpdated || new Date().toISOString(),
       };
-
-      console.log("✅ Returning processed token data:", {
-        tokenCount: result.tokens.length,
-        totalValue: result.totalValue,
-        hasNativeToken: result.tokens.some((t) => t.isNative),
-        chainId: result.chainId,
-      });
 
       return result;
     } catch (error: any) {
@@ -186,7 +201,7 @@ class TokenService {
         console.error("🔧 Unexpected error:", error.message);
       }
 
-      // FIXED: Always return a valid response instead of throwing
+      // Always return a valid response instead of throwing
       console.warn(
         "🔄 Returning empty result due to error (graceful degradation)"
       );
@@ -202,7 +217,51 @@ class TokenService {
   }
 
   /**
-   * FIXED: Get native balance with better error handling
+   * Debug price data to identify issues
+   */
+  private debugPriceData(tokens: TokenBalance[]): PriceDebugInfo {
+    const tokensWithPrice = tokens.filter((t) => t.price > 0).length;
+    const tokensWithoutPrice = tokens.filter((t) => t.price === 0).length;
+    const totalValue = tokens.reduce((sum, t) => sum + (t.value || 0), 0);
+
+    const priceIssues: string[] = [];
+
+    if (tokensWithoutPrice > 0) {
+      priceIssues.push(`${tokensWithoutPrice} tokens have no price data`);
+    }
+
+    if (totalValue === 0 && tokens.length > 0) {
+      priceIssues.push("All tokens have zero USD value");
+    }
+
+    const nativeTokens = tokens.filter((t) => t.isNative);
+    const nativeTokensWithoutPrice = nativeTokens.filter((t) => t.price === 0);
+
+    if (nativeTokensWithoutPrice.length > 0) {
+      priceIssues.push("Native tokens missing price data");
+    }
+
+    const popularTokens = tokens.filter((t) => t.isPopular);
+    const popularTokensWithoutPrice = popularTokens.filter(
+      (t) => t.price === 0
+    );
+
+    if (popularTokensWithoutPrice.length > 0) {
+      priceIssues.push(
+        `${popularTokensWithoutPrice.length} popular tokens missing price data`
+      );
+    }
+
+    return {
+      tokensWithPrice,
+      tokensWithoutPrice,
+      totalValue,
+      priceIssues,
+    };
+  }
+
+  /**
+   * Enhanced native balance with price info
    */
   async getNativeBalance(
     walletAddress: string,
@@ -242,6 +301,18 @@ class TokenService {
         `✅ Fetched native balance: ${data.data.nativeBalance.balance} for wallet ${walletAddress}`
       );
 
+      // Enhanced logging for native balance
+      if (data.data.nativeBalance.price) {
+        console.log(`💰 Native token price: $${data.data.nativeBalance.price}`);
+        console.log(
+          `💰 Native token value: $${
+            data.data.nativeBalance.value?.toFixed(2) || "0.00"
+          }`
+        );
+      } else {
+        console.warn("⚠️ Native balance missing price data");
+      }
+
       return data.data;
     } catch (error: any) {
       console.error("❌ Error fetching native balance:", error);
@@ -252,9 +323,99 @@ class TokenService {
         nativeBalance: {
           balance: 0,
           balanceWei: "0",
+          price: 0,
+          value: 0,
         },
         lastUpdated: new Date().toISOString(),
       };
+    }
+  }
+
+  /**
+   * Test pricing system (debug endpoint)
+   */
+  async testPricingSystem(walletAddress?: string, chainId?: number) {
+    if (!this.debugMode) {
+      console.warn("⚠️ Pricing test only available in development mode");
+      return null;
+    }
+
+    try {
+      const url = `${this.baseURL.replace(
+        "/tokens",
+        "/debug"
+      )}/test-pricing?wallet=${walletAddress || ""}&chain=${chainId || ""}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(30000),
+      });
+
+      const data = await response.json();
+
+      console.log("🧪 Pricing system test results:", data);
+
+      return data;
+    } catch (error) {
+      console.error("❌ Pricing system test failed:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Check current prices (debug endpoint)
+   */
+  async checkCurrentPrices() {
+    if (!this.debugMode) return null;
+
+    try {
+      const url = `${this.baseURL.replace("/tokens", "/debug")}/check-prices`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      console.log("💰 Current price check:", data);
+
+      return data;
+    } catch (error) {
+      console.error("❌ Price check failed:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Manually refresh prices (debug endpoint)
+   */
+  async refreshPrices() {
+    if (!this.debugMode) return null;
+
+    try {
+      const url = `${this.baseURL.replace("/tokens", "/debug")}/refresh-prices`;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      console.log("🔄 Price refresh result:", data);
+
+      return data;
+    } catch (error) {
+      console.error("❌ Price refresh failed:", error);
+      return null;
     }
   }
 
@@ -287,9 +448,13 @@ class TokenService {
       }
 
       console.log(`✅ Refreshed token data for wallet ${walletAddress}`);
+
+      // Also refresh prices if in debug mode
+      if (this.debugMode) {
+        await this.refreshPrices();
+      }
     } catch (error: any) {
       console.error("❌ Error refreshing token data:", error);
-      // Don't throw - just log the error
       console.warn("⚠️ Token refresh failed, but continuing...");
     }
   }
@@ -371,11 +536,18 @@ class TokenService {
   }
 
   /**
-   * Format percentage change
+   * Format percentage change with enhanced display
    */
-  formatPercentage(value: number): string {
+  formatPercentage(value: number, showUsdChange?: number): string {
     const sign = value >= 0 ? "+" : "";
-    return `${sign}${value.toFixed(2)}%`;
+    const percentage = `${sign}${value.toFixed(2)}%`;
+
+    if (showUsdChange && showUsdChange !== 0) {
+      const usdSign = showUsdChange >= 0 ? "+" : "";
+      return `${percentage} (${usdSign}${Math.abs(showUsdChange).toFixed(2)})`;
+    }
+
+    return percentage;
   }
 
   /**
@@ -395,4 +567,9 @@ class TokenService {
 
 // Export singleton instance
 export const tokenService = new TokenService();
-export type { TokenBalance, WalletTokensResponse, NativeBalanceResponse };
+export type {
+  TokenBalance,
+  WalletTokensResponse,
+  NativeBalanceResponse,
+  PriceDebugInfo,
+};
