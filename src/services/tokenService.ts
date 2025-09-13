@@ -1,4 +1,4 @@
-// src/services/tokenService.ts - Enhanced version with better error handling and debugging
+// src/services/tokenService.ts - Enhanced version with percentage changes
 interface TokenBalance {
   id: string;
   symbol: string;
@@ -8,7 +8,8 @@ interface TokenBalance {
   balance: number;
   balanceWei: string;
   value: number;
-  change24h: number;
+  change24h: number; // NOW PROPERLY HANDLED FROM MORALIS
+  usdChange24h?: number; // Optional USD change
   price: number;
   isNative: boolean;
   logoUrl?: string;
@@ -41,6 +42,7 @@ interface NativeBalanceResponse {
 interface PriceDebugInfo {
   tokensWithPrice: number;
   tokensWithoutPrice: number;
+  tokensWithChange: number; // NEW: Track tokens with percentage changes
   totalValue: number;
   priceIssues: string[];
 }
@@ -57,7 +59,7 @@ class TokenService {
   }
 
   /**
-   * Enhanced token fetching with price debugging
+   * Enhanced token fetching with price debugging and percentage changes
    */
   async getWalletTokens(
     walletAddress: string,
@@ -153,7 +155,7 @@ class TokenService {
         )} for wallet ${walletAddress}`
       );
 
-      // Enhanced price debugging
+      // Enhanced price debugging with percentage changes
       const priceDebug = this.debugPriceData(tokens);
       if (this.debugMode) {
         console.log("💰 Price Debug Info:", priceDebug);
@@ -164,7 +166,7 @@ class TokenService {
         console.warn("⚠️ Price issues detected:", priceDebug.priceIssues);
       }
 
-      // Log each token for debugging
+      // Log each token for debugging WITH percentage changes
       tokens.forEach((token, index) => {
         console.log(`🪙 Token ${index + 1}:`, {
           symbol: token.symbol,
@@ -172,10 +174,14 @@ class TokenService {
           balance: token.balance,
           price: token.price,
           value: token.value,
+          change24h: token.change24h, // NEW: Log percentage changes
+          usdChange24h: token.usdChange24h, // NEW: Log USD changes if available
           isNative: token.isNative,
           contractAddress: token.contractAddress,
           hasPrice: token.price > 0,
           hasValue: token.value > 0,
+          hasPercentageChange:
+            typeof token.change24h === "number" && !isNaN(token.change24h), // NEW
         });
       });
 
@@ -217,11 +223,14 @@ class TokenService {
   }
 
   /**
-   * Debug price data to identify issues
+   * Debug price data to identify issues WITH percentage change tracking
    */
   private debugPriceData(tokens: TokenBalance[]): PriceDebugInfo {
     const tokensWithPrice = tokens.filter((t) => t.price > 0).length;
     const tokensWithoutPrice = tokens.filter((t) => t.price === 0).length;
+    const tokensWithChange = tokens.filter(
+      (t) => typeof t.change24h === "number" && !isNaN(t.change24h)
+    ).length; // NEW: Track tokens with percentage changes
     const totalValue = tokens.reduce((sum, t) => sum + (t.value || 0), 0);
 
     const priceIssues: string[] = [];
@@ -234,16 +243,32 @@ class TokenService {
       priceIssues.push("All tokens have zero USD value");
     }
 
+    // NEW: Check for missing percentage change data
+    const tokensWithoutChange = tokens.length - tokensWithChange;
+    if (tokensWithoutChange > 0) {
+      priceIssues.push(`${tokensWithoutChange} tokens missing 24h change data`);
+    }
+
     const nativeTokens = tokens.filter((t) => t.isNative);
     const nativeTokensWithoutPrice = nativeTokens.filter((t) => t.price === 0);
+    const nativeTokensWithoutChange = nativeTokens.filter(
+      (t) => typeof t.change24h !== "number" || isNaN(t.change24h)
+    );
 
     if (nativeTokensWithoutPrice.length > 0) {
       priceIssues.push("Native tokens missing price data");
     }
 
+    if (nativeTokensWithoutChange.length > 0) {
+      priceIssues.push("Native tokens missing 24h change data");
+    }
+
     const popularTokens = tokens.filter((t) => t.isPopular);
     const popularTokensWithoutPrice = popularTokens.filter(
       (t) => t.price === 0
+    );
+    const popularTokensWithoutChange = popularTokens.filter(
+      (t) => typeof t.change24h !== "number" || isNaN(t.change24h)
     );
 
     if (popularTokensWithoutPrice.length > 0) {
@@ -252,9 +277,16 @@ class TokenService {
       );
     }
 
+    if (popularTokensWithoutChange.length > 0) {
+      priceIssues.push(
+        `${popularTokensWithoutChange.length} popular tokens missing 24h change data`
+      );
+    }
+
     return {
       tokensWithPrice,
       tokensWithoutPrice,
+      tokensWithChange, // NEW
       totalValue,
       priceIssues,
     };
@@ -536,18 +568,16 @@ class TokenService {
   }
 
   /**
-   * Format percentage change with enhanced display
+   * Enhanced percentage formatting with better handling
    */
-  formatPercentage(value: number, showUsdChange?: number): string {
-    const sign = value >= 0 ? "+" : "";
-    const percentage = `${sign}${value.toFixed(2)}%`;
-
-    if (showUsdChange && showUsdChange !== 0) {
-      const usdSign = showUsdChange >= 0 ? "+" : "";
-      return `${percentage} (${usdSign}${Math.abs(showUsdChange).toFixed(2)})`;
+  formatPercentage(value: number): string {
+    // Handle invalid or missing values
+    if (typeof value !== "number" || isNaN(value)) {
+      return "+0.00%";
     }
 
-    return percentage;
+    const sign = value >= 0 ? "+" : "";
+    return `${sign}${value.toFixed(2)}%`;
   }
 
   /**

@@ -1,14 +1,70 @@
-// src/components/dashboard/WalletBalance.tsx - UPDATED FOR WAGMI V2
+// src/components/dashboard/WalletBalance.tsx - ENHANCED VERSION with portfolio percentage change
 "use client";
 
 import { useSelector } from "react-redux";
 import { useEffect, useState } from "react";
-import { Copy, RefreshCw, AlertCircle } from "lucide-react";
+import {
+  Copy,
+  RefreshCw,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
 import { useAccount, useChainId, useBalance } from "wagmi"; // UPDATED: useChainId instead of useNetwork
 import { RootState } from "@/store";
 import { SkeletonWalletBalance } from "@/components/ui/Skeleton";
 import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
+
+// Portfolio Change Component
+const PortfolioChange = ({
+  change24h,
+  totalChange24h,
+}: {
+  change24h: number;
+  totalChange24h?: number;
+}) => {
+  // Handle invalid or missing values
+  const isValidChange = typeof change24h === "number" && !isNaN(change24h);
+  const displayChange = isValidChange ? change24h : 0;
+
+  const isPositive = displayChange > 0;
+  const isNegative = displayChange < 0;
+
+  // Color classes
+  let colorClass = "text-gray-400";
+  let bgClass = "bg-gray-500/10";
+  let iconColor = "text-gray-400";
+
+  if (isPositive) {
+    colorClass = "text-green-400";
+    bgClass = "bg-green-500/10";
+    iconColor = "text-green-400";
+  }
+  if (isNegative) {
+    colorClass = "text-red-400";
+    bgClass = "bg-red-500/10";
+    iconColor = "text-red-400";
+  }
+
+  const formattedPercentage = tokenService.formatPercentage(displayChange);
+
+  return (
+    <div className={`flex items-center gap-2 px-2 py-1 rounded-lg ${bgClass}`}>
+      {isPositive && <TrendingUp size={14} className={iconColor} />}
+      {isNegative && <TrendingDown size={14} className={iconColor} />}
+      <span className={`text-sm font-satoshi ${colorClass}`}>
+        {!isValidChange ? "+0.00%" : formattedPercentage}
+      </span>
+      <span className="text-gray-400 text-sm font-satoshi">24h</span>
+      {totalChange24h && Math.abs(totalChange24h) > 0.01 && (
+        <span className={`text-xs font-satoshi ${colorClass} ml-1`}>
+          (${totalChange24h >= 0 ? "+" : ""}${totalChange24h.toFixed(2)})
+        </span>
+      )}
+    </div>
+  );
+};
 
 export default function WalletBalance() {
   const { user, isAuthenticated } = useSelector(
@@ -32,6 +88,7 @@ export default function WalletBalance() {
   const [totalValue, setTotalValue] = useState(0);
   const [tokenCount, setTokenCount] = useState(0);
   const [change24h, setChange24h] = useState(0);
+  const [totalChange24h, setTotalChange24h] = useState(0); // USD change amount
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -51,6 +108,7 @@ export default function WalletBalance() {
       setTotalValue(0);
       setTokenCount(0);
       setChange24h(0);
+      setTotalChange24h(0);
       setError("");
       setLoading(false);
     }
@@ -74,17 +132,56 @@ export default function WalletBalance() {
       setTotalValue(response.totalValue);
       setTokenCount(response.tokenCount);
 
-      // Calculate overall portfolio change (simplified)
-      const overallChange = response.tokens.reduce((acc, token) => {
-        return acc + token.change24h * (token.value / response.totalValue);
-      }, 0);
-      setChange24h(overallChange);
+      // ENHANCED: Calculate weighted portfolio change
+      let portfolioChange = 0;
+      let totalUsdChange = 0;
+
+      if (response.totalValue > 0) {
+        response.tokens.forEach((token) => {
+          // Skip invalid change values
+          if (typeof token.change24h === "number" && !isNaN(token.change24h)) {
+            // Weight by token value proportion
+            const weight = token.value / response.totalValue;
+            portfolioChange += token.change24h * weight;
+
+            // Calculate USD change if available
+            if (token.usdChange24h) {
+              totalUsdChange += token.usdChange24h;
+            } else {
+              // Calculate from percentage if USD change not available
+              const previousValue = token.value / (1 + token.change24h / 100);
+              const usdChange = token.value - previousValue;
+              totalUsdChange += usdChange;
+            }
+          }
+        });
+      }
+
+      setChange24h(portfolioChange);
+      setTotalChange24h(totalUsdChange);
 
       console.log(
         `✅ Wallet data loaded: $${response.totalValue.toFixed(2)}, ${
           response.tokenCount
-        } tokens`
+        } tokens, ${portfolioChange.toFixed(2)}% change`
       );
+
+      // Log percentage change calculation details
+      const tokensWithChange = response.tokens.filter(
+        (t) => typeof t.change24h === "number" && !isNaN(t.change24h)
+      );
+      console.log(`📈 Portfolio change calculation:`, {
+        totalTokens: response.tokens.length,
+        tokensWithChange: tokensWithChange.length,
+        portfolioChange: portfolioChange.toFixed(4),
+        totalUsdChange: totalUsdChange.toFixed(2),
+        weights: response.tokens.map((t) => ({
+          symbol: t.symbol,
+          value: t.value,
+          change: t.change24h,
+          weight: response.totalValue > 0 ? t.value / response.totalValue : 0,
+        })),
+      });
     } catch (err: any) {
       console.error("❌ Error fetching wallet data:", err);
       setError(err.message || "Failed to load wallet data");
@@ -100,11 +197,6 @@ export default function WalletBalance() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(balance);
-  };
-
-  const formatPercentage = (value: number) => {
-    const sign = value >= 0 ? "+" : "";
-    return `${sign}${value.toFixed(2)}%`;
   };
 
   const copyToClipboard = async (text: string) => {
@@ -258,31 +350,26 @@ export default function WalletBalance() {
             <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
               {formatBalance(totalValue)}
             </div>
-            <div className="flex items-center gap-2">
-              {change24h !== 0 && (
-                <>
-                  <div
-                    className={`text-sm font-satoshi ${
-                      change24h >= 0 ? "text-green-400" : "text-red-400"
-                    }`}
-                  >
-                    {formatPercentage(change24h)}
-                  </div>
-                  <div className="text-gray-400 text-sm font-satoshi">24h</div>
-                </>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* ENHANCED: Portfolio percentage change */}
+              {(change24h !== 0 || totalChange24h !== 0) && (
+                <PortfolioChange
+                  change24h={change24h}
+                  totalChange24h={totalChange24h}
+                />
               )}
             </div>
           </div>
 
           {/* Token count */}
-          {/* {tokenCount > 0 && (
+          {tokenCount > 0 && (
             <div className="text-right">
-              <div className="text-gray-400 text-xs font-satoshi">Tokens</div>
+              <div className="text-gray-400 text-xs font-satoshi">Assets</div>
               <div className="text-white text-sm font-satoshi font-medium">
                 {tokenCount}
               </div>
             </div>
-          )} */}
+          )}
         </div>
 
         {/* Native Balance Display (if available) */}

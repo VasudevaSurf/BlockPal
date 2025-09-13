@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - UPDATED FOR WAGMI V2
+// src/components/dashboard/TokenList.tsx - ENHANCED VERSION with proper percentage display
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,7 +7,14 @@ import { useSelector } from "react-redux";
 import { useAccount, useChainId } from "wagmi"; // UPDATED: useChainId instead of useNetwork
 import { RootState } from "@/store";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
-import { RefreshCw, Plus, X, AlertCircle } from "lucide-react";
+import {
+  RefreshCw,
+  Plus,
+  X,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
 import { SkeletonTokenList } from "@/components/ui/Skeleton";
 import AddTokenModal from "@/components/dashboard/AddTokenModal";
 import { tokenService, TokenBalance } from "@/services/tokenService";
@@ -48,6 +55,63 @@ const TokenImage = ({
       onError={() => setHasError(true)}
       loading="lazy"
     />
+  );
+};
+
+// Enhanced Percentage Display Component
+const PercentageDisplay = ({
+  change24h,
+  usdChange24h,
+  className = "",
+  showIcon = false,
+  size = "sm",
+}: {
+  change24h: number;
+  usdChange24h?: number;
+  className?: string;
+  showIcon?: boolean;
+  size?: "xs" | "sm" | "md";
+}) => {
+  // Handle invalid or missing values by showing neutral
+  const isValidChange = typeof change24h === "number" && !isNaN(change24h);
+  const displayChange = isValidChange ? change24h : 0;
+
+  const isPositive = displayChange > 0;
+  const isNegative = displayChange < 0;
+  const isNeutral = displayChange === 0;
+
+  // Size classes
+  const sizeClasses = {
+    xs: "text-xs",
+    sm: "text-xs",
+    md: "text-sm",
+  };
+
+  // Color classes
+  let colorClass = "text-gray-400";
+  if (isPositive) colorClass = "text-green-400";
+  if (isNegative) colorClass = "text-red-400";
+
+  const formattedPercentage = tokenService.formatPercentage(displayChange);
+
+  return (
+    <div
+      className={`${sizeClasses[size]} font-satoshi ${colorClass} ${className} flex items-center`}
+    >
+      {showIcon && (
+        <>
+          {isPositive && <TrendingUp size={12} className="mr-1" />}
+          {isNegative && <TrendingDown size={12} className="mr-1" />}
+        </>
+      )}
+      <span>{!isValidChange ? "+0.00%" : formattedPercentage}</span>
+      {/* Optional: Show USD change if available */}
+      {usdChange24h && Math.abs(usdChange24h) > 0.01 && (
+        <span className="ml-1 opacity-75">
+          (${usdChange24h >= 0 ? "+" : ""}${usdChange24h.toFixed(2)})
+        </span>
+      )}
+    </div>
   );
 };
 
@@ -105,8 +169,31 @@ export default function TokenList() {
       console.log(
         `✅ Loaded ${
           response.tokens.length
-        } tokens, total value: $${response.totalValue.toFixed(2)}`
+        } tokens with total value: $${response.totalValue.toFixed(2)}`
       );
+
+      // Log percentage change data for debugging
+      const tokensWithChange = response.tokens.filter(
+        (t) => typeof t.change24h === "number" && !isNaN(t.change24h)
+      );
+      console.log(
+        `📈 ${tokensWithChange.length}/${response.tokens.length} tokens have percentage change data`
+      );
+
+      // Log sample of tokens with their change data
+      response.tokens.slice(0, 3).forEach((token) => {
+        console.log(
+          `📊 ${token.symbol}: ${tokenService.formatPercentage(
+            token.change24h
+          )}`,
+          {
+            rawChange: token.change24h,
+            isValid:
+              typeof token.change24h === "number" && !isNaN(token.change24h),
+            usdChange: token.usdChange24h,
+          }
+        );
+      });
     } catch (err: any) {
       console.error("❌ Error fetching tokens:", err);
       setError(err.message || "Failed to load tokens");
@@ -186,11 +273,6 @@ export default function TokenList() {
   // Format currency
   const formatCurrency = (value: number) => {
     return tokenService.formatCurrency(value);
-  };
-
-  // Format percentage
-  const formatPercentage = (value: number) => {
-    return tokenService.formatPercentage(value);
   };
 
   // Show loading state
@@ -359,15 +441,12 @@ export default function TokenList() {
                         <div className="text-white font-medium font-satoshi text-sm">
                           {formatCurrency(token.value)}
                         </div>
-                        <div
-                          className={`text-xs font-satoshi ${
-                            token.change24h >= 0
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }`}
-                        >
-                          {formatPercentage(token.change24h)}
-                        </div>
+                        {/* ENHANCED: Updated percentage display */}
+                        <PercentageDisplay
+                          change24h={token.change24h}
+                          usdChange24h={token.usdChange24h}
+                          size="xs"
+                        />
                       </div>
                     </div>
                   </div>
@@ -428,6 +507,7 @@ export default function TokenList() {
                       <div className="text-white font-medium font-satoshi text-sm">
                         {formatCurrency(token.value)}
                       </div>
+                      {/* FIXED: Proper percentage display */}
                       <div
                         className={`text-xs font-satoshi ${
                           token.change24h >= 0
@@ -435,7 +515,7 @@ export default function TokenList() {
                             : "text-red-400"
                         }`}
                       >
-                        {formatPercentage(token.change24h)}
+                        {tokenService.formatPercentage(token.change24h)}
                       </div>
                     </div>
                   </div>
