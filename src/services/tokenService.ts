@@ -1,4 +1,4 @@
-// src/services/tokenService.ts - Enhanced version with percentage changes
+// src/services/tokenService.ts - Enhanced version following wallet-balance.js approach
 interface TokenBalance {
   id: string;
   symbol: string;
@@ -8,8 +8,8 @@ interface TokenBalance {
   balance: number;
   balanceWei: string;
   value: number;
-  change24h: number; // NOW PROPERLY HANDLED FROM MORALIS
-  usdChange24h?: number; // Optional USD change
+  change24h: number; // Percentage change
+  usdChange24h?: number; // USD change amount
   price: number;
   isNative: boolean;
   logoUrl?: string;
@@ -21,9 +21,15 @@ interface TokenBalance {
 interface WalletTokensResponse {
   wallet: string;
   chainId: number;
+  chainName: string;
   tokens: TokenBalance[];
   totalValue: number;
+  total24hrChange: number; // NEW: 24hr portfolio change in USD
   tokenCount: number;
+  presetTokenCount: number; // NEW: Count of preset tokens
+  hiddenTokenCount: number; // NEW: Count of hidden tokens
+  showingHidden: boolean; // NEW: Whether hidden tokens are shown
+  hasHiddenTokens: boolean; // NEW: Whether there are hidden tokens
   lastUpdated: string;
 }
 
@@ -33,18 +39,9 @@ interface NativeBalanceResponse {
   nativeBalance: {
     balance: number;
     balanceWei: string;
-    price?: number;
-    value?: number;
+    symbol?: string;
   };
   lastUpdated: string;
-}
-
-interface PriceDebugInfo {
-  tokensWithPrice: number;
-  tokensWithoutPrice: number;
-  tokensWithChange: number; // NEW: Track tokens with percentage changes
-  totalValue: number;
-  priceIssues: string[];
 }
 
 class TokenService {
@@ -59,18 +56,19 @@ class TokenService {
   }
 
   /**
-   * Enhanced token fetching with price debugging and percentage changes
+   * Enhanced token fetching with show/hide functionality - Following wallet-balance.js approach
    */
   async getWalletTokens(
     walletAddress: string,
-    chainId: number
+    chainId: number,
+    showHidden: boolean = false
   ): Promise<WalletTokensResponse> {
     try {
       console.log(
-        `🪙 Fetching tokens for wallet: ${walletAddress} on chain: ${chainId}`
+        `🪙 Fetching tokens for wallet: ${walletAddress} on chain: ${chainId}, showHidden: ${showHidden}`
       );
 
-      const url = `${this.baseURL}/wallet/${walletAddress}?chain=${chainId}`;
+      const url = `${this.baseURL}/wallet/${walletAddress}?chain=${chainId}&showHidden=${showHidden}`;
       console.log("📡 Making request to:", url);
 
       const response = await fetch(url, {
@@ -96,14 +94,20 @@ class TokenService {
 
         console.error("❌ API Error Response:", errorData);
 
-        // Return empty result for better UX
+        // Return empty result for better UX - Following wallet-balance.js approach
         console.warn("🔄 API error, returning empty result for UX");
         return {
           wallet: walletAddress,
           chainId,
+          chainName: "Unknown",
           tokens: [],
           totalValue: 0,
+          total24hrChange: 0,
           tokenCount: 0,
+          presetTokenCount: 0,
+          hiddenTokenCount: 0,
+          showingHidden: showHidden,
+          hasHiddenTokens: false,
           lastUpdated: new Date().toISOString(),
         };
       }
@@ -111,7 +115,10 @@ class TokenService {
       let data;
       try {
         const responseText = await response.text();
-        console.log("📦 Raw response text:", responseText);
+        console.log(
+          "📦 Raw response text:",
+          responseText.substring(0, 500) + "..."
+        );
 
         if (!responseText.trim()) {
           throw new Error("Empty response from server");
@@ -129,9 +136,15 @@ class TokenService {
         return {
           wallet: walletAddress,
           chainId,
+          chainName: "Unknown",
           tokens: [],
           totalValue: 0,
+          total24hrChange: 0,
           tokenCount: 0,
+          presetTokenCount: 0,
+          hiddenTokenCount: 0,
+          showingHidden: showHidden,
+          hasHiddenTokens: false,
           lastUpdated: new Date().toISOString(),
         };
       }
@@ -140,59 +153,72 @@ class TokenService {
       const tokens = Array.isArray(responseData.tokens)
         ? responseData.tokens
         : [];
-      const totalValue =
-        typeof responseData.totalValue === "number"
-          ? responseData.totalValue
-          : 0;
-      const tokenCount =
-        typeof responseData.tokenCount === "number"
-          ? responseData.tokenCount
-          : tokens.length;
+
+      // Extract enhanced metadata - Following wallet-balance.js structure
+      const result = {
+        wallet: walletAddress,
+        chainId,
+        chainName: responseData.chainName || "Unknown",
+        tokens,
+        totalValue:
+          typeof responseData.totalValue === "number"
+            ? responseData.totalValue
+            : 0,
+        total24hrChange:
+          typeof responseData.total24hrChange === "number"
+            ? responseData.total24hrChange
+            : 0,
+        tokenCount:
+          typeof responseData.tokenCount === "number"
+            ? responseData.tokenCount
+            : tokens.length,
+        presetTokenCount:
+          typeof responseData.presetTokenCount === "number"
+            ? responseData.presetTokenCount
+            : 0,
+        hiddenTokenCount:
+          typeof responseData.hiddenTokenCount === "number"
+            ? responseData.hiddenTokenCount
+            : 0,
+        showingHidden: responseData.showingHidden === true,
+        hasHiddenTokens: responseData.hasHiddenTokens === true,
+        lastUpdated: responseData.lastUpdated || new Date().toISOString(),
+      };
 
       console.log(
-        `✅ Fetched ${tokenCount} tokens with total value $${totalValue.toFixed(
+        `✅ Fetched ${result.tokenCount} tokens (${
+          result.presetTokenCount
+        } preset, ${
+          result.hiddenTokenCount
+        } hidden) with total value $${result.totalValue.toFixed(
           2
         )} for wallet ${walletAddress}`
       );
 
-      // Enhanced price debugging with percentage changes
-      const priceDebug = this.debugPriceData(tokens);
-      if (this.debugMode) {
-        console.log("💰 Price Debug Info:", priceDebug);
-      }
+      console.log(
+        `📈 24hr Portfolio Change: ${
+          result.total24hrChange >= 0 ? "+" : ""
+        }$${result.total24hrChange.toFixed(3)}`
+      );
+      console.log(`👁️ Show mode: ${showHidden ? "All tokens" : "Preset only"}`);
 
-      // Log pricing issues if any
-      if (priceDebug.priceIssues.length > 0) {
-        console.warn("⚠️ Price issues detected:", priceDebug.priceIssues);
-      }
-
-      // Log each token for debugging WITH percentage changes
-      tokens.forEach((token, index) => {
-        console.log(`🪙 Token ${index + 1}:`, {
-          symbol: token.symbol,
-          name: token.name,
-          balance: token.balance,
-          price: token.price,
-          value: token.value,
-          change24h: token.change24h, // NEW: Log percentage changes
-          usdChange24h: token.usdChange24h, // NEW: Log USD changes if available
-          isNative: token.isNative,
-          contractAddress: token.contractAddress,
-          hasPrice: token.price > 0,
-          hasValue: token.value > 0,
-          hasPercentageChange:
-            typeof token.change24h === "number" && !isNaN(token.change24h), // NEW
+      // Log token details for debugging
+      if (this.debugMode && tokens.length > 0) {
+        console.log("🔍 Token breakdown:");
+        tokens.slice(0, 3).forEach((token, index) => {
+          console.log(
+            `  ${index + 1}. ${token.symbol}: ${this.formatTokenAmount(
+              token.balance,
+              4
+            )} (${this.formatCurrency(token.value)}) ${this.formatPercentage(
+              token.change24h
+            )}`
+          );
         });
-      });
-
-      const result = {
-        wallet: walletAddress,
-        chainId,
-        tokens,
-        totalValue,
-        tokenCount,
-        lastUpdated: responseData.lastUpdated || new Date().toISOString(),
-      };
+        if (tokens.length > 3) {
+          console.log(`  ... and ${tokens.length - 3} more tokens`);
+        }
+      }
 
       return result;
     } catch (error: any) {
@@ -207,93 +233,29 @@ class TokenService {
         console.error("🔧 Unexpected error:", error.message);
       }
 
-      // Always return a valid response instead of throwing
+      // Always return a valid response instead of throwing - Following wallet-balance.js approach
       console.warn(
         "🔄 Returning empty result due to error (graceful degradation)"
       );
       return {
         wallet: walletAddress,
         chainId,
+        chainName: "Unknown",
         tokens: [],
         totalValue: 0,
+        total24hrChange: 0,
         tokenCount: 0,
+        presetTokenCount: 0,
+        hiddenTokenCount: 0,
+        showingHidden: showHidden,
+        hasHiddenTokens: false,
         lastUpdated: new Date().toISOString(),
       };
     }
   }
 
   /**
-   * Debug price data to identify issues WITH percentage change tracking
-   */
-  private debugPriceData(tokens: TokenBalance[]): PriceDebugInfo {
-    const tokensWithPrice = tokens.filter((t) => t.price > 0).length;
-    const tokensWithoutPrice = tokens.filter((t) => t.price === 0).length;
-    const tokensWithChange = tokens.filter(
-      (t) => typeof t.change24h === "number" && !isNaN(t.change24h)
-    ).length; // NEW: Track tokens with percentage changes
-    const totalValue = tokens.reduce((sum, t) => sum + (t.value || 0), 0);
-
-    const priceIssues: string[] = [];
-
-    if (tokensWithoutPrice > 0) {
-      priceIssues.push(`${tokensWithoutPrice} tokens have no price data`);
-    }
-
-    if (totalValue === 0 && tokens.length > 0) {
-      priceIssues.push("All tokens have zero USD value");
-    }
-
-    // NEW: Check for missing percentage change data
-    const tokensWithoutChange = tokens.length - tokensWithChange;
-    if (tokensWithoutChange > 0) {
-      priceIssues.push(`${tokensWithoutChange} tokens missing 24h change data`);
-    }
-
-    const nativeTokens = tokens.filter((t) => t.isNative);
-    const nativeTokensWithoutPrice = nativeTokens.filter((t) => t.price === 0);
-    const nativeTokensWithoutChange = nativeTokens.filter(
-      (t) => typeof t.change24h !== "number" || isNaN(t.change24h)
-    );
-
-    if (nativeTokensWithoutPrice.length > 0) {
-      priceIssues.push("Native tokens missing price data");
-    }
-
-    if (nativeTokensWithoutChange.length > 0) {
-      priceIssues.push("Native tokens missing 24h change data");
-    }
-
-    const popularTokens = tokens.filter((t) => t.isPopular);
-    const popularTokensWithoutPrice = popularTokens.filter(
-      (t) => t.price === 0
-    );
-    const popularTokensWithoutChange = popularTokens.filter(
-      (t) => typeof t.change24h !== "number" || isNaN(t.change24h)
-    );
-
-    if (popularTokensWithoutPrice.length > 0) {
-      priceIssues.push(
-        `${popularTokensWithoutPrice.length} popular tokens missing price data`
-      );
-    }
-
-    if (popularTokensWithoutChange.length > 0) {
-      priceIssues.push(
-        `${popularTokensWithoutChange.length} popular tokens missing 24h change data`
-      );
-    }
-
-    return {
-      tokensWithPrice,
-      tokensWithoutPrice,
-      tokensWithChange, // NEW
-      totalValue,
-      priceIssues,
-    };
-  }
-
-  /**
-   * Enhanced native balance with price info
+   * Get native balance (unchanged)
    */
   async getNativeBalance(
     walletAddress: string,
@@ -333,18 +295,6 @@ class TokenService {
         `✅ Fetched native balance: ${data.data.nativeBalance.balance} for wallet ${walletAddress}`
       );
 
-      // Enhanced logging for native balance
-      if (data.data.nativeBalance.price) {
-        console.log(`💰 Native token price: $${data.data.nativeBalance.price}`);
-        console.log(
-          `💰 Native token value: $${
-            data.data.nativeBalance.value?.toFixed(2) || "0.00"
-          }`
-        );
-      } else {
-        console.warn("⚠️ Native balance missing price data");
-      }
-
       return data.data;
     } catch (error: any) {
       console.error("❌ Error fetching native balance:", error);
@@ -355,99 +305,10 @@ class TokenService {
         nativeBalance: {
           balance: 0,
           balanceWei: "0",
-          price: 0,
-          value: 0,
+          symbol: "ETH",
         },
         lastUpdated: new Date().toISOString(),
       };
-    }
-  }
-
-  /**
-   * Test pricing system (debug endpoint)
-   */
-  async testPricingSystem(walletAddress?: string, chainId?: number) {
-    if (!this.debugMode) {
-      console.warn("⚠️ Pricing test only available in development mode");
-      return null;
-    }
-
-    try {
-      const url = `${this.baseURL.replace(
-        "/tokens",
-        "/debug"
-      )}/test-pricing?wallet=${walletAddress || ""}&chain=${chainId || ""}`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(30000),
-      });
-
-      const data = await response.json();
-
-      console.log("🧪 Pricing system test results:", data);
-
-      return data;
-    } catch (error) {
-      console.error("❌ Pricing system test failed:", error);
-      return null;
-    }
-  }
-
-  /**
-   * Check current prices (debug endpoint)
-   */
-  async checkCurrentPrices() {
-    if (!this.debugMode) return null;
-
-    try {
-      const url = `${this.baseURL.replace("/tokens", "/debug")}/check-prices`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await response.json();
-
-      console.log("💰 Current price check:", data);
-
-      return data;
-    } catch (error) {
-      console.error("❌ Price check failed:", error);
-      return null;
-    }
-  }
-
-  /**
-   * Manually refresh prices (debug endpoint)
-   */
-  async refreshPrices() {
-    if (!this.debugMode) return null;
-
-    try {
-      const url = `${this.baseURL.replace("/tokens", "/debug")}/refresh-prices`;
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await response.json();
-
-      console.log("🔄 Price refresh result:", data);
-
-      return data;
-    } catch (error) {
-      console.error("❌ Price refresh failed:", error);
-      return null;
     }
   }
 
@@ -480,11 +341,6 @@ class TokenService {
       }
 
       console.log(`✅ Refreshed token data for wallet ${walletAddress}`);
-
-      // Also refresh prices if in debug mode
-      if (this.debugMode) {
-        await this.refreshPrices();
-      }
     } catch (error: any) {
       console.error("❌ Error refreshing token data:", error);
       console.warn("⚠️ Token refresh failed, but continuing...");
@@ -531,27 +387,22 @@ class TokenService {
   }
 
   /**
-   * Format currency value
+   * Format currency value - Following wallet-balance.js format
    */
   formatCurrency(value: number): string {
-    if (value === 0) return "$0.00";
-    if (value < 0.01) return "< $0.01";
+    if (value === 0) return "$0.000";
+    if (value < 0.001) return "< $0.001";
     if (value >= 1000000) {
       return `$${(value / 1000000).toFixed(2)}M`;
     }
     if (value >= 1000) {
       return `$${(value / 1000).toFixed(2)}K`;
     }
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 6,
-    }).format(value);
+    return `$${value.toFixed(3)}`; // Show 3 decimals like wallet-balance.js
   }
 
   /**
-   * Format token amount
+   * Format token amount - Following wallet-balance.js format
    */
   formatTokenAmount(amount: number, decimals: number = 6): string {
     if (amount === 0) return "0";
@@ -568,7 +419,7 @@ class TokenService {
   }
 
   /**
-   * Enhanced percentage formatting with better handling
+   * Format percentage - Following wallet-balance.js format
    */
   formatPercentage(value: number): string {
     // Handle invalid or missing values
@@ -578,6 +429,18 @@ class TokenService {
 
     const sign = value >= 0 ? "+" : "";
     return `${sign}${value.toFixed(2)}%`;
+  }
+
+  /**
+   * Format 24hr change - Following wallet-balance.js format
+   */
+  format24hrChange(value: number): string {
+    if (typeof value !== "number" || isNaN(value) || Math.abs(value) < 0.001) {
+      return "+$0.000";
+    }
+
+    const sign = value >= 0 ? "+" : "";
+    return `${sign}$${Math.abs(value).toFixed(3)}`;
   }
 
   /**
@@ -593,13 +456,76 @@ class TokenService {
   isValidChainId(chainId: number): boolean {
     return Number.isInteger(chainId) && chainId > 0;
   }
+
+  /**
+   * Get supported chains
+   */
+  async getSupportedChains(): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/chains`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Failed to fetch supported chains");
+      }
+
+      console.log("⛓️ Supported chains:", data.data.chains.length);
+      return data.data.chains;
+    } catch (error: any) {
+      console.error("❌ Error fetching supported chains:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Debug helpers
+   */
+  logTokenSummary(
+    tokens: TokenBalance[],
+    totalValue: number,
+    total24hrChange: number
+  ) {
+    if (!this.debugMode) return;
+
+    console.log("📊 WALLET SUMMARY (wallet-balance.js style):");
+    console.log("═".repeat(80));
+    console.log(`Total Portfolio Value: $${totalValue.toFixed(3)}`);
+    console.log(
+      `24hr Portfolio Change: ${this.format24hrChange(total24hrChange)}`
+    );
+    console.log(`Token Holdings: ${tokens.length} tokens`);
+    console.log("─".repeat(80));
+
+    tokens.forEach((token, index) => {
+      const isNative = token.isNative ? " - Native Token" : "";
+      console.log(`${index + 1}. ${token.symbol} (${token.name})${isNative}`);
+      console.log(`   Balance: ${this.formatTokenAmount(token.balance, 6)}`);
+      console.log(`   USD Value: ${this.formatCurrency(token.value)}`);
+      if (token.usdChange24h !== undefined) {
+        console.log(
+          `   24hr Change: ${this.format24hrChange(token.usdChange24h)}`
+        );
+      }
+      if (token.logoUrl) {
+        console.log(`   Logo: ${token.logoUrl}`);
+      }
+      console.log("");
+    });
+    console.log("═".repeat(80));
+  }
 }
 
 // Export singleton instance
 export const tokenService = new TokenService();
-export type {
-  TokenBalance,
-  WalletTokensResponse,
-  NativeBalanceResponse,
-  PriceDebugInfo,
-};
+export type { TokenBalance, WalletTokensResponse, NativeBalanceResponse };
