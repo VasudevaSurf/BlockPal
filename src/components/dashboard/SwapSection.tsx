@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ArrowUpDown, ChevronDown, Settings } from "lucide-react";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  Settings,
+  RefreshCw,
+  AlertCircle,
+} from "lucide-react";
 import TokenSelectorModal from "@/components/swap/TokenSelectorModal";
 import SwapPreviewModal from "@/components/swap/SwapPreviewModal";
 import { SkeletonSwapSection } from "@/components/ui/Skeleton";
+import { useCoinGecko, TrendingToken, TopGainer } from "@/hooks/useCoinGecko";
 
 // Mock token data
 const mockTokens = [
@@ -43,137 +50,6 @@ const mockTokens = [
   },
 ];
 
-// Trending tokens data
-const trendingTokens = [
-  {
-    name: "Avalanche",
-    symbol: "AVAX",
-    price: "$25.46",
-    change: "▲ 1.37%",
-    changeType: "positive",
-    bgColor: "bg-red-500",
-    icon: "A",
-  },
-  {
-    name: "Polkadot",
-    symbol: "DOT",
-    price: "$4,478.78",
-    change: "▲ 0.48%",
-    changeType: "positive",
-    bgColor: "bg-pink-500",
-    icon: "•",
-  },
-  {
-    name: "Ethereum",
-    symbol: "ETH",
-    price: "$4,478.78",
-    change: "▲ 4.36%",
-    changeType: "positive",
-    bgColor: "bg-blue-500",
-    icon: "◆",
-  },
-  {
-    name: "Cardano",
-    symbol: "ADA",
-    price: "$25.45",
-    change: "▼ 1.06%",
-    changeType: "negative",
-    bgColor: "bg-blue-400",
-    icon: "❄",
-  },
-  {
-    name: "Solana",
-    symbol: "SOL",
-    price: "$212.22",
-    change: "▲ 5.42%",
-    changeType: "positive",
-    bgColor: "bg-purple-500",
-    icon: "S",
-  },
-  {
-    name: "Sui",
-    symbol: "SUI",
-    price: "$3.39",
-    change: "▲ 3.71%",
-    changeType: "positive",
-    bgColor: "bg-cyan-500",
-    icon: "~",
-  },
-  {
-    name: "Toncoin",
-    symbol: "TON",
-    price: "$25.54",
-    change: "▲ 5.42%",
-    changeType: "positive",
-    bgColor: "bg-blue-600",
-    icon: "T",
-  },
-];
-
-// Top Gainers data
-const topGainersData = [
-  {
-    name: "Bitcoin",
-    symbol: "BTC",
-    price: "$112,212.87",
-    marketCap: "$480,212,687",
-    change: "1.37%",
-    changeType: "positive",
-    icon: "₿",
-    bgColor: "bg-orange-500",
-  },
-  {
-    name: "Ethereum",
-    symbol: "ETH",
-    price: "$4,478.78",
-    marketCap: "$112,212,687",
-    change: "4.36%",
-    changeType: "positive",
-    icon: "◆",
-    bgColor: "bg-blue-500",
-  },
-  {
-    name: "Solana",
-    symbol: "SOL",
-    price: "$212.22",
-    marketCap: "$2,212,687",
-    change: "5.42%",
-    changeType: "positive",
-    icon: "◎",
-    bgColor: "bg-purple-500",
-  },
-  {
-    name: "Cardano",
-    symbol: "ADA",
-    price: "$25.45",
-    marketCap: "$480,212,687",
-    change: "1.06%",
-    changeType: "negative",
-    icon: "❄",
-    bgColor: "bg-blue-400",
-  },
-  {
-    name: "Ethereum",
-    symbol: "ETH",
-    price: "$4,478.78",
-    marketCap: "$112,212,687",
-    change: "4.36%",
-    changeType: "positive",
-    icon: "◆",
-    bgColor: "bg-blue-500",
-  },
-  {
-    name: "Sui",
-    symbol: "SUI",
-    price: "$3.39",
-    marketCap: "$112,212,687",
-    change: "3.71%",
-    changeType: "positive",
-    icon: "~",
-    bgColor: "bg-cyan-500",
-  },
-];
-
 interface Token {
   symbol: string;
   name: string;
@@ -206,8 +82,20 @@ interface SwapQuote {
 }
 
 export default function SwapSection() {
+  // Use CoinGecko hook for real data
+  const {
+    data: coinGeckoData,
+    loading: coinGeckoLoading,
+    error: coinGeckoError,
+    refetch,
+  } = useCoinGecko();
+
   // Use mock data instead of Redux
   const tokens = mockTokens;
+
+  // Get real trending tokens and top gainers from CoinGecko
+  const trendingTokens = coinGeckoData?.trendingTokens || [];
+  const topGainersData = coinGeckoData?.topGainers || [];
 
   // State
   const [sellToken, setSellToken] = useState<Token | null>(null);
@@ -419,27 +307,18 @@ export default function SwapSection() {
               <span className="text-gray-400 text-[10px] font-satoshi">
                 Change in the last 24h
               </span>
-              <button className="p-0.5 hover:bg-gray-800 rounded transition-colors">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                >
-                  <path
-                    d="M8.00003 15.1666C4.53337 15.1666 1.72003 12.3466 1.72003 8.88659C1.72003 7.63993 2.0867 6.43326 2.78003 5.39326C2.93337 5.16659 3.2467 5.09993 3.47337 5.25326C3.70003 5.4066 3.7667 5.71993 3.61337 5.94659C3.03337 6.81326 2.7267 7.83326 2.7267 8.87993C2.7267 11.7933 5.09337 14.1599 8.0067 14.1599C10.92 14.1599 13.2867 11.7933 13.2867 8.87993C13.2867 5.96659 10.9134 3.59993 8.00003 3.59993C7.3867 3.59993 6.7867 3.68659 6.22003 3.85993C5.95337 3.93993 5.67337 3.79326 5.59337 3.52659C5.51337 3.25993 5.66003 2.97993 5.9267 2.89993C6.59337 2.69993 7.2867 2.59326 8.00003 2.59326C11.4667 2.59326 14.28 5.41326 14.28 8.87326C14.28 12.3333 11.4667 15.1666 8.00003 15.1666Z"
-                    fill="#E7BC3F"
-                  />
-                  <path
-                    d="M5.24668 4.04683C5.13335 4.04683 5.01335 4.00683 4.92002 3.92683C4.70668 3.74016 4.68668 3.42683 4.86668 3.22016L6.79335 1.00683C6.97335 0.800162 7.29335 0.773495 7.50002 0.960162C7.70668 1.14016 7.72668 1.46016 7.54668 1.66683L5.62002 3.8735C5.52002 3.98683 5.38002 4.04683 5.24668 4.04683Z"
-                    fill="#E7BC3F"
-                  />
-                  <path
-                    d="M7.49332 5.68659C7.39332 5.68659 7.28666 5.65325 7.19999 5.59325L4.94666 3.94659C4.72666 3.78659 4.67999 3.47325 4.83999 3.25325C4.99999 3.02659 5.31332 2.97992 5.53999 3.13992L7.78666 4.77992C8.00666 4.93992 8.05999 5.25325 7.89332 5.47992C7.79999 5.61992 7.64666 5.68659 7.49332 5.68659Z"
-                    fill="#E7BC3F"
-                  />
-                </svg>
+              <button
+                onClick={refetch}
+                className="p-0.5 hover:bg-gray-800 rounded transition-colors"
+                disabled={coinGeckoLoading}
+                title="Refresh data"
+              >
+                <RefreshCw
+                  size={12}
+                  className={`text-[#E7BC3F] ${
+                    coinGeckoLoading ? "animate-spin" : ""
+                  }`}
+                />
               </button>
             </div>
           </div>
@@ -447,59 +326,110 @@ export default function SwapSection() {
           {/* Border between header and content */}
           <div className="border-t border-[#2C2C2C] mb-1"></div>
 
-          {/* Token List */}
-          <div className="flex-1 overflow-y-auto space-y-2">
-            {trendingTokens.map((token, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between py-1.5"
-              >
-                {/* Token info with fixed width */}
-                <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
-                  <div
-                    className={`w-7 h-7 ${token.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
-                  >
-                    <span className="text-white text-xs font-bold font-satoshi">
-                      {token.icon}
-                    </span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white text-[11px] font-medium font-satoshi truncate">
-                      {token.name}
-                    </div>
-                    <div className="text-gray-400 text-[8px] font-satoshi">
-                      {token.symbol}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Price with fixed width */}
-                <div className="text-white text-[13px] font-medium font-satoshi w-20 text-center flex-shrink-0">
-                  {token.price}
-                </div>
-
-                {/* Chart with fixed width */}
-                <div className="w-20 h-7 flex-shrink-0 flex items-center justify-center">
-                  <img
-                    src="/graph.png"
-                    alt="chart"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-
-                {/* Change percentage with fixed width */}
-                <div
-                  className={`text-xs font-medium font-satoshi w-16 text-center flex-shrink-0 ${
-                    token.changeType === "positive"
-                      ? "text-green-400"
-                      : "text-red-400"
-                  }`}
+          {/* Error State */}
+          {coinGeckoError && (
+            <div className="flex items-center justify-center p-4">
+              <div className="text-center">
+                <AlertCircle size={24} className="text-red-400 mx-auto mb-2" />
+                <p className="text-red-400 text-xs font-satoshi mb-2">
+                  {coinGeckoError}
+                </p>
+                <button
+                  onClick={refetch}
+                  className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-xs"
                 >
-                  {token.change}
-                </div>
+                  Try Again
+                </button>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {coinGeckoLoading && !trendingTokens.length && (
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {Array.from({ length: 7 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between py-1.5 animate-pulse"
+                >
+                  <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
+                    <div className="w-7 h-7 bg-gray-600 rounded-full"></div>
+                    <div className="min-w-0 flex-1">
+                      <div className="h-2 bg-gray-600 rounded mb-1"></div>
+                      <div className="h-1.5 bg-gray-700 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="w-20 h-2 bg-gray-600 rounded"></div>
+                  <div className="w-20 h-7 bg-gray-600 rounded"></div>
+                  <div className="w-16 h-2 bg-gray-600 rounded"></div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Token List */}
+          {!coinGeckoLoading && !coinGeckoError && (
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {trendingTokens.length > 0 ? (
+                trendingTokens.map((token: TrendingToken) => (
+                  <div
+                    key={token.index}
+                    className="flex items-center justify-between py-1.5"
+                  >
+                    {/* Token info with fixed width */}
+                    <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
+                      <div
+                        className={`w-7 h-7 ${token.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
+                      >
+                        <span className="text-white text-xs font-bold font-satoshi">
+                          {token.icon}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-white text-[11px] font-medium font-satoshi truncate">
+                          {token.name}
+                        </div>
+                        <div className="text-gray-400 text-[8px] font-satoshi">
+                          {token.symbol}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Price with fixed width */}
+                    <div className="text-white text-[13px] font-medium font-satoshi w-20 text-center flex-shrink-0">
+                      {token.price}
+                    </div>
+
+                    {/* Chart with fixed width */}
+                    <div className="w-20 h-7 flex-shrink-0 flex items-center justify-center">
+                      <img
+                        src="/graph.png"
+                        alt="chart"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+
+                    {/* Change percentage with fixed width */}
+                    <div
+                      className={`text-xs font-medium font-satoshi w-16 text-center flex-shrink-0 ${
+                        token.changeType === "positive"
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }`}
+                    >
+                      {token.change}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center p-4">
+                  <p className="text-gray-400 text-sm font-satoshi">
+                    No trending tokens available
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Second Box - Top Gainers */}
@@ -565,57 +495,91 @@ export default function SwapSection() {
             </div>
           </div>
 
+          {/* Loading State for Top Gainers */}
+          {coinGeckoLoading && !topGainersData.length && (
+            <div className="flex-1 overflow-y-auto space-y-1">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between py-1.5 animate-pulse"
+                >
+                  <div className="flex items-center gap-2.5 w-[100px]">
+                    <div className="w-6 h-6 bg-gray-600 rounded-full"></div>
+                    <div className="min-w-0 flex-1">
+                      <div className="h-2 bg-gray-600 rounded mb-1"></div>
+                      <div className="h-1.5 bg-gray-700 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="w-[80px] h-2 bg-gray-600 rounded"></div>
+                  <div className="w-[100px] h-2 bg-gray-600 rounded"></div>
+                  <div className="w-[60px] h-2 bg-gray-600 rounded"></div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Token List */}
-          <div className="flex-1 overflow-y-auto space-y-1">
-            {topGainersData.map((token, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
-              >
-                {/* Token info */}
-                <div className="flex items-center gap-2.5 w-[100px] flex-shrink-0">
+          {!coinGeckoLoading && (
+            <div className="flex-1 overflow-y-auto space-y-1">
+              {topGainersData.length > 0 ? (
+                topGainersData.map((token: TopGainer) => (
                   <div
-                    className={`w-6 h-6 ${token.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
+                    key={token.index}
+                    className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
                   >
-                    <span className="text-white text-xs font-bold font-satoshi">
-                      {token.icon}
-                    </span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white text-[11px] font-medium font-satoshi truncate">
-                      {token.name}
+                    {/* Token info */}
+                    <div className="flex items-center gap-2.5 w-[100px] flex-shrink-0">
+                      <div
+                        className={`w-6 h-6 ${token.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
+                      >
+                        <span className="text-white text-xs font-bold font-satoshi">
+                          {token.icon}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-white text-[11px] font-medium font-satoshi truncate">
+                          {token.name}
+                        </div>
+                        <div className="text-gray-400 text-[9px] font-satoshi">
+                          {token.symbol}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-gray-400 text-[9px] font-satoshi">
-                      {token.symbol}
+
+                    {/* Price */}
+                    <div className="text-white text-[11px] font-medium font-satoshi w-[80px] text-center flex-shrink-0">
+                      {token.price}
+                    </div>
+
+                    {/* Market Cap */}
+                    <div className="text-white text-[11px] font-medium font-satoshi w-[100px] text-center flex-shrink-0">
+                      {token.marketCap}
+                    </div>
+
+                    {/* Change percentage */}
+                    <div className="w-[60px] text-center flex-shrink-0">
+                      <div
+                        className={`text-[11px] font-medium font-satoshi ${
+                          token.changeType === "positive"
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {token.changeType === "positive" ? "▲" : "▼"}{" "}
+                        {token.change}
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center p-4">
+                  <p className="text-gray-400 text-sm font-satoshi">
+                    No top gainers available
+                  </p>
                 </div>
-
-                {/* Price */}
-                <div className="text-white text-[11px] font-medium font-satoshi w-[80px] text-center flex-shrink-0">
-                  {token.price}
-                </div>
-
-                {/* Market Cap */}
-                <div className="text-white text-[11px] font-medium font-satoshi w-[100px] text-center flex-shrink-0">
-                  {token.marketCap}
-                </div>
-
-                {/* Change percentage */}
-                <div className="w-[60px] text-center flex-shrink-0">
-                  <div
-                    className={`text-[11px] font-medium font-satoshi ${
-                      token.changeType === "positive"
-                        ? "text-green-400"
-                        : "text-red-400"
-                    }`}
-                  >
-                    {token.changeType === "positive" ? "▲" : "▼"} {token.change}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
         <style jsx global>{`
