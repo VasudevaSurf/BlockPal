@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx - BACKEND REMOVED, UI PRESERVED
+// src/components/AIChatPage.tsx - Small New Chat button at bottom
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -46,9 +46,27 @@ export default function AIChatPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeTab, setActiveTab] = useState<"chat" | "history">("chat");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Suggestion chips data
+  const suggestionChips = [
+    "Analyze BTC",
+    "DeFi Yields",
+    "Finance",
+    "Token Strategy",
+    "Supply Trends",
+    "Assets",
+    "Tokenization",
+    "Comprehensive Analysis",
+    "Analyze ETH",
+    "Borrow Trends",
+    "Chart Trends",
+    "Ownership",
+    "Cryptocurrency",
+  ];
 
   // Load conversations and initialize
   useEffect(() => {
@@ -75,16 +93,6 @@ export default function AIChatPage() {
 
     const timer = setTimeout(() => {
       setInitialLoading(false);
-      if (messages.length === 0) {
-        setMessages([
-          {
-            id: "welcome",
-            type: "assistant",
-            content: `🤖 **Welcome to BlockPal AI Demo!**\n\nThis is a demo version of our AI chat interface. The AI functionality is currently disabled, but you can explore the UI and see how conversations would work.\n\n**Demo Features:**\n• Chat interface demonstration\n• Message history and persistence\n• Conversation management\n• Copy functionality\n\nType \`demo\` to see a sample AI response, or \`help\` for available demo commands.`,
-            timestamp: new Date(),
-          },
-        ]);
-      }
     }, 1000);
 
     return () => clearTimeout(timer);
@@ -132,37 +140,21 @@ export default function AIChatPage() {
     }
   }, [messages, sessionId]);
 
-  // Auto scroll and close sidebar on outside click
+  // Auto scroll
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
+  // Handle tab change
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!sidebarOpen) return;
-
-      const target = event.target as Element;
-      const sidebar = document.querySelector('[data-sidebar="true"]');
-      const hamburger = document.getElementById("chat-hamburger-button");
-
-      if (
-        sidebar &&
-        !sidebar.contains(target) &&
-        hamburger &&
-        !hamburger.contains(target)
-      ) {
-        setSidebarOpen(false);
-      }
-    };
-
-    if (sidebarOpen) {
-      document.addEventListener("mousedown", handleClickOutside, true);
+    if (activeTab === "history") {
+      setSidebarOpen(true);
+    } else {
+      setSidebarOpen(false);
     }
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside, true);
-  }, [sidebarOpen]);
+  }, [activeTab]);
 
   const getRelativeTime = (timestamp: string | Date) => {
     try {
@@ -242,7 +234,6 @@ export default function AIChatPage() {
     });
   };
 
-  // MODIFIED: Demo responses instead of API calls
   const getDemoResponse = (input: string): string => {
     const lowerInput = input.toLowerCase().trim();
 
@@ -254,12 +245,8 @@ export default function AIChatPage() {
       return `🔷 **BlockPal AI Demo Commands**\n\n**Available Demo Commands:**\n• \`demo\` - Show sample AI response\n• \`help\` - Show this help message\n• \`clear\` - Clear conversation\n• \`features\` - List planned AI features\n• \`status\` - Show system status\n\n**Note:** This is a demo interface. Real AI functionality is disabled.`;
     }
 
-    if (lowerInput === "features") {
-      return `🔷 **Planned AI Features**\n\n**Analysis:**\n• Portfolio analysis and insights\n• Transaction history review\n• Token price predictions\n• Risk assessment\n\n**Tools:**\n• Gas price optimization\n• Smart contract analysis\n• Market trend analysis\n• Trading recommendations\n\n**Currently:** Demo mode only - AI backend disabled`;
-    }
-
-    if (lowerInput === "status") {
-      return `🔷 **System Status**\n\n**✅ Working:**\n• Chat interface\n• Message persistence\n• Conversation history\n• UI interactions\n\n**❌ Disabled:**\n• AI backend processing\n• Real-time analysis\n• External API calls\n• Blockchain data fetching\n\n**Status:** Demo mode active`;
+    if (lowerInput.includes("btc") || lowerInput.includes("bitcoin")) {
+      return `🔷 **Bitcoin Analysis (Demo)**\n\nAnalyzing BTC market data...\n\n**Current Status:**\n• Price: Demo data only\n• Market cap: Demo analysis\n• 24h volume: Sample metrics\n• Trend: Simulated insights\n\n**Note:** This is demo mode - real market data would be provided in production.`;
     }
 
     // Default response for any other input
@@ -272,19 +259,19 @@ export default function AIChatPage() {
     return responses[Math.floor(Math.random() * responses.length)];
   };
 
-  // MODIFIED: Handle demo responses instead of API calls
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isTyping) return;
+  const handleSendMessage = async (messageText?: string) => {
+    const textToSend = messageText || inputMessage;
+    if (!textToSend.trim() || isTyping) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: "user",
-      content: inputMessage,
+      content: textToSend,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    const currentInput = inputMessage;
+    const currentInput = textToSend;
     setInputMessage("");
     setIsTyping(true);
 
@@ -315,12 +302,10 @@ export default function AIChatPage() {
     try {
       console.log("🤖 Processing demo message:", currentInput);
 
-      // Simulate processing delay
       await new Promise((resolve) =>
         setTimeout(resolve, 1000 + Math.random() * 1000)
       );
 
-      // Get demo response
       const demoResponse = getDemoResponse(currentInput);
 
       setMessages((prev) => prev.filter((msg) => !msg.processing));
@@ -388,7 +373,7 @@ export default function AIChatPage() {
 
   const handleSessionSelect = (selectedSessionId: string) => {
     if (selectedSessionId === sessionId) {
-      setSidebarOpen(false);
+      setActiveTab("chat");
       return;
     }
 
@@ -398,21 +383,14 @@ export default function AIChatPage() {
     if (conversation) {
       setSessionId(selectedSessionId);
       setMessages(conversation.messages || []);
-      setSidebarOpen(false);
+      setActiveTab("chat");
     }
   };
 
   const handleNewChat = () => {
-    setMessages([
-      {
-        id: "welcome-new",
-        type: "assistant",
-        content: `🤖 **New Demo Chat Started!**\n\nThis is a fresh conversation in demo mode. The AI backend is disabled, but you can explore the interface.\n\nTry these demo commands:\n• \`demo\` - Sample AI response\n• \`help\` - Available commands\n• \`features\` - Planned AI features`,
-        timestamp: new Date(),
-      },
-    ]);
+    setMessages([]);
     setSessionId(Date.now().toString());
-    setSidebarOpen(false);
+    setActiveTab("chat");
   };
 
   const deleteConversation = (conversationId: string) => {
@@ -433,143 +411,183 @@ export default function AIChatPage() {
       .replace(/\n/g, "<br>");
   };
 
+  const handleChipClick = (chipText: string) => {
+    handleSendMessage(chipText);
+  };
+
   if (initialLoading) return <SkeletonAIChat />;
+
+  const showWelcomeScreen = messages.length === 0;
 
   return (
     <div className="h-full relative bg-[#0F0F0F] flex">
       {/* Overlay Background */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-white/10 z-30"
-          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
+          onClick={() => {
+            setSidebarOpen(false);
+            setActiveTab("chat");
+          }}
         />
       )}
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Demo Mode Banner */}
-        <div className="flex-shrink-0 bg-yellow-900/20 border-b border-yellow-500/30 px-4 py-2">
-          <div className="flex items-center justify-center">
-            <AlertTriangle size={16} className="text-yellow-400 mr-2" />
-            <span className="text-yellow-400 text-sm font-satoshi">
-              Demo Mode: AI functionality disabled - UI demonstration only
-            </span>
+        {/* Top Navigation Tabs */}
+        <div className="flex-shrink-0 bg-[#0F0F0F] px-4 py-3">
+          <div className="flex justify-center">
+            <div className="flex bg-black rounded-[16px] p-1 border border-[#2C2C2C]">
+              <button
+                onClick={() => setActiveTab("chat")}
+                className={`px-6 py-2 rounded-[12px] text-sm font-satoshi font-medium transition-all ${
+                  activeTab === "chat"
+                    ? "bg-[#E2AF19] text-black"
+                    : "text-white hover:text-[#E2AF19]"
+                }`}
+              >
+                Chat
+              </button>
+              <button
+                onClick={() => setActiveTab("history")}
+                className={`px-6 py-2 rounded-[12px] text-sm font-satoshi font-medium transition-all ${
+                  activeTab === "history"
+                    ? "bg-[#E2AF19] text-black"
+                    : "text-white hover:text-[#E2AF19]"
+                }`}
+              >
+                History
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Chat Sub-Header - Only for mobile to show hamburger menu */}
-        <div className="lg:hidden flex-shrink-0 p-3 border-b border-[#2C2C2C]/30 bg-gradient-to-r from-[#0F0F0F] to-[#1a1a1a]">
-          <div className="flex items-center justify-end">
-            <button
-              id="chat-hamburger-button"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
-            >
-              <Menu size={20} className="text-[#E2AF19]" />
-            </button>
-          </div>
-        </div>
-
-        {/* Desktop Chat History Button */}
-        <div className="hidden lg:flex items-center justify-end px-4 border-b border-[#2C2C2C]/30">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
-          >
-            <Menu size={20} className="text-[#E2AF19]" />
-          </button>
-        </div>
-
-        {/* Messages */}
+        {/* Messages or Welcome Screen */}
         <div className="flex-1 overflow-y-auto px-4 min-h-0">
-          <div className="py-4 space-y-4">
-            {messages.map((message) => (
-              <div key={message.id} className="flex flex-col space-y-2">
-                {message.type === "assistant" ? (
-                  <div className="flex flex-col items-start space-y-2">
-                    <div className="max-w-4xl bg-black p-4 rounded-xl border border-[#2C2C2C]">
-                      {message.processing && !message.content ? (
-                        <div className="flex items-center space-x-2">
-                          <RefreshCw
-                            size={16}
-                            className="text-[#E2AF19] animate-spin"
-                          />
-                          <span className="text-[#F9EFD1] text-sm">
-                            Processing demo response...
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="text-[#F9EFD1] text-sm leading-relaxed">
-                          <div
-                            dangerouslySetInnerHTML={{
-                              __html: formatMessage(message.content),
-                            }}
-                          />
-                          {message.typing && (
-                            <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {!message.processing &&
-                      !message.typing &&
-                      message.content && (
-                        <button
-                          onClick={() =>
-                            copyMessage(message.content, message.id)
-                          }
-                          className="bg-[#E2AF19] text-black px-3 py-1 rounded-lg text-xs font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1.5"
-                        >
-                          {copiedItems.has(message.id) ? (
-                            <>
-                              <Check size={12} />
-                              Copied!
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={12} />
-                              Copy
-                            </>
-                          )}
-                        </button>
-                      )}
-                  </div>
-                ) : (
-                  <div className="flex justify-end">
-                    <div className="bg-[#E2AF19] text-black p-4 max-w-2xl rounded-xl">
-                      <p className="text-sm">{message.content}</p>
-                    </div>
-                  </div>
-                )}
+          {showWelcomeScreen ? (
+            /* Welcome Screen */
+            <div className="h-full flex flex-col items-center justify-center -mt-5">
+              {/* Lumen AI Logo */}
+              <div className="mb-2">
+                <img
+                  src="/AImiddleImage.png"
+                  alt="Lumen AI"
+                  className="w-45 h-45 object-contain"
+                />
               </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+
+              {/* Heading */}
+              <h1 className="text-white text-3xl font-satoshi font-bold mb-10 text-center">
+                Chat with Lumen
+              </h1>
+
+              {/* Suggestion Chips - Fixed to match textarea width */}
+              <div className="w-full max-w-2xl mx-auto mb-16">
+                <div className="flex flex-wrap justify-center gap-2 px-4">
+                  {suggestionChips.map((chip, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleChipClick(chip)}
+                      className="px-3 py-1.5 text-white text-xs font-satoshi rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105"
+                      disabled={isTyping}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Chat Messages */
+            <div className="py-4 space-y-4">
+              {messages.map((message) => (
+                <div key={message.id} className="flex flex-col space-y-2">
+                  {message.type === "assistant" ? (
+                    <div className="flex flex-col items-start space-y-2">
+                      <div className="max-w-4xl bg-black p-4 rounded-xl border border-[#2C2C2C]">
+                        {message.processing && !message.content ? (
+                          <div className="flex items-center space-x-2">
+                            <RefreshCw
+                              size={16}
+                              className="text-[#E2AF19] animate-spin"
+                            />
+                            <span className="text-[#F9EFD1] text-sm">
+                              Processing demo response...
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[#F9EFD1] text-sm leading-relaxed">
+                            <div
+                              dangerouslySetInnerHTML={{
+                                __html: formatMessage(message.content),
+                              }}
+                            />
+                            {message.typing && (
+                              <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {!message.processing &&
+                        !message.typing &&
+                        message.content && (
+                          <button
+                            onClick={() =>
+                              copyMessage(message.content, message.id)
+                            }
+                            className="bg-[#E2AF19] text-black px-3 py-1 rounded-lg text-xs font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1.5"
+                          >
+                            {copiedItems.has(message.id) ? (
+                              <>
+                                <Check size={12} />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={12} />
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        )}
+                    </div>
+                  ) : (
+                    <div className="flex justify-end">
+                      <div className="bg-[#E2AF19] text-black p-4 max-w-2xl rounded-xl">
+                        <p className="text-sm">{message.content}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
 
-        {/* Input */}
-        <div className="flex-shrink-0 p-4 border-t border-[#2C2C2C]">
-          <div className="relative">
+        {/* Input - Fixed send button alignment */}
+        <div className="flex-shrink-0 p-4">
+          <div className="relative max-w-2xl mx-auto">
             <textarea
               ref={inputRef}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Try demo commands: 'demo', 'help', 'features', 'status'..."
-              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-12 pl-4 py-3 min-h-[52px] max-h-32 text-sm border border-[#2C2C2C] focus:border-[#E2AF19] transition-colors rounded-2xl"
+              placeholder="Type your message"
+              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-12 pl-4 py-3 min-h-[48px] max-h-32 text-sm border border-[#2C2C2C] focus:border-[#E2AF19] transition-colors rounded-[100px]"
               rows={1}
               disabled={isTyping}
             />
             <button
-              onClick={handleSendMessage}
+              onClick={() => handleSendMessage()}
               disabled={!inputMessage.trim() || isTyping}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 text-black rounded-full w-10 h-10 flex items-center justify-center transition-colors"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 text-black rounded-full w-8 h-8 flex items-center justify-center transition-colors"
             >
               {isTyping ? (
-                <RefreshCw size={16} className="animate-spin" />
+                <RefreshCw size={14} className="animate-spin" />
               ) : (
-                <Send size={16} />
+                <Send size={14} />
               )}
             </button>
           </div>
@@ -591,7 +609,7 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Conversation Sidebar - Now on the right */}
+      {/* Conversation Sidebar */}
       <div
         data-sidebar="true"
         className={`fixed right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out bg-gradient-to-b from-[#1a1a1a] to-[#141414] border-l border-[#2C2C2C] ${
@@ -602,66 +620,25 @@ export default function AIChatPage() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="h-full flex flex-col">
-          {/* Sidebar Header */}
-          <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-[#E2AF19]/10 rounded-lg">
-                <MessageCircle className="text-[#E2AF19]" size={20} />
-              </div>
-              <div>
-                <span className="text-white font-satoshi font-bold text-lg">
-                  Chat History
-                </span>
-                <p className="text-gray-400 text-xs">Demo conversations</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-all"
-            >
-              <X size={18} className="text-gray-400 hover:text-white" />
-            </button>
-          </div>
-
-          {/* New Chat Button */}
-          <div className="p-4 border-b border-[#2C2C2C]">
-            <button
-              onClick={handleNewChat}
-              className="w-full bg-gradient-to-r from-[#E2AF19] to-[#D4A853] text-black p-3 rounded-xl font-satoshi font-medium hover:scale-[1.02] transition-all flex items-center justify-center space-x-2"
-            >
-              <Plus size={16} />
-              <span>New Demo Chat</span>
-            </button>
-          </div>
-
-          {/* Conversations List */}
-          <div className="flex-1 px-4 pb-4 overflow-y-auto">
+          {/* Conversations List - Takes full height */}
+          <div className="flex-1 px-4 pt-4 overflow-y-auto">
             <div className="mb-4">
               <span className="text-gray-300 text-sm font-satoshi font-medium">
-                Recent ({conversations.length})
+                Recents
               </span>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 pb-20">
               {/* Current Session */}
               {messages.length > 0 && sessionId && (
                 <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    <span className="text-white text-sm font-medium">
-                      Current Demo Chat
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-xs line-clamp-2">
-                    {messages
-                      .find((m) => m.type === "user")
-                      ?.content?.slice(0, 60) || "New demo conversation"}
-                    ...
-                  </p>
-                  <div className="flex items-center space-x-2 mt-2 text-gray-500 text-xs">
-                    <span>{messages.length} messages</span>
-                    <span>•</span>
-                    <span>Active now</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                      <span className="text-white text-sm font-medium">
+                        Current Demo Chat
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -675,23 +652,11 @@ export default function AIChatPage() {
                     className="p-3 rounded-xl cursor-pointer group transition-all bg-[#2C2C2C]/20 hover:bg-[#2C2C2C]/40"
                     onClick={() => handleSessionSelect(conversation.id)}
                   >
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-center">
                       <div className="flex-1 min-w-0">
                         <span className="text-gray-300 text-sm font-medium line-clamp-1">
                           {conversation.title || "Untitled Demo Chat"}
                         </span>
-                        <p className="text-gray-400 text-xs line-clamp-2 mt-1">
-                          {conversation.lastMessage || "No messages"}
-                        </p>
-                        <div className="flex items-center space-x-2 mt-2 text-gray-500 text-xs">
-                          <span>{conversation.messageCount} messages</span>
-                          <span>•</span>
-                          <span>
-                            {getRelativeTime(
-                              conversation.timestamp || conversation.createdAt
-                            )}
-                          </span>
-                        </div>
                       </div>
                       <button
                         onClick={(e) => {
@@ -721,6 +686,17 @@ export default function AIChatPage() {
                   </div>
                 )}
             </div>
+          </div>
+
+          {/* Small New Chat Button - Fixed at bottom */}
+          <div className="absolute bottom-4 left-4 right-4 bg-gradient-to-b from-transparent to-[#141414] pt-4">
+            <button
+              onClick={handleNewChat}
+              className="w-full bg-[#E2AF19] text-black px-3 py-2 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center justify-center space-x-2"
+            >
+              <Plus size={14} />
+              <span>New Chat</span>
+            </button>
           </div>
         </div>
       </div>
