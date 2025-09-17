@@ -1,4 +1,4 @@
-// src/app/api/wallet/tracking/route.ts - API for wallet connection tracking
+// src/app/api/wallet/tracking/route.ts - ENHANCED with proper token status tracking
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
@@ -12,6 +12,8 @@ interface TokenStatus {
   change24h: number;
   isNative: boolean;
   isPreferred: boolean;
+  isUserAdded?: boolean;
+  isPreset?: boolean;
   firstSeen?: string;
   lastUpdated: string;
 }
@@ -28,11 +30,12 @@ interface WalletConnection {
   firstConnected: string;
   lastConnected: string;
   lastUpdated: string;
-  // Additional metadata
-  preferredTokenCount?: number;
+  // Enhanced metadata
+  presetTokenCount?: number;
+  userAddedTokenCount?: number;
   hiddenTokenCount?: number;
   userAgent?: string;
-  ipAddress?: string; // In production, consider privacy implications
+  ipAddress?: string;
 }
 
 // POST - Track wallet connection and token status
@@ -89,7 +92,7 @@ export async function POST(request: NextRequest) {
     );
     console.log(`📊 Total value: $${totalValue}, Tokens: ${tokens.length}`);
 
-    // Get client info for tracking (optional)
+    // Get client info for tracking
     const userAgent = request.headers.get("user-agent") || "";
     const forwardedFor = request.headers.get("x-forwarded-for") || "";
     const realIP = request.headers.get("x-real-ip") || "";
@@ -103,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
 
-    // Process tokens with status tracking
+    // Process tokens with enhanced status tracking
     const processedTokens: TokenStatus[] = tokens.map((token: any) => {
       const existingToken = existingConnection?.tokens.find(
         (t: TokenStatus) =>
@@ -121,17 +124,20 @@ export async function POST(request: NextRequest) {
         change24h: token.change24h || 0,
         isNative: token.isNative || false,
         isPreferred: token.isPreferred || false,
+        isUserAdded: token.isUserAdded || false,
+        isPreset: token.isPreset || false,
         firstSeen: existingToken?.firstSeen || now,
         lastUpdated: now,
       };
     });
 
-    // Count preferred and hidden tokens
-    const preferredTokenCount = processedTokens.filter(
-      (t) => t.isPreferred
+    // Count different token types
+    const presetTokenCount = processedTokens.filter((t) => t.isPreset).length;
+    const userAddedTokenCount = processedTokens.filter(
+      (t) => t.isUserAdded
     ).length;
     const hiddenTokenCount = processedTokens.filter(
-      (t) => !t.isPreferred
+      (t) => !t.isPreferred && !t.isUserAdded
     ).length;
 
     const connectionData: WalletConnection = {
@@ -148,10 +154,11 @@ export async function POST(request: NextRequest) {
       firstConnected: existingConnection?.firstConnected || now,
       lastConnected: now,
       lastUpdated: now,
-      preferredTokenCount,
+      presetTokenCount,
+      userAddedTokenCount,
       hiddenTokenCount,
-      userAgent: userAgent.substring(0, 200), // Limit length
-      ipAddress: process.env.NODE_ENV === "development" ? clientIP : "hidden", // Hide in production
+      userAgent: userAgent.substring(0, 200),
+      ipAddress: process.env.NODE_ENV === "development" ? clientIP : "hidden",
     };
 
     // Upsert the connection data
@@ -169,10 +176,10 @@ export async function POST(request: NextRequest) {
     );
     console.log(`📈 Connection count: ${connectionData.connectionCount}`);
     console.log(
-      `🎯 Token breakdown: ${preferredTokenCount} preferred, ${hiddenTokenCount} hidden`
+      `🎯 Token breakdown: ${presetTokenCount} preset, ${userAddedTokenCount} user-added, ${hiddenTokenCount} hidden`
     );
 
-    // Also update global wallet stats
+    // Update global wallet stats
     await updateGlobalWalletStats(db, walletAddress, chainId, connectionData);
 
     return NextResponse.json({
@@ -183,7 +190,8 @@ export async function POST(request: NextRequest) {
         chainName: connectionData.chainName,
         connectionCount: connectionData.connectionCount,
         tokenCount: connectionData.tokenCount,
-        preferredTokenCount,
+        presetTokenCount,
+        userAddedTokenCount,
         hiddenTokenCount,
         totalValue: connectionData.totalValue,
         isNewWallet: !!result.upsertedId,
@@ -205,7 +213,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET - Retrieve wallet connection history
+// GET - Retrieve wallet connection history with enhanced filtering
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -249,7 +257,7 @@ export async function GET(request: NextRequest) {
     const connections = await collection
       .find(query)
       .sort({ lastConnected: -1 })
-      .limit(10) // Limit to last 10 connections per chain
+      .limit(10)
       .toArray();
 
     if (connections.length === 0) {
@@ -262,24 +270,33 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Process connections for response
+    // Process connections for response with enhanced data
     const processedConnections = connections.map((conn) => {
-      const { _id, tokens, userAgent, ipAddress, ...cleanConnection } = conn;
+      const { _id, userAgent, ipAddress, ...cleanConnection } = conn;
 
-      return {
+      const response: any = {
         ...cleanConnection,
-        ...(includeTokens && {
-          tokens: tokens.map((token: TokenStatus) => ({
-            ...token,
-            // Add token age calculation
-            daysSinceFirstSeen: Math.floor(
-              (new Date().getTime() -
-                new Date(token.firstSeen || token.lastUpdated).getTime()) /
-                (1000 * 60 * 60 * 24)
-            ),
-          })),
-        }),
+        tokenAnalysis: {
+          totalTokens: conn.tokenCount,
+          presetTokens: conn.presetTokenCount || 0,
+          userAddedTokens: conn.userAddedTokenCount || 0,
+          hiddenTokens: conn.hiddenTokenCount || 0,
+        },
       };
+
+      if (includeTokens && conn.tokens) {
+        response.tokens = conn.tokens.map((token: TokenStatus) => ({
+          ...token,
+          // Add token age calculation
+          daysSinceFirstSeen: Math.floor(
+            (new Date().getTime() -
+              new Date(token.firstSeen || token.lastUpdated).getTime()) /
+              (1000 * 60 * 60 * 24)
+          ),
+        }));
+      }
+
+      return response;
     });
 
     console.log(
@@ -301,6 +318,26 @@ export async function GET(request: NextRequest) {
         firstConnection:
           processedConnections[processedConnections.length - 1]?.firstConnected,
         lastConnection: processedConnections[0]?.lastConnected,
+        analytics: {
+          averageTokens: Math.round(
+            processedConnections.reduce(
+              (sum, conn) => sum + conn.tokenCount,
+              0
+            ) / processedConnections.length
+          ),
+          totalPresetTokens: processedConnections.reduce(
+            (sum, conn) => sum + (conn.presetTokenCount || 0),
+            0
+          ),
+          totalUserAddedTokens: processedConnections.reduce(
+            (sum, conn) => sum + (conn.userAddedTokenCount || 0),
+            0
+          ),
+          totalHiddenTokens: processedConnections.reduce(
+            (sum, conn) => sum + (conn.hiddenTokenCount || 0),
+            0
+          ),
+        },
       },
       message: "Connection history retrieved successfully",
     });
@@ -329,13 +366,17 @@ async function updateGlobalWalletStats(
     const statsCollection = db.collection("globalWalletStats");
     const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
 
-    // Update daily stats
+    // Update daily stats with enhanced metrics
     await statsCollection.updateOne(
       { date: today },
       {
         $inc: {
           totalConnections: 1,
           [`chainConnections.${chainId}`]: 1,
+          totalTokensTracked: connectionData.tokenCount,
+          totalPresetTokens: connectionData.presetTokenCount || 0,
+          totalUserAddedTokens: connectionData.userAddedTokenCount || 0,
+          totalHiddenTokens: connectionData.hiddenTokenCount || 0,
         },
         $addToSet: {
           uniqueWallets: walletAddress.toLowerCase(),

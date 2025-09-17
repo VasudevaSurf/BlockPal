@@ -1,4 +1,4 @@
-// src/app/api/wallet/preferences/route.ts - API for wallet preferences
+// src/app/api/wallet/preferences/route.ts - COMPLETE wallet preferences API
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
@@ -6,6 +6,8 @@ interface WalletPreferences {
   walletAddress: string;
   chainId: number;
   userAddedTokens: string[]; // Contract addresses of tokens user manually added to main list
+  hiddenTokens: string[]; // Contract addresses of tokens user manually hid
+  tokenDisplayOrder?: string[]; // Custom order for tokens (optional)
   lastUpdated: string;
   // Additional metadata
   totalTokenCount?: number;
@@ -54,14 +56,22 @@ export async function GET(request: NextRequest) {
     });
 
     if (!preferences) {
-      console.log("📝 No preferences found, returning 404");
-      return NextResponse.json(
-        {
-          success: false,
-          error: "No preferences found for this wallet",
-        },
-        { status: 404 }
+      console.log(
+        "📝 No preferences found, returning default empty preferences"
       );
+      return NextResponse.json({
+        success: true,
+        data: {
+          walletAddress: walletAddress.toLowerCase(),
+          chainId: parseInt(chainId),
+          userAddedTokens: [],
+          hiddenTokens: [],
+          tokenDisplayOrder: [],
+          lastUpdated: new Date().toISOString(),
+          isNew: true,
+        },
+        message: "No existing preferences found, returning defaults",
+      });
     }
 
     // Remove MongoDB _id from response
@@ -70,7 +80,9 @@ export async function GET(request: NextRequest) {
     console.log(
       `✅ Preferences loaded: ${
         cleanPreferences.userAddedTokens?.length || 0
-      } user-added tokens`
+      } user-added tokens, ${
+        cleanPreferences.hiddenTokens?.length || 0
+      } hidden tokens`
     );
 
     return NextResponse.json({
@@ -100,15 +112,16 @@ export async function POST(request: NextRequest) {
       walletAddress,
       chainId,
       userAddedTokens,
-      lastUpdated,
-    }: WalletPreferences = body;
+      hiddenTokens,
+      tokenDisplayOrder,
+    }: Partial<WalletPreferences> = body;
 
     // Validation
-    if (!walletAddress || !chainId || !userAddedTokens) {
+    if (!walletAddress || !chainId) {
       return NextResponse.json(
         {
           success: false,
-          error: "Missing required fields",
+          error: "walletAddress and chainId are required",
         },
         { status: 400 }
       );
@@ -126,11 +139,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate arrays
-    if (!Array.isArray(userAddedTokens)) {
+    if (userAddedTokens && !Array.isArray(userAddedTokens)) {
       return NextResponse.json(
         {
           success: false,
           error: "userAddedTokens must be an array",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (hiddenTokens && !Array.isArray(hiddenTokens)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "hiddenTokens must be an array",
         },
         { status: 400 }
       );
@@ -142,7 +165,8 @@ export async function POST(request: NextRequest) {
     console.log(
       `💾 Saving preferences for wallet: ${walletAddress} on chain: ${chainId}`
     );
-    console.log(`📊 User-added tokens: ${userAddedTokens.length}`);
+    console.log(`📊 User-added tokens: ${userAddedTokens?.length || 0}`);
+    console.log(`📊 Hidden tokens: ${hiddenTokens?.length || 0}`);
 
     // Check if preferences already exist
     const existingPreferences = await collection.findOne({
@@ -150,14 +174,20 @@ export async function POST(request: NextRequest) {
       chainId: chainId,
     });
 
+    // Prepare preferences data with proper defaults
     const preferencesData: WalletPreferences = {
       walletAddress: walletAddress.toLowerCase(),
       chainId: chainId,
-      userAddedTokens: userAddedTokens.map((addr: string) =>
+      userAddedTokens: (userAddedTokens || []).map((addr: string) =>
         addr.toLowerCase()
       ),
-      lastUpdated: lastUpdated || new Date().toISOString(),
-      totalTokenCount: userAddedTokens.length,
+      hiddenTokens: (hiddenTokens || []).map((addr: string) =>
+        addr.toLowerCase()
+      ),
+      tokenDisplayOrder: tokenDisplayOrder || [],
+      lastUpdated: new Date().toISOString(),
+      totalTokenCount:
+        (userAddedTokens?.length || 0) + (hiddenTokens?.length || 0),
       preferenceUpdates: existingPreferences
         ? (existingPreferences.preferenceUpdates || 0) + 1
         : 1,
@@ -179,14 +209,17 @@ export async function POST(request: NextRequest) {
       `✅ Preferences ${result.upsertedId ? "created" : "updated"} successfully`
     );
 
+    // Return success response with analytics
     return NextResponse.json({
       success: true,
       data: {
         walletAddress: preferencesData.walletAddress,
         chainId: preferencesData.chainId,
-        userAddedCount: userAddedTokens.length,
+        userAddedCount: preferencesData.userAddedTokens.length,
+        hiddenCount: preferencesData.hiddenTokens.length,
         isNewWallet: !!result.upsertedId,
         lastUpdated: preferencesData.lastUpdated,
+        preferenceUpdates: preferencesData.preferenceUpdates,
       },
       message: `Preferences ${
         result.upsertedId ? "created" : "updated"
@@ -198,6 +231,200 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "Failed to save wallet preferences",
+        details:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update specific preference (add/remove single token)
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      walletAddress,
+      chainId,
+      action,
+      tokenAddress,
+    }: {
+      walletAddress: string;
+      chainId: number;
+      action:
+        | "add_to_main"
+        | "remove_from_main"
+        | "hide_token"
+        | "unhide_token";
+      tokenAddress: string;
+    } = body;
+
+    // Validation
+    if (!walletAddress || !chainId || !action || !tokenAddress) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "walletAddress, chainId, action, and tokenAddress are required",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate wallet address format
+    if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid wallet address format",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate token address format
+    if (
+      !tokenAddress.match(/^0x[a-fA-F0-9]{40}$/) &&
+      tokenAddress !== "native"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid token address format",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { db } = await connectToDatabase();
+    const collection = db.collection("walletPreferences");
+
+    console.log(
+      `🔄 Updating preference: ${action} for token ${tokenAddress} on wallet ${walletAddress}`
+    );
+
+    const normalizedWallet = walletAddress.toLowerCase();
+    const normalizedToken = tokenAddress.toLowerCase();
+
+    // Get current preferences or create default
+    let currentPreferences = await collection.findOne({
+      walletAddress: normalizedWallet,
+      chainId: chainId,
+    });
+
+    if (!currentPreferences) {
+      currentPreferences = {
+        walletAddress: normalizedWallet,
+        chainId: chainId,
+        userAddedTokens: [],
+        hiddenTokens: [],
+        tokenDisplayOrder: [],
+        lastUpdated: new Date().toISOString(),
+        preferenceUpdates: 0,
+        firstConnected: new Date().toISOString(),
+      };
+    }
+
+    // Apply the action
+    const updatedPreferences = { ...currentPreferences };
+    let actionDescription = "";
+
+    switch (action) {
+      case "add_to_main":
+        if (!updatedPreferences.userAddedTokens.includes(normalizedToken)) {
+          updatedPreferences.userAddedTokens.push(normalizedToken);
+          actionDescription = "Added to main list";
+        } else {
+          actionDescription = "Already in main list";
+        }
+        // Remove from hidden if it was there
+        updatedPreferences.hiddenTokens =
+          updatedPreferences.hiddenTokens.filter(
+            (addr: string) => addr !== normalizedToken
+          );
+        break;
+
+      case "remove_from_main":
+        updatedPreferences.userAddedTokens =
+          updatedPreferences.userAddedTokens.filter(
+            (addr: string) => addr !== normalizedToken
+          );
+        actionDescription = "Removed from main list";
+        break;
+
+      case "hide_token":
+        if (!updatedPreferences.hiddenTokens.includes(normalizedToken)) {
+          updatedPreferences.hiddenTokens.push(normalizedToken);
+          actionDescription = "Hidden token";
+        } else {
+          actionDescription = "Already hidden";
+        }
+        // Remove from main list if it was there
+        updatedPreferences.userAddedTokens =
+          updatedPreferences.userAddedTokens.filter(
+            (addr: string) => addr !== normalizedToken
+          );
+        break;
+
+      case "unhide_token":
+        updatedPreferences.hiddenTokens =
+          updatedPreferences.hiddenTokens.filter(
+            (addr: string) => addr !== normalizedToken
+          );
+        actionDescription = "Unhidden token";
+        break;
+
+      default:
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Invalid action. Must be: add_to_main, remove_from_main, hide_token, or unhide_token",
+          },
+          { status: 400 }
+        );
+    }
+
+    // Update metadata
+    updatedPreferences.lastUpdated = new Date().toISOString();
+    updatedPreferences.preferenceUpdates =
+      (updatedPreferences.preferenceUpdates || 0) + 1;
+    updatedPreferences.totalTokenCount =
+      updatedPreferences.userAddedTokens.length +
+      updatedPreferences.hiddenTokens.length;
+
+    // Save updated preferences
+    const result = await collection.replaceOne(
+      {
+        walletAddress: normalizedWallet,
+        chainId: chainId,
+      },
+      updatedPreferences,
+      { upsert: true }
+    );
+
+    console.log(`✅ ${actionDescription}: ${tokenAddress}`);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        walletAddress: updatedPreferences.walletAddress,
+        chainId: updatedPreferences.chainId,
+        action,
+        tokenAddress: normalizedToken,
+        userAddedCount: updatedPreferences.userAddedTokens.length,
+        hiddenCount: updatedPreferences.hiddenTokens.length,
+        preferenceUpdates: updatedPreferences.preferenceUpdates,
+        actionDescription,
+      },
+      message: `${actionDescription} successfully`,
+    });
+  } catch (error: any) {
+    console.error("❌ Error updating wallet preferences:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to update wallet preferences",
         details:
           process.env.NODE_ENV === "development" ? error.message : undefined,
       },
@@ -260,6 +487,11 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      data: {
+        walletAddress: walletAddress.toLowerCase(),
+        chainId: parseInt(chainId),
+        deletedCount: result.deletedCount,
+      },
       message: "Preferences deleted successfully",
     });
   } catch (error: any) {
@@ -268,6 +500,256 @@ export async function DELETE(request: NextRequest) {
       {
         success: false,
         error: "Failed to delete wallet preferences",
+        details:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH - Bulk update preferences (for advanced operations)
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      walletAddress,
+      chainId,
+      operations,
+    }: {
+      walletAddress: string;
+      chainId: number;
+      operations: Array<{
+        action:
+          | "add_to_main"
+          | "remove_from_main"
+          | "hide_token"
+          | "unhide_token";
+        tokenAddress: string;
+      }>;
+    } = body;
+
+    // Validation
+    if (
+      !walletAddress ||
+      !chainId ||
+      !operations ||
+      !Array.isArray(operations)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "walletAddress, chainId, and operations array are required",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate wallet address format
+    if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid wallet address format",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (operations.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "At least one operation is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (operations.length > 50) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Maximum 50 operations allowed per request",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { db } = await connectToDatabase();
+    const collection = db.collection("walletPreferences");
+
+    console.log(
+      `🔄 Bulk updating ${operations.length} preferences for wallet: ${walletAddress} on chain: ${chainId}`
+    );
+
+    const normalizedWallet = walletAddress.toLowerCase();
+
+    // Get current preferences or create default
+    let currentPreferences = await collection.findOne({
+      walletAddress: normalizedWallet,
+      chainId: chainId,
+    });
+
+    if (!currentPreferences) {
+      currentPreferences = {
+        walletAddress: normalizedWallet,
+        chainId: chainId,
+        userAddedTokens: [],
+        hiddenTokens: [],
+        tokenDisplayOrder: [],
+        lastUpdated: new Date().toISOString(),
+        preferenceUpdates: 0,
+        firstConnected: new Date().toISOString(),
+      };
+    }
+
+    // Apply all operations
+    const updatedPreferences = { ...currentPreferences };
+    const results: Array<{
+      tokenAddress: string;
+      action: string;
+      success: boolean;
+      error?: string;
+    }> = [];
+
+    for (const operation of operations) {
+      const { action, tokenAddress } = operation;
+      const normalizedToken = tokenAddress.toLowerCase();
+
+      try {
+        // Validate token address
+        if (
+          !tokenAddress.match(/^0x[a-fA-F0-9]{40}$/) &&
+          tokenAddress !== "native"
+        ) {
+          results.push({
+            tokenAddress,
+            action,
+            success: false,
+            error: "Invalid token address format",
+          });
+          continue;
+        }
+
+        let actionSuccess = false;
+
+        switch (action) {
+          case "add_to_main":
+            if (!updatedPreferences.userAddedTokens.includes(normalizedToken)) {
+              updatedPreferences.userAddedTokens.push(normalizedToken);
+              actionSuccess = true;
+            }
+            // Remove from hidden if it was there
+            updatedPreferences.hiddenTokens =
+              updatedPreferences.hiddenTokens.filter(
+                (addr: string) => addr !== normalizedToken
+              );
+            break;
+
+          case "remove_from_main":
+            const beforeLength = updatedPreferences.userAddedTokens.length;
+            updatedPreferences.userAddedTokens =
+              updatedPreferences.userAddedTokens.filter(
+                (addr: string) => addr !== normalizedToken
+              );
+            actionSuccess =
+              updatedPreferences.userAddedTokens.length < beforeLength;
+            break;
+
+          case "hide_token":
+            if (!updatedPreferences.hiddenTokens.includes(normalizedToken)) {
+              updatedPreferences.hiddenTokens.push(normalizedToken);
+              actionSuccess = true;
+            }
+            // Remove from main list if it was there
+            updatedPreferences.userAddedTokens =
+              updatedPreferences.userAddedTokens.filter(
+                (addr: string) => addr !== normalizedToken
+              );
+            break;
+
+          case "unhide_token":
+            const beforeHiddenLength = updatedPreferences.hiddenTokens.length;
+            updatedPreferences.hiddenTokens =
+              updatedPreferences.hiddenTokens.filter(
+                (addr: string) => addr !== normalizedToken
+              );
+            actionSuccess =
+              updatedPreferences.hiddenTokens.length < beforeHiddenLength;
+            break;
+
+          default:
+            results.push({
+              tokenAddress,
+              action,
+              success: false,
+              error: "Invalid action",
+            });
+            continue;
+        }
+
+        results.push({
+          tokenAddress,
+          action,
+          success: actionSuccess,
+        });
+      } catch (opError: any) {
+        results.push({
+          tokenAddress,
+          action,
+          success: false,
+          error: opError.message,
+        });
+      }
+    }
+
+    // Update metadata
+    updatedPreferences.lastUpdated = new Date().toISOString();
+    updatedPreferences.preferenceUpdates =
+      (updatedPreferences.preferenceUpdates || 0) + 1;
+    updatedPreferences.totalTokenCount =
+      updatedPreferences.userAddedTokens.length +
+      updatedPreferences.hiddenTokens.length;
+
+    // Save updated preferences
+    const result = await collection.replaceOne(
+      {
+        walletAddress: normalizedWallet,
+        chainId: chainId,
+      },
+      updatedPreferences,
+      { upsert: true }
+    );
+
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.length - successCount;
+
+    console.log(
+      `✅ Bulk update completed: ${successCount} successful, ${failureCount} failed`
+    );
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        walletAddress: updatedPreferences.walletAddress,
+        chainId: updatedPreferences.chainId,
+        operationsProcessed: operations.length,
+        successfulOperations: successCount,
+        failedOperations: failureCount,
+        userAddedCount: updatedPreferences.userAddedTokens.length,
+        hiddenCount: updatedPreferences.hiddenTokens.length,
+        preferenceUpdates: updatedPreferences.preferenceUpdates,
+        results: results,
+      },
+      message: `Bulk update completed: ${successCount}/${operations.length} operations successful`,
+    });
+  } catch (error: any) {
+    console.error("❌ Error in bulk preference update:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to perform bulk preference update",
         details:
           process.env.NODE_ENV === "development" ? error.message : undefined,
       },
