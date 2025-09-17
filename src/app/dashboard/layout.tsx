@@ -78,7 +78,7 @@ export default function DashboardLayout({
           {/* Main Content */}
           <main className="flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col">
             {/* Global Header - Always show */}
-            <div className="flex-shrink-0 bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] sm:p-4 lg:p-5">
+            <div className="flex-shrink-0 bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2">
               <GlobalDashboardHeader
                 title={isAIChatPage ? "Lumen AI" : "Dashboard"}
                 subtitle={

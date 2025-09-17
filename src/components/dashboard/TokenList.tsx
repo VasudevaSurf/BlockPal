@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - COMPLETE Enhanced with show/hide functionality
+// src/components/dashboard/TokenList.tsx - FIXED with original preset logic + 3-dot menus for additional tokens
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,20 +7,23 @@ import { useSelector } from "react-redux";
 import { useAccount, useChainId } from "wagmi";
 import { RootState } from "@/store";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
+import { useWalletTracking } from "@/hooks/useWalletTracking";
 import {
   RefreshCw,
+  MoreVertical,
   Eye,
   EyeOff,
-  X,
   AlertCircle,
   TrendingUp,
   TrendingDown,
   Info,
+  Plus,
+  Minus,
 } from "lucide-react";
 import { SkeletonTokenList } from "@/components/ui/Skeleton";
 import { chains } from "@/components/wallet/WalletProvider";
 
-// Token Interface - Complete definition
+// Token Interface
 interface TokenBalance {
   id: string;
   symbol: string;
@@ -30,14 +33,23 @@ interface TokenBalance {
   balance: number;
   balanceWei: string;
   value: number;
-  change24h: number; // Percentage change
-  usdChange24h?: number; // USD change amount
+  change24h: number;
+  usdChange24h?: number;
   price: number;
   isNative: boolean;
   logoUrl?: string | null;
   isPopular?: boolean;
   possibleSpam?: boolean;
   verifiedContract?: boolean;
+  isUserAdded?: boolean; // NEW: Track if user manually added this token
+}
+
+// Wallet Preferences Interface
+interface WalletPreferences {
+  walletAddress: string;
+  chainId: number;
+  userAddedTokens: string[]; // Contract addresses of tokens user manually added to main list
+  lastUpdated: string;
 }
 
 // Enhanced API Response Interface
@@ -152,7 +164,71 @@ const PercentageDisplay = ({
   );
 };
 
-// Enhanced Token Service Class
+// Three Dot Menu Component - ONLY for additional tokens
+const ThreeDotMenu = ({
+  token,
+  onAddToMain,
+}: {
+  token: TokenBalance;
+  onAddToMain: (tokenAddress: string) => void;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const handleAddToMain = async () => {
+    if (isAnimating) return;
+
+    setIsAnimating(true);
+    await onAddToMain(token.contractAddress);
+    setIsOpen(false);
+    setTimeout(() => setIsAnimating(false), 500);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="p-2 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+        title="Add to main list"
+      >
+        <MoreVertical size={14} />
+      </button>
+
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-20"
+            onClick={() => setIsOpen(false)}
+          />
+
+          {/* Dropdown Menu */}
+          <div className="absolute right-0 top-8 z-30 bg-black border border-[#2C2C2C] rounded-lg shadow-lg min-w-[160px] overflow-hidden">
+            <button
+              onClick={handleAddToMain}
+              disabled={isAnimating}
+              className={`w-full flex items-center px-3 py-2 text-sm text-left hover:bg-[#1A1A1A] transition-colors ${
+                isAnimating ? "opacity-50 cursor-not-allowed" : "text-white"
+              }`}
+            >
+              {isAnimating ? (
+                <div className="w-4 h-4 border-2 border-[#E2AF19] border-t-transparent rounded-full animate-spin mr-2" />
+              ) : (
+                <Plus size={14} className="mr-2 text-green-400" />
+              )}
+              {isAnimating ? "Adding..." : "Add to Main List"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// Enhanced Token Service Class with Preferences
 class EnhancedTokenService {
   private baseURL: string;
   private debugMode: boolean;
@@ -247,35 +323,62 @@ class EnhancedTokenService {
     }
   }
 
-  async refreshWalletTokens(walletAddress: string): Promise<void> {
+  // NEW: Save user preferences for added tokens
+  async saveWalletPreferences(
+    preferences: WalletPreferences
+  ): Promise<boolean> {
     try {
-      console.log(`🔄 Refreshing token data for wallet: ${walletAddress}`);
+      console.log("💾 Saving wallet preferences:", preferences);
 
-      const response = await fetch(`${this.baseURL}/refresh/${walletAddress}`, {
+      const response = await fetch(`/api/wallet/preferences`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        signal: AbortSignal.timeout(10000),
+        body: JSON.stringify(preferences),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || `HTTP ${response.status}: ${response.statusText}`
-        );
+        throw new Error(`Failed to save preferences: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log("✅ Preferences saved successfully");
+      return data.success;
+    } catch (error: any) {
+      console.error("❌ Error saving preferences:", error);
+      return false;
+    }
+  }
 
-      if (!data.success) {
-        throw new Error(data.message || "Failed to refresh token data");
+  // NEW: Load user preferences for added tokens
+  async loadWalletPreferences(
+    walletAddress: string,
+    chainId: number
+  ): Promise<WalletPreferences | null> {
+    try {
+      console.log(
+        `📥 Loading preferences for ${walletAddress} on chain ${chainId}`
+      );
+
+      const response = await fetch(
+        `/api/wallet/preferences?wallet=${walletAddress}&chain=${chainId}`
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log("📝 No existing preferences found");
+          return null;
+        }
+        throw new Error(`Failed to load preferences: ${response.statusText}`);
       }
 
-      console.log(`✅ Refreshed token data for wallet ${walletAddress}`);
+      const data = await response.json();
+      console.log("✅ Preferences loaded successfully:", data.data);
+      return data.data;
     } catch (error: any) {
-      console.error("❌ Error refreshing token data:", error);
-      throw error;
+      console.error("❌ Error loading preferences:", error);
+      return null;
     }
   }
 
@@ -304,15 +407,6 @@ class EnhancedTokenService {
 
     return amount.toFixed(Math.min(decimals, 8));
   }
-
-  format24hrChange(value: number): string {
-    if (typeof value !== "number" || isNaN(value) || Math.abs(value) < 0.001) {
-      return "+$0.000";
-    }
-
-    const sign = value >= 0 ? "+" : "";
-    return `${sign}$${Math.abs(value).toFixed(3)}`;
-  }
 }
 
 // Create service instance
@@ -324,6 +418,13 @@ export default function TokenList() {
   const { user } = useSelector((state: RootState) => state.auth);
   const { isLoading: isNavigating, startLoading } = useNavigationLoading();
 
+  // NEW: Add wallet tracking hook
+  const {
+    updateTrackingData,
+    trackNow,
+    isConnected: trackingConnected,
+  } = useWalletTracking();
+
   // Wallet integration
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -332,33 +433,39 @@ export default function TokenList() {
   const currentChain = chains.find((c) => c.id === chainId);
 
   // Component state
-  const [tokens, setTokens] = useState<TokenBalance[]>([]);
+  const [allTokens, setAllTokens] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [removingToken, setRemovingToken] = useState<string | null>(null);
 
-  // Enhanced state for show/hide functionality
+  // NEW: Show/Hide state (KEEPING ORIGINAL LOGIC)
   const [showHidden, setShowHidden] = useState(false);
   const [presetTokenCount, setPresetTokenCount] = useState(0);
   const [hiddenTokenCount, setHiddenTokenCount] = useState(0);
   const [hasHiddenTokens, setHasHiddenTokens] = useState(false);
+
+  // NEW: Preferences state
+  const [preferences, setPreferences] = useState<WalletPreferences | null>(
+    null
+  );
+  const [addingToken, setAddingToken] = useState<string | null>(null);
+
+  // Enhanced state
   const [totalValue, setTotalValue] = useState(0);
   const [total24hrChange, setTotal24hrChange] = useState(0);
   const [chainName, setChainName] = useState("");
 
-  // Fetch tokens when wallet or chain changes or show/hide toggles
+  // Load preferences and tokens when wallet connects
   useEffect(() => {
     if (isConnected && address && chainId) {
-      fetchTokens();
+      loadPreferencesAndTokens();
     } else {
-      // Reset state when not connected
       resetTokenState();
     }
-  }, [isConnected, address, chainId, showHidden]);
+  }, [isConnected, address, chainId, showHidden]); // Include showHidden in dependencies
 
   const resetTokenState = () => {
-    setTokens([]);
+    setAllTokens([]);
     setTotalValue(0);
     setTotal24hrChange(0);
     setPresetTokenCount(0);
@@ -367,10 +474,11 @@ export default function TokenList() {
     setChainName("");
     setLoading(false);
     setError("");
+    setPreferences(null);
   };
 
-  // Fetch tokens from enhanced API
-  const fetchTokens = async () => {
+  // Load preferences and tokens
+  const loadPreferencesAndTokens = async () => {
     if (!address || !chainId) {
       setLoading(false);
       return;
@@ -380,17 +488,31 @@ export default function TokenList() {
       setLoading(true);
       setError("");
 
-      console.log(
-        `📡 Fetching tokens for ${address} on chain ${chainId}, showHidden: ${showHidden}`
-      );
+      console.log("📊 Loading preferences and tokens...");
 
+      // Load user preferences first
+      const userPreferences = await enhancedTokenService.loadWalletPreferences(
+        address,
+        chainId
+      );
+      setPreferences(userPreferences);
+
+      // Fetch tokens based on showHidden state (ORIGINAL LOGIC)
       const response = await enhancedTokenService.getWalletTokens(
         address,
         chainId,
         showHidden
       );
 
-      setTokens(response.tokens);
+      // Apply user preferences to mark user-added tokens
+      const tokensWithPreferences = response.tokens.map((token) => ({
+        ...token,
+        isUserAdded: userPreferences
+          ? userPreferences.userAddedTokens.includes(token.contractAddress)
+          : false,
+      }));
+
+      setAllTokens(tokensWithPreferences);
       setTotalValue(response.totalValue);
       setTotal24hrChange(response.total24hrChange);
       setPresetTokenCount(response.presetTokenCount);
@@ -399,45 +521,37 @@ export default function TokenList() {
       setChainName(response.chainName);
 
       console.log(
-        `✅ Loaded ${
-          response.tokens.length
-        } tokens with total value: ${enhancedTokenService.formatCurrency(
-          response.totalValue
-        )}`
-      );
-      console.log(
-        `📊 Preset: ${response.presetTokenCount}, Hidden: ${
-          response.hiddenTokenCount
-        }, Showing: ${showHidden ? "All" : "Preset only"}`
-      );
-      console.log(
-        `📈 24hr Change: ${enhancedTokenService.format24hrChange(
-          response.total24hrChange
-        )}`
+        `✅ Loaded ${tokensWithPreferences.length} tokens (${response.presetTokenCount} preset, ${response.hiddenTokenCount} hidden)`
       );
 
-      // Log wallet-balance.js style summary
-      if (response.totalValue > 0) {
-        console.log("📊 Portfolio Summary:");
-        console.log(
-          `   Total Portfolio Value: ${enhancedTokenService.formatCurrency(
-            response.totalValue
-          )}`
+      // NEW: Update tracking data after successful token load
+      if (tokensWithPreferences.length > 0) {
+        const trackingTokens = tokensWithPreferences.map((token) => ({
+          contractAddress: token.contractAddress,
+          symbol: token.symbol,
+          name: token.name,
+          balance: token.balance,
+          value: token.value,
+          price: token.price,
+          change24h: token.change24h,
+          isNative: token.isNative,
+          isPreferred:
+            token.isPopular || token.isNative || token.isUserAdded || false,
+        }));
+
+        updateTrackingData(
+          response.totalValue,
+          response.total24hrChange,
+          trackingTokens
         );
-        console.log(
-          `   24hr Portfolio Change: ${enhancedTokenService.format24hrChange(
-            response.total24hrChange
-          )}`
-        );
-        console.log(`   Showing: ${response.presetTokenCount} preset tokens`);
-        if (response.hasHiddenTokens) {
-          console.log(
-            `   💡 Found ${response.hiddenTokenCount} additional token(s) not in preset list.`
-          );
-        }
+
+        // Auto-track after a short delay to ensure data is stable
+        setTimeout(() => {
+          trackNow();
+        }, 1500);
       }
     } catch (err: any) {
-      console.error("❌ Error fetching tokens:", err);
+      console.error("❌ Error loading tokens and preferences:", err);
       setError(err.message || "Failed to load tokens");
       resetTokenState();
     } finally {
@@ -445,31 +559,69 @@ export default function TokenList() {
     }
   };
 
-  // Handle refresh
-  const handleRefresh = async () => {
-    if (!address) return;
-
-    setIsRefreshing(true);
-    try {
-      await enhancedTokenService.refreshWalletTokens(address);
-      await fetchTokens();
-    } catch (err: any) {
-      console.error("❌ Error refreshing tokens:", err);
-      setError("Failed to refresh tokens");
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  // Handle show/hide toggle
+  // Handle show/hide toggle (ORIGINAL LOGIC)
   const handleToggleHidden = () => {
     console.log(`🔄 Toggling hidden tokens: ${showHidden} -> ${!showHidden}`);
     setShowHidden(!showHidden);
   };
 
+  // NEW: Handle adding token to main list
+  const handleAddToMainList = async (tokenAddress: string) => {
+    if (!address || !chainId || addingToken) return;
+
+    setAddingToken(tokenAddress);
+
+    try {
+      // Create updated preferences
+      const currentPrefs = preferences || {
+        walletAddress: address,
+        chainId,
+        userAddedTokens: [],
+        lastUpdated: new Date().toISOString(),
+      };
+
+      const updatedPrefs = {
+        ...currentPrefs,
+        userAddedTokens: [...currentPrefs.userAddedTokens, tokenAddress],
+        lastUpdated: new Date().toISOString(),
+      };
+
+      // Save to backend
+      const saved = await enhancedTokenService.saveWalletPreferences(
+        updatedPrefs
+      );
+
+      if (saved) {
+        // Update local state
+        setPreferences(updatedPrefs);
+        setAllTokens((prevTokens) =>
+          prevTokens.map((token) =>
+            token.contractAddress === tokenAddress
+              ? { ...token, isUserAdded: true }
+              : token
+          )
+        );
+
+        console.log(`✅ Token added to main list: ${tokenAddress}`);
+
+        // Refresh to show token in main list
+        setTimeout(() => {
+          loadPreferencesAndTokens();
+        }, 500);
+      } else {
+        throw new Error("Failed to save preferences");
+      }
+    } catch (error: any) {
+      console.error("❌ Error adding token to main list:", error);
+      setError("Failed to add token to main list");
+    } finally {
+      setAddingToken(null);
+    }
+  };
+
   // Handle token click
   const handleTokenClick = (token: TokenBalance) => {
-    if (isNavigating) return;
+    if (isNavigating || addingToken === token.contractAddress) return;
 
     try {
       const url = `/dashboard/token/${encodeURIComponent(
@@ -484,27 +636,35 @@ export default function TokenList() {
     }
   };
 
-  // Handle remove token
-  const handleRemoveToken = async (
-    e: React.MouseEvent,
-    contractAddress: string
-  ) => {
-    e.stopPropagation();
-
-    if (removingToken || contractAddress === "native") return;
-
-    setRemovingToken(contractAddress);
+  // Handle refresh
+  const handleRefresh = async () => {
+    if (!address) return;
+    setIsRefreshing(true);
     try {
-      // For now, just remove from local state
-      setTimeout(() => {
-        setTokens(tokens.filter((t) => t.contractAddress !== contractAddress));
-        setRemovingToken(null);
-      }, 500);
-    } catch (error) {
-      console.error("Failed to remove token:", error);
-      setRemovingToken(null);
+      await loadPreferencesAndTokens();
+    } catch (err: any) {
+      console.error("❌ Error refreshing tokens:", err);
+      setError("Failed to refresh tokens");
+    } finally {
+      setIsRefreshing(false);
     }
   };
+
+  // Split tokens based on original logic + user preferences
+  const mainTokens = showHidden
+    ? allTokens
+    : allTokens.filter((token, index) => {
+        // Show preset tokens + user-added tokens when not showing hidden
+        return index < presetTokenCount || token.isUserAdded;
+      });
+
+  const additionalTokens = showHidden
+    ? []
+    : allTokens.slice(presetTokenCount).filter((token) => !token.isUserAdded);
+
+  // When showing all, we need to identify which tokens can be added to main list
+  const tokensToShow = showHidden ? allTokens : mainTokens;
+  const canShowAdditionalMenus = showHidden; // Show 3-dot menus when showing all
 
   // Show loading state
   if (loading) {
@@ -539,28 +699,16 @@ export default function TokenList() {
   return (
     <>
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-        {/* Enhanced Header with Show/Hide Toggle */}
+        {/* Header with Show All toggle (ORIGINAL LOGIC) */}
         <div className="flex items-center justify-between mb-3 px-2">
           <div className="flex items-center gap-2">
             <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
               Token Holdings
             </h2>
-
-            {/* Token count display */}
-            {/* <div className="flex items-center gap-1 text-xs font-satoshi">
-              <span className="text-gray-400">
-                ({showHidden ? tokens.length : presetTokenCount})
-              </span>
-              {hasHiddenTokens && !showHidden && (
-                <span className="text-yellow-400">
-                  +{hiddenTokenCount} hidden
-                </span>
-              )}
-            </div> */}
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Show/Hide Toggle Button */}
+            {/* Show All Toggle Button (ORIGINAL LOGIC) */}
             {hasHiddenTokens && (
               <button
                 onClick={handleToggleHidden}
@@ -570,18 +718,18 @@ export default function TokenList() {
                     : "text-gray-400 hover:text-yellow-400 hover:bg-[#2C2C2C]"
                 }`}
                 title={
-                  showHidden ? "Hide non-preset tokens" : "Show all tokens"
+                  showHidden ? "Hide additional tokens" : "Show all tokens"
                 }
               >
                 {showHidden ? <EyeOff size={14} /> : <Eye size={14} />}
                 <span className="text-xs font-satoshi hidden sm:inline">
-                  {showHidden ? "Hide" : "Show"} All
+                  {showHidden ? "Hide All" : "Show All"}
                 </span>
               </button>
             )}
 
             {/* Refresh Button */}
-            {/* <button
+            <button
               onClick={handleRefresh}
               disabled={isRefreshing}
               className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
@@ -593,7 +741,7 @@ export default function TokenList() {
                   isRefreshing ? "animate-spin" : ""
                 }`}
               />
-            </button> */}
+            </button>
           </div>
         </div>
 
@@ -605,7 +753,7 @@ export default function TokenList() {
               <div>
                 <p className="text-red-400 text-sm font-satoshi">{error}</p>
                 <button
-                  onClick={() => fetchTokens()}
+                  onClick={() => loadPreferencesAndTokens()}
                   className="text-red-400 underline text-xs mt-1 font-satoshi"
                 >
                   Try Again
@@ -615,57 +763,8 @@ export default function TokenList() {
           </div>
         )}
 
-        {/* Chain info with enhanced stats */}
-        {/* {currentChain && (
-          <div className="mb-3 p-2 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-4 h-4 bg-blue-500 rounded-full mr-2"></div>
-                <span className="text-white text-sm font-satoshi">
-                  {chainName || currentChain.name}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-gray-400 text-xs font-satoshi">
-                  {enhancedTokenService.formatCurrency(totalValue)}
-                </div>
-                {Math.abs(total24hrChange) > 0.001 && (
-                  <div
-                    className={`text-xs font-satoshi ${
-                      total24hrChange >= 0 ? "text-green-400" : "text-red-400"
-                    }`}
-                  >
-                    {enhancedTokenService.format24hrChange(total24hrChange)}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )} */}
-
-        {/* Hidden tokens info banner - Following wallet-balance.js style */}
-        {/* {hasHiddenTokens && !showHidden && (
-          <div className="mb-3 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Info size={14} className="text-yellow-400 mr-2" />
-                <span className="text-yellow-400 text-xs font-satoshi">
-                  💡 Found {hiddenTokenCount} additional token
-                  {hiddenTokenCount > 1 ? "s" : ""} not in preset list.
-                </span>
-              </div>
-              <button
-                onClick={handleToggleHidden}
-                className="text-yellow-400 hover:text-yellow-300 text-xs font-satoshi underline"
-              >
-                Show All
-              </button>
-            </div>
-          </div>
-        )} */}
-
         {/* Token List */}
-        {tokens.length === 0 ? (
+        {allTokens.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8 flex-1">
             <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
               <span className="text-gray-400 text-base lg:text-lg">🪙</span>
@@ -685,47 +784,48 @@ export default function TokenList() {
             </button>
           </div>
         ) : (
-          <>
-            {/* Mobile Grid Layout */}
-            <div className="block sm:hidden flex-1 overflow-y-auto scrollbar-hide">
-              <div className="grid grid-cols-1 gap-2 pr-1">
-                {tokens.map((token, index) => (
-                  <div
-                    key={`${token.contractAddress}_${index}`}
-                    onClick={() => handleTokenClick(token)}
-                    className={`bg-[#0F0F0F] rounded-lg p-2.5 border border-[#2C2C2C] transition-colors relative group ${
-                      isNavigating || removingToken === token.contractAddress
-                        ? "cursor-wait opacity-70"
-                        : "cursor-pointer hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
-                    }`}
-                  >
-                    {/* Remove button */}
-                    {!token.isNative && (
-                      <button
-                        onClick={(e) =>
-                          handleRemoveToken(e, token.contractAddress)
-                        }
-                        disabled={removingToken === token.contractAddress}
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition-all p-1 hover:bg-[#2C2C2C] rounded"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
+          <div className="flex-1 overflow-y-auto scrollbar-hide">
+            {showHidden ? (
+              // Show All Mode: Single list with 3-dot menus for non-preset, non-user-added tokens
+              <div className="space-y-2 pr-1">
+                {tokensToShow.map((token, index) => {
+                  const isPresetToken = index < presetTokenCount;
+                  const isAdditionalToken =
+                    !isPresetToken && !token.isUserAdded;
 
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center">
+                  return (
+                    <div
+                      key={`${token.contractAddress}_${index}_showall`}
+                      onClick={() => handleTokenClick(token)}
+                      className={`flex items-center justify-between p-2.5 rounded-lg transition-colors relative group ${
+                        isNavigating || addingToken === token.contractAddress
+                          ? "cursor-wait opacity-70"
+                          : "cursor-pointer hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+                      }`}
+                    >
+                      <div className="flex items-center min-w-0 flex-1">
                         <TokenImage
                           src={token.logoUrl}
                           alt={token.symbol}
                           symbol={token.symbol}
-                          className="w-8 h-8 mr-2.5 flex-shrink-0"
+                          className="w-10 h-10 mr-2.5 flex-shrink-0"
                         />
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="text-white font-medium font-satoshi text-sm flex items-center">
                             {token.name}
                             {token.isNative && (
                               <span className="ml-2 text-xs bg-[#E2AF19] text-black px-1.5 py-0.5 rounded">
                                 Native
+                              </span>
+                            )}
+                            {token.isUserAdded && (
+                              <span className="ml-2 text-xs bg-green-600 text-green-100 px-1.5 py-0.5 rounded">
+                                Added
+                              </span>
+                            )}
+                            {isAdditionalToken && (
+                              <span className="ml-2 text-xs bg-gray-600 text-gray-300 px-1.5 py-0.5 rounded">
+                                Additional
                               </span>
                             )}
                           </div>
@@ -738,94 +838,171 @@ export default function TokenList() {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-white font-medium font-satoshi text-sm">
-                          {enhancedTokenService.formatCurrency(token.value)}
+
+                      <div className="flex items-center">
+                        <div className="text-right flex-shrink-0 mr-2">
+                          <div className="text-white font-medium font-satoshi text-sm">
+                            {enhancedTokenService.formatCurrency(token.value)}
+                          </div>
+                          <PercentageDisplay
+                            change24h={token.change24h}
+                            usdChange24h={token.usdChange24h}
+                            size="xs"
+                          />
                         </div>
-                        <PercentageDisplay
-                          change24h={token.change24h}
-                          usdChange24h={token.usdChange24h}
-                          size="xs"
-                        />
+
+                        {/* Show 3-dot menu ONLY for additional tokens (not preset, not user-added) */}
+                        {isAdditionalToken && (
+                          <ThreeDotMenu
+                            token={token}
+                            onAddToMain={handleAddToMainList}
+                          />
+                        )}
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Organized Mode: Separate sections
+              <>
+                {/* Main Tokens Section (Preset + User Added) */}
+                {mainTokens.length > 0 && (
+                  <div className={additionalTokens.length > 0 ? "mb-6" : ""}>
+                    <div className="space-y-2 pr-1">
+                      {mainTokens.map((token, index) => (
+                        <div
+                          key={`${token.contractAddress}_${index}`}
+                          onClick={() => handleTokenClick(token)}
+                          className={`flex items-center justify-between p-2.5 rounded-lg transition-colors relative group ${
+                            isNavigating ||
+                            addingToken === token.contractAddress
+                              ? "cursor-wait opacity-70"
+                              : "cursor-pointer hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+                          }`}
+                        >
+                          <div className="flex items-center min-w-0 flex-1">
+                            <TokenImage
+                              src={token.logoUrl}
+                              alt={token.symbol}
+                              symbol={token.symbol}
+                              className="w-10 h-10 mr-2.5 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-white font-medium font-satoshi text-sm flex items-center">
+                                {token.name}
+                                {token.isNative && (
+                                  <span className="ml-2 text-xs bg-[#E2AF19] text-black px-1.5 py-0.5 rounded">
+                                    Native
+                                  </span>
+                                )}
+                                {token.isUserAdded && (
+                                  <span className="ml-2 text-xs bg-green-600 text-green-100 px-1.5 py-0.5 rounded">
+                                    Added
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-gray-400 text-xs font-satoshi">
+                                {enhancedTokenService.formatTokenAmount(
+                                  token.balance,
+                                  4
+                                )}{" "}
+                                {token.symbol}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-white font-medium font-satoshi text-sm">
+                              {enhancedTokenService.formatCurrency(token.value)}
+                            </div>
+                            <PercentageDisplay
+                              change24h={token.change24h}
+                              usdChange24h={token.usdChange24h}
+                              size="xs"
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                )}
 
-            {/* Desktop List Layout */}
-            <div className="hidden sm:block flex-1 overflow-y-auto scrollbar-hide">
-              <div className="space-y-2 pr-1">
-                {tokens.map((token, index) => (
-                  <div
-                    key={`${token.contractAddress}_${index}`}
-                    onClick={() => handleTokenClick(token)}
-                    className={`flex items-center justify-between p-2.5 rounded-lg transition-colors relative group ${
-                      isNavigating || removingToken === token.contractAddress
-                        ? "cursor-wait opacity-70"
-                        : "cursor-pointer hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
-                    }`}
-                  >
-                    {/* Remove button */}
-                    {!token.isNative && (
-                      <button
-                        onClick={(e) =>
-                          handleRemoveToken(e, token.contractAddress)
-                        }
-                        disabled={removingToken === token.contractAddress}
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition-all p-1 hover:bg-[#2C2C2C] rounded z-10"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-
-                    <div className="flex items-center min-w-0 flex-1">
-                      <TokenImage
-                        src={token.logoUrl}
-                        alt={token.symbol}
-                        symbol={token.symbol}
-                        className="w-10 h-10 mr-2.5 flex-shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-white font-medium font-satoshi text-sm sm:text-sm flex items-center">
-                          {token.name}
-                          {token.isNative && (
-                            <span className="ml-2 text-xs bg-[#E2AF19] text-black px-1.5 py-0.5 rounded">
-                              Native
-                            </span>
-                          )}
-                          {!token.isPopular && showHidden && (
-                            <span className="ml-2 text-xs bg-gray-600 text-gray-300 px-1.5 py-0.5 rounded">
-                              New
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-gray-400 text-xs font-satoshi">
-                          {enhancedTokenService.formatTokenAmount(
-                            token.balance,
-                            4
-                          )}{" "}
-                          {token.symbol}
-                        </div>
+                {/* Additional Tokens Section (ONLY visible when not showing all) */}
+                {additionalTokens.length > 0 && (
+                  <div>
+                    <div className="flex items-center mb-3 px-2">
+                      <div className="flex-1 h-px bg-[#2C2C2C]"></div>
+                      <div className="px-3 text-xs text-gray-400 font-satoshi">
+                        Additional Tokens ({additionalTokens.length})
                       </div>
+                      <div className="flex-1 h-px bg-[#2C2C2C]"></div>
                     </div>
 
-                    <div className="text-right flex-shrink-0 pr-8">
-                      <div className="text-white font-medium font-satoshi text-sm">
-                        {enhancedTokenService.formatCurrency(token.value)}
-                      </div>
-                      <PercentageDisplay
-                        change24h={token.change24h}
-                        usdChange24h={token.usdChange24h}
-                        size="xs"
-                      />
+                    <div className="space-y-2 pr-1">
+                      {additionalTokens.map((token, index) => (
+                        <div
+                          key={`${token.contractAddress}_${index}_additional`}
+                          onClick={() => handleTokenClick(token)}
+                          className={`flex items-center justify-between p-2.5 rounded-lg transition-colors relative group ${
+                            isNavigating ||
+                            addingToken === token.contractAddress
+                              ? "cursor-wait opacity-70"
+                              : "cursor-pointer hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+                          }`}
+                        >
+                          <div className="flex items-center min-w-0 flex-1">
+                            <TokenImage
+                              src={token.logoUrl}
+                              alt={token.symbol}
+                              symbol={token.symbol}
+                              className="w-10 h-10 mr-2.5 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-white font-medium font-satoshi text-sm flex items-center">
+                                {token.name}
+                                <span className="ml-2 text-xs bg-gray-600 text-gray-300 px-1.5 py-0.5 rounded">
+                                  Additional
+                                </span>
+                              </div>
+                              <div className="text-gray-400 text-xs font-satoshi">
+                                {enhancedTokenService.formatTokenAmount(
+                                  token.balance,
+                                  4
+                                )}{" "}
+                                {token.symbol}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center">
+                            <div className="text-right flex-shrink-0 mr-2">
+                              <div className="text-white font-medium font-satoshi text-sm">
+                                {enhancedTokenService.formatCurrency(
+                                  token.value
+                                )}
+                              </div>
+                              <PercentageDisplay
+                                change24h={token.change24h}
+                                usdChange24h={token.usdChange24h}
+                                size="xs"
+                              />
+                            </div>
+
+                            {/* Three Dot Menu - ONLY for additional tokens */}
+                            <ThreeDotMenu
+                              token={token}
+                              onAddToMain={handleAddToMainList}
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </>
+                )}
+              </>
+            )}
+          </div>
         )}
 
         {/* Custom scrollbar styles */}
