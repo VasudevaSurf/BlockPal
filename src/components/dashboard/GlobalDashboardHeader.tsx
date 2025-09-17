@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED FOR WAGMI V2
+// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED chain icons
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -7,7 +7,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { Bell, User, LogOut, ChevronDown, ArrowLeft, X } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
-import { useAccount, useChainId, useSwitchChain } from "wagmi"; // UPDATED: wagmi v2 hooks
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { chains } from "@/components/wallet/WalletProvider";
 
 interface GlobalDashboardHeaderProps {
@@ -59,45 +59,45 @@ const getPageTitle = (
   }
 };
 
-// Chain data with colors and icons
-const chainData = [
-  {
-    id: 1,
-    name: "Ethereum",
-    color: "bg-blue-500",
-    icon: "Ξ",
-  },
-  {
-    id: 8453,
-    name: "Base",
-    color: "bg-blue-600",
-    icon: "B",
-  },
-  {
-    id: 137,
-    name: "Polygon",
-    color: "bg-purple-500",
-    icon: "◆",
-  },
-  {
-    id: 43114,
-    name: "Avalanche",
-    color: "bg-red-500",
-    icon: "A",
-  },
-  {
-    id: 42161,
-    name: "Arbitrum",
-    color: "bg-blue-400",
-    icon: "◉",
-  },
-  {
-    id: 56,
-    name: "BSC",
-    color: "bg-yellow-500",
-    icon: "B",
-  },
-];
+// FIXED: Chain data with proper icons and colors
+const getChainDisplayData = () => {
+  const chainDisplayData: {
+    [key: number]: { name: string; color: string; icon: string };
+  } = {
+    1: {
+      name: "Ethereum",
+      color: "bg-blue-500",
+      icon: "Ξ",
+    },
+    8453: {
+      name: "Base",
+      color: "bg-blue-600",
+      icon: "B",
+    },
+    137: {
+      name: "Polygon",
+      color: "bg-purple-500",
+      icon: "◆",
+    },
+    43114: {
+      name: "Avalanche",
+      color: "bg-red-500",
+      icon: "A",
+    },
+    42161: {
+      name: "Arbitrum",
+      color: "bg-blue-400",
+      icon: "◉",
+    },
+    56: {
+      name: "BSC",
+      color: "bg-yellow-500",
+      icon: "B",
+    },
+  };
+
+  return chainDisplayData;
+};
 
 export default function GlobalDashboardHeader({
   title: propTitle,
@@ -113,7 +113,7 @@ export default function GlobalDashboardHeader({
   } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch<AppDispatch>();
 
-  // UPDATED: wagmi v2 hooks
+  // Wallet integration
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const {
@@ -255,7 +255,7 @@ export default function GlobalDashboardHeader({
     }
   };
 
-  // UPDATED: Handle chain switch with wagmi v2
+  // Handle chain switch with wagmi v2
   const handleChainSwitch = async (targetChainId: number) => {
     // Don't proceed if not mounted to avoid hydration issues
     if (!mounted) {
@@ -297,9 +297,7 @@ export default function GlobalDashboardHeader({
     setSwitchError(null);
 
     try {
-      // UPDATED: wagmi v2 syntax
       switchChain({ chainId: targetChainId });
-
       console.log(`✅ Chain switch to ${targetChainId} initiated successfully`);
     } catch (error: any) {
       console.error(`❌ Chain switch to ${targetChainId} failed:`, error);
@@ -331,10 +329,28 @@ export default function GlobalDashboardHeader({
     }
   };
 
-  // Get current chain data with fallback
+  // FIXED: Get chain display data with proper fallbacks
+  const chainDisplayData = getChainDisplayData();
   const currentChain =
     mounted && isConnected ? chains.find((c) => c.id === chainId) : null;
-  const currentChainData = currentChain || chainData[0];
+
+  // Get display data for current chain with proper fallback
+  const getCurrentChainDisplay = () => {
+    if (mounted && isConnected && chainId && chainDisplayData[chainId]) {
+      return chainDisplayData[chainId];
+    }
+
+    // Fallback to first chain in display data
+    return (
+      chainDisplayData[1] || {
+        name: "Ethereum",
+        color: "bg-blue-500",
+        icon: "Ξ",
+      }
+    );
+  };
+
+  const currentChainDisplay = getCurrentChainDisplay();
 
   // Don't render if not authenticated
   if (!isAuthenticated) {
@@ -371,19 +387,19 @@ export default function GlobalDashboardHeader({
           <div className="relative" ref={chainSelectorRef}>
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] gap-1.5">
               <div className="flex items-center flex-1 min-w-0 bg-[#0F0F0F] rounded-[100px] p-[4px] mr-2">
-                {/* Chain Icon */}
+                {/* Chain Icon - FIXED */}
                 <div
-                  className={`w-6 h-6 lg:w-7 lg:h-7 ${currentChainData.color} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
+                  className={`w-6 h-6 lg:w-7 lg:h-7 ${currentChainDisplay.color} rounded-full mr-2 lg:mr-2.5 flex items-center justify-center relative flex-shrink-0`}
                 >
                   <span className="text-white text-xs font-bold font-satoshi">
-                    {currentChainData.icon}
+                    {currentChainDisplay.icon}
                   </span>
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate block">
                     {showWalletInfo
-                      ? currentChainData.name
+                      ? currentChainDisplay.name
                       : selectedWallet.name}
                   </span>
                 </div>
@@ -440,18 +456,24 @@ export default function GlobalDashboardHeader({
                     </button>
                   </div>
 
-                  {/* Chain List */}
+                  {/* Chain List - FIXED */}
                   <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
                     <div className="p-2 space-y-1">
-                      {chainData.map((chainItem) => {
+                      {chains.map((chain) => {
+                        const chainDisplay = chainDisplayData[chain.id] || {
+                          name: chain.name,
+                          color: "bg-gray-500",
+                          icon: chain.name.charAt(0),
+                        };
+
                         const isCurrentChain =
-                          showWalletInfo && chainId === chainItem.id;
-                        const isSwitching = switchingChain === chainItem.id;
+                          showWalletInfo && chainId === chain.id;
+                        const isSwitching = switchingChain === chain.id;
 
                         return (
                           <button
-                            key={chainItem.id}
-                            onClick={() => handleChainSwitch(chainItem.id)}
+                            key={chain.id}
+                            onClick={() => handleChainSwitch(chain.id)}
                             disabled={
                               isSwitching || !isConnected || isSwitchingChain
                             }
@@ -464,10 +486,10 @@ export default function GlobalDashboardHeader({
                             <div className="flex items-center">
                               {/* Chain Icon */}
                               <div
-                                className={`w-7 h-7 ${chainItem.color} rounded-full mr-2.5 flex items-center justify-center`}
+                                className={`w-7 h-7 ${chainDisplay.color} rounded-full mr-2.5 flex items-center justify-center`}
                               >
                                 <span className="text-white text-sm font-bold font-satoshi">
-                                  {chainItem.icon}
+                                  {chainDisplay.icon}
                                 </span>
                               </div>
 
@@ -479,7 +501,7 @@ export default function GlobalDashboardHeader({
                                     : "text-white"
                                 }`}
                               >
-                                {chainItem.name}
+                                {chainDisplay.name}
                                 {isSwitching && (
                                   <span className="ml-2 text-xs">
                                     (Switching...)

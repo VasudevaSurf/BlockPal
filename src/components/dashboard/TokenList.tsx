@@ -835,7 +835,7 @@ export default function TokenList() {
                       <div className="min-w-0 flex-1">
                         <div className="text-white font-medium font-satoshi text-sm flex items-center">
                           {token.name}
-                          {token.isNative && (
+                          {/* {token.isNative && (
                             <span className="ml-2 text-xs bg-[#E2AF19] text-black px-1.5 py-0.5 rounded">
                               Native
                             </span>
@@ -849,7 +849,7 @@ export default function TokenList() {
                             <span className="ml-2 text-xs bg-green-600 text-green-100 px-1.5 py-0.5 rounded">
                               Added
                             </span>
-                          )}
+                          )} */}
                         </div>
                         <div className="text-gray-400 text-xs font-satoshi">
                           {enhancedTokenService.formatTokenAmount(
