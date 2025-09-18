@@ -120,6 +120,12 @@ export default function SwapSection() {
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
   const [showGainersDropdown, setShowGainersDropdown] = useState(false);
 
+  // Auto-scroll refs and state
+  const trendingScrollRef = useRef<HTMLDivElement>(null);
+  const gainersScrollRef = useRef<HTMLDivElement>(null);
+  const [isPausedTrending, setIsPausedTrending] = useState(false);
+  const [isPausedGainers, setIsPausedGainers] = useState(false);
+
   // Close settings dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -136,6 +142,48 @@ export default function SwapSection() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Auto-scroll for Trending Tokens
+  useEffect(() => {
+    const scrollContainer = trendingScrollRef.current;
+    if (!scrollContainer || isPausedTrending || trendingTokens.length === 0)
+      return;
+
+    const scroll = () => {
+      if (
+        scrollContainer.scrollTop + scrollContainer.clientHeight >=
+        scrollContainer.scrollHeight - 1
+      ) {
+        scrollContainer.scrollTop = 0;
+      } else {
+        scrollContainer.scrollTop += 1;
+      }
+    };
+
+    const interval = setInterval(scroll, 50);
+    return () => clearInterval(interval);
+  }, [isPausedTrending, trendingTokens]);
+
+  // Auto-scroll for Top Gainers
+  useEffect(() => {
+    const scrollContainer = gainersScrollRef.current;
+    if (!scrollContainer || isPausedGainers || topGainersData.length === 0)
+      return;
+
+    const scroll = () => {
+      if (
+        scrollContainer.scrollTop + scrollContainer.clientHeight >=
+        scrollContainer.scrollHeight - 1
+      ) {
+        scrollContainer.scrollTop = 0;
+      } else {
+        scrollContainer.scrollTop += 1;
+      }
+    };
+
+    const interval = setInterval(scroll, 50);
+    return () => clearInterval(interval);
+  }, [isPausedGainers, topGainersData]);
 
   // Initialize with ETH as default sell token
   useEffect(() => {
@@ -369,7 +417,12 @@ export default function SwapSection() {
 
           {/* Token List */}
           {!coinGeckoLoading && !coinGeckoError && (
-            <div className="flex-1 overflow-y-auto space-y-2">
+            <div
+              ref={trendingScrollRef}
+              className="flex-1 overflow-y-auto space-y-2 scrollbar-hide"
+              onMouseEnter={() => setIsPausedTrending(true)}
+              onMouseLeave={() => setIsPausedTrending(false)}
+            >
               {trendingTokens.length > 0 ? (
                 trendingTokens.map((token: TrendingToken) => (
                   <div
@@ -520,7 +573,12 @@ export default function SwapSection() {
 
           {/* Token List */}
           {!coinGeckoLoading && (
-            <div className="flex-1 overflow-y-auto space-y-1">
+            <div
+              ref={gainersScrollRef}
+              className="flex-1 overflow-y-auto space-y-1 scrollbar-hide"
+              onMouseEnter={() => setIsPausedGainers(true)}
+              onMouseLeave={() => setIsPausedGainers(false)}
+            >
               {topGainersData.length > 0 ? (
                 topGainersData.map((token: TopGainer) => (
                   <div
