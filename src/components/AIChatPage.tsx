@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx - Small New Chat button at bottom
+// src/components/AIChatPage.tsx - Real AI functionality
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -9,10 +9,7 @@ import {
   RefreshCw,
   Check,
   Brain,
-  Menu,
-  X,
   Plus,
-  MessageCircle,
   AlertTriangle,
 } from "lucide-react";
 import { RootState } from "@/store";
@@ -25,6 +22,12 @@ interface Message {
   timestamp: Date;
   processing?: boolean;
   typing?: boolean;
+  functionCalls?: string[];
+  tokens?: {
+    input?: number;
+    output?: number;
+    total?: number;
+  };
 }
 
 interface Conversation {
@@ -41,12 +44,15 @@ export default function AIChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [sessionId, setSessionId] = useState<string>("");
+  const [userId, setUserId] = useState<string>("");
+  const [conversationId, setConversationId] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeTab, setActiveTab] = useState<"chat" | "history">("chat");
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -54,91 +60,96 @@ export default function AIChatPage() {
   // Suggestion chips data
   const suggestionChips = [
     "Analyze BTC",
-    "DeFi Yields",
-    "Finance",
-    "Token Strategy",
-    "Supply Trends",
-    "Assets",
-    "Tokenization",
-    "Comprehensive Analysis",
-    "Analyze ETH",
-    "Borrow Trends",
-    "Chart Trends",
-    "Ownership",
-    "Cryptocurrency",
+    "Check ETH security",
+    "Compare Bitcoin vs Ethereum",
+    "Analyze my wallet",
+    "What's trending in DeFi?",
+    "Chart analysis for LINK",
+    "Token security for SHIB",
+    "Portfolio insights",
+    "Market sentiment today",
+    "Best altcoins 2025",
+    "Crypto news summary",
+    "Gas fees prediction",
   ];
 
-  // Load conversations and initialize
+  // Initialize AI chat system
   useEffect(() => {
-    const loadConversations = () => {
+    const initializeAI = async () => {
       try {
-        const saved = localStorage.getItem("ai-chat-conversations");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const fixedConversations = parsed.map((conv) => ({
-            ...conv,
-            timestamp:
-              conv.timestamp || conv.createdAt || new Date().toISOString(),
-            createdAt:
-              conv.createdAt || conv.timestamp || new Date().toISOString(),
-          }));
-          setConversations(fixedConversations);
-        }
-      } catch (error) {
-        console.error("Error loading conversations:", error);
+        // Create or get user
+        const response = await fetch("/api/ai/user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!response.ok) throw new Error("Failed to create user");
+
+        const userData = await response.json();
+        setUserId(userData.userId);
+
+        // Create new conversation
+        const convResponse = await fetch("/api/ai/conversation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: userData.userId }),
+        });
+
+        if (!convResponse.ok) throw new Error("Failed to create conversation");
+
+        const convData = await convResponse.json();
+        setConversationId(convData.conversationId);
+
+        setIsInitialized(true);
+        console.log("✅ AI chat initialized:", {
+          userId: userData.userId,
+          conversationId: convData.conversationId,
+        });
+      } catch (error: any) {
+        console.error("❌ Failed to initialize AI chat:", error);
+        setError("Failed to initialize AI chat. Some features may not work.");
+        setIsInitialized(true); // Still allow basic usage
+      } finally {
+        setInitialLoading(false);
       }
     };
 
-    loadConversations();
-
-    const timer = setTimeout(() => {
-      setInitialLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
+    initializeAI();
   }, []);
 
-  // Save conversation
+  // Load conversations
   useEffect(() => {
-    if (messages.length > 0 && sessionId) {
-      const now = new Date().toISOString();
-      const currentConversation: Conversation = {
-        id: sessionId,
-        title:
-          messages.find((m) => m.type === "user")?.content?.slice(0, 50) +
-            "..." || "New Chat",
-        messages: messages,
-        lastMessage:
-          messages[messages.length - 1]?.content?.slice(0, 60) + "...",
-        timestamp: now,
-        messageCount: messages.length,
-        createdAt: now,
-      };
+    const loadConversations = async () => {
+      if (!userId) return;
 
-      setConversations((prev) => {
-        const existing = prev.findIndex((conv) => conv.id === sessionId);
-        if (existing >= 0) {
-          const updated = prev.map((conv, i) =>
-            i === existing
-              ? { ...currentConversation, createdAt: conv.createdAt || now }
-              : conv
-          );
-          localStorage.setItem(
-            "ai-chat-conversations",
-            JSON.stringify(updated)
-          );
-          return updated;
-        } else {
-          const updated = [currentConversation, ...prev];
-          localStorage.setItem(
-            "ai-chat-conversations",
-            JSON.stringify(updated)
-          );
-          return updated;
+      try {
+        const response = await fetch(`/api/ai/user?userId=${userId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.conversations) {
+            const formattedConversations = data.conversations.map(
+              (conv: any) => ({
+                id: conv.conversation_id,
+                title: conv.title || "New Conversation",
+                messages: [],
+                lastMessage: conv.title || "",
+                timestamp: conv.last_updated || new Date().toISOString(),
+                messageCount: conv.message_count || 0,
+                createdAt: conv.created_at || new Date().toISOString(),
+              })
+            );
+            setConversations(formattedConversations);
+          }
         }
-      });
+      } catch (error) {
+        console.error("Failed to load conversations:", error);
+      }
+    };
+
+    if (userId) {
+      loadConversations();
     }
-  }, [messages, sessionId]);
+  }, [userId]);
 
   // Auto scroll
   useEffect(() => {
@@ -158,19 +169,8 @@ export default function AIChatPage() {
 
   const getRelativeTime = (timestamp: string | Date) => {
     try {
-      let date: Date;
-
-      if (timestamp instanceof Date) {
-        date = timestamp;
-      } else if (typeof timestamp === "string") {
-        date = new Date(timestamp);
-      } else {
-        return "Unknown";
-      }
-
-      if (isNaN(date.getTime())) {
-        return "Unknown";
-      }
+      const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+      if (isNaN(date.getTime())) return "Unknown";
 
       const now = new Date();
       const diff = now.getTime() - date.getTime();
@@ -200,7 +200,7 @@ export default function AIChatPage() {
 
       const typeInterval = setInterval(() => {
         if (currentIndex < fullText.length) {
-          const charsToAdd = Math.random() > 0.3 ? 8 : 3;
+          const charsToAdd = Math.random() > 0.3 ? 12 : 4;
           currentText += fullText.slice(
             currentIndex,
             currentIndex + charsToAdd
@@ -230,33 +230,8 @@ export default function AIChatPage() {
           );
           resolve();
         }
-      }, 12);
+      }, 18);
     });
-  };
-
-  const getDemoResponse = (input: string): string => {
-    const lowerInput = input.toLowerCase().trim();
-
-    if (lowerInput === "demo") {
-      return `🔷 **Demo AI Response**\n\nThis is a sample AI response showing how the chat interface would work with real AI functionality.\n\n**Features demonstrated:**\n• Markdown formatting with **bold** and *italic* text\n• Code snippets like \`console.log('Hello')\`\n• Structured responses\n• Real-time typing animation\n\nThe actual AI would provide cryptocurrency analysis, market insights, and blockchain information.`;
-    }
-
-    if (lowerInput === "help") {
-      return `🔷 **BlockPal AI Demo Commands**\n\n**Available Demo Commands:**\n• \`demo\` - Show sample AI response\n• \`help\` - Show this help message\n• \`clear\` - Clear conversation\n• \`features\` - List planned AI features\n• \`status\` - Show system status\n\n**Note:** This is a demo interface. Real AI functionality is disabled.`;
-    }
-
-    if (lowerInput.includes("btc") || lowerInput.includes("bitcoin")) {
-      return `🔷 **Bitcoin Analysis (Demo)**\n\nAnalyzing BTC market data...\n\n**Current Status:**\n• Price: Demo data only\n• Market cap: Demo analysis\n• 24h volume: Sample metrics\n• Trend: Simulated insights\n\n**Note:** This is demo mode - real market data would be provided in production.`;
-    }
-
-    // Default response for any other input
-    const responses = [
-      `🤖 **Demo Response**\n\nI received your message: "${input}"\n\nIn the full version, I would provide detailed crypto analysis and insights. For now, try these demo commands: \`demo\`, \`help\`, \`features\`, or \`status\`.`,
-      `🔷 **AI Analysis (Demo)**\n\nYour query about "${input}" would normally trigger:\n• Market data lookup\n• Technical analysis\n• Personalized recommendations\n\nCurrently showing demo responses only.`,
-      `⚡ **BlockPal AI (Demo Mode)**\n\nProcessing "${input}"...\n\nIn production, this would connect to:\n• Real-time market data\n• Blockchain analytics\n• Portfolio tracking\n\nDemo mode: Try \`help\` for available commands.`,
-    ];
-
-    return responses[Math.floor(Math.random() * responses.length)];
   };
 
   const handleSendMessage = async (messageText?: string) => {
@@ -275,14 +250,29 @@ export default function AIChatPage() {
     setInputMessage("");
     setIsTyping(true);
 
-    if (!sessionId) setSessionId(Date.now().toString());
-
     // Handle clear command
     if (currentInput.toLowerCase().trim() === "clear") {
       setMessages([]);
-      setSessionId("");
+      setConversationId("");
       setIsTyping(false);
       setSidebarOpen(false);
+
+      // Create new conversation
+      if (userId) {
+        try {
+          const response = await fetch("/api/ai/conversation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId }),
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setConversationId(data.conversationId);
+          }
+        } catch (error) {
+          console.error("Failed to create new conversation:", error);
+        }
+      }
       return;
     }
 
@@ -300,13 +290,26 @@ export default function AIChatPage() {
     ]);
 
     try {
-      console.log("🤖 Processing demo message:", currentInput);
+      console.log("🤖 Sending message to AI:", currentInput);
 
-      await new Promise((resolve) =>
-        setTimeout(resolve, 1000 + Math.random() * 1000)
-      );
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: currentInput,
+          conversationId: conversationId || null,
+          userId: userId || null,
+        }),
+      });
 
-      const demoResponse = getDemoResponse(currentInput);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("📦 AI Response received:", data);
 
       setMessages((prev) => prev.filter((msg) => !msg.processing));
       const aiId = (Date.now() + 2).toString();
@@ -318,13 +321,18 @@ export default function AIChatPage() {
           content: "",
           timestamp: new Date(),
           typing: true,
+          functionCalls: data.functionCalls || [],
+          tokens: data.tokens,
         },
       ]);
 
-      await typeMessage(demoResponse, aiId);
-      console.log("✅ Demo response completed");
-    } catch (error) {
-      console.error("❌ Error in demo response:", error);
+      await typeMessage(
+        data.message || "Sorry, I didn't receive a proper response.",
+        aiId
+      );
+      console.log("✅ AI response completed");
+    } catch (error: any) {
+      console.error("❌ Error sending message:", error);
 
       setMessages((prev) => prev.filter((msg) => !msg.processing));
       const errorId = (Date.now() + 2).toString();
@@ -339,10 +347,23 @@ export default function AIChatPage() {
         },
       ]);
 
-      await typeMessage(
-        `❌ **Demo Error**\n\nSomething went wrong with the demo response. This would normally show a proper error message.\n\nTry typing \`help\` for available demo commands.`,
-        errorId
-      );
+      let errorMessage =
+        "❌ **Error**\n\nSomething went wrong while processing your request.";
+
+      if (error.message.includes("fetch")) {
+        errorMessage =
+          "🌐 **Connection Error**\n\nUnable to connect to the AI service. Please check your internet connection and try again.";
+      } else if (error.message.includes("500")) {
+        errorMessage =
+          "⚠️ **Server Error**\n\nThe AI service is temporarily unavailable. Please try again in a few moments.";
+      } else if (error.message.includes("404")) {
+        errorMessage =
+          "🔍 **Service Not Found**\n\nThe AI service endpoint was not found. Please contact support.";
+      } else {
+        errorMessage += `\n\n**Details:** ${error.message}`;
+      }
+
+      await typeMessage(errorMessage, errorId);
     } finally {
       setIsTyping(false);
     }
@@ -357,7 +378,14 @@ export default function AIChatPage() {
 
   const copyMessage = async (content: string, messageId: string) => {
     try {
-      await navigator.clipboard.writeText(content);
+      // Clean content for copying (remove markdown formatting)
+      const cleanContent = content
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .replace(/\*(.*?)\*/g, "$1")
+        .replace(/`(.*?)`/g, "$1")
+        .replace(/\n/g, "\n");
+
+      await navigator.clipboard.writeText(cleanContent);
       setCopiedItems((prev) => new Set(prev).add(messageId));
       setTimeout(() => {
         setCopiedItems((prev) => {
@@ -371,36 +399,71 @@ export default function AIChatPage() {
     }
   };
 
-  const handleSessionSelect = (selectedSessionId: string) => {
-    if (selectedSessionId === sessionId) {
+  const handleSessionSelect = async (selectedSessionId: string) => {
+    if (selectedSessionId === conversationId) {
       setActiveTab("chat");
       return;
     }
 
-    const conversation = conversations.find(
-      (conv) => conv.id === selectedSessionId
-    );
-    if (conversation) {
-      setSessionId(selectedSessionId);
-      setMessages(conversation.messages || []);
-      setActiveTab("chat");
+    try {
+      const response = await fetch(
+        `/api/ai/conversation?conversationId=${selectedSessionId}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.conversation && data.conversation.messages) {
+          const formattedMessages = data.conversation.messages.map(
+            (msg: any) => ({
+              id: msg.timestamp + Math.random(),
+              type: msg.role,
+              content: msg.content,
+              timestamp: new Date(msg.timestamp),
+              functionCalls: msg.function_calls || [],
+            })
+          );
+          setConversationId(selectedSessionId);
+          setMessages(formattedMessages);
+          setActiveTab("chat");
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load conversation:", error);
     }
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = async () => {
     setMessages([]);
-    setSessionId(Date.now().toString());
+    setSidebarOpen(false);
     setActiveTab("chat");
+
+    // Create new conversation if we have a user
+    if (userId) {
+      try {
+        const response = await fetch("/api/ai/conversation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setConversationId(data.conversationId);
+          console.log("✅ New conversation created:", data.conversationId);
+        }
+      } catch (error) {
+        console.error("Failed to create new conversation:", error);
+        setConversationId(Date.now().toString()); // Fallback to local ID
+      }
+    }
   };
 
   const deleteConversation = (conversationId: string) => {
-    setConversations((prev) => {
-      const updated = prev.filter((conv) => conv.id !== conversationId);
-      localStorage.setItem("ai-chat-conversations", JSON.stringify(updated));
-      return updated;
-    });
+    setConversations((prev) =>
+      prev.filter((conv) => conv.id !== conversationId)
+    );
 
-    if (conversationId === sessionId) handleNewChat();
+    if (conversationId === conversationId) {
+      handleNewChat();
+    }
   };
 
   const formatMessage = (content: string) => {
@@ -460,6 +523,33 @@ export default function AIChatPage() {
               </button>
             </div>
           </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="mt-2 bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-2 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <AlertTriangle size={16} className="text-yellow-400" />
+                <p className="text-yellow-400 text-xs font-satoshi">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Status Indicator */}
+          {!error && isInitialized && (
+            <div className="mt-2 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-green-400 text-xs font-satoshi">
+                  AI Ready
+                </span>
+                {userId && (
+                  <span className="text-gray-500 text-xs">
+                    • ID: {userId.slice(-6)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Messages or Welcome Screen */}
@@ -478,18 +568,18 @@ export default function AIChatPage() {
 
               {/* Heading */}
               <h1 className="text-white text-3xl font-satoshi font-bold mb-10 text-center">
-                Chat with Lumen
+                Chat with Lumen AI
               </h1>
 
-              {/* Suggestion Chips - Fixed to match textarea width */}
+              {/* Suggestion Chips */}
               <div className="w-full max-w-2xl mx-auto mb-16">
                 <div className="flex flex-wrap justify-center gap-2 px-4">
                   {suggestionChips.map((chip, index) => (
                     <button
                       key={index}
                       onClick={() => handleChipClick(chip)}
-                      className="px-3 py-1.5 text-white text-xs font-satoshi rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105"
-                      disabled={isTyping}
+                      className="px-3 py-1.5 text-white text-xs font-satoshi rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
+                      disabled={isTyping || !isInitialized}
                     >
                       {chip}
                     </button>
@@ -512,18 +602,45 @@ export default function AIChatPage() {
                               className="text-[#E2AF19] animate-spin"
                             />
                             <span className="text-[#F9EFD1] text-sm">
-                              Processing demo response...
+                              Lumen AI is thinking...
                             </span>
                           </div>
                         ) : (
                           <div className="text-[#F9EFD1] text-sm leading-relaxed">
                             <div
+                              className="message-content"
                               dangerouslySetInnerHTML={{
                                 __html: formatMessage(message.content),
                               }}
                             />
                             {message.typing && (
                               <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
+                            )}
+
+                            {/* Function calls indicator */}
+                            {message.functionCalls &&
+                              message.functionCalls.length > 0 &&
+                              !message.typing && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {message.functionCalls.map((func, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="text-xs bg-[#E2AF19]/20 text-[#E2AF19] px-2 py-1 rounded"
+                                    >
+                                      {func.replace("_", " ")}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                            {/* Token usage */}
+                            {message.tokens && !message.typing && (
+                              <div className="mt-2 text-xs text-gray-500">
+                                Tokens:{" "}
+                                {message.tokens.total ||
+                                  (message.tokens.input || 0) +
+                                    (message.tokens.output || 0)}
+                              </div>
                             )}
                           </div>
                         )}
@@ -566,7 +683,7 @@ export default function AIChatPage() {
           )}
         </div>
 
-        {/* Input - Fixed send button alignment */}
+        {/* Input */}
         <div className="flex-shrink-0 p-4">
           <div className="relative max-w-2xl mx-auto">
             <textarea
@@ -574,14 +691,18 @@ export default function AIChatPage() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message"
-              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-12 pl-4 py-3 min-h-[48px] max-h-32 text-sm border border-[#2C2C2C] focus:border-[#E2AF19] transition-colors rounded-[100px]"
+              placeholder={
+                isInitialized
+                  ? "Ask about crypto, analyze tokens, check wallet performance..."
+                  : "Initializing AI..."
+              }
+              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-12 pl-4 py-3 min-h-[48px] max-h-32 text-sm border border-[#2C2C2C] focus:border-[#E2AF19] transition-colors rounded-[100px] disabled:opacity-50"
               rows={1}
-              disabled={isTyping}
+              disabled={isTyping || !isInitialized}
             />
             <button
               onClick={() => handleSendMessage()}
-              disabled={!inputMessage.trim() || isTyping}
+              disabled={!inputMessage.trim() || isTyping || !isInitialized}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 text-black rounded-full w-8 h-8 flex items-center justify-center transition-colors"
             >
               {isTyping ? (
@@ -603,7 +724,9 @@ export default function AIChatPage() {
                   />
                 ))}
               </div>
-              <span className="text-gray-400 text-xs">Demo AI thinking...</span>
+              <span className="text-gray-400 text-xs">
+                Lumen AI is working...
+              </span>
             </div>
           )}
         </div>
@@ -620,79 +743,76 @@ export default function AIChatPage() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="h-full flex flex-col">
-          {/* Conversations List - Takes full height */}
           <div className="flex-1 px-4 pt-4 overflow-y-auto">
             <div className="mb-4">
               <span className="text-gray-300 text-sm font-satoshi font-medium">
-                Recents
+                Recent Conversations
               </span>
             </div>
 
             <div className="space-y-2 pb-20">
               {/* Current Session */}
-              {messages.length > 0 && sessionId && (
+              {messages.length > 0 && conversationId && (
                 <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                       <span className="text-white text-sm font-medium">
-                        Current Demo Chat
+                        Current Chat
                       </span>
                     </div>
                   </div>
+                  <p className="text-gray-400 text-xs mt-1 truncate">
+                    {messages[0]?.content?.substring(0, 60)}...
+                  </p>
                 </div>
               )}
 
               {/* Saved Conversations */}
               {conversations
-                .filter((conv) => conv.id !== sessionId)
+                .filter((conv) => conv.id !== conversationId)
                 .map((conversation) => (
                   <div
                     key={conversation.id}
                     className="p-3 rounded-xl cursor-pointer group transition-all bg-[#2C2C2C]/20 hover:bg-[#2C2C2C]/40"
                     onClick={() => handleSessionSelect(conversation.id)}
                   >
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <span className="text-gray-300 text-sm font-medium line-clamp-1">
-                          {conversation.title || "Untitled Demo Chat"}
+                          {conversation.title}
                         </span>
+                        <p className="text-gray-500 text-xs mt-1 line-clamp-1">
+                          {conversation.lastMessage}
+                        </p>
+                        <p className="text-gray-600 text-xs mt-1">
+                          {getRelativeTime(conversation.timestamp)} •{" "}
+                          {conversation.messageCount} messages
+                        </p>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteConversation(conversation.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-all"
-                      >
-                        <X size={12} className="text-red-400" />
-                      </button>
                     </div>
                   </div>
                 ))}
 
               {/* Empty State */}
-              {conversations.filter((conv) => conv.id !== sessionId).length ===
-                0 &&
-                messages.length === 0 && (
-                  <div className="text-center py-8">
-                    <Brain className="text-gray-500 mx-auto mb-3" size={32} />
-                    <p className="text-gray-500 text-sm">
-                      No demo conversations yet
-                    </p>
-                    <p className="text-gray-600 text-xs mt-1">
-                      Start chatting to see history
-                    </p>
-                  </div>
-                )}
+              {conversations.length === 0 && messages.length === 0 && (
+                <div className="text-center py-8">
+                  <Brain className="text-gray-500 mx-auto mb-3" size={32} />
+                  <p className="text-gray-500 text-sm">No conversations yet</p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    Start chatting to see history
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Small New Chat Button - Fixed at bottom */}
+          {/* New Chat Button */}
           <div className="absolute bottom-4 left-4 right-4 bg-gradient-to-b from-transparent to-[#141414] pt-4">
             <button
               onClick={handleNewChat}
-              className="w-full bg-[#E2AF19] text-black px-3 py-2 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center justify-center space-x-2"
+              className="w-full bg-[#E2AF19] text-black px-3 py-2 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+              disabled={isTyping}
             >
               <Plus size={14} />
               <span>New Chat</span>

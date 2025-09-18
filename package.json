@@ -15,7 +15,9 @@
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
     "@firebase/app": "^0.13.2",
+    "@rainbow-me/rainbowkit": "^2.2.8",
     "@reduxjs/toolkit": "^2.8.2",
+    "@tanstack/react-query": "^5.56.2",
     "@vercel/blob": "^1.1.1",
     "alchemy-sdk": "^3.6.2",
     "axios": "^1.10.0",
@@ -23,6 +25,7 @@
     "clsx": "^2.1.1",
     "ethers": "^6.14.4",
     "firebase": "^11.10.0",
+    "gpt-tokenizer": "^3.0.1",
     "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",
     "lodash.debounce": "^4.0.8",
@@ -38,10 +41,8 @@
     "speakeasy": "^2.0.0",
     "tls": "^0.0.1",
     "uuid": "^11.1.0",
-    "@rainbow-me/rainbowkit": "^2.2.8",
-    "@tanstack/react-query": "^5.56.2",
-    "wagmi": "^2.12.17",
-    "viem": "^2.21.19"
+    "viem": "^2.21.19",
+    "wagmi": "^2.12.17"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
