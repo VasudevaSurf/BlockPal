@@ -1,12 +1,14 @@
-// src/app/api/chat/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import TokenMetadata from '@/lib/ai/TokenMetadata';
-import ChartAnalyzer from '@/lib/ai/ChartAnalyzer';
-import TokenSecurity from '@/lib/ai/TokenSecurity';
-import { WalletAnalyzer } from '@/lib/ai/TokenSecurity';
-import DatabaseManager from '@/lib/ai/DatabaseManager';
-import { encode } from 'gpt-tokenizer';
+// src/app/api/chat/route.ts - FIXED with user authentication
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
+import OpenAI from "openai";
+import TokenMetadata from "@/lib/ai/TokenMetadata";
+import ChartAnalyzer from "@/lib/ai/ChartAnalyzer";
+import TokenSecurity from "@/lib/ai/TokenSecurity";
+import { WalletAnalyzer } from "@/lib/ai/TokenSecurity";
+import DatabaseManager from "@/lib/ai/DatabaseManager";
+import { encode } from "gpt-tokenizer";
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -32,131 +34,134 @@ const tools = [
     type: "function" as const,
     function: {
       name: "get_token_metadata",
-      description: "Get comprehensive metadata about a cryptocurrency token including price, market cap, supply, description, and links",
+      description: "Get comprehensive metadata about a cryptocurrency token",
       parameters: {
         type: "object",
         properties: {
           token: {
             type: "string",
-            description: "Token name, symbol, or contract address (e.g., 'BTC', 'Bitcoin', '0x...')"
-          }
+            description: "Token name, symbol, or contract address",
+          },
         },
-        required: ["token"]
-      }
-    }
+        required: ["token"],
+      },
+    },
   },
   {
     type: "function" as const,
     function: {
       name: "analyze_token_chart",
-      description: "Perform 90-day technical analysis on a token including RSI, MACD, support/resistance levels, Fibonacci retracements, and sentiment scoring",
+      description: "Perform technical analysis on a token",
       parameters: {
         type: "object",
         properties: {
           token: {
             type: "string",
-            description: "Token name, symbol, or contract address"
-          }
+            description: "Token name, symbol, or contract address",
+          },
         },
-        required: ["token"]
-      }
-    }
+        required: ["token"],
+      },
+    },
   },
   {
     type: "function" as const,
     function: {
       name: "check_token_security",
-      description: "Check smart contract security for risks, honeypots, taxes, and red flags with security scoring",
+      description: "Check smart contract security",
       parameters: {
         type: "object",
         properties: {
           token: {
             type: "string",
-            description: "Token name, symbol, or contract address"
-          }
+            description: "Token name, symbol, or contract address",
+          },
         },
-        required: ["token"]
-      }
-    }
+        required: ["token"],
+      },
+    },
   },
   {
     type: "function" as const,
     function: {
       name: "analyze_wallet",
-      description: "Analyze wallet trading performance including profit/loss, win rate, top trades, and portfolio health",
+      description: "Analyze wallet trading performance",
       parameters: {
         type: "object",
         properties: {
           address: {
             type: "string",
-            description: "EVM wallet address (0x...)"
+            description: "EVM wallet address",
           },
           chain: {
             type: "string",
-            description: "Chain ID (default: '0x1' for Ethereum)",
-            default: "0x1"
-          }
+            description: "Chain ID (default: '0x1')",
+            default: "0x1",
+          },
         },
-        required: ["address"]
-      }
-    }
+        required: ["address"],
+      },
+    },
   },
   {
     type: "function" as const,
     function: {
       name: "compare_tokens",
-      description: "Compare two tokens side by side",
+      description: "Compare two tokens",
       parameters: {
         type: "object",
         properties: {
           token1: {
             type: "string",
-            description: "First token to compare"
+            description: "First token",
           },
           token2: {
             type: "string",
-            description: "Second token to compare"
-          }
+            description: "Second token",
+          },
         },
-        required: ["token1", "token2"]
-      }
-    }
-  }
+        required: ["token1", "token2"],
+      },
+    },
+  },
 ];
 
 async function executeFunction(name: string, args: any) {
   try {
     let result;
-    
-    switch(name) {
-      case 'get_token_metadata':
+
+    switch (name) {
+      case "get_token_metadata":
         result = await tokenMetadata.getTokenData(args.token);
         break;
-      
-      case 'analyze_token_chart':
+
+      case "analyze_token_chart":
         result = await chartAnalyzer.analyze(args.token);
         break;
-      
-      case 'check_token_security':
+
+      case "check_token_security":
         result = await tokenSecurity.checkSecurity(args.token);
         break;
-      
-      case 'analyze_wallet':
-        result = await walletAnalyzer.analyzeWallet(args.address, args.chain || "0x1");
+
+      case "analyze_wallet":
+        result = await walletAnalyzer.analyzeWallet(
+          args.address,
+          args.chain || "0x1"
+        );
         break;
-        
-      case 'compare_tokens':
+
+      case "compare_tokens":
         const [data1, data2] = await Promise.all([
           tokenMetadata.getTokenData(args.token1),
-          tokenMetadata.getTokenData(args.token2)
+          tokenMetadata.getTokenData(args.token2),
         ]);
         result = { token1: data1, token2: data2 };
         break;
-      
+
       default:
         result = { error: `Unknown function: ${name}` };
     }
-    
+
     return result;
   } catch (error: any) {
     return { error: error.message };
@@ -166,95 +171,13 @@ async function executeFunction(name: string, args: any) {
 function getSystemInstructions() {
   return `You are Lumen AI, an advanced cryptocurrency analysis assistant.
 
-When users ask about your capabilities or what you can do, naturally explain your features based on the available tools and functions you have access to. Don't use preset responses - instead, dynamically describe your abilities based on the context of the conversation.
+When users ask about your capabilities or what you can do, naturally explain your features based on the available tools and functions you have access to.
 
 RESPONSE FORMAT RULES:
-
-1. SPECIFIC QUERIES (price, market cap, volume, RSI, etc.):
-   - Provide ONLY what was asked
-   - Use concise, natural language
-   - Example: "Bitcoin is trading at $45,678 (+2.3% today)"
-
-2. GENERAL QUERIES (tell me about, analyze):
-   - Start with overview paragraph
-   - Include relevant metrics
-   - Add insights and context
-   - End with follow-up question
-
-3. TOKEN METADATA RESPONSES:
-   When user asks "tell me about X", provide:
-   - Brief description of project (if available)
-   - Current price with 24h change
-   - Market cap and ranking
-   - Key supply metrics
-   - Official links
-   
-   When user asks for specific data (price only):
-   - Give just that data point concisely
-
-4. CHART ANALYSIS RESPONSES:
-   Structure your response as:
-   - Current price and trend summary
-   - Key technical indicators interpretation
-   - Support and resistance levels WITH explanation of what they mean
-   - Fibonacci levels and their significance
-   - Sentiment score (0-100) with interpretation
-   - Always end with: "Note: Be aware of rugpulls and scammers. This is analysis, not trading advice."
-
-   **Analysis:**
-   [2 sentences: provide a detailed summary that covers the all the information what as discussed about the chart analysis. and tell user that is chart is bullish or bearish]
-
-5. SECURITY AUDIT RESPONSES:
-   Structure your response like this:
-   
-   **Security Score: XX/100 - [RISK LEVEL]**
-   
-   **Critical Findings:**
-   • [Issue]: [What this means for investors]
-   
-   **Tax Analysis:**
-   • Buy Tax: X% | Sell Tax: Y% 
-   • Round-trip cost: Z% (need Z% gain to break even)
-   
-   **Contract Details:**
-   • Open Source: [Yes/No] - [why this matters]
-   • Liquidity Locked: [Status]
-   • Holder Count: [Number] - [what this indicates]
-   
-   **Risk Assessment:**
-   [2 sentences: Overall risk level and specific investor warning if score < 60]
-
-6. WALLET ANALYSIS RESPONSES:
-   Structure your response EXACTLY like this:
-   
-   **Wallet Performance Score: XX/100**
-   • Win Rate: X% (Y wins/Z trades) - [brief impact]
-   • ROI: ±X% - [brief impact]
-   • Trading Style: [style] - [brief impact]
-   
-   **Top Trades:**
-   • [TOKEN]: +$X.XX (+Y%) 
-   • [TOKEN]: -$X.XX (-Y%)
-   [One line analysis of what these trades reveal]
-   
-   **Analysis:**
-   [2-3 sentences covering: Overall performance assessment, main strength, main weakness]
-   
-   End with 2-3 actionable insights based on the data.
-
-7. TOKEN COMPARISONS:
-   When comparing tokens:
-   - Create side-by-side analysis
-   - Highlight key differences
-   - Compare: price performance, market cap, volume, use case
-   - Provide verdict on which might be better for different scenarios
-
-IMPORTANT:
-- Write naturally, not in bullet points unless listing items
-- Embed numbers in sentences
-- Provide context and insights, not just data
-- Always end with ONE follow-up question to keep the conversation going
-- No excessive formatting or emojis`;
+1. For specific queries (price, RSI, etc.): provide ONLY what was asked
+2. For general queries: start with overview, add insights, end with follow-up
+3. Always be concise and helpful
+4. End responses with a relevant follow-up question`;
 }
 
 function countTokens(text: string): number {
@@ -265,18 +188,60 @@ function countTokens(text: string): number {
   }
 }
 
+// Get current user from cookie
+async function getCurrentUser(request: NextRequest) {
+  const cookieStore = cookies();
+  const token = (await cookieStore).get("auth-token")?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const jwtSecret = process.env.JWT_SECRET || "your-secret-key";
+    const decoded = jwt.verify(token, jwtSecret) as any;
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // FIXED: Get authenticated user
+    const currentUser = await getCurrentUser(request);
+
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     // Connect to database if not already connected
     if (!dbConnected) {
       dbConnected = await db.connect();
     }
 
     const body = await request.json();
-    const { message, conversationId, userId } = body;
+    let { message, conversationId } = body;
+
+    // FIXED: Use authenticated user's ID
+    const userId = currentUser.userId;
 
     if (!message) {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Message is required" },
+        { status: 400 }
+      );
+    }
+
+    console.log(`🤖 AI Chat request from user: ${userId}`);
+
+    // FIXED: Create conversation if not exists
+    if (!conversationId) {
+      conversationId = await db.createConversation(userId);
+      console.log(`✅ Created new conversation: ${conversationId}`);
     }
 
     // Calculate input tokens
@@ -286,25 +251,23 @@ export async function POST(request: NextRequest) {
     const messages = [
       {
         role: "system" as const,
-        content: getSystemInstructions()
+        content: getSystemInstructions(),
       },
       {
         role: "user" as const,
-        content: message
-      }
+        content: message,
+      },
     ];
 
-    // Save user message to database if we have user info
-    if (userId && conversationId) {
-      await db.saveMessage(
-        userId,
-        conversationId,
-        { role: "user", content: message },
-        null,
-        [],
-        { input: inputTokens }
-      );
-    }
+    // Save user message to database
+    await db.saveMessage(
+      userId,
+      conversationId,
+      { role: "user", content: message },
+      null,
+      [],
+      { input: inputTokens }
+    );
 
     // First completion - check if we need tools
     const firstCompletion = await openai.chat.completions.create({
@@ -317,40 +280,37 @@ export async function POST(request: NextRequest) {
     });
 
     const assistantMessage = firstCompletion.choices[0]?.message;
-    
+
     if (!assistantMessage) {
-      return NextResponse.json({ error: 'No response from AI' }, { status: 500 });
+      return NextResponse.json(
+        { error: "No response from AI" },
+        { status: 500 }
+      );
     }
 
     // Check if we need to call tools
     const toolCalls = assistantMessage.tool_calls;
-    let finalContent = assistantMessage.content || '';
+    let finalContent = assistantMessage.content || "";
     let functionNames: string[] = [];
 
     if (toolCalls && toolCalls.length > 0) {
-      // Execute tool calls
       const toolMessages = [...messages, assistantMessage];
-      
+
       for (const toolCall of toolCalls) {
         const functionName = toolCall.function.name;
         const functionArgs = JSON.parse(toolCall.function.arguments);
-        
+
         functionNames.push(functionName);
-        
+
         const result = await executeFunction(functionName, functionArgs);
-        
+
         toolMessages.push({
           role: "tool" as const,
           tool_call_id: toolCall.id,
-          content: JSON.stringify(result)
+          content: JSON.stringify(result),
         });
-        
-        // Update function usage in database
-        if (userId) {
-          await db.updateFunctionUsage(userId, functionName);
-        }
       }
-      
+
       // Get final response with tool results
       const finalCompletion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -358,39 +318,40 @@ export async function POST(request: NextRequest) {
         temperature: 0.7,
         max_tokens: 2000,
       });
-      
-      finalContent = finalCompletion.choices[0]?.message?.content || finalContent;
+
+      finalContent =
+        finalCompletion.choices[0]?.message?.content || finalContent;
     }
 
     // Calculate output tokens
     const outputTokens = countTokens(finalContent);
 
-    // Save assistant message to database
-    if (userId && conversationId) {
-      await db.saveMessage(
-        userId,
-        conversationId,
-        { role: "assistant", content: finalContent },
-        Date.now().toString(), // Simple response ID
-        functionNames,
-        { output: outputTokens }
-      );
-    }
+    // FIXED: Save assistant message with proper conversation tracking
+    await db.saveMessage(
+      userId,
+      conversationId,
+      { role: "assistant", content: finalContent },
+      Date.now().toString(),
+      functionNames,
+      { output: outputTokens }
+    );
+
+    console.log(`✅ AI response saved for user: ${userId}`);
 
     return NextResponse.json({
       message: finalContent,
+      conversationId,
       functionCalls: functionNames,
       tokens: {
         input: inputTokens,
         output: outputTokens,
-        total: inputTokens + outputTokens
-      }
+        total: inputTokens + outputTokens,
+      },
     });
-
   } catch (error: any) {
-    console.error('Chat API error:', error);
+    console.error("❌ Chat API error:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

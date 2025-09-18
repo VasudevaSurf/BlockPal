@@ -1,10 +1,29 @@
-
-// src/app/api/ai/conversation/route.ts
+// src/app/api/ai/conversation/route.ts - FIXED
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
 import DatabaseManager from "@/lib/ai/DatabaseManager";
 
 const db = new DatabaseManager();
 let dbConnected = false;
+
+// Get current user from cookie
+async function getCurrentUser(request: NextRequest) {
+  const cookieStore = cookies();
+  const token = (await cookieStore).get("auth-token")?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const jwtSecret = process.env.JWT_SECRET || "your-secret-key";
+    const decoded = jwt.verify(token, jwtSecret) as any;
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,12 +37,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const body = await request.json();
-    const { userId } = body;
+    // FIXED: Get authenticated user
+    const currentUser = await getCurrentUser(request);
 
-    if (!userId) {
-      return NextResponse.json({ error: "User ID required" }, { status: 400 });
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+
+    const userId = currentUser.userId;
 
     const conversationId = await db.createConversation(userId);
 

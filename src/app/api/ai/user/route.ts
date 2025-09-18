@@ -1,35 +1,27 @@
-// src/app/api/ai/user/route.ts
+// src/app/api/ai/user/route.ts - FIXED to use authenticated user
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
 import DatabaseManager from "@/lib/ai/DatabaseManager";
 
 const db = new DatabaseManager();
 let dbConnected = false;
 
-export async function POST(request: NextRequest) {
+// Get current user from cookie
+async function getCurrentUser(request: NextRequest) {
+  const cookieStore = cookies();
+  const token = (await cookieStore).get("auth-token")?.value;
+
+  if (!token) {
+    return null;
+  }
+
   try {
-    if (!dbConnected) {
-      dbConnected = await db.connect();
-      if (!dbConnected) {
-        return NextResponse.json(
-          { error: "Database connection failed" },
-          { status: 500 }
-        );
-      }
-    }
-
-    const userId = await db.createUser();
-
-    return NextResponse.json({
-      success: true,
-      userId,
-      message: "User created successfully",
-    });
-  } catch (error: any) {
-    console.error("Create user error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    const jwtSecret = process.env.JWT_SECRET || "your-secret-key";
+    const decoded = jwt.verify(token, jwtSecret) as any;
+    return decoded;
+  } catch (error) {
+    return null;
   }
 }
 
@@ -45,31 +37,47 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+    // FIXED: Get authenticated user
+    const currentUser = await getCurrentUser(request);
 
-    if (!userId) {
-      return NextResponse.json({ error: "User ID required" }, { status: 400 });
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
 
-    const user = await db.getUser(userId);
+    const userId = currentUser.userId;
 
-    if (!user) {
+    // FIXED: Use getUserAIData instead of getUserLumenAI
+    const aiData = await db.getUserAIData(userId);
+
+    if (!aiData) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const conversations = await db.getUserConversations(userId);
     const stats = await db.getUserStats(userId);
 
+    // Format response similar to JavaScript version
+    const formattedConversations = conversations.map((conv: any) => ({
+      conversation_id: conv.conversation_id,
+      title: conv.title || "New Conversation",
+      last_updated: conv.last_updated,
+      message_count: conv.message_count || 0,
+      created_at: conv.created_at,
+      last_response_id: conv.last_response_id,
+    }));
+
     return NextResponse.json({
       success: true,
       user: {
-        id: user.user_id,
-        createdAt: user.created_at,
-        totalConversations: user.total_usage.conversations_count,
-        totalMessages: user.total_usage.messages_count,
+        id: userId,
+        createdAt: aiData.created_at || new Date(),
+        totalConversations: aiData.total_usage?.conversations_count || 0,
+        totalMessages: aiData.total_usage?.messages_count || 0,
       },
-      conversations: conversations || [],
+      conversations: formattedConversations,
       stats,
     });
   } catch (error: any) {

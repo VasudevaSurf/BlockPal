@@ -1,4 +1,3 @@
-// src/components/AIChatPage.tsx - Real AI functionality
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -44,7 +43,6 @@ export default function AIChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [userId, setUserId] = useState<string>("");
   const [conversationId, setConversationId] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -73,84 +71,77 @@ export default function AIChatPage() {
     "Gas fees prediction",
   ];
 
-  // Initialize AI chat system
+  // Get authenticated user from Redux
+  const { user, isAuthenticated } = useSelector(
+    (state: RootState) => state.auth
+  );
+
+  // Initialize AI chat - FIXED to use authenticated user
   useEffect(() => {
     const initializeAI = async () => {
+      if (!isAuthenticated || !user) {
+        setError("Please log in to use Lumen AI");
+        setInitialLoading(false);
+        return;
+      }
+
       try {
-        // Create or get user
+        console.log("🤖 Initializing Lumen AI for user:", user.id);
+
+        // Load user's conversations
         const response = await fetch("/api/ai/user", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          credentials: "include",
         });
 
-        if (!response.ok) throw new Error("Failed to create user");
+        if (!response.ok) {
+          throw new Error("Failed to load user data");
+        }
 
         const userData = await response.json();
-        setUserId(userData.userId);
+
+        if (userData.conversations && userData.conversations.length > 0) {
+          const formattedConversations = userData.conversations.map(
+            (conv: any) => ({
+              id: conv.conversation_id,
+              title: conv.title || "New Conversation",
+              messages: [],
+              lastMessage: conv.title || "",
+              timestamp: conv.last_updated || new Date().toISOString(),
+              messageCount: conv.message_count || 0,
+              createdAt: conv.created_at || new Date().toISOString(),
+            })
+          );
+          setConversations(formattedConversations);
+        }
 
         // Create new conversation
         const convResponse = await fetch("/api/ai/conversation", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: userData.userId }),
+          credentials: "include",
         });
 
-        if (!convResponse.ok) throw new Error("Failed to create conversation");
+        if (!convResponse.ok) {
+          throw new Error("Failed to create conversation");
+        }
 
         const convData = await convResponse.json();
         setConversationId(convData.conversationId);
 
         setIsInitialized(true);
-        console.log("✅ AI chat initialized:", {
-          userId: userData.userId,
-          conversationId: convData.conversationId,
-        });
+        console.log("✅ Lumen AI initialized for user:", user.id);
       } catch (error: any) {
         console.error("❌ Failed to initialize AI chat:", error);
-        setError("Failed to initialize AI chat. Some features may not work.");
-        setIsInitialized(true); // Still allow basic usage
+        setError("Failed to initialize Lumen AI");
       } finally {
         setInitialLoading(false);
       }
     };
 
     initializeAI();
-  }, []);
+  }, [isAuthenticated, user]);
 
-  // Load conversations
-  useEffect(() => {
-    const loadConversations = async () => {
-      if (!userId) return;
-
-      try {
-        const response = await fetch(`/api/ai/user?userId=${userId}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.conversations) {
-            const formattedConversations = data.conversations.map(
-              (conv: any) => ({
-                id: conv.conversation_id,
-                title: conv.title || "New Conversation",
-                messages: [],
-                lastMessage: conv.title || "",
-                timestamp: conv.last_updated || new Date().toISOString(),
-                messageCount: conv.message_count || 0,
-                createdAt: conv.created_at || new Date().toISOString(),
-              })
-            );
-            setConversations(formattedConversations);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to load conversations:", error);
-      }
-    };
-
-    if (userId) {
-      loadConversations();
-    }
-  }, [userId]);
-
+  // Keep ALL the rest of your EXACT original UI code below
   // Auto scroll
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -258,20 +249,18 @@ export default function AIChatPage() {
       setSidebarOpen(false);
 
       // Create new conversation
-      if (userId) {
-        try {
-          const response = await fetch("/api/ai/conversation", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId }),
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setConversationId(data.conversationId);
-          }
-        } catch (error) {
-          console.error("Failed to create new conversation:", error);
+      try {
+        const response = await fetch("/api/ai/conversation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setConversationId(data.conversationId);
         }
+      } catch (error) {
+        console.error("Failed to create new conversation:", error);
       }
       return;
     }
@@ -297,10 +286,10 @@ export default function AIChatPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           message: currentInput,
           conversationId: conversationId || null,
-          userId: userId || null,
         }),
       });
 
@@ -310,6 +299,11 @@ export default function AIChatPage() {
 
       const data = await response.json();
       console.log("📦 AI Response received:", data);
+
+      // Update conversation ID if returned
+      if (data.conversationId && !conversationId) {
+        setConversationId(data.conversationId);
+      }
 
       setMessages((prev) => prev.filter((msg) => !msg.processing));
       const aiId = (Date.now() + 2).toString();
@@ -407,7 +401,8 @@ export default function AIChatPage() {
 
     try {
       const response = await fetch(
-        `/api/ai/conversation?conversationId=${selectedSessionId}`
+        `/api/ai/conversation?conversationId=${selectedSessionId}`,
+        { credentials: "include" }
       );
       if (response.ok) {
         const data = await response.json();
@@ -436,23 +431,21 @@ export default function AIChatPage() {
     setSidebarOpen(false);
     setActiveTab("chat");
 
-    // Create new conversation if we have a user
-    if (userId) {
-      try {
-        const response = await fetch("/api/ai/conversation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setConversationId(data.conversationId);
-          console.log("✅ New conversation created:", data.conversationId);
-        }
-      } catch (error) {
-        console.error("Failed to create new conversation:", error);
-        setConversationId(Date.now().toString()); // Fallback to local ID
+    // Create new conversation
+    try {
+      const response = await fetch("/api/ai/conversation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setConversationId(data.conversationId);
+        console.log("✅ New conversation created:", data.conversationId);
       }
+    } catch (error) {
+      console.error("Failed to create new conversation:", error);
+      setConversationId(Date.now().toString());
     }
   };
 
@@ -542,11 +535,6 @@ export default function AIChatPage() {
                 <span className="text-green-400 text-xs font-satoshi">
                   AI Ready
                 </span>
-                {userId && (
-                  <span className="text-gray-500 text-xs">
-                    • ID: {userId.slice(-6)}
-                  </span>
-                )}
               </div>
             </div>
           )}
@@ -588,7 +576,7 @@ export default function AIChatPage() {
               </div>
             </div>
           ) : (
-            /* Chat Messages */
+            /* Chat Messages - keep your exact original code */
             <div className="py-4 space-y-4">
               {messages.map((message) => (
                 <div key={message.id} className="flex flex-col space-y-2">
@@ -683,7 +671,7 @@ export default function AIChatPage() {
           )}
         </div>
 
-        {/* Input */}
+        {/* Input - keep your exact original code */}
         <div className="flex-shrink-0 p-4">
           <div className="relative max-w-2xl mx-auto">
             <textarea
@@ -732,7 +720,7 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Conversation Sidebar */}
+      {/* Conversation Sidebar - keep your exact original code */}
       <div
         data-sidebar="true"
         className={`fixed right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out bg-gradient-to-b from-[#1a1a1a] to-[#141414] border-l border-[#2C2C2C] ${
