@@ -493,13 +493,13 @@ export default function AIChatPage() {
         {/* Top Navigation Tabs */}
         <div className="flex-shrink-0 bg-[#0F0F0F] px-4 py-3">
           <div className="flex justify-center">
-            <div className="flex bg-black rounded-[16px] p-1 border border-[#2C2C2C]">
+            <div className="flex rounded-[16px] p-1">
               <button
                 onClick={() => setActiveTab("chat")}
                 className={`px-6 py-2 rounded-[12px] text-sm font-satoshi font-medium transition-all ${
                   activeTab === "chat"
-                    ? "bg-[#E2AF19] text-black"
-                    : "text-white hover:text-[#E2AF19]"
+                    ? "text-white border-b border-b-amber-50"
+                    : "text-white"
                 }`}
               >
                 Chat
@@ -508,8 +508,8 @@ export default function AIChatPage() {
                 onClick={() => setActiveTab("history")}
                 className={`px-6 py-2 rounded-[12px] text-sm font-satoshi font-medium transition-all ${
                   activeTab === "history"
-                    ? "bg-[#E2AF19] text-black"
-                    : "text-white hover:text-[#E2AF19]"
+                    ? "text-white border-b border-b-amber-50"
+                    : "text-white"
                 }`}
               >
                 History
@@ -528,7 +528,7 @@ export default function AIChatPage() {
           )}
 
           {/* Status Indicator */}
-          {!error && isInitialized && (
+          {/* {!error && isInitialized && (
             <div className="mt-2 text-center">
               <div className="flex items-center justify-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -537,7 +537,7 @@ export default function AIChatPage() {
                 </span>
               </div>
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Messages or Welcome Screen */}
