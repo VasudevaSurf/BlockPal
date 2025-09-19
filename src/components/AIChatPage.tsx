@@ -10,6 +10,9 @@ import {
   Brain,
   Plus,
   AlertTriangle,
+  X,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import { RootState } from "@/store";
 import { SkeletonAIChat } from "@/components/ui/Skeleton";
@@ -44,7 +47,6 @@ export default function AIChatPage() {
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string>("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -76,7 +78,7 @@ export default function AIChatPage() {
     (state: RootState) => state.auth
   );
 
-  // Initialize AI chat - FIXED to use authenticated user
+  // Initialize AI chat
   useEffect(() => {
     const initializeAI = async () => {
       if (!isAuthenticated || !user) {
@@ -141,22 +143,12 @@ export default function AIChatPage() {
     initializeAI();
   }, [isAuthenticated, user]);
 
-  // Keep ALL the rest of your EXACT original UI code below
   // Auto scroll
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
-
-  // Handle tab change
-  useEffect(() => {
-    if (activeTab === "history") {
-      setSidebarOpen(true);
-    } else {
-      setSidebarOpen(false);
-    }
-  }, [activeTab]);
 
   const getRelativeTime = (timestamp: string | Date) => {
     try {
@@ -246,7 +238,6 @@ export default function AIChatPage() {
       setMessages([]);
       setConversationId("");
       setIsTyping(false);
-      setSidebarOpen(false);
 
       // Create new conversation
       try {
@@ -300,7 +291,6 @@ export default function AIChatPage() {
       const data = await response.json();
       console.log("📦 AI Response received:", data);
 
-      // Update conversation ID if returned
       if (data.conversationId && !conversationId) {
         setConversationId(data.conversationId);
       }
@@ -372,7 +362,6 @@ export default function AIChatPage() {
 
   const copyMessage = async (content: string, messageId: string) => {
     try {
-      // Clean content for copying (remove markdown formatting)
       const cleanContent = content
         .replace(/\*\*(.*?)\*\*/g, "$1")
         .replace(/\*(.*?)\*/g, "$1")
@@ -428,10 +417,8 @@ export default function AIChatPage() {
 
   const handleNewChat = async () => {
     setMessages([]);
-    setSidebarOpen(false);
     setActiveTab("chat");
 
-    // Create new conversation
     try {
       const response = await fetch("/api/ai/conversation", {
         method: "POST",
@@ -474,22 +461,24 @@ export default function AIChatPage() {
   if (initialLoading) return <SkeletonAIChat />;
 
   const showWelcomeScreen = messages.length === 0;
+  const sidebarOpen = activeTab === "history";
 
   return (
     <div className="h-full relative bg-[#0F0F0F] flex">
       {/* Overlay Background */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30"
-          onClick={() => {
-            setSidebarOpen(false);
-            setActiveTab("chat");
-          }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden"
+          onClick={() => setActiveTab("chat")}
         />
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
+          sidebarOpen ? "lg:mr-80" : ""
+        }`}
+      >
         {/* Top Navigation Tabs */}
         <div className="flex-shrink-0 bg-[#0F0F0F] px-4 py-3">
           <div className="flex justify-center">
@@ -526,18 +515,6 @@ export default function AIChatPage() {
               </div>
             </div>
           )}
-
-          {/* Status Indicator */}
-          {/* {!error && isInitialized && (
-            <div className="mt-2 text-center">
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-green-400 text-xs font-satoshi">
-                  AI Ready
-                </span>
-              </div>
-            </div>
-          )} */}
         </div>
 
         {/* Messages or Welcome Screen */}
@@ -545,7 +522,6 @@ export default function AIChatPage() {
           {showWelcomeScreen ? (
             /* Welcome Screen */
             <div className="h-full flex flex-col items-center justify-center -mt-5">
-              {/* Lumen AI Logo */}
               <div className="mb-2">
                 <img
                   src="/AImiddleImage.png"
@@ -554,12 +530,10 @@ export default function AIChatPage() {
                 />
               </div>
 
-              {/* Heading */}
               <h1 className="text-white text-3xl font-satoshi font-bold mb-10 text-center">
                 Chat with Lumen AI
               </h1>
 
-              {/* Suggestion Chips */}
               <div className="w-full max-w-2xl mx-auto mb-16">
                 <div className="flex flex-wrap justify-center gap-2 px-4">
                   {suggestionChips.map((chip, index) => (
@@ -576,13 +550,13 @@ export default function AIChatPage() {
               </div>
             </div>
           ) : (
-            /* Chat Messages - keep your exact original code */
+            /* Chat Messages */
             <div className="py-4 space-y-4">
               {messages.map((message) => (
                 <div key={message.id} className="flex flex-col space-y-2">
                   {message.type === "assistant" ? (
                     <div className="flex flex-col items-start space-y-2">
-                      <div className="max-w-4xl bg-black p-4 rounded-xl border border-[#2C2C2C]">
+                      <div className="max-w-4xl bg-black/40 backdrop-blur-md p-4 rounded-xl border border-[#F9EFD1]/30">
                         {message.processing && !message.content ? (
                           <div className="flex items-center space-x-2">
                             <RefreshCw
@@ -605,7 +579,6 @@ export default function AIChatPage() {
                               <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
                             )}
 
-                            {/* Function calls indicator */}
                             {message.functionCalls &&
                               message.functionCalls.length > 0 &&
                               !message.typing && (
@@ -621,20 +594,19 @@ export default function AIChatPage() {
                                 </div>
                               )}
 
-                            {/* Token usage */}
-                            {message.tokens && !message.typing && (
+                            {/* {message.tokens && !message.typing && (
                               <div className="mt-2 text-xs text-gray-500">
                                 Tokens:{" "}
                                 {message.tokens.total ||
                                   (message.tokens.input || 0) +
                                     (message.tokens.output || 0)}
                               </div>
-                            )}
+                            )} */}
                           </div>
                         )}
                       </div>
 
-                      {!message.processing &&
+                      {/* {!message.processing &&
                         !message.typing &&
                         message.content && (
                           <button
@@ -655,11 +627,11 @@ export default function AIChatPage() {
                               </>
                             )}
                           </button>
-                        )}
+                        )} */}
                     </div>
                   ) : (
                     <div className="flex justify-end">
-                      <div className="bg-[#E2AF19] text-black p-4 max-w-2xl rounded-xl">
+                      <div className="bg-[#F9EFD1] text-black p-4 max-w-2xl rounded-xl rounded-tr-none">
                         <p className="text-sm">{message.content}</p>
                       </div>
                     </div>
@@ -671,7 +643,7 @@ export default function AIChatPage() {
           )}
         </div>
 
-        {/* Input - keep your exact original code */}
+        {/* Input */}
         <div className="flex-shrink-0 p-4">
           <div className="relative max-w-4xl mx-auto">
             <textarea
@@ -701,7 +673,7 @@ export default function AIChatPage() {
             </button>
           </div>
 
-          {isTyping && (
+          {/* {isTyping && (
             <div className="flex items-center justify-center mt-2">
               <div className="flex space-x-1 mr-2">
                 {[0, 0.1, 0.2].map((delay, i) => (
@@ -716,43 +688,53 @@ export default function AIChatPage() {
                 Lumen AI is working...
               </span>
             </div>
-          )}
+          )} */}
         </div>
       </div>
 
-      {/* Conversation Sidebar - keep your exact original code */}
+      {/* Right Sidebar - Shown when History tab is active */}
+      {/* Right Sidebar - Shown when History tab is active */}
       <div
-        data-sidebar="true"
-        className={`fixed right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out bg-gradient-to-b from-[#1a1a1a] to-[#141414] border-l border-[#2C2C2C] ${
+        className={`fixed lg:absolute right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out ${
           sidebarOpen
             ? "translate-x-0 w-80 opacity-100"
-            : "translate-x-full w-80 opacity-0"
+            : "translate-x-full lg:translate-x-full w-80 opacity-0"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="h-full flex flex-col">
-          <div className="flex-1 px-4 pt-4 overflow-y-auto">
+        <div className="h-full flex flex-col bg-black/20 backdrop-blur-md lg:rounded-[30px] border border-[#2C2C2C] lg:m-2 lg:h-[calc(100%-16px)]">
+          {/* Close button for mobile */}
+          <div className="lg:hidden flex items-center justify-between p-4 border-b border-[#2C2C2C]">
+            <h2 className="text-white text-lg font-satoshi font-medium">
+              Chat History
+            </h2>
+            <button
+              onClick={() => setActiveTab("chat")}
+              className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+            >
+              <X size={20} className="text-gray-400" />
+            </button>
+          </div>
+
+          {/* Scrollable Chat History */}
+          <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-20">
             <div className="mb-4">
               <span className="text-gray-300 text-sm font-satoshi font-medium">
-                Recent Conversations
+                Recent
               </span>
             </div>
 
-            <div className="space-y-2 pb-20">
+            <div className="space-y-2">
               {/* Current Session */}
               {messages.length > 0 && conversationId && (
-                <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer">
+                <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer hover:bg-[#E2AF19]/15 transition-all">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                       <span className="text-white text-sm font-medium">
                         Current Chat
                       </span>
                     </div>
                   </div>
-                  <p className="text-gray-400 text-xs mt-1 truncate">
-                    {messages[0]?.content?.substring(0, 60)}...
-                  </p>
                 </div>
               )}
 
@@ -762,7 +744,7 @@ export default function AIChatPage() {
                 .map((conversation) => (
                   <div
                     key={conversation.id}
-                    className="p-3 rounded-xl cursor-pointer group transition-all bg-[#2C2C2C]/20 hover:bg-[#2C2C2C]/40"
+                    className="p-2 rounded-xl cursor-pointer group transition-all hover:bg-[#2C2C2C]/30"
                     onClick={() => handleSessionSelect(conversation.id)}
                   >
                     <div className="flex justify-between items-start">
@@ -770,13 +752,6 @@ export default function AIChatPage() {
                         <span className="text-gray-300 text-sm font-medium line-clamp-1">
                           {conversation.title}
                         </span>
-                        <p className="text-gray-500 text-xs mt-1 line-clamp-1">
-                          {conversation.lastMessage}
-                        </p>
-                        <p className="text-gray-600 text-xs mt-1">
-                          {getRelativeTime(conversation.timestamp)} •{" "}
-                          {conversation.messageCount} messages
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -795,14 +770,16 @@ export default function AIChatPage() {
             </div>
           </div>
 
-          {/* New Chat Button */}
-          <div className="absolute bottom-4 left-4 right-4 bg-gradient-to-b from-transparent to-[#141414] pt-4">
+          {/* New Chat Button - Fixed at bottom */}
+          <div className="flex-shrink-0 p-4 bg-gradient-to-t from-[#0F0F0F] via-[#0F0F0F]/95 to-transparent">
             <button
               onClick={handleNewChat}
-              className="w-full bg-[#E2AF19] text-black px-3 py-2 rounded-lg text-sm font-satoshi font-medium hover:bg-[#D4A853] transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+              className="mx-auto text-[#E2AF19] px-3 py-1.5 rounded-[300px] border border-[#71570C] text-[18px] font-satoshi font-medium transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"
               disabled={isTyping}
             >
-              <Plus size={14} />
+              <div className="p-1 bg-[#E2AF19] rounded-[100px]">
+                <Plus color="#000" size={12} />
+              </div>
               <span>New Chat</span>
             </button>
           </div>
@@ -810,6 +787,13 @@ export default function AIChatPage() {
       </div>
 
       <style jsx global>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
         .line-clamp-1 {
           display: -webkit-box;
           -webkit-line-clamp: 1;
