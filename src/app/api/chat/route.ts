@@ -1,26 +1,22 @@
-// src/app/api/chat/route.ts - UPDATED to use real APIs
+// src/app/api/chat/route.ts - FIXED duplicate conversation issue
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import OpenAI from "openai";
 import TokenMetadata from "@/lib/ai/TokenMetadata";
 import ChartAnalyzer from "@/lib/ai/ChartAnalyzer";
-import WalletAnalyzer from "@/lib/ai/WalletAnalyzer"; // Import the REAL WalletAnalyzer
+import WalletAnalyzer from "@/lib/ai/WalletAnalyzer";
 import DatabaseManager from "@/lib/ai/DatabaseManager";
 import { encode } from "gpt-tokenizer";
 
-// Initialize OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-// Initialize AI utilities with REAL implementations
 const tokenMetadata = new TokenMetadata(process.env.COINGECKO_API_KEY!);
 const chartAnalyzer = new ChartAnalyzer(process.env.COINGECKO_API_KEY!);
-const walletAnalyzer = new WalletAnalyzer(process.env.MORALIS_API_KEY!); // REAL Moralis integration
+const walletAnalyzer = new WalletAnalyzer(process.env.MORALIS_API_KEY!);
 
-// For TokenSecurity, you'll need to implement the real GoPlus API
-// For now, keeping the existing implementation
 class TokenSecurity {
   private appKey?: string;
   private appSecret?: string;
@@ -38,9 +34,6 @@ class TokenSecurity {
         error: "Security check unavailable - GoPlus credentials not configured",
       };
     }
-
-    // Implement real GoPlus API integration here
-    // For now, return a placeholder
     return {
       error: "Security check temporarily unavailable",
     };
@@ -182,7 +175,6 @@ async function executeFunction(name: string, args: any) {
             args.chain || "0x1"
           }`
         );
-        // REAL Moralis API call here
         result = await walletAnalyzer.analyzeWallet(
           args.address,
           args.chain || "0x1"
@@ -293,10 +285,14 @@ export async function POST(request: NextRequest) {
 
     console.log(`🤖 AI Chat request from user: ${userId}`);
     console.log(`📝 Message: ${message}`);
+    console.log(`💬 Conversation ID: ${conversationId || "NEW"}`);
 
+    // FIXED: Only create new conversation if conversationId is null/undefined
     if (!conversationId) {
       conversationId = await db.createConversation(userId);
-      console.log(`✅ Created new conversation: ${conversationId}`);
+      console.log(`✅ Created NEW conversation: ${conversationId}`);
+    } else {
+      console.log(`📌 Using existing conversation: ${conversationId}`);
     }
 
     const inputTokens = countTokens(message);
@@ -386,7 +382,7 @@ export async function POST(request: NextRequest) {
       { output: outputTokens }
     );
 
-    console.log(`✅ AI response saved for user: ${userId}`);
+    console.log(`✅ AI response saved for conversation: ${conversationId}`);
 
     return NextResponse.json({
       message: finalContent,

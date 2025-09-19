@@ -53,6 +53,8 @@ export default function AIChatPage() {
   const [activeTab, setActiveTab] = useState<"chat" | "history">("chat");
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentConversationLoaded, setCurrentConversationLoaded] =
+    useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -78,8 +80,10 @@ export default function AIChatPage() {
     (state: RootState) => state.auth
   );
 
-  // Initialize AI chat
+  // Initialize AI chat - ONLY ONCE
   useEffect(() => {
+    let isMounted = true;
+
     const initializeAI = async () => {
       if (!isAuthenticated || !user) {
         setError("Please log in to use Lumen AI");
@@ -101,46 +105,47 @@ export default function AIChatPage() {
 
         const userData = await response.json();
 
-        if (userData.conversations && userData.conversations.length > 0) {
-          const formattedConversations = userData.conversations.map(
-            (conv: any) => ({
-              id: conv.conversation_id,
-              title: conv.title || "New Conversation",
-              messages: [],
-              lastMessage: conv.title || "",
-              timestamp: conv.last_updated || new Date().toISOString(),
-              messageCount: conv.message_count || 0,
-              createdAt: conv.created_at || new Date().toISOString(),
-            })
-          );
-          setConversations(formattedConversations);
+        if (isMounted) {
+          if (userData.conversations && userData.conversations.length > 0) {
+            const formattedConversations = userData.conversations.map(
+              (conv: any) => ({
+                id: conv.conversation_id,
+                title: conv.title || "New Conversation",
+                messages: [],
+                lastMessage: conv.title || "",
+                timestamp: conv.last_updated || new Date().toISOString(),
+                messageCount: conv.message_count || 0,
+                createdAt: conv.created_at || new Date().toISOString(),
+              })
+            );
+            setConversations(formattedConversations);
+            console.log(
+              "📚 Loaded",
+              formattedConversations.length,
+              "conversations"
+            );
+          }
+
+          setIsInitialized(true);
+          console.log("✅ Lumen AI initialized for user:", user.id);
         }
-
-        // Create new conversation
-        const convResponse = await fetch("/api/ai/conversation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-        });
-
-        if (!convResponse.ok) {
-          throw new Error("Failed to create conversation");
-        }
-
-        const convData = await convResponse.json();
-        setConversationId(convData.conversationId);
-
-        setIsInitialized(true);
-        console.log("✅ Lumen AI initialized for user:", user.id);
       } catch (error: any) {
         console.error("❌ Failed to initialize AI chat:", error);
-        setError("Failed to initialize Lumen AI");
+        if (isMounted) {
+          setError("Failed to initialize Lumen AI");
+        }
       } finally {
-        setInitialLoading(false);
+        if (isMounted) {
+          setInitialLoading(false);
+        }
       }
     };
 
     initializeAI();
+
+    return () => {
+      isMounted = false;
+    };
   }, [isAuthenticated, user]);
 
   // Auto scroll
@@ -237,22 +242,8 @@ export default function AIChatPage() {
     if (currentInput.toLowerCase().trim() === "clear") {
       setMessages([]);
       setConversationId("");
+      setCurrentConversationLoaded(false);
       setIsTyping(false);
-
-      // Create new conversation
-      try {
-        const response = await fetch("/api/ai/conversation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setConversationId(data.conversationId);
-        }
-      } catch (error) {
-        console.error("Failed to create new conversation:", error);
-      }
       return;
     }
 
@@ -291,8 +282,33 @@ export default function AIChatPage() {
       const data = await response.json();
       console.log("📦 AI Response received:", data);
 
+      // FIXED: Only set conversation ID once per conversation
       if (data.conversationId && !conversationId) {
+        console.log("📝 Setting conversation ID:", data.conversationId);
         setConversationId(data.conversationId);
+        setCurrentConversationLoaded(true);
+
+        // Add to conversations list only if not already there
+        setConversations((prev) => {
+          const exists = prev.some((c) => c.id === data.conversationId);
+          if (!exists) {
+            return [
+              {
+                id: data.conversationId,
+                title:
+                  currentInput.substring(0, 50) +
+                  (currentInput.length > 50 ? "..." : ""),
+                messages: [],
+                lastMessage: currentInput,
+                timestamp: new Date().toISOString(),
+                messageCount: 1,
+                createdAt: new Date().toISOString(),
+              },
+              ...prev,
+            ];
+          }
+          return prev;
+        });
       }
 
       setMessages((prev) => prev.filter((msg) => !msg.processing));
@@ -407,6 +423,7 @@ export default function AIChatPage() {
           );
           setConversationId(selectedSessionId);
           setMessages(formattedMessages);
+          setCurrentConversationLoaded(true);
           setActiveTab("chat");
         }
       }
@@ -417,23 +434,12 @@ export default function AIChatPage() {
 
   const handleNewChat = async () => {
     setMessages([]);
+    setConversationId("");
+    setCurrentConversationLoaded(false);
     setActiveTab("chat");
-
-    try {
-      const response = await fetch("/api/ai/conversation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setConversationId(data.conversationId);
-        console.log("✅ New conversation created:", data.conversationId);
-      }
-    } catch (error) {
-      console.error("Failed to create new conversation:", error);
-      setConversationId(Date.now().toString());
-    }
+    console.log(
+      "🆕 Starting new chat - conversation will be created on first message"
+    );
   };
 
   const deleteConversation = (conversationId: string) => {
@@ -601,41 +607,9 @@ export default function AIChatPage() {
                                   ))}
                                 </div>
                               )}
-
-                            {/* {message.tokens && !message.typing && (
-                              <div className="mt-2 text-xs text-gray-500">
-                                Tokens:{" "}
-                                {message.tokens.total ||
-                                  (message.tokens.input || 0) +
-                                    (message.tokens.output || 0)}
-                              </div>
-                            )} */}
                           </div>
                         )}
                       </div>
-
-                      {/* {!message.processing &&
-                        !message.typing &&
-                        message.content && (
-                          <button
-                            onClick={() =>
-                              copyMessage(message.content, message.id)
-                            }
-                            className="bg-[#E2AF19] text-black px-3 py-1 rounded-lg text-xs font-medium hover:bg-[#D4A853] transition-colors flex items-center gap-1.5"
-                          >
-                            {copiedItems.has(message.id) ? (
-                              <>
-                                <Check size={12} />
-                                Copied!
-                              </>
-                            ) : (
-                              <>
-                                <Copy size={12} />
-                                Copy
-                              </>
-                            )}
-                          </button>
-                        )} */}
                     </div>
                   ) : (
                     <div className="flex justify-end">
@@ -746,28 +720,10 @@ export default function AIChatPage() {
               </button>
             </div>
           </div>
-
-          {/* {isTyping && (
-            <div className="flex items-center justify-center mt-2">
-              <div className="flex space-x-1 mr-2">
-                {[0, 0.1, 0.2].map((delay, i) => (
-                  <div
-                    key={i}
-                    className="w-2 h-2 bg-[#E2AF19] rounded-full animate-bounce"
-                    style={{ animationDelay: `${delay}s` }}
-                  />
-                ))}
-              </div>
-              <span className="text-gray-400 text-xs">
-                Lumen AI is working...
-              </span>
-            </div>
-          )} */}
         </div>
       </div>
 
-      {/* Right Sidebar - Shown when History tab is active */}
-      {/* Right Sidebar - Shown when History tab is active */}
+      {/* Right Sidebar - History */}
       <div
         className={`fixed lg:absolute right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out ${
           sidebarOpen
@@ -799,20 +755,22 @@ export default function AIChatPage() {
             </div>
 
             <div className="space-y-2">
-              {/* Current Session */}
-              {messages.length > 0 && conversationId && (
-                <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer hover:bg-[#E2AF19]/15 transition-all">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-white text-sm font-medium">
-                        Current Chat
-                      </span>
+              {/* Current Session - only show if we have messages AND a conversation ID */}
+              {messages.length > 0 &&
+                conversationId &&
+                currentConversationLoaded && (
+                  <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer hover:bg-[#E2AF19]/15 transition-all">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-white text-sm font-medium">
+                          Current Chat
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Saved Conversations */}
+              {/* Saved Conversations - filter out current conversation */}
               {conversations
                 .filter((conv) => conv.id !== conversationId)
                 .map((conversation) => (
