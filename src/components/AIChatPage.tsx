@@ -493,12 +493,12 @@ export default function AIChatPage() {
         {/* Top Navigation Tabs */}
         <div className="flex-shrink-0 bg-[#0F0F0F] px-4 py-3">
           <div className="flex justify-center">
-            <div className="flex rounded-[16px] p-1">
+            <div className="flex rounded-[16px] p-1 gap-[24px]">
               <button
                 onClick={() => setActiveTab("chat")}
-                className={`px-6 py-2 rounded-[12px] text-sm font-satoshi font-medium transition-all ${
+                className={`text-[24px] font-mayeka font-medium transition-all ${
                   activeTab === "chat"
-                    ? "text-white border-b border-b-amber-50"
+                    ? "text-white border-b border-b-[#E7BC3F]"
                     : "text-white"
                 }`}
               >
@@ -506,9 +506,9 @@ export default function AIChatPage() {
               </button>
               <button
                 onClick={() => setActiveTab("history")}
-                className={`px-6 py-2 rounded-[12px] text-sm font-satoshi font-medium transition-all ${
+                className={`text-[24px] font-mayeka font-medium transition-all ${
                   activeTab === "history"
-                    ? "text-white border-b border-b-amber-50"
+                    ? "text-white border-b border-b-[#E7BC3F]"
                     : "text-white"
                 }`}
               >
@@ -673,7 +673,7 @@ export default function AIChatPage() {
 
         {/* Input - keep your exact original code */}
         <div className="flex-shrink-0 p-4">
-          <div className="relative max-w-2xl mx-auto">
+          <div className="relative max-w-4xl mx-auto">
             <textarea
               ref={inputRef}
               value={inputMessage}
