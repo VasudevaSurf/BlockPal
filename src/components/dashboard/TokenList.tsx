@@ -747,13 +747,13 @@ export default function TokenList() {
             >
               {showHidden ? <EyeOff size={14} /> : <Eye size={14} />}
               <span className="text-xs font-satoshi hidden sm:inline">
-                {showHidden ? "Hide All" : "Show All"}
+                {showHidden ? "Show All" : "Hide All"}
               </span>
             </button>
           )}
 
           {/* Refresh Button */}
-          <button
+          {/* <button
             onClick={handleRefresh}
             disabled={isRefreshing}
             className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
@@ -763,7 +763,7 @@ export default function TokenList() {
               size={16}
               className={`lg:w-5 lg:h-5 ${isRefreshing ? "animate-spin" : ""}`}
             />
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -918,12 +918,12 @@ export default function TokenList() {
                         className="w-10 h-10 mr-2.5 flex-shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="text-white font-medium font-satoshi text-sm flex items-center">
+                        {/* <div className="text-white font-medium font-satoshi text-sm flex items-center">
                           {token.name}
                           <span className="ml-2 text-xs bg-gray-600 text-gray-300 px-1.5 py-0.5 rounded">
                             Additional
                           </span>
-                        </div>
+                        </div> */}
                         <div className="text-gray-400 text-xs font-satoshi">
                           {enhancedTokenService.formatTokenAmount(
                             token.balance,

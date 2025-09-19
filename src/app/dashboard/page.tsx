@@ -170,7 +170,7 @@ export default function DashboardPage() {
       )}
 
       {/* NEW: Stats Toggle (Debug/Development) */}
-      {process.env.NODE_ENV === "development" && (
+      {/* {process.env.NODE_ENV === "development" && (
         <div className="mb-2 flex items-center justify-end">
           <button
             onClick={toggleWalletStats}
@@ -179,7 +179,7 @@ export default function DashboardPage() {
             {dashboardState.showStats ? "Hide" : "Show"} Wallet Stats
           </button>
         </div>
-      )}
+      )} */}
 
       {/* Main Dashboard Content */}
       {dashboardState.hasWallets && activeWallet ? (
