@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - Enhanced following wallet-balance.js approach
+// src/components/dashboard/WalletBalance.tsx - FIXED to show only main list balance
 "use client";
 
 import { useSelector } from "react-redux";
@@ -87,10 +87,11 @@ export default function WalletBalance() {
   // Get current chain data
   const currentChain = chains.find((c) => c.id === chainId);
 
-  // Component state
-  const [totalValue, setTotalValue] = useState(0);
+  // Component state - FIXED: Use mainListValue instead of totalValue
+  const [mainListValue, setMainListValue] = useState(0); // CHANGED: Only main list value
+  const [totalValue, setTotalValue] = useState(0); // Keep for reference
   const [tokenCount, setTokenCount] = useState(0);
-  const [total24hrChange, setTotal24hrChange] = useState(0); // USD change amount following wallet-balance.js
+  const [mainList24hrChange, setMainList24hrChange] = useState(0); // CHANGED: Only main list 24hr change
   const [presetTokenCount, setPresetTokenCount] = useState(0);
   const [hiddenTokenCount, setHiddenTokenCount] = useState(0);
   const [chainName, setChainName] = useState("");
@@ -115,9 +116,10 @@ export default function WalletBalance() {
   }, [isConnected, address, chainId]);
 
   const resetWalletState = () => {
+    setMainListValue(0);
     setTotalValue(0);
     setTokenCount(0);
-    setTotal24hrChange(0);
+    setMainList24hrChange(0);
     setPresetTokenCount(0);
     setHiddenTokenCount(0);
     setChainName("");
@@ -125,7 +127,7 @@ export default function WalletBalance() {
     setLoading(false);
   };
 
-  // Fetch wallet data from enhanced API - Following wallet-balance.js approach
+  // FIXED: Fetch wallet data and use mainListValue
   const fetchWalletData = async () => {
     if (!address || !chainId) {
       setLoading(false);
@@ -138,46 +140,57 @@ export default function WalletBalance() {
 
       console.log(`📊 Fetching wallet data for ${address} on chain ${chainId}`);
 
-      // Fetch preset tokens only for main balance display (like wallet-balance.js default view)
+      // Fetch preset tokens only for main balance display (showHidden = false to get main list)
       const response = await tokenService.getWalletTokens(
         address,
         chainId,
-        false
+        false // Only main list tokens
       );
 
-      setTotalValue(response.totalValue);
+      // FIXED: Use mainListValue instead of totalValue
+      setMainListValue(response.mainListValue); // CHANGED: Show only main list value
+      setTotalValue(response.totalValue); // Keep for reference/logging
       setTokenCount(response.tokenCount);
-      setTotal24hrChange(response.total24hrChange);
+      setMainList24hrChange(response.total24hrChange); // CHANGED: Main list 24hr change
       setPresetTokenCount(response.presetTokenCount);
       setHiddenTokenCount(response.hiddenTokenCount);
       setChainName(response.chainName);
 
-      // Log summary like wallet-balance.js
+      // FIXED: Log the correct values being displayed
       console.log(
-        `✅ Wallet data loaded: ${tokenService.formatCurrency(
-          response.totalValue
-        )}, ${response.tokenCount} tokens, ${tokenService.format24hrChange(
+        `✅ Wallet data loaded (MAIN LIST ONLY): ${tokenService.formatCurrency(
+          response.mainListValue
+        )}, ${
+          response.presetTokenCount
+        } tokens in main list, ${tokenService.format24hrChange(
           response.total24hrChange
         )}`
       );
 
-      // Enhanced logging following wallet-balance.js style
-      if (response.totalValue > 0) {
-        console.log("📊 Portfolio Summary:");
+      // Enhanced logging
+      if (response.mainListValue > 0) {
+        console.log("📊 Portfolio Summary (MAIN LIST DISPLAY):");
         console.log(
-          `   Total Portfolio Value: ${tokenService.formatCurrency(
+          `   🎯 Main List Value (DISPLAYED): ${tokenService.formatCurrency(
+            response.mainListValue
+          )}`
+        );
+        console.log(
+          `   📊 Total Value (ALL TOKENS): ${tokenService.formatCurrency(
             response.totalValue
           )}`
         );
         console.log(
-          `   24hr Portfolio Change: ${tokenService.format24hrChange(
+          `   📈 24hr Main List Change: ${tokenService.format24hrChange(
             response.total24hrChange
           )}`
         );
-        console.log(`   Showing: ${response.presetTokenCount} preset tokens`);
+        console.log(
+          `   🏷️ Showing: ${response.presetTokenCount} main list tokens`
+        );
         if (response.hasHiddenTokens) {
           console.log(
-            `   💡 Found ${response.hiddenTokenCount} additional token(s) not in preset list.`
+            `   💡 Hidden: ${response.hiddenTokenCount} additional token(s) not counted in balance.`
           );
         }
       }
@@ -189,8 +202,8 @@ export default function WalletBalance() {
     }
   };
 
+  // FIXED: Format balance using mainListValue
   const formatBalance = (balance: number) => {
-    // Use wallet-balance.js formatting style
     return tokenService.formatCurrency(balance);
   };
 
@@ -258,7 +271,7 @@ export default function WalletBalance() {
 
   return (
     <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0">
-      {/* Header - Following wallet-balance.js style */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
         <div className="flex items-center gap-2">
           <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo">
@@ -294,18 +307,6 @@ export default function WalletBalance() {
           >
             <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
           </button>
-
-          {/* <button
-            onClick={handleRefresh}
-            disabled={isRefreshing || !address}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh wallet data"
-          >
-            <RefreshCw
-              size={14}
-              className={isRefreshing ? "animate-spin" : ""}
-            />
-          </button> */}
         </div>
       </div>
 
@@ -327,28 +328,29 @@ export default function WalletBalance() {
         </div>
       )}
 
-      {/* Balance Display - Following wallet-balance.js summary format */}
+      {/* FIXED: Balance Display - Show only main list value */}
       <div className="space-y-2">
-        {/* Main Balance Display */}
+        {/* Main Balance Display - FIXED: Use mainListValue */}
         <div className="flex items-end justify-between">
           <div>
             <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
-              {formatBalance(totalValue)}
+              {formatBalance(mainListValue)}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Portfolio 24hr Change - Following wallet-balance.js format */}
+              {/* Portfolio 24hr Change - FIXED: Use mainList24hrChange */}
               <PortfolioChange
                 change24h={0} // Not used, keeping for compatibility
-                totalChange24h={total24hrChange}
+                totalChange24h={mainList24hrChange}
               />
             </div>
           </div>
 
+          {/* Token count info */}
           {/* <div className="text-right">
             <div className="text-gray-400 text-xs font-satoshi mb-1">
               {presetTokenCount > 0 ? (
                 <>
-                  Showing: {presetTokenCount} preset token
+                  Main List: {presetTokenCount} token
                   {presetTokenCount !== 1 ? "s" : ""}
                 </>
               ) : (
@@ -357,8 +359,7 @@ export default function WalletBalance() {
             </div>
             {hiddenTokenCount > 0 && (
               <div className="text-yellow-400 text-xs font-satoshi mb-1">
-                💡 +{hiddenTokenCount} additional token
-                {hiddenTokenCount !== 1 ? "s" : ""}
+                +{hiddenTokenCount} additional
               </div>
             )}
             <div className="text-white text-sm font-satoshi font-medium">
@@ -367,31 +368,32 @@ export default function WalletBalance() {
           </div> */}
         </div>
 
-        {/* Native Balance Display (if available) */}
-        {/* {balance && (
-          <div className="text-gray-400 text-sm font-satoshi">
-            {parseFloat(balance.formatted).toFixed(4)} {balance.symbol}
-          </div>
-        )} */}
-
-        {/* Loading state */}
-        {/* {loading && (
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#E2AF19]"></div>
-            <span className="text-gray-400 text-sm font-satoshi">
-              Loading wallet data...
-            </span>
-          </div>
-        )} */}
-
-        {/* Additional Info Banner - Following wallet-balance.js style */}
-        {/* {totalValue > 0 && hiddenTokenCount > 0 && (
+        {/* Additional Info Banner */}
+        {/* {mainListValue > 0 && hiddenTokenCount > 0 && (
           <div className="mt-3 p-2 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg">
             <div className="text-gray-400 text-xs font-satoshi">
-              💡 Found {hiddenTokenCount} additional token
-              {hiddenTokenCount !== 1 ? "s" : ""} not in preset list.
+              💡 Showing balance of {presetTokenCount} main list token
+              {presetTokenCount !== 1 ? "s" : ""} only.
               <br />
-              View the Token Holdings section to see all tokens.
+              {hiddenTokenCount} additional token
+              {hiddenTokenCount !== 1 ? "s" : ""} not included in balance.
+            </div>
+          </div>
+        )}
+
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+            <div className="text-blue-400 text-xs font-satoshi">
+              <strong>Debug Info:</strong>
+              <br />
+              Main List Value (Displayed): {formatBalance(mainListValue)}
+              <br />
+              Total Value (All Tokens): {formatBalance(totalValue)}
+              <br />
+              Main List 24h Change:{" "}
+              {tokenService.format24hrChange(mainList24hrChange)}
+              <br />
+              Preset Tokens: {presetTokenCount} | Hidden: {hiddenTokenCount}
             </div>
           </div>
         )} */}

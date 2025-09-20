@@ -1,4 +1,4 @@
-// src/services/tokenService.ts - Enhanced version following wallet-balance.js approach
+// src/services/tokenService.ts - Enhanced version with separate main list balance
 interface TokenBalance {
   id: string;
   symbol: string;
@@ -23,8 +23,9 @@ interface WalletTokensResponse {
   chainId: number;
   chainName: string;
   tokens: TokenBalance[];
-  totalValue: number;
-  total24hrChange: number; // NEW: 24hr portfolio change in USD
+  totalValue: number; // ALL tokens total value
+  mainListValue: number; // NEW: Only main list (preset + user-added) tokens value
+  total24hrChange: number; // NEW: 24hr portfolio change in USD for main list only
   tokenCount: number;
   presetTokenCount: number; // NEW: Count of preset tokens
   hiddenTokenCount: number; // NEW: Count of hidden tokens
@@ -56,7 +57,7 @@ class TokenService {
   }
 
   /**
-   * Enhanced token fetching with show/hide functionality - Following wallet-balance.js approach
+   * Enhanced token fetching with separate main list balance calculation
    */
   async getWalletTokens(
     walletAddress: string,
@@ -94,7 +95,7 @@ class TokenService {
 
         console.error("❌ API Error Response:", errorData);
 
-        // Return empty result for better UX - Following wallet-balance.js approach
+        // Return empty result for better UX
         console.warn("🔄 API error, returning empty result for UX");
         return {
           wallet: walletAddress,
@@ -102,6 +103,7 @@ class TokenService {
           chainName: "Unknown",
           tokens: [],
           totalValue: 0,
+          mainListValue: 0,
           total24hrChange: 0,
           tokenCount: 0,
           presetTokenCount: 0,
@@ -139,6 +141,7 @@ class TokenService {
           chainName: "Unknown",
           tokens: [],
           totalValue: 0,
+          mainListValue: 0,
           total24hrChange: 0,
           tokenCount: 0,
           presetTokenCount: 0,
@@ -154,28 +157,42 @@ class TokenService {
         ? responseData.tokens
         : [];
 
-      // Extract enhanced metadata - Following wallet-balance.js structure
+      // CALCULATE SEPARATE VALUES FOR MAIN LIST VS ALL TOKENS
+      const presetTokenCount = responseData.presetTokenCount || 0;
+
+      // Main list tokens = preset tokens + user-added tokens (first presetTokenCount + user-added)
+      const mainListTokens = tokens.slice(0, presetTokenCount); // Assuming API returns preset tokens first
+
+      // Calculate main list value (only preset + user-added tokens)
+      const mainListValue = mainListTokens.reduce((sum, token) => {
+        return sum + (typeof token.value === "number" ? token.value : 0);
+      }, 0);
+
+      // Calculate main list 24hr change (only preset + user-added tokens)
+      const mainList24hrChange = mainListTokens.reduce((sum, token) => {
+        return (
+          sum +
+          (typeof token.usdChange24h === "number" ? token.usdChange24h : 0)
+        );
+      }, 0);
+
+      // Total value includes all tokens (for reference)
+      const totalValue = responseData.totalValue || 0;
+
+      // Extract enhanced metadata
       const result = {
         wallet: walletAddress,
         chainId,
         chainName: responseData.chainName || "Unknown",
         tokens,
-        totalValue:
-          typeof responseData.totalValue === "number"
-            ? responseData.totalValue
-            : 0,
-        total24hrChange:
-          typeof responseData.total24hrChange === "number"
-            ? responseData.total24hrChange
-            : 0,
+        totalValue, // All tokens value
+        mainListValue, // NEW: Only main list tokens value
+        total24hrChange: mainList24hrChange, // NEW: Only main list 24hr change
         tokenCount:
           typeof responseData.tokenCount === "number"
             ? responseData.tokenCount
             : tokens.length,
-        presetTokenCount:
-          typeof responseData.presetTokenCount === "number"
-            ? responseData.presetTokenCount
-            : 0,
+        presetTokenCount,
         hiddenTokenCount:
           typeof responseData.hiddenTokenCount === "number"
             ? responseData.hiddenTokenCount
@@ -186,26 +203,29 @@ class TokenService {
       };
 
       console.log(
-        `✅ Fetched ${result.tokenCount} tokens (${
-          result.presetTokenCount
-        } preset, ${
-          result.hiddenTokenCount
-        } hidden) with total value $${result.totalValue.toFixed(
-          2
-        )} for wallet ${walletAddress}`
+        `✅ Fetched ${result.tokenCount} tokens (${result.presetTokenCount} in main list, ${result.hiddenTokenCount} hidden)`
       );
 
       console.log(
-        `📈 24hr Portfolio Change: ${
-          result.total24hrChange >= 0 ? "+" : ""
-        }$${result.total24hrChange.toFixed(3)}`
+        `💰 Main List Value: ${this.formatCurrency(
+          result.mainListValue
+        )} (showing in wallet balance)`
       );
-      console.log(`👁️ Show mode: ${showHidden ? "All tokens" : "Preset only"}`);
+
+      console.log(
+        `📊 Total Value: ${this.formatCurrency(result.totalValue)} (all tokens)`
+      );
+
+      console.log(
+        `📈 24hr Main List Change: ${this.format24hrChange(
+          result.total24hrChange
+        )}`
+      );
 
       // Log token details for debugging
       if (this.debugMode && tokens.length > 0) {
-        console.log("🔍 Token breakdown:");
-        tokens.slice(0, 3).forEach((token, index) => {
+        console.log("🔍 Main list tokens (first %d):", presetTokenCount);
+        mainListTokens.slice(0, 3).forEach((token, index) => {
           console.log(
             `  ${index + 1}. ${token.symbol}: ${this.formatTokenAmount(
               token.balance,
@@ -215,8 +235,10 @@ class TokenService {
             )}`
           );
         });
-        if (tokens.length > 3) {
-          console.log(`  ... and ${tokens.length - 3} more tokens`);
+        if (mainListTokens.length > 3) {
+          console.log(
+            `  ... and ${mainListTokens.length - 3} more main list tokens`
+          );
         }
       }
 
@@ -233,7 +255,7 @@ class TokenService {
         console.error("🔧 Unexpected error:", error.message);
       }
 
-      // Always return a valid response instead of throwing - Following wallet-balance.js approach
+      // Always return a valid response instead of throwing
       console.warn(
         "🔄 Returning empty result due to error (graceful degradation)"
       );
@@ -243,6 +265,7 @@ class TokenService {
         chainName: "Unknown",
         tokens: [],
         totalValue: 0,
+        mainListValue: 0,
         total24hrChange: 0,
         tokenCount: 0,
         presetTokenCount: 0,
@@ -493,18 +516,18 @@ class TokenService {
    */
   logTokenSummary(
     tokens: TokenBalance[],
-    totalValue: number,
+    mainListValue: number,
     total24hrChange: number
   ) {
     if (!this.debugMode) return;
 
-    console.log("📊 WALLET SUMMARY (wallet-balance.js style):");
+    console.log("📊 WALLET SUMMARY (Main List Only):");
     console.log("═".repeat(80));
-    console.log(`Total Portfolio Value: $${totalValue.toFixed(3)}`);
+    console.log(`Main List Portfolio Value: $${mainListValue.toFixed(3)}`);
     console.log(
-      `24hr Portfolio Change: ${this.format24hrChange(total24hrChange)}`
+      `24hr Main List Change: ${this.format24hrChange(total24hrChange)}`
     );
-    console.log(`Token Holdings: ${tokens.length} tokens`);
+    console.log(`Main List Holdings: ${tokens.length} tokens`);
     console.log("─".repeat(80));
 
     tokens.forEach((token, index) => {
