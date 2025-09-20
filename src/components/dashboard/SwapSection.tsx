@@ -81,6 +81,65 @@ interface SwapQuote {
   sources: any[];
 }
 
+// Token Image Component with fallback
+const TokenImage = ({
+  token,
+  size = "w-7 h-7",
+}: {
+  token: TrendingToken | TopGainer;
+  size?: string;
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+
+  const handleImageLoad = () => {
+    setImageLoading(false);
+    setImageError(false);
+  };
+
+  const handleImageError = () => {
+    setImageLoading(false);
+    setImageError(true);
+  };
+
+  // Show fallback if no image URL, image failed to load, or still loading
+  if (!token.imageUrl || imageError || imageLoading) {
+    return (
+      <div
+        className={`${size} ${token.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
+      >
+        <span className="text-white text-xs font-bold font-satoshi">
+          {token.icon}
+        </span>
+        {/* Hidden img tag to attempt loading */}
+        {token.imageUrl && imageLoading && (
+          <img
+            src={token.imageUrl}
+            alt={token.name}
+            className="hidden"
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${size} rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-800`}
+    >
+      <img
+        src={token.imageUrl}
+        alt={token.name}
+        className="w-full h-full object-cover"
+        onLoad={handleImageLoad}
+        onError={handleImageError}
+      />
+    </div>
+  );
+};
+
 export default function SwapSection() {
   // Use CoinGecko hook for real data
   const {
@@ -429,15 +488,9 @@ export default function SwapSection() {
                     key={token.index}
                     className="flex items-center justify-between py-1.5"
                   >
-                    {/* Token info with fixed width */}
+                    {/* Token info with fixed width - NOW WITH IMAGES */}
                     <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
-                      <div
-                        className={`w-7 h-7 ${token.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
-                      >
-                        <span className="text-white text-xs font-bold font-satoshi">
-                          {token.icon}
-                        </span>
-                      </div>
+                      <TokenImage token={token} />
                       <div className="min-w-0 flex-1">
                         <div className="text-white text-[11px] font-medium font-satoshi truncate">
                           {token.name}
@@ -585,15 +638,9 @@ export default function SwapSection() {
                     key={token.index}
                     className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
                   >
-                    {/* Token info */}
+                    {/* Token info - NOW WITH IMAGES */}
                     <div className="flex items-center gap-2.5 w-[100px] flex-shrink-0">
-                      <div
-                        className={`w-6 h-6 ${token.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
-                      >
-                        <span className="text-white text-xs font-bold font-satoshi">
-                          {token.icon}
-                        </span>
-                      </div>
+                      <TokenImage token={token} size="w-6 h-6" />
                       <div className="min-w-0 flex-1">
                         <div className="text-white text-[11px] font-medium font-satoshi truncate">
                           {token.name}
