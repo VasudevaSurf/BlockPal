@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - UPDATED VERSION with RainbowKit integration
+// src/components/dashboard/Sidebar.tsx - COMPLETE VERSION with minimized wallet support
 "use client";
 
 import { useState } from "react";
@@ -243,7 +243,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
       {/* Bottom Section - RainbowKit Connect Wallet Button */}
       <div className="p-2 lg:p-4 flex-shrink-0 relative z-20">
-        <WalletConnectButton />
+        <WalletConnectButton isMinimized={isMinimized} />
       </div>
 
       <style jsx>{`

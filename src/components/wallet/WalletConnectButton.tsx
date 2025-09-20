@@ -1,15 +1,21 @@
-// src/components/wallet/WalletConnectButton.tsx - UPDATED FOR WAGMI V2
+// src/components/wallet/WalletConnectButton.tsx - COMPLETE VERSION with minimized support
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useChainId, useDisconnect } from "wagmi"; // UPDATED: wagmi v2 hooks
+import { useAccount, useChainId, useDisconnect } from "wagmi";
 import { useState, useEffect } from "react";
-import { Copy, LogOut, Check } from "lucide-react";
+import { Copy, LogOut, Check, Wallet } from "lucide-react";
 import { chains } from "./WalletProvider";
 
-export default function WalletConnectButton() {
+interface WalletConnectButtonProps {
+  isMinimized?: boolean;
+}
+
+export default function WalletConnectButton({
+  isMinimized = false,
+}: WalletConnectButtonProps) {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId(); // UPDATED: useChainId instead of useNetwork
+  const chainId = useChainId();
   const { disconnect } = useDisconnect();
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -54,38 +60,23 @@ export default function WalletConnectButton() {
     return (
       <button
         type="button"
-        className="w-full flex items-center rounded-[12px] bg-[#E2AF19] text-black font-medium font-satoshi text-xs transition-all duration-200 hover:bg-[#D4A118] active:bg-[#C69516] disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 justify-center"
+        className={`flex items-center rounded-[12px] bg-[#E2AF19] text-black font-medium font-satoshi text-xs transition-all duration-200 hover:bg-[#D4A118] active:bg-[#C69516] disabled:opacity-50 disabled:cursor-not-allowed ${
+          isMinimized
+            ? "w-10 h-10 justify-center"
+            : "w-full px-3 py-1.5 justify-center"
+        }`}
         disabled
+        title={isMinimized ? "Connect Wallet" : undefined}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="28"
-          height="28"
-          viewBox="0 0 28 28"
-          fill="none"
-          className="mr-2"
-        >
-          <path
-            d="M15.1667 11.375H8.16675C7.68841 11.375 7.29175 10.9783 7.29175 10.5C7.29175 10.0217 7.68841 9.625 8.16675 9.625H15.1667C15.6451 9.625 16.0417 10.0217 16.0417 10.5C16.0417 10.9783 15.6451 11.375 15.1667 11.375Z"
-            fill="black"
-          />
-          <path
-            d="M22.2133 17.2667C20.4516 17.2667 18.9583 15.96 18.8183 14.28C18.725 13.3117 19.075 12.3667 19.775 11.6784C20.3583 11.0717 21.1866 10.7334 22.0616 10.7334H24.5C25.655 10.7684 26.5416 11.6783 26.5416 12.7983V15.2018C26.5416 16.3218 25.655 17.2317 24.535 17.2667H22.2133ZM24.4649 12.4834H22.0733C21.665 12.4834 21.2917 12.6351 21.0233 12.9151C20.685 13.2417 20.5216 13.685 20.5683 14.1284C20.6266 14.8984 21.3733 15.5167 22.2133 15.5167H24.5C24.6516 15.5167 24.7916 15.3768 24.7916 15.2018V12.7983C24.7916 12.6233 24.6516 12.4951 24.4649 12.4834Z"
-            fill="black"
-          />
-          <path
-            d="M18.6666 24.7918H8.16658C4.15325 24.7918 1.45825 22.0968 1.45825 18.0835V9.91683C1.45825 6.3235 3.67489 3.72184 7.11656 3.29017C7.43156 3.2435 7.79325 3.2085 8.16658 3.2085H18.6666C18.9466 3.2085 19.3082 3.22016 19.6816 3.27849C23.1232 3.67516 25.3749 6.2885 25.3749 9.91683V11.6085C25.3749 12.0868 24.9783 12.4835 24.4999 12.4835H22.0732C21.6649 12.4835 21.2916 12.6352 21.0233 12.9152L21.0116 12.9268C20.6849 13.2418 20.5333 13.6735 20.5683 14.1168C20.6266 14.8868 21.3732 15.5051 22.2132 15.5051H24.4999C24.9783 15.5051 25.3749 15.9018 25.3749 16.3801V18.0718C25.3749 22.0968 22.6799 24.7918 18.6666 24.7918ZM8.16658 4.9585C7.88659 4.9585 7.61824 4.98182 7.3499 5.01682C4.78324 5.34348 3.20825 7.21016 3.20825 9.91683V18.0835C3.20825 21.0935 5.15659 23.0418 8.16658 23.0418H18.6666C21.6766 23.0418 23.6249 21.0935 23.6249 18.0835V17.2668H22.2132C20.4516 17.2668 18.9583 15.9602 18.8183 14.2802C18.7249 13.3235 19.0749 12.3669 19.7749 11.6902C20.3816 11.0719 21.1982 10.7335 22.0732 10.7335H23.6249V9.91683C23.6249 7.18683 22.0266 5.30847 19.4366 5.00514C19.1566 4.95847 18.9116 4.9585 18.6666 4.9585H8.16658Z"
-            fill="black"
-          />
-        </svg>
-        Connect Wallet
+        <Wallet size={16} className={isMinimized ? "" : "mr-2"} />
+        {!isMinimized && "Connect Wallet"}
       </button>
     );
   }
 
   return (
     <div className="wallet-container">
-      {connectionError && (
+      {connectionError && !isMinimized && (
         <div className="mb-2 p-2 bg-red-900/20 border border-red-500/50 rounded-lg">
           <p className="text-red-400 text-xs font-satoshi">{connectionError}</p>
         </div>
@@ -128,30 +119,15 @@ export default function WalletConnectButton() {
                         openConnectModal();
                       }}
                       type="button"
-                      className="w-full flex items-center rounded-[12px] bg-[#E2AF19] text-black font-medium font-satoshi text-xs transition-all duration-200 hover:bg-[#D4A118] active:bg-[#C69516] disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 justify-center"
+                      className={`flex items-center rounded-[12px] bg-[#E2AF19] text-black font-medium font-satoshi text-xs transition-all duration-200 hover:bg-[#D4A118] active:bg-[#C69516] disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isMinimized
+                          ? "w-10 h-10 justify-center"
+                          : "w-full px-3 py-1.5 justify-center"
+                      }`}
+                      title={isMinimized ? "Connect Wallet" : undefined}
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="28"
-                        height="28"
-                        viewBox="0 0 28 28"
-                        fill="none"
-                        className="mr-2"
-                      >
-                        <path
-                          d="M15.1667 11.375H8.16675C7.68841 11.375 7.29175 10.9783 7.29175 10.5C7.29175 10.0217 7.68841 9.625 8.16675 9.625H15.1667C15.6451 9.625 16.0417 10.0217 16.0417 10.5C16.0417 10.9783 15.6451 11.375 15.1667 11.375Z"
-                          fill="black"
-                        />
-                        <path
-                          d="M22.2133 17.2667C20.4516 17.2667 18.9583 15.96 18.8183 14.28C18.725 13.3117 19.075 12.3667 19.775 11.6784C20.3583 11.0717 21.1866 10.7334 22.0616 10.7334H24.5C25.655 10.7684 26.5416 11.6783 26.5416 12.7983V15.2018C26.5416 16.3218 25.655 17.2317 24.535 17.2667H22.2133ZM24.4649 12.4834H22.0733C21.665 12.4834 21.2917 12.6351 21.0233 12.9151C20.685 13.2417 20.5216 13.685 20.5683 14.1284C20.6266 14.8984 21.3733 15.5167 22.2133 15.5167H24.5C24.6516 15.5167 24.7916 15.3768 24.7916 15.2018V12.7983C24.7916 12.6233 24.6516 12.4951 24.4649 12.4834Z"
-                          fill="black"
-                        />
-                        <path
-                          d="M18.6666 24.7918H8.16658C4.15325 24.7918 1.45825 22.0968 1.45825 18.0835V9.91683C1.45825 6.3235 3.67489 3.72184 7.11656 3.29017C7.43156 3.2435 7.79325 3.2085 8.16658 3.2085H18.6666C18.9466 3.2085 19.3082 3.22016 19.6816 3.27849C23.1232 3.67516 25.3749 6.2885 25.3749 9.91683V11.6085C25.3749 12.0868 24.9783 12.4835 24.4999 12.4835H22.0732C21.6649 12.4835 21.2916 12.6352 21.0233 12.9152L21.0116 12.9268C20.6849 13.2418 20.5333 13.6735 20.5683 14.1168C20.6266 14.8868 21.3732 15.5051 22.2132 15.5051H24.4999C24.9783 15.5051 25.3749 15.9018 25.3749 16.3801V18.0718C25.3749 22.0968 22.6799 24.7918 18.6666 24.7918ZM8.16658 4.9585C7.88659 4.9585 7.61824 4.98182 7.3499 5.01682C4.78324 5.34348 3.20825 7.21016 3.20825 9.91683V18.0835C3.20825 21.0935 5.15659 23.0418 8.16658 23.0418H18.6666C21.6766 23.0418 23.6249 21.0935 23.6249 18.0835V17.2668H22.2132C20.4516 17.2668 18.9583 15.9602 18.8183 14.2802C18.7249 13.3235 19.0749 12.3669 19.7749 11.6902C20.3816 11.0719 21.1982 10.7335 22.0732 10.7335H23.6249V9.91683C23.6249 7.18683 22.0266 5.30847 19.4366 5.00514C19.1566 4.95847 18.9116 4.9585 18.6666 4.9585H8.16658Z"
-                          fill="black"
-                        />
-                      </svg>
-                      Connect Wallet
+                      <Wallet size={16} className={isMinimized ? "" : "mr-2"} />
+                      {!isMinimized && "Connect Wallet"}
                     </button>
                   );
                 }
@@ -164,14 +140,72 @@ export default function WalletConnectButton() {
                         openChainModal();
                       }}
                       type="button"
-                      className="w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-[12px] font-satoshi text-xs"
+                      className={`bg-red-500 hover:bg-red-600 text-white rounded-[12px] font-satoshi text-xs flex items-center justify-center ${
+                        isMinimized ? "w-10 h-10" : "w-full py-2 px-4"
+                      }`}
+                      title={isMinimized ? "Wrong Network" : undefined}
                     >
-                      Wrong network
+                      {isMinimized ? "⚠️" : "Wrong network"}
                     </button>
                   );
                 }
 
-                // Connected wallet with clean box layout
+                // Connected wallet - minimized view (icons only)
+                if (isMinimized) {
+                  return (
+                    <div className="flex flex-col gap-2">
+                      {/* Connected status indicator */}
+                      <div
+                        className="w-10 h-10 bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] flex items-center justify-center relative group cursor-pointer hover:bg-[#D4A118] transition-colors"
+                        title={`Connected: ${account.displayName}`}
+                      >
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+
+                        {/* Tooltip */}
+                        <div className="absolute left-12 top-1/2 transform -translate-y-1/2 bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-xs text-white font-satoshi opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                          Connected: {account.displayName}
+                          <br />
+                          {account.address?.slice(0, 6)}...
+                          {account.address?.slice(-4)}
+                        </div>
+                      </div>
+
+                      {/* Copy address button */}
+                      <button
+                        onClick={handleCopyAddress}
+                        className="w-10 h-10 bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] hover:bg-[#D4A118] transition-colors flex items-center justify-center group relative"
+                        title="Copy Address"
+                      >
+                        {copied ? (
+                          <Check size={14} className="text-black" />
+                        ) : (
+                          <Copy size={14} className="text-black" />
+                        )}
+
+                        {/* Tooltip */}
+                        <div className="absolute left-12 top-1/2 transform -translate-y-1/2 bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-xs text-white font-satoshi opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                          {copied ? "Copied!" : "Copy Address"}
+                        </div>
+                      </button>
+
+                      {/* Disconnect button */}
+                      <button
+                        onClick={handleDisconnect}
+                        className="w-10 h-10 bg-[#F9EFD1] border border-[#F9EFD1] rounded-[12px] hover:bg-[#F5E8C4] transition-colors flex items-center justify-center group relative"
+                        title="Disconnect"
+                      >
+                        <LogOut size={14} className="text-black" />
+
+                        {/* Tooltip */}
+                        <div className="absolute left-12 top-1/2 transform -translate-y-1/2 bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-xs text-white font-satoshi opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                          Disconnect
+                        </div>
+                      </button>
+                    </div>
+                  );
+                }
+
+                // Connected wallet - full view
                 return (
                   <div className="w-full space-y-2">
                     {/* Main wallet info box */}
