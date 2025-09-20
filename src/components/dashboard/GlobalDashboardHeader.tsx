@@ -51,6 +51,11 @@ const getPageTitle = (
         title: "User Profile",
         subtitle: "Manage your account settings and preferences",
       };
+    case "/dashboard/swap":
+      return {
+        title: "Swap",
+        subtitle: "Make Swap Payments",
+      };
     default:
       return {
         title: "Dashboard",

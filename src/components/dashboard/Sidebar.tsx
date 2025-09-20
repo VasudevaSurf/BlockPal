@@ -18,6 +18,7 @@ import DarkModeIcon from "@/components/icons/DarkModeIcon";
 import LogoutIcon from "@/components/icons/LogoutIcon";
 import { logoutUser } from "@/store/slices/authSlice";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
+import SwapIcon from "../icons/SwapIcon";
 
 const menuItems = [
   {
@@ -48,6 +49,12 @@ const menuItems = [
     icon: FriendsIcon,
     label: "Friends",
     href: "/dashboard/friends",
+    comingSoon: false,
+  },
+  {
+    icon: SwapIcon,
+    label: "Swap",
+    href: "/dashboard/swap",
     comingSoon: false,
   },
 ];
