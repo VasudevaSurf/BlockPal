@@ -1,7 +1,7 @@
 // src/components/dashboard/TokenList.tsx - FIXED with proper token management
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { useAccount, useChainId } from "wagmi";
@@ -437,6 +437,7 @@ export default function TokenList() {
   const [presetTokenCount, setPresetTokenCount] = useState(0);
   const [hiddenTokenCount, setHiddenTokenCount] = useState(0);
   const [hasHiddenTokens, setHasHiddenTokens] = useState(false);
+  const presetTokenCountRef = useRef(0); // FIXED: Add reference for preset count
 
   // Preferences state
   const [preferences, setPreferences] = useState<WalletPreferences | null>(
@@ -469,6 +470,7 @@ export default function TokenList() {
     setLoading(false);
     setError("");
     setPreferences(null);
+    presetTokenCountRef.current = 0; // FIXED: Reset reference
   };
 
   // Load preferences and tokens
@@ -498,12 +500,16 @@ export default function TokenList() {
         true // Always fetch all tokens
       );
 
-      // Mark tokens with proper flags
+      // FIXED: Mark tokens with proper flags - trust backend classification
       const tokensWithFlags = response.tokens.map((token, index) => {
-        const isPreset = index < response.presetTokenCount;
+        // Check if token is in user's manually added list
         const isUserAdded = userPreferences
           ? userPreferences.userAddedTokens.includes(token.contractAddress)
           : false;
+
+        // For preset classification, check if token is in the first presetTokenCount tokens
+        // that the backend already sorted (preset tokens come first from backend)
+        const isPreset = index < response.presetTokenCount;
 
         return {
           ...token,
@@ -519,6 +525,7 @@ export default function TokenList() {
       setHiddenTokenCount(response.hiddenTokenCount);
       setHasHiddenTokens(response.hasHiddenTokens);
       setChainName(response.chainName);
+      presetTokenCountRef.current = response.presetTokenCount; // FIXED: Update reference
 
       console.log(
         `✅ Loaded ${tokensWithFlags.length} tokens (${response.presetTokenCount} preset, ${response.hiddenTokenCount} hidden)`
@@ -676,17 +683,30 @@ export default function TokenList() {
     }
   };
 
-  // Split tokens for display
+  // FIXED: Split tokens for display - trust backend's preset classification
   const getTokensForDisplay = () => {
-    // Main list tokens: preset tokens + user added tokens
-    const mainTokens = allTokens.filter(
-      (token) => token.isPreset || token.isUserAdded
-    );
+    const presetTokenCount = presetTokenCountRef.current || 0;
 
-    // Additional tokens: non-preset, non-user-added tokens
-    const additionalTokens = allTokens.filter(
-      (token) => !token.isPreset && !token.isUserAdded
-    );
+    // Main list tokens: first N tokens (preset) + user manually added tokens
+    const mainTokens = allTokens.filter((token, index) => {
+      // Token is in preset list (first presetTokenCount tokens from backend)
+      const isInPresetList = index < presetTokenCount;
+
+      // Token was manually added by user
+      const isUserAdded =
+        preferences?.userAddedTokens?.includes(token.contractAddress) || false;
+
+      return isInPresetList || isUserAdded;
+    });
+
+    // Additional tokens: everything else
+    const additionalTokens = allTokens.filter((token, index) => {
+      const isInPresetList = index < presetTokenCount;
+      const isUserAdded =
+        preferences?.userAddedTokens?.includes(token.contractAddress) || false;
+
+      return !isInPresetList && !isUserAdded;
+    });
 
     return { mainTokens, additionalTokens };
   };
@@ -751,19 +771,6 @@ export default function TokenList() {
               </span>
             </button>
           )}
-
-          {/* Refresh Button */}
-          {/* <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
-            title="Refresh tokens"
-          >
-            <RefreshCw
-              size={16}
-              className={`lg:w-5 lg:h-5 ${isRefreshing ? "animate-spin" : ""}`}
-            />
-          </button> */}
         </div>
       </div>
 
@@ -835,21 +842,6 @@ export default function TokenList() {
                       <div className="min-w-0 flex-1">
                         <div className="text-white font-medium font-satoshi text-sm flex items-center">
                           {token.name}
-                          {/* {token.isNative && (
-                            <span className="ml-2 text-xs bg-[#E2AF19] text-black px-1.5 py-0.5 rounded">
-                              Native
-                            </span>
-                          )}
-                          {token.isPreset && (
-                            <span className="ml-2 text-xs bg-blue-600 text-blue-100 px-1.5 py-0.5 rounded">
-                              Preset
-                            </span>
-                          )}
-                          {token.isUserAdded && (
-                            <span className="ml-2 text-xs bg-green-600 text-green-100 px-1.5 py-0.5 rounded">
-                              Added
-                            </span>
-                          )} */}
                         </div>
                         <div className="text-gray-400 text-xs font-satoshi">
                           {enhancedTokenService.formatTokenAmount(
@@ -918,12 +910,9 @@ export default function TokenList() {
                         className="w-10 h-10 mr-2.5 flex-shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        {/* <div className="text-white font-medium font-satoshi text-sm flex items-center">
+                        <div className="text-white font-medium font-satoshi text-sm flex items-center">
                           {token.name}
-                          <span className="ml-2 text-xs bg-gray-600 text-gray-300 px-1.5 py-0.5 rounded">
-                            Additional
-                          </span>
-                        </div> */}
+                        </div>
                         <div className="text-gray-400 text-xs font-satoshi">
                           {enhancedTokenService.formatTokenAmount(
                             token.balance,

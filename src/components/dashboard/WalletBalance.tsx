@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - FIXED to show only main list balance
+// src/components/dashboard/WalletBalance.tsx - FIXED to include user-added tokens in balance
 "use client";
 
 import { useSelector } from "react-redux";
@@ -16,7 +16,7 @@ import { SkeletonWalletBalance } from "@/components/ui/Skeleton";
 import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
 
-// Portfolio Change Component - Following wallet-balance.js display style
+// Portfolio Change Component
 const PortfolioChange = ({
   change24h,
   totalChange24h,
@@ -87,11 +87,11 @@ export default function WalletBalance() {
   // Get current chain data
   const currentChain = chains.find((c) => c.id === chainId);
 
-  // Component state - FIXED: Use mainListValue instead of totalValue
-  const [mainListValue, setMainListValue] = useState(0); // CHANGED: Only main list value
-  const [totalValue, setTotalValue] = useState(0); // Keep for reference
+  // Component state - FIXED: Use mainListValue for display
+  const [mainListValue, setMainListValue] = useState(0);
+  const [totalValue, setTotalValue] = useState(0);
   const [tokenCount, setTokenCount] = useState(0);
-  const [mainList24hrChange, setMainList24hrChange] = useState(0); // CHANGED: Only main list 24hr change
+  const [mainList24hrChange, setMainList24hrChange] = useState(0);
   const [presetTokenCount, setPresetTokenCount] = useState(0);
   const [hiddenTokenCount, setHiddenTokenCount] = useState(0);
   const [chainName, setChainName] = useState("");
@@ -127,7 +127,7 @@ export default function WalletBalance() {
     setLoading(false);
   };
 
-  // FIXED: Fetch wallet data and use mainListValue
+  // FIXED: Fetch wallet data and calculate main list balance properly
   const fetchWalletData = async () => {
     if (!address || !chainId) {
       setLoading(false);
@@ -140,59 +140,62 @@ export default function WalletBalance() {
 
       console.log(`📊 Fetching wallet data for ${address} on chain ${chainId}`);
 
-      // Fetch preset tokens only for main balance display (showHidden = false to get main list)
+      // FIXED: Fetch ALL tokens so we can calculate main list balance properly
       const response = await tokenService.getWalletTokens(
         address,
         chainId,
-        false // Only main list tokens
+        true // Get ALL tokens including hidden ones
       );
 
-      // FIXED: Use mainListValue instead of totalValue
-      setMainListValue(response.mainListValue); // CHANGED: Show only main list value
-      setTotalValue(response.totalValue); // Keep for reference/logging
-      setTokenCount(response.tokenCount);
-      setMainList24hrChange(response.total24hrChange); // CHANGED: Main list 24hr change
+      // FIXED: Load user preferences to know which tokens are user-added
+      const userPreferences = await loadUserPreferences(address, chainId);
+
+      // FIXED: Calculate main list value (preset + user-added tokens only)
+      let calculatedMainListValue = 0;
+      let calculatedMainList24hrChange = 0;
+      let mainListTokenCount = 0;
+
+      response.tokens.forEach((token, index) => {
+        // Check if token is in main list (preset or user-added)
+        const isPresetToken = index < response.presetTokenCount;
+        const isUserAddedToken =
+          userPreferences?.userAddedTokens?.includes(token.contractAddress) ||
+          false;
+
+        if (isPresetToken || isUserAddedToken) {
+          calculatedMainListValue += token.value || 0;
+          calculatedMainList24hrChange += token.usdChange24h || 0;
+          mainListTokenCount++;
+        }
+      });
+
+      // FIXED: Set the calculated main list values
+      setMainListValue(calculatedMainListValue);
+      setTotalValue(response.totalValue);
+      setTokenCount(mainListTokenCount); // Only count main list tokens
+      setMainList24hrChange(calculatedMainList24hrChange);
       setPresetTokenCount(response.presetTokenCount);
       setHiddenTokenCount(response.hiddenTokenCount);
       setChainName(response.chainName);
 
-      // FIXED: Log the correct values being displayed
       console.log(
-        `✅ Wallet data loaded (MAIN LIST ONLY): ${tokenService.formatCurrency(
-          response.mainListValue
-        )}, ${
-          response.presetTokenCount
-        } tokens in main list, ${tokenService.format24hrChange(
-          response.total24hrChange
-        )}`
+        `✅ Wallet data loaded - Main List Value: ${tokenService.formatCurrency(
+          calculatedMainListValue
+        )}, Total Value: ${tokenService.formatCurrency(response.totalValue)}`
       );
 
-      // Enhanced logging
-      if (response.mainListValue > 0) {
-        console.log("📊 Portfolio Summary (MAIN LIST DISPLAY):");
+      console.log(
+        `📊 Main list: ${mainListTokenCount} tokens (${
+          response.presetTokenCount
+        } preset + ${
+          mainListTokenCount - response.presetTokenCount
+        } user-added)`
+      );
+
+      if (response.hasHiddenTokens) {
         console.log(
-          `   🎯 Main List Value (DISPLAYED): ${tokenService.formatCurrency(
-            response.mainListValue
-          )}`
+          `💡 ${response.hiddenTokenCount} additional tokens not included in main balance.`
         );
-        console.log(
-          `   📊 Total Value (ALL TOKENS): ${tokenService.formatCurrency(
-            response.totalValue
-          )}`
-        );
-        console.log(
-          `   📈 24hr Main List Change: ${tokenService.format24hrChange(
-            response.total24hrChange
-          )}`
-        );
-        console.log(
-          `   🏷️ Showing: ${response.presetTokenCount} main list tokens`
-        );
-        if (response.hasHiddenTokens) {
-          console.log(
-            `   💡 Hidden: ${response.hiddenTokenCount} additional token(s) not counted in balance.`
-          );
-        }
       }
     } catch (err: any) {
       console.error("❌ Error fetching wallet data:", err);
@@ -202,7 +205,32 @@ export default function WalletBalance() {
     }
   };
 
-  // FIXED: Format balance using mainListValue
+  // FIXED: Helper function to load user preferences
+  const loadUserPreferences = async (
+    walletAddress: string,
+    chainId: number
+  ) => {
+    try {
+      const response = await fetch(
+        `/api/wallet/preferences?wallet=${walletAddress}&chain=${chainId}`
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null; // No preferences found
+        }
+        throw new Error(`Failed to load preferences: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success ? data.data : null;
+    } catch (error: any) {
+      console.warn("⚠️ Could not load user preferences:", error.message);
+      return null;
+    }
+  };
+
+  // Format balance using mainListValue
   const formatBalance = (balance: number) => {
     return tokenService.formatCurrency(balance);
   };
@@ -328,18 +356,18 @@ export default function WalletBalance() {
         </div>
       )}
 
-      {/* FIXED: Balance Display - Show only main list value */}
+      {/* FIXED: Balance Display - Show main list value (preset + user-added) */}
       <div className="space-y-2">
-        {/* Main Balance Display - FIXED: Use mainListValue */}
+        {/* Main Balance Display */}
         <div className="flex items-end justify-between">
           <div>
             <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
               {formatBalance(mainListValue)}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Portfolio 24hr Change - FIXED: Use mainList24hrChange */}
+              {/* Portfolio 24hr Change */}
               <PortfolioChange
-                change24h={0} // Not used, keeping for compatibility
+                change24h={0}
                 totalChange24h={mainList24hrChange}
               />
             </div>
@@ -348,10 +376,9 @@ export default function WalletBalance() {
           {/* Token count info */}
           {/* <div className="text-right">
             <div className="text-gray-400 text-xs font-satoshi mb-1">
-              {presetTokenCount > 0 ? (
+              {tokenCount > 0 ? (
                 <>
-                  Main List: {presetTokenCount} token
-                  {presetTokenCount !== 1 ? "s" : ""}
+                  Main List: {tokenCount} token{tokenCount !== 1 ? "s" : ""}
                 </>
               ) : (
                 "Assets"
@@ -362,9 +389,6 @@ export default function WalletBalance() {
                 +{hiddenTokenCount} additional
               </div>
             )}
-            <div className="text-white text-sm font-satoshi font-medium">
-              {tokenCount} total
-            </div>
           </div> */}
         </div>
 
@@ -372,16 +396,17 @@ export default function WalletBalance() {
         {/* {mainListValue > 0 && hiddenTokenCount > 0 && (
           <div className="mt-3 p-2 bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg">
             <div className="text-gray-400 text-xs font-satoshi">
-              💡 Showing balance of {presetTokenCount} main list token
-              {presetTokenCount !== 1 ? "s" : ""} only.
+              💡 Showing balance of {tokenCount} main list token
+              {tokenCount !== 1 ? "s" : ""} only.
               <br />
               {hiddenTokenCount} additional token
               {hiddenTokenCount !== 1 ? "s" : ""} not included in balance.
             </div>
           </div>
-        )}
+        )} */}
 
-        {process.env.NODE_ENV === "development" && (
+        {/* Debug Info for Development */}
+        {/* {process.env.NODE_ENV === "development" && (
           <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/30 rounded-lg">
             <div className="text-blue-400 text-xs font-satoshi">
               <strong>Debug Info:</strong>
@@ -393,7 +418,7 @@ export default function WalletBalance() {
               Main List 24h Change:{" "}
               {tokenService.format24hrChange(mainList24hrChange)}
               <br />
-              Preset Tokens: {presetTokenCount} | Hidden: {hiddenTokenCount}
+              Main List Tokens: {tokenCount} | Hidden: {hiddenTokenCount}
             </div>
           </div>
         )} */}
