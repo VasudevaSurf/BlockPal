@@ -1,20 +1,23 @@
-// src/lib/ai/WalletAnalyzer.ts - FIXED to use real Moralis API
-interface MoralisConfig {
-  apiKey: string;
-}
+// src/lib/ai/WalletAnalyzer.ts
+import Moralis from "moralis";
 
 class WalletAnalyzer {
-  private apiKey: string;
+  private apiKey?: string;
   private initialized: boolean = false;
 
-  constructor(apiKey: string) {
+  constructor(apiKey?: string) {
     this.apiKey = apiKey;
   }
 
   async initialize() {
     if (!this.initialized && this.apiKey) {
-      this.initialized = true;
-      console.log("✅ WalletAnalyzer initialized with Moralis API");
+      try {
+        await Moralis.start({ apiKey: this.apiKey });
+        this.initialized = true;
+        console.log("✅ Moralis initialized successfully");
+      } catch (error: any) {
+        console.error("Failed to initialize Moralis:", error.message);
+      }
     }
   }
 
@@ -39,51 +42,29 @@ class WalletAnalyzer {
     await this.initialize();
 
     try {
-      // REAL Moralis API call
-      const response = await fetch(
-        `https://deep-index.moralis.io/api/v2.2/wallets/${address}/profitability?chain=${chain}`,
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "X-API-Key": this.apiKey,
-          },
-        }
-      );
+      const response = await Moralis.EvmApi.wallets.getWalletProfitability({
+        chain,
+        address,
+      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Moralis API error:", errorText);
-
-        if (response.status === 404) {
-          return {
-            error: "NO_DATA",
-            message: `No trading data found for wallet ${address}.`,
-          };
-        }
-
-        throw new Error(`Moralis API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-
-      if (!data || !data.result || data.result.length === 0) {
+      const data = response.raw.result;
+      if (!data || data.length === 0) {
         return {
           error: "NO_DATA",
           message: `No trading data found for wallet ${address}.`,
         };
       }
 
-      const processedData = this.processWalletData(data.result, address);
+      const processedData = this.processWalletData(data, address);
       return this.formatForAI(processedData);
     } catch (error: any) {
       console.error("Wallet analysis error:", error);
-      return { error: error.message || "Failed to analyze wallet" };
+      return { error: error.message };
     }
   }
 
   processWalletData(data: any[], address: string) {
-    const metrics = {
+    const metrics: any = {
       address,
       totalInvested: 0,
       totalRealized: 0,
@@ -91,8 +72,8 @@ class WalletAnalyzer {
       totalTrades: 0,
       totalBuys: 0,
       totalSells: 0,
-      profitableTokens: [] as any[],
-      losingTokens: [] as any[],
+      profitableTokens: [],
+      losingTokens: [],
       winRate: 0,
       realizedROI: 0,
       currency: "USD",
@@ -147,8 +128,8 @@ class WalletAnalyzer {
     });
 
     // Sort by profit/loss magnitude
-    metrics.profitableTokens.sort((a, b) => b.profit - a.profit);
-    metrics.losingTokens.sort((a, b) => a.profit - b.profit);
+    metrics.profitableTokens.sort((a: any, b: any) => b.profit - a.profit);
+    metrics.losingTokens.sort((a: any, b: any) => a.profit - b.profit);
 
     // Calculate win rate (only for closed positions)
     const soldTokens =
@@ -222,7 +203,8 @@ class WalletAnalyzer {
   }
 
   formatForAI(metrics: any) {
-    return {
+    // Create a clean, structured summary for AI interpretation
+    const summary = {
       wallet: {
         address: metrics.address,
         shortAddress: `${metrics.address.substring(
@@ -276,6 +258,8 @@ class WalletAnalyzer {
         recommendations: this.generateRecommendations(metrics),
       },
     };
+
+    return summary;
   }
 
   getPerformanceLevel(metrics: any): string {
@@ -415,258 +399,4 @@ class WalletAnalyzer {
   }
 }
 
-export { WalletAnalyzer };
 export default WalletAnalyzer;
-
-// ALSO UPDATE TokenSecurity class to use real GoPlus API
-class TokenSecurityReal {
-  private appKey?: string;
-  private appSecret?: string;
-  private coingeckoKey: string;
-  private initialized: boolean = false;
-  private accessToken?: string;
-
-  constructor(appKey?: string, appSecret?: string, coingeckoKey: string = "") {
-    this.appKey = appKey;
-    this.appSecret = appSecret;
-    this.coingeckoKey = coingeckoKey;
-  }
-
-  async initialize() {
-    if (!this.initialized && this.appKey && this.appSecret) {
-      try {
-        // Get GoPlus access token
-        const response = await fetch("https://api.gopluslabs.io/api/v1/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            app_key: this.appKey,
-            app_secret: this.appSecret,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          this.accessToken = data.access_token;
-          this.initialized = true;
-          console.log("✅ GoPlus API initialized");
-        }
-      } catch (error) {
-        console.error("Failed to initialize GoPlus:", error);
-      }
-    }
-  }
-
-  async checkSecurity(input: string) {
-    if (!this.appKey || !this.appSecret) {
-      return {
-        error: "Security check unavailable - GoPlus credentials not configured",
-      };
-    }
-
-    await this.initialize();
-
-    let contractAddress = input;
-
-    if (!/^0x[a-fA-F0-9]{40}$/.test(input)) {
-      const tokenData = await this.findTokenContract(input);
-      if (!tokenData) {
-        return { error: `Token not found: ${input}` };
-      }
-      contractAddress = tokenData.contractAddress;
-    }
-
-    try {
-      // Real GoPlus API call
-      const response = await fetch(
-        `https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=${contractAddress.toLowerCase()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`GoPlus API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.code === 1 && data.result) {
-        const security = data.result[contractAddress.toLowerCase()];
-        return this.analyzeSecurityData(security);
-      }
-
-      return { error: "Security data not available" };
-    } catch (error: any) {
-      console.error("Security check error:", error);
-      return { error: error.message };
-    }
-  }
-
-  async findTokenContract(input: string) {
-    const url = `${COINGECKO_BASE_URL}/search?query=${encodeURIComponent(
-      input
-    )}`;
-    const headers = { "x-cg-demo-api-key": this.coingeckoKey };
-
-    try {
-      const response = await fetch(url, {
-        headers,
-        next: { revalidate: 300 },
-      });
-
-      if (!response.ok) return null;
-
-      const data = await response.json();
-      const coins = data.coins || [];
-
-      const match = coins.find(
-        (coin: any) =>
-          coin.symbol?.toLowerCase() === input.toLowerCase() ||
-          coin.name?.toLowerCase() === input.toLowerCase()
-      );
-
-      if (match) {
-        const detailUrl = `${COINGECKO_BASE_URL}/coins/${match.id}`;
-        const detailResponse = await fetch(detailUrl, {
-          headers,
-          next: { revalidate: 300 },
-        });
-
-        if (detailResponse.ok) {
-          const detailData = await detailResponse.json();
-          if (detailData.platforms?.ethereum) {
-            return {
-              contractAddress: detailData.platforms.ethereum,
-            };
-          }
-        }
-      }
-
-      return null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  analyzeSecurityData(security: any) {
-    if (!security) {
-      return { error: "No security data available" };
-    }
-
-    let score = 100;
-    const issues = [];
-
-    // Critical issues
-    if (security.is_honeypot === "1") {
-      score -= 20;
-      issues.push({ severity: "critical", issue: "Honeypot detected" });
-    }
-    if (security.is_airdrop_scam === "1") {
-      score -= 20;
-      issues.push({ severity: "critical", issue: "Airdrop scam" });
-    }
-    if (security.owner_change_balance === "1") {
-      score -= 15;
-      issues.push({ severity: "high", issue: "Owner can change balance" });
-    }
-    if (security.cannot_sell_all === "1") {
-      score -= 15;
-      issues.push({ severity: "high", issue: "Cannot sell all tokens" });
-    }
-
-    // Medium issues
-    if (security.is_mintable === "1") {
-      score -= 10;
-      issues.push({ severity: "medium", issue: "Token is mintable" });
-    }
-    if (security.hidden_owner === "1") {
-      score -= 10;
-      issues.push({ severity: "medium", issue: "Hidden owner" });
-    }
-
-    // Tax issues
-    const buyTax = parseFloat(security.buy_tax) || 0;
-    const sellTax = parseFloat(security.sell_tax) || 0;
-
-    if (buyTax > 0.1) {
-      score -= 7;
-      issues.push({
-        severity: "medium",
-        issue: `High buy tax: ${(buyTax * 100).toFixed(2)}%`,
-      });
-    }
-    if (sellTax > 0.1) {
-      score -= 7;
-      issues.push({
-        severity: "medium",
-        issue: `High sell tax: ${(sellTax * 100).toFixed(2)}%`,
-      });
-    }
-
-    // Positive factors
-    if (security.trust_list === "1") {
-      score += 15;
-    }
-    if (security.is_open_source === "1") {
-      score += 5;
-    }
-
-    score = Math.max(0, Math.min(100, score));
-
-    return {
-      name: security.token_name,
-      symbol: security.token_symbol,
-      score: score,
-      riskLevel: this.getRiskLevel(score),
-      issues: issues,
-      details: {
-        openSource: security.is_open_source === "1",
-        proxy: security.is_proxy === "1",
-        mintable: security.is_mintable === "1",
-        honeypot: security.is_honeypot === "1",
-        buyTax: buyTax * 100,
-        sellTax: sellTax * 100,
-        totalTax: (buyTax + sellTax) * 100,
-        holderCount: parseInt(security.holder_count) || 0,
-        liquidityLocked: security.lp_holder_count > 1,
-        trustList: security.trust_list === "1",
-        dexAvailable: security.is_in_dex === "1",
-      },
-      warnings: this.generateWarnings(security, score),
-    };
-  }
-
-  generateWarnings(security: any, score: number) {
-    const warnings = [];
-
-    if (security.is_honeypot === "1") {
-      warnings.push("CRITICAL: Honeypot - Cannot sell after buying");
-    }
-    if (security.is_mintable === "1") {
-      warnings.push("Owner can create unlimited new tokens");
-    }
-    if (parseFloat(security.buy_tax) + parseFloat(security.sell_tax) > 0.15) {
-      warnings.push("High taxes will significantly impact profitability");
-    }
-    if (score < 40) {
-      warnings.push("Multiple red flags indicate potential scam");
-    }
-
-    return warnings;
-  }
-
-  getRiskLevel(score: number): string {
-    if (score >= 90) return "SAFE";
-    if (score >= 75) return "MODERATE";
-    if (score >= 60) return "RISKY";
-    if (score >= 40) return "DANGEROUS";
-    return "MALICIOUS";
-  }
-}
-
-export { TokenSecurityReal };

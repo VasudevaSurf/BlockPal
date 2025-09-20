@@ -1,109 +1,16 @@
 // src/lib/ai/ChartAnalyzer.ts
+import axios from "axios";
+import * as TI from "technicalindicators";
+
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
-
-// Simple technical indicators calculations
-class TechnicalIndicators {
-  static SMA(values: number[], period: number): number[] {
-    const result: number[] = [];
-    for (let i = period - 1; i < values.length; i++) {
-      const sum = values
-        .slice(i - period + 1, i + 1)
-        .reduce((a, b) => a + b, 0);
-      result.push(sum / period);
-    }
-    return result;
-  }
-
-  static EMA(values: number[], period: number): number[] {
-    const result: number[] = [];
-    const multiplier = 2 / (period + 1);
-    result[0] = values[0];
-
-    for (let i = 1; i < values.length; i++) {
-      result[i] = values[i] * multiplier + result[i - 1] * (1 - multiplier);
-    }
-
-    return result;
-  }
-
-  static RSI(values: number[], period: number = 14): number[] {
-    const result: number[] = [];
-    const gains: number[] = [];
-    const losses: number[] = [];
-
-    for (let i = 1; i < values.length; i++) {
-      const change = values[i] - values[i - 1];
-      gains.push(change > 0 ? change : 0);
-      losses.push(change < 0 ? Math.abs(change) : 0);
-    }
-
-    for (let i = period - 1; i < gains.length; i++) {
-      const avgGain =
-        gains.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0) / period;
-      const avgLoss =
-        losses.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0) / period;
-
-      const rs = avgGain / (avgLoss || 0.0001);
-      const rsi = 100 - 100 / (1 + rs);
-      result.push(rsi);
-    }
-
-    return result;
-  }
-
-  static MACD(
-    values: number[],
-    fastPeriod: number = 12,
-    slowPeriod: number = 26,
-    signalPeriod: number = 9
-  ) {
-    const ema12 = this.EMA(values, fastPeriod);
-    const ema26 = this.EMA(values, slowPeriod);
-    const macdLine: number[] = [];
-
-    for (let i = 0; i < Math.min(ema12.length, ema26.length); i++) {
-      macdLine.push(ema12[i] - ema26[i]);
-    }
-
-    const signalLine = this.EMA(macdLine, signalPeriod);
-    const histogram: number[] = [];
-
-    for (let i = 0; i < Math.min(macdLine.length, signalLine.length); i++) {
-      histogram.push(macdLine[i] - signalLine[i]);
-    }
-
-    return {
-      MACD: macdLine[macdLine.length - 1],
-      signal: signalLine[signalLine.length - 1],
-      histogram: histogram[histogram.length - 1],
-    };
-  }
-
-  static BollingerBands(
-    values: number[],
-    period: number = 20,
-    stdDev: number = 2
-  ) {
-    const sma = this.SMA(values, period);
-    const result: any[] = [];
-
-    for (let i = period - 1; i < values.length; i++) {
-      const slice = values.slice(i - period + 1, i + 1);
-      const mean = slice.reduce((a, b) => a + b, 0) / period;
-      const variance =
-        slice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / period;
-      const standardDev = Math.sqrt(variance);
-
-      result.push({
-        upper: mean + standardDev * stdDev,
-        middle: mean,
-        lower: mean - standardDev * stdDev,
-      });
-    }
-
-    return result;
-  }
-}
+const CHAIN_FALLBACK_ORDER = [
+  "ethereum",
+  "base",
+  "polygon-pos",
+  "binance-smart-chain",
+  "arbitrum-one",
+  "avalanche",
+];
 
 class ChartAnalyzer {
   private apiKey: string;
@@ -124,16 +31,12 @@ class ChartAnalyzer {
 
   async searchToken(query: string) {
     try {
-      const response = await fetch(`${this.baseUrl}/search`, {
+      const response = await axios.get(`${this.baseUrl}/search`, {
+        params: { query },
         headers: this.headers,
-        next: { revalidate: 300 },
       });
 
-      if (!response.ok) throw new Error("Search failed");
-
-      const data = await response.json();
-      const { coins } = data;
-
+      const { coins } = response.data;
       if (!coins || coins.length === 0) {
         throw new Error("No tokens found");
       }
@@ -170,24 +73,20 @@ class ChartAnalyzer {
         const url = `${this.baseUrl}/coins/${
           chain.id
         }/contract/${contractAddress.toLowerCase()}`;
-        const response = await fetch(url, {
+        const response = await axios.get(url, {
           headers: this.headers,
-          next: { revalidate: 60 },
-          signal: AbortSignal.timeout(5000),
+          timeout: 5000,
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.id) {
-            return {
-              id: data.id,
-              name: data.name,
-              symbol: data.symbol,
-              platform: chain.id,
-              platformName: chain.name,
-              address: contractAddress,
-            };
-          }
+        if (response.data && response.data.id) {
+          return {
+            id: response.data.id,
+            name: response.data.name,
+            symbol: response.data.symbol,
+            platform: chain.id,
+            platformName: chain.name,
+            address: contractAddress,
+          };
         }
       } catch (error) {
         continue;
@@ -207,33 +106,29 @@ class ChartAnalyzer {
       const fromTimestamp = toTimestamp - days * 24 * 60 * 60;
 
       let url: string;
-      const params = new URLSearchParams({
+      const params = {
         vs_currency: "usd",
-        from: fromTimestamp.toString(),
-        to: toTimestamp.toString(),
-      });
+        from: fromTimestamp,
+        to: toTimestamp,
+      };
 
       if (this.isContractAddress(tokenIdentifier)) {
         url = `${
           this.baseUrl
-        }/coins/${platform}/contract/${tokenIdentifier.toLowerCase()}/market_chart/range?${params}`;
+        }/coins/${platform}/contract/${tokenIdentifier.toLowerCase()}/market_chart/range`;
       } else {
-        url = `${this.baseUrl}/coins/${tokenIdentifier}/market_chart/range?${params}`;
+        url = `${this.baseUrl}/coins/${tokenIdentifier}/market_chart/range`;
       }
 
-      const response = await fetch(url, {
+      const response = await axios.get(url, {
+        params,
         headers: this.headers,
-        next: { revalidate: 300 },
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const data = await response.json();
-
       return {
-        prices: data.prices || [],
-        market_caps: data.market_caps || [],
-        volumes: data.total_volumes || [],
+        prices: response.data.prices,
+        market_caps: response.data.market_caps,
+        volumes: response.data.total_volumes,
       };
     } catch (error: any) {
       throw new Error(`Failed to fetch historical data: ${error.message}`);
@@ -245,50 +140,76 @@ class ChartAnalyzer {
     const volumeValues = volumes.map((v) => v[1]);
 
     // Moving Averages
-    const sma5 = TechnicalIndicators.SMA(priceValues, 5);
-    const sma10 = TechnicalIndicators.SMA(priceValues, 10);
-    const sma20 = TechnicalIndicators.SMA(priceValues, 20);
-    const ema12 = TechnicalIndicators.EMA(priceValues, 12);
-    const ema26 = TechnicalIndicators.EMA(priceValues, 26);
+    const sma5 = TI.SMA.calculate({ period: 5, values: priceValues });
+    const sma10 = TI.SMA.calculate({ period: 10, values: priceValues });
+    const sma20 = TI.SMA.calculate({ period: 20, values: priceValues });
+    const ema12 = TI.EMA.calculate({ period: 12, values: priceValues });
+    const ema26 = TI.EMA.calculate({ period: 26, values: priceValues });
 
     // RSI
-    const rsi = TechnicalIndicators.RSI(priceValues, 14);
+    const rsi = TI.RSI.calculate({ period: 14, values: priceValues });
 
     // MACD
-    const macd = TechnicalIndicators.MACD(priceValues, 12, 26, 9);
+    const macd = TI.MACD.calculate({
+      values: priceValues,
+      fastPeriod: 12,
+      slowPeriod: 26,
+      signalPeriod: 9,
+      SimpleMAOscillator: false,
+      SimpleMASignal: false,
+    });
 
     // Bollinger Bands
-    const bb = TechnicalIndicators.BollingerBands(priceValues, 20, 2);
+    const bb = TI.BollingerBands.calculate({
+      period: 20,
+      values: priceValues,
+      stdDev: 2,
+    });
+
+    // Stochastic
+    const stochastic = TI.Stochastic.calculate({
+      high: priceValues,
+      low: priceValues,
+      close: priceValues,
+      period: 14,
+      signalPeriod: 3,
+    });
 
     // Volume analysis
-    const volumeSMA7 = TechnicalIndicators.SMA(volumeValues, 7);
+    const volumeSMA7 = TI.SMA.calculate({ period: 7, values: volumeValues });
     const last7Days = priceValues.slice(-7);
     const volatility7d = this.calculateVolatility(last7Days);
 
     return {
       currentPrice: priceValues[priceValues.length - 1],
-      sma5: sma5[sma5.length - 1] || 0,
-      sma10: sma10[sma10.length - 1] || 0,
-      sma20: sma20[sma20.length - 1] || 0,
-      ema12: ema12[ema12.length - 1] || 0,
-      ema26: ema26[ema26.length - 1] || 0,
-      rsi14: rsi[rsi.length - 1] || 50,
-      macd: macd,
-      bollingerBands: bb[bb.length - 1] || { upper: 0, middle: 0, lower: 0 },
+      sma5: sma5[sma5.length - 1],
+      sma10: sma10[sma10.length - 1],
+      sma20: sma20[sma20.length - 1],
+      ema12: ema12[ema12.length - 1],
+      ema26: ema26[ema26.length - 1],
+      rsi14: rsi[rsi.length - 1],
+      macd: macd[macd.length - 1],
+      bollingerBands: bb[bb.length - 1],
+      stochastic: stochastic[stochastic.length - 1],
       volatility7dPct: volatility7d,
-      avgVolume7d: volumeSMA7[volumeSMA7.length - 1] || 0,
-      lastVolume: volumeValues[volumeValues.length - 1] || 0,
-      priceChange24h: this.calculatePriceChange(priceValues, 1),
-      priceChange7d: this.calculatePriceChange(priceValues, 7),
-      priceChange30d: this.calculatePriceChange(priceValues, 30),
+      avgVolume7d: volumeSMA7[volumeSMA7.length - 1],
+      lastVolume: volumeValues[volumeValues.length - 1],
+      priceChange24h:
+        ((priceValues[priceValues.length - 1] -
+          priceValues[priceValues.length - 2]) /
+          priceValues[priceValues.length - 2]) *
+        100,
+      priceChange7d:
+        ((priceValues[priceValues.length - 1] -
+          priceValues[priceValues.length - 7]) /
+          priceValues[priceValues.length - 7]) *
+        100,
+      priceChange30d:
+        ((priceValues[priceValues.length - 1] -
+          priceValues[priceValues.length - 30]) /
+          priceValues[priceValues.length - 30]) *
+        100,
     };
-  }
-
-  calculatePriceChange(prices: number[], days: number): number {
-    if (prices.length < days + 1) return 0;
-    const current = prices[prices.length - 1];
-    const past = prices[prices.length - 1 - days];
-    return ((current - past) / past) * 100;
   }
 
   calculateVolatility(prices: number[]): number {
@@ -307,9 +228,8 @@ class ChartAnalyzer {
 
     // Calculate pivot points
     const lastPrice = priceData[priceData.length - 1].price;
-    const recent = priceData.slice(-20);
-    const high = Math.max(...recent.map((d) => d.price));
-    const low = Math.min(...recent.map((d) => d.price));
+    const high = Math.max(...priceData.slice(-20).map((d) => d.price));
+    const low = Math.min(...priceData.slice(-20).map((d) => d.price));
 
     const pivot = (high + low + lastPrice) / 3;
     const r1 = 2 * pivot - low;
@@ -334,7 +254,7 @@ class ChartAnalyzer {
     // Calculate VWAP
     let vwapSum = 0;
     let volumeSum = 0;
-    recent.forEach((d) => {
+    priceData.slice(-20).forEach((d) => {
       vwapSum += d.price * d.volume;
       volumeSum += d.volume;
     });
@@ -390,7 +310,7 @@ class ChartAnalyzer {
   }
 
   analyzeMomentum(indicators: any) {
-    const { rsi14, macd } = indicators;
+    const { rsi14, macd, stochastic } = indicators;
 
     let description = `RSI at ${rsi14.toFixed(1)}`;
     let strength = 50;
@@ -414,6 +334,14 @@ class ChartAnalyzer {
       strength -= 10;
     }
 
+    if (stochastic) {
+      if (stochastic.k < 20) {
+        description += ", Stochastic oversold";
+      } else if (stochastic.k > 80) {
+        description += ", Stochastic overbought";
+      }
+    }
+
     return {
       description,
       strength: Math.min(100, Math.max(0, strength)),
@@ -422,7 +350,7 @@ class ChartAnalyzer {
 
   analyzeVolume(indicators: any) {
     const { lastVolume, avgVolume7d } = indicators;
-    const ratio = lastVolume / (avgVolume7d || 1);
+    const ratio = lastVolume / avgVolume7d;
 
     if (ratio > 2) {
       return {
@@ -588,8 +516,9 @@ class ChartAnalyzer {
           ema26: indicators.ema26,
           macd: indicators.macd,
           bollingerBands: indicators.bollingerBands,
+          stochastic: indicators.stochastic,
           volatility: indicators.volatility7dPct,
-          volumeRatio: indicators.lastVolume / (indicators.avgVolume7d || 1),
+          volumeRatio: indicators.lastVolume / indicators.avgVolume7d,
         },
         levels: {
           resistance1: sr.resistance1,
@@ -611,6 +540,7 @@ class ChartAnalyzer {
         },
       };
     } catch (error: any) {
+      console.error("Chart analysis error:", error);
       return { error: error.message };
     }
   }
