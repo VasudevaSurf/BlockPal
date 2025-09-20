@@ -74,23 +74,42 @@ const TokenImage = ({
   src,
   alt,
   symbol,
+  name,
   className = "",
 }: {
   src?: string | null;
   alt: string;
   symbol: string;
+  name?: string;
   className?: string;
 }) => {
   const [hasError, setHasError] = React.useState(false);
 
+  // Get first word from token name or symbol
+  const getFirstWord = () => {
+    // Try to get first word from name first, then symbol
+    const text = name || symbol || "?";
+    const firstWord = text.split(/[\s\-_]+/)[0]; // Split on spaces, hyphens, underscores
+
+    // If first word is too long, truncate it
+    if (firstWord.length > 6) {
+      return firstWord.substring(0, 6);
+    }
+
+    return firstWord;
+  };
+
   if (!src || hasError) {
+    const firstWord = getFirstWord();
+
     return (
       <div
         className={`${className} rounded-full flex items-center justify-center`}
         style={{ backgroundColor: "#4A4A4A" }}
+        title={name || symbol}
       >
-        <span className="text-white font-bold text-xs">
-          {symbol?.charAt(0) || "?"}
+        <span className="text-white font-bold text-xs text-center px-1">
+          {firstWord}
         </span>
       </div>
     );
