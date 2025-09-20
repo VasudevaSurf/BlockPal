@@ -1,4 +1,4 @@
-// src/lib/ai/DatabaseManager.ts - Simple version using lumenAI collection in BlockPal DB
+// src/lib/ai/DatabaseManager.ts - Enhanced with star, rename, delete functionality
 import { MongoClient, ObjectId, Db } from "mongodb";
 import { v4 as uuidv4 } from "uuid";
 
@@ -41,6 +41,12 @@ class DatabaseManager {
       await this.db
         .collection("lumenAI")
         .createIndex({ "conversations.conversation_id": 1 });
+      await this.db
+        .collection("lumenAI")
+        .createIndex({ "conversations.isStarred": 1 });
+      await this.db
+        .collection("lumenAI")
+        .createIndex({ "conversations.last_updated": -1 });
 
       console.log("✅ Indexes created for lumenAI collection");
     } catch (error) {
@@ -107,6 +113,7 @@ class DatabaseManager {
       title: "New Conversation",
       message_count: 0,
       messages: [],
+      isStarred: false, // NEW: Default star status
     };
 
     await this.db.collection("lumenAI").updateOne(
@@ -144,6 +151,7 @@ class DatabaseManager {
       metadata: {
         message_count: conversation.message_count || 0,
         last_activity: conversation.last_updated,
+        isStarred: conversation.isStarred || false,
       },
     };
   }
@@ -233,16 +241,118 @@ class DatabaseManager {
     userId: string,
     conversationId: string,
     title: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (!this.db) throw new Error("Database not connected");
 
-    await this.db.collection("lumenAI").updateOne(
-      {
+    try {
+      const result = await this.db.collection("lumenAI").updateOne(
+        {
+          user_id: userId,
+          "conversations.conversation_id": conversationId,
+        },
+        {
+          $set: {
+            "conversations.$.title": title,
+            "conversations.$.last_updated": new Date(),
+            updated_at: new Date(),
+          },
+        }
+      );
+
+      return result.matchedCount > 0;
+    } catch (error) {
+      console.error("Error updating conversation title:", error);
+      return false;
+    }
+  }
+
+  // NEW: Update conversation star status
+  async updateConversationStar(
+    userId: string,
+    conversationId: string,
+    isStarred: boolean
+  ): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+
+    try {
+      const result = await this.db.collection("lumenAI").updateOne(
+        {
+          user_id: userId,
+          "conversations.conversation_id": conversationId,
+        },
+        {
+          $set: {
+            "conversations.$.isStarred": isStarred,
+            "conversations.$.last_updated": new Date(),
+            updated_at: new Date(),
+          },
+        }
+      );
+
+      return result.matchedCount > 0;
+    } catch (error) {
+      console.error("Error updating conversation star:", error);
+      return false;
+    }
+  }
+
+  // NEW: Delete conversation
+  async deleteConversation(
+    userId: string,
+    conversationId: string
+  ): Promise<{ success: boolean; error?: string; deletedMessages?: number }> {
+    if (!this.db) throw new Error("Database not connected");
+
+    try {
+      // First, get the conversation to count messages
+      const aiData = await this.db.collection("lumenAI").findOne({
         user_id: userId,
         "conversations.conversation_id": conversationId,
-      },
-      { $set: { "conversations.$.title": title } }
-    );
+      });
+
+      if (!aiData) {
+        return { success: false, error: "Conversation not found" };
+      }
+
+      const conversation = aiData.conversations.find(
+        (c: any) => c.conversation_id === conversationId
+      );
+
+      if (!conversation) {
+        return { success: false, error: "Conversation not found" };
+      }
+
+      const messageCount = conversation.messages?.length || 0;
+
+      // Remove the conversation from the array
+      const result = await this.db.collection("lumenAI").updateOne(
+        { user_id: userId },
+        {
+          $pull: { conversations: { conversation_id: conversationId } },
+          $inc: {
+            "total_usage.conversations_count": -1,
+            "total_usage.messages_count": -messageCount,
+          },
+          $set: { updated_at: new Date() },
+        }
+      );
+
+      if (result.matchedCount === 0) {
+        return { success: false, error: "User not found" };
+      }
+
+      if (result.modifiedCount === 0) {
+        return {
+          success: false,
+          error: "Conversation not found or already deleted",
+        };
+      }
+
+      return { success: true, deletedMessages: messageCount };
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      return { success: false, error: "Database error occurred" };
+    }
   }
 
   async getUserStats(userId: string) {

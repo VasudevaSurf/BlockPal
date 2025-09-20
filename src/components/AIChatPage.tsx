@@ -13,6 +13,8 @@ import {
   X,
   MoreHorizontal,
   Trash2,
+  Star,
+  Edit3,
 } from "lucide-react";
 import { RootState } from "@/store";
 import { SkeletonAIChat } from "@/components/ui/Skeleton";
@@ -40,6 +42,7 @@ interface Conversation {
   timestamp: string;
   messageCount: number;
   createdAt: string;
+  isStarred?: boolean;
 }
 
 export default function AIChatPage() {
@@ -56,8 +59,14 @@ export default function AIChatPage() {
   const [currentConversationLoaded, setCurrentConversationLoaded] =
     useState(false);
 
+  // New states for menu functionality
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Suggestion chips data
   const suggestionChips = [
@@ -79,6 +88,20 @@ export default function AIChatPage() {
   const { user, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Initialize AI chat - ONLY ONCE
   useEffect(() => {
@@ -116,6 +139,7 @@ export default function AIChatPage() {
                 timestamp: conv.last_updated || new Date().toISOString(),
                 messageCount: conv.message_count || 0,
                 createdAt: conv.created_at || new Date().toISOString(),
+                isStarred: conv.isStarred || false,
               })
             );
             setConversations(formattedConversations);
@@ -303,6 +327,7 @@ export default function AIChatPage() {
                 timestamp: new Date().toISOString(),
                 messageCount: 1,
                 createdAt: new Date().toISOString(),
+                isStarred: false,
               },
               ...prev,
             ];
@@ -442,13 +467,183 @@ export default function AIChatPage() {
     );
   };
 
-  const deleteConversation = (conversationId: string) => {
-    setConversations((prev) =>
-      prev.filter((conv) => conv.id !== conversationId)
-    );
+  // Menu action handlers with real API calls
+  const toggleStar = async (conversationId: string) => {
+    try {
+      // Optimistically update UI
+      const conversation = conversations.find((c) => c.id === conversationId);
+      const newStarredState = !conversation?.isStarred;
 
-    if (conversationId === conversationId) {
-      handleNewChat();
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === conversationId
+            ? { ...conv, isStarred: newStarredState }
+            : conv
+        )
+      );
+
+      // Make API call to update star status
+      const response = await fetch(`/api/ai/conversation/star`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          conversationId,
+          isStarred: newStarredState,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update star status");
+      }
+
+      console.log(
+        `⭐ ${
+          newStarredState ? "Starred" : "Unstarred"
+        } conversation: ${conversationId}`
+      );
+    } catch (error) {
+      console.error("Failed to toggle star:", error);
+
+      // Revert optimistic update on error
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === conversationId
+            ? { ...conv, isStarred: !conv.isStarred }
+            : conv
+        )
+      );
+
+      // Show error to user
+      setError("Failed to update star status");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setOpenMenuId(null);
+    }
+  };
+
+  const startRename = (conversationId: string, currentTitle: string) => {
+    setEditingId(conversationId);
+    setEditingTitle(currentTitle);
+    setOpenMenuId(null);
+  };
+
+  const handleRename = async (conversationId: string) => {
+    if (!editingTitle.trim()) {
+      setEditingId(null);
+      setEditingTitle("");
+      return;
+    }
+
+    const newTitle = editingTitle.trim();
+    const originalTitle = conversations.find(
+      (c) => c.id === conversationId
+    )?.title;
+
+    try {
+      // Optimistically update UI
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === conversationId ? { ...conv, title: newTitle } : conv
+        )
+      );
+
+      // Make API call to update title
+      const response = await fetch(`/api/ai/conversation/rename`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          conversationId,
+          title: newTitle,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to rename conversation");
+      }
+
+      console.log(`✏️ Renamed conversation ${conversationId} to: ${newTitle}`);
+    } catch (error) {
+      console.error("Failed to rename conversation:", error);
+
+      // Revert optimistic update on error
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === conversationId
+            ? { ...conv, title: originalTitle || "New Conversation" }
+            : conv
+        )
+      );
+
+      // Show error to user
+      setError("Failed to rename conversation");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setEditingId(null);
+      setEditingTitle("");
+    }
+  };
+
+  const deleteConversation = async (conversationIdToDelete: string) => {
+    // Show confirmation dialog
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this conversation? This action cannot be undone."
+      )
+    ) {
+      setOpenMenuId(null);
+      return;
+    }
+
+    try {
+      // Optimistically update UI
+      const conversationToDelete = conversations.find(
+        (c) => c.id === conversationIdToDelete
+      );
+      setConversations((prev) =>
+        prev.filter((conv) => conv.id !== conversationIdToDelete)
+      );
+
+      // If deleting current conversation, start new chat
+      if (conversationIdToDelete === conversationId) {
+        handleNewChat();
+      }
+
+      // Make API call to delete conversation
+      const response = await fetch(`/api/ai/conversation/delete`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          conversationId: conversationIdToDelete,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete conversation");
+      }
+
+      console.log(`🗑️ Deleted conversation: ${conversationIdToDelete}`);
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
+
+      // Revert optimistic update on error - add the conversation back
+      if (conversationToDelete) {
+        setConversations((prev) => [conversationToDelete, ...prev]);
+      }
+
+      // Show error to user
+      setError("Failed to delete conversation");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setOpenMenuId(null);
     }
   };
 
@@ -776,14 +971,103 @@ export default function AIChatPage() {
                 .map((conversation) => (
                   <div
                     key={conversation.id}
-                    className="p-2 rounded-xl cursor-pointer group transition-all hover:bg-[#2C2C2C]/30"
-                    onClick={() => handleSessionSelect(conversation.id)}
+                    className="relative p-2 rounded-xl cursor-pointer group transition-all hover:bg-[#2C2C2C]/30"
                   >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0">
-                        <span className="text-gray-300 text-sm font-medium line-clamp-1">
-                          {conversation.title}
-                        </span>
+                    <div className="flex items-center justify-between">
+                      <div
+                        className="flex-1 min-w-0 pr-2"
+                        onClick={() => handleSessionSelect(conversation.id)}
+                      >
+                        {editingId === conversation.id ? (
+                          <input
+                            type="text"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onBlur={() => handleRename(conversation.id)}
+                            onKeyPress={(e) => {
+                              if (e.key === "Enter") {
+                                handleRename(conversation.id);
+                              }
+                              if (e.key === "Escape") {
+                                setEditingId(null);
+                                setEditingTitle("");
+                              }
+                            }}
+                            autoFocus
+                            className="w-full bg-[#2C2C2C] text-white text-sm rounded px-2 py-1 outline-none border border-[#E2AF19]"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {conversation.isStarred && (
+                              <Star
+                                size={12}
+                                className="text-[#E2AF19] fill-current flex-shrink-0"
+                              />
+                            )}
+                            <span className="text-gray-300 text-sm font-medium line-clamp-1">
+                              {conversation.title}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Three-dot menu */}
+                      <div className="relative" ref={menuRef}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(
+                              openMenuId === conversation.id
+                                ? null
+                                : conversation.id
+                            );
+                          }}
+                          className="p-1 hover:bg-[#2C2C2C] rounded transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <MoreHorizontal size={16} className="text-gray-400" />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {openMenuId === conversation.id && (
+                          <div className="absolute right-0 top-8 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg shadow-lg min-w-[160px] z-50">
+                            <button
+                              onClick={() => toggleStar(conversation.id)}
+                              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                            >
+                              <Star
+                                size={14}
+                                className={
+                                  conversation.isStarred
+                                    ? "text-[#E2AF19] fill-current"
+                                    : "text-gray-400"
+                                }
+                              />
+                              {conversation.isStarred ? "Unstar" : "Star"}
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                startRename(conversation.id, conversation.title)
+                              }
+                              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                            >
+                              <Edit3 size={14} className="text-gray-400" />
+                              Rename
+                            </button>
+
+                            <div className="border-t border-[#2C2C2C] my-1" />
+
+                            <button
+                              onClick={() =>
+                                deleteConversation(conversation.id)
+                              }
+                              className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                            >
+                              <Trash2 size={14} className="text-red-400" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

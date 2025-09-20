@@ -1,4 +1,4 @@
-// src/app/api/ai/user/route.ts - UPDATED to include isStarred field
+// src/app/api/ai/conversation/delete/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
@@ -25,7 +25,7 @@ async function getCurrentUser(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function DELETE(request: NextRequest) {
   try {
     if (!dbConnected) {
       dbConnected = await db.connect();
@@ -47,42 +47,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = currentUser.userId;
+    const body = await request.json();
+    const { conversationId } = body;
 
-    // Get getUserAIData instead of getUserLumenAI
-    const aiData = await db.getUserAIData(userId);
-
-    if (!aiData) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (!conversationId) {
+      return NextResponse.json(
+        { error: "Conversation ID is required" },
+        { status: 400 }
+      );
     }
 
-    const conversations = await db.getUserConversations(userId);
-    const stats = await db.getUserStats(userId);
+    // Delete conversation from database
+    const result = await db.deleteConversation(
+      currentUser.userId,
+      conversationId
+    );
 
-    // Format response with isStarred field included
-    const formattedConversations = conversations.map((conv: any) => ({
-      conversation_id: conv.conversation_id,
-      title: conv.title || "New Conversation",
-      last_updated: conv.last_updated,
-      message_count: conv.message_count || 0,
-      created_at: conv.created_at,
-      last_response_id: conv.last_response_id,
-      isStarred: conv.isStarred || false, // Include star status
-    }));
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error || "Conversation not found or access denied" },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      user: {
-        id: userId,
-        createdAt: aiData.created_at || new Date(),
-        totalConversations: aiData.total_usage?.conversations_count || 0,
-        totalMessages: aiData.total_usage?.messages_count || 0,
-      },
-      conversations: formattedConversations,
-      stats,
+      message: "Conversation deleted successfully",
+      conversationId,
+      deletedMessages: result.deletedMessages || 0,
     });
   } catch (error: any) {
-    console.error("Get user error:", error);
+    console.error("Delete conversation error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
