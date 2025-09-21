@@ -1,6 +1,7 @@
+// src/app/dashboard/swap/page.tsx
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ArrowDownUp, Clock, CheckCircle, History, X } from "lucide-react";
 import {
   motion,
@@ -9,12 +10,14 @@ import {
   useTransform,
   PanInfo,
 } from "framer-motion";
-import { useAccount } from "wagmi";
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { chains } from "@/components/wallet/WalletProvider";
 import ExternalLinkIcon from "@/components/icons/ExternalLinkIcon";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
+import SwapChainSelector from "@/components/swap/SwapChainSelector";
 
 // Custom icons as simple components
-const SwapIcon = ({ className, ...props }) => (
+const SwapIcon = ({ className, ...props }: any) => (
   <svg
     className={className}
     {...props}
@@ -28,7 +31,7 @@ const SwapIcon = ({ className, ...props }) => (
   </svg>
 );
 
-const LightningIcon = ({ size = 16, className, ...props }) => (
+const LightningIcon = ({ size = 16, className, ...props }: any) => (
   <svg
     className={className}
     {...props}
@@ -43,7 +46,7 @@ const LightningIcon = ({ size = 16, className, ...props }) => (
   </svg>
 );
 
-const FilterIcon = ({ size = 16, className, ...props }) => (
+const FilterIcon = ({ size = 16, className, ...props }: any) => (
   <svg
     className={className}
     {...props}
@@ -57,6 +60,156 @@ const FilterIcon = ({ size = 16, className, ...props }) => (
     <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46 22,3" />
   </svg>
 );
+
+// Chain data with proper image paths and conditional background colors
+const getChainDisplayData = () => {
+  const chainDisplayData: {
+    [key: number]: {
+      name: string;
+      color: string;
+      icon: string;
+      image?: string;
+      fallbackIcon: string;
+      useBackground: boolean;
+    };
+  } = {
+    1: {
+      name: "Ethereum",
+      color: "bg-blue-500",
+      icon: "Ξ",
+      image: "/chains/Ethereum.png",
+      fallbackIcon: "Ξ",
+      useBackground: true,
+    },
+    8453: {
+      name: "Base",
+      color: "bg-blue-600",
+      icon: "B",
+      image: "/chains/Base.png",
+      fallbackIcon: "B",
+      useBackground: false,
+    },
+    137: {
+      name: "Polygon",
+      color: "bg-purple-500",
+      icon: "◆",
+      image: "/chains/Polygon.png",
+      fallbackIcon: "◆",
+      useBackground: false,
+    },
+    43114: {
+      name: "Avalanche",
+      color: "bg-red-500",
+      icon: "A",
+      image: "/chains/Avalanche.png",
+      fallbackIcon: "A",
+      useBackground: true,
+    },
+    42161: {
+      name: "Arbitrum",
+      color: "bg-blue-400",
+      icon: "◉",
+      image: "/chains/Arbitrum.png",
+      fallbackIcon: "◉",
+      useBackground: false,
+    },
+    56: {
+      name: "BSC",
+      color: "bg-yellow-500",
+      icon: "B",
+      image: "/chains/BSC.png",
+      fallbackIcon: "B",
+      useBackground: true,
+    },
+  };
+
+  return chainDisplayData;
+};
+
+// Chain Icon Component with image support and conditional background
+interface ChainIconProps {
+  chainData: {
+    name: string;
+    color: string;
+    icon: string;
+    image?: string;
+    fallbackIcon: string;
+    useBackground: boolean;
+  };
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}
+
+const ChainIcon: React.FC<ChainIconProps> = ({
+  chainData,
+  size = "md",
+  className = "",
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  const sizeClasses = {
+    sm: "w-5 h-5",
+    md: "w-6 h-6 lg:w-7 lg:h-7",
+    lg: "w-8 h-8",
+  };
+
+  const iconSizes = {
+    sm: "text-xs",
+    md: "text-xs",
+    lg: "text-sm",
+  };
+
+  // Reset image error state when chainData changes
+  useEffect(() => {
+    setImageError(false);
+    setImageLoaded(false);
+  }, [chainData.image]);
+
+  const handleImageError = () => {
+    console.warn(`Failed to load chain image: ${chainData.image}`);
+    setImageError(true);
+  };
+
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+  };
+
+  // Determine if we should show background
+  const shouldShowBackground =
+    !chainData.image || imageError || !imageLoaded || chainData.useBackground;
+  const backgroundClass = shouldShowBackground ? chainData.color : "";
+
+  return (
+    <div
+      className={`${sizeClasses[size]} ${backgroundClass} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
+      title={chainData.name}
+    >
+      {/* Chain Image */}
+      {chainData.image && !imageError && (
+        <img
+          src={chainData.image}
+          alt={chainData.name}
+          className={`w-full h-full object-contain transition-opacity duration-200 ${
+            imageLoaded ? "opacity-100" : "opacity-0"
+          } ${!chainData.useBackground && imageLoaded ? "p-0" : "p-1"}`}
+          onError={handleImageError}
+          onLoad={handleImageLoad}
+          loading="lazy"
+        />
+      )}
+
+      {/* Fallback Icon - only show when needed */}
+      {(!chainData.image || imageError || !imageLoaded) && (
+        <span
+          className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
+        >
+          {chainData.fallbackIcon}
+        </span>
+      )}
+    </div>
+  );
+};
 
 // History data moved outside component to prevent recreation
 const historyData = [
@@ -121,34 +274,57 @@ export default function SwapPage() {
   const [activeTab, setActiveTab] = useState("swap");
   const [isSwapping, setIsSwapping] = useState(false);
   const [swipeCompleted, setSwipeCompleted] = useState(false);
+  const [showChainSelector, setShowChainSelector] = useState(false);
   const { isConnected } = useAccount();
+  const chainId = useChainId();
 
   // Motion values for swipe functionality
   const x = useMotionValue(0);
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chainButtonRef = useRef<HTMLButtonElement>(null); // Add ref for chain button
+
+  // Get chain display data
+  const chainDisplayData = getChainDisplayData();
+  const currentChain = isConnected
+    ? chains.find((c) => c.id === chainId)
+    : null;
+
+  // Get display data for current chain with proper fallback
+  const getCurrentChainDisplay = () => {
+    if (isConnected && chainId && chainDisplayData[chainId]) {
+      return chainDisplayData[chainId];
+    }
+    // Fallback to Ethereum
+    return (
+      chainDisplayData[1] || {
+        name: "Ethereum",
+        color: "bg-blue-500",
+        icon: "Ξ",
+        image: "/chains/Ethereum.png",
+        fallbackIcon: "Ξ",
+        useBackground: true,
+      }
+    );
+  };
+
+  const currentChainDisplay = getCurrentChainDisplay();
 
   const handleSwipeEnd = (event: any, info: PanInfo) => {
     const containerWidth = containerRef.current?.offsetWidth || 300;
-    const currentX = x.get(); // Get current position
-    const threshold = 200; // Simple fixed threshold that's achievable
+    const currentX = x.get();
+    const threshold = 200;
 
     if (currentX >= threshold && !isSwapping) {
-      // Complete the swap
       setSwipeCompleted(true);
       setIsSwapping(true);
-
-      // Animate to end position
       x.set(containerWidth - 50);
 
-      // Simulate swap process
       setTimeout(() => {
         setIsSwapping(false);
         setSwipeCompleted(false);
-        x.set(0); // Reset position
-        // Add actual swap logic here
+        x.set(0);
       }, 2000);
     } else {
-      // Snap back to start
       x.set(0);
     }
   };
@@ -223,12 +399,14 @@ export default function SwapPage() {
               }}
             >
               <div className="flex flex-row items-center justify-between mb-4">
-                <button className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit justify-center">
-                  <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">E</span>
-                  </div>
+                <button
+                  ref={chainButtonRef}
+                  onClick={() => setShowChainSelector(true)}
+                  className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit justify-center"
+                >
+                  <ChainIcon chainData={currentChainDisplay} size="md" />
                   <span className="text-white text-base font-satoshi">
-                    Ethereum
+                    {currentChainDisplay.name}
                   </span>
                   <svg
                     className="w-3.5 h-3.5 text-gray-400"
@@ -414,9 +592,10 @@ export default function SwapPage() {
                     className="absolute left-1 top-1/2 transform -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing"
                     style={{ x }}
                     drag="x"
-                    dragConstraints={{ left: 0, right: 350 }} // Much higher constraint
+                    dragConstraints={{ left: 0, right: 350 }}
                     dragElastic={0.1}
                     onDragEnd={handleSwipeEnd}
+                    // @ts-ignore
                     disabled={isSwapping}
                   >
                     <div className="w-10 h-10 rounded-full flex items-center justify-center border-4 border-[#797878]">
@@ -572,6 +751,17 @@ export default function SwapPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Chain Selector Modal */}
+      <SwapChainSelector
+        isOpen={showChainSelector}
+        onClose={() => setShowChainSelector(false)}
+        onChainSelect={(chainId) => {
+          console.log("Chain selected:", chainId);
+          setShowChainSelector(false);
+        }}
+        triggerRef={chainButtonRef}
+      />
     </div>
   );
 }
