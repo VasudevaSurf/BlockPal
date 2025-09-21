@@ -1,4 +1,4 @@
-// src/components/swap/TokenSelector.tsx
+// src/components/swap/TokenSelectorModal.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -7,7 +7,7 @@ import { useAccount, useChainId } from "wagmi";
 import { chains } from "@/components/wallet/WalletProvider";
 import { tokenService } from "@/services/tokenService";
 
-// Chain data with proper image paths and conditional background colors
+// Chain data with proper PNG image paths
 const getChainDisplayData = () => {
   const chainDisplayData: {
     [key: number]: {
@@ -23,7 +23,7 @@ const getChainDisplayData = () => {
       name: "Ethereum",
       color: "bg-blue-500",
       icon: "Ξ",
-      image: "/chains/Ethereum.png",
+      image: "/chains/ethereum.png", // Updated to lowercase .png
       fallbackIcon: "Ξ",
       useBackground: true,
     },
@@ -31,7 +31,7 @@ const getChainDisplayData = () => {
       name: "Base",
       color: "bg-blue-600",
       icon: "B",
-      image: "/chains/Base.png",
+      image: "/chains/base.png", // Updated to lowercase .png
       fallbackIcon: "B",
       useBackground: false,
     },
@@ -39,7 +39,7 @@ const getChainDisplayData = () => {
       name: "Polygon",
       color: "bg-purple-500",
       icon: "◆",
-      image: "/chains/Polygon.png",
+      image: "/chains/polygon.png", // Updated to lowercase .png
       fallbackIcon: "◆",
       useBackground: false,
     },
@@ -47,7 +47,7 @@ const getChainDisplayData = () => {
       name: "Avalanche",
       color: "bg-red-500",
       icon: "A",
-      image: "/chains/Avalanche.png",
+      image: "/chains/avalanche.png", // Updated to lowercase .png
       fallbackIcon: "A",
       useBackground: true,
     },
@@ -55,7 +55,7 @@ const getChainDisplayData = () => {
       name: "Arbitrum",
       color: "bg-blue-400",
       icon: "◉",
-      image: "/chains/Arbitrum.png",
+      image: "/chains/arbitrum.png", // Updated to lowercase .png
       fallbackIcon: "◉",
       useBackground: false,
     },
@@ -63,7 +63,7 @@ const getChainDisplayData = () => {
       name: "BSC",
       color: "bg-yellow-500",
       icon: "B",
-      image: "/chains/BSC.png",
+      image: "/chains/bsc.png", // Updated to lowercase .png
       fallbackIcon: "B",
       useBackground: true,
     },
@@ -112,10 +112,12 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   }, [chainData.image]);
 
   const handleImageError = () => {
+    console.log(`Failed to load image: ${chainData.image}`);
     setImageError(true);
   };
 
   const handleImageLoad = () => {
+    console.log(`Successfully loaded image: ${chainData.image}`);
     setImageLoaded(true);
   };
 
@@ -332,170 +334,178 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-white/10 z-50" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-4xl h-[600px] relative">
-          {/* Container with gradient border */}
-          <div className="relative p-[3px] rounded-[30px] h-full">
-            {/* Gradient border background */}
-            <div
-              className="absolute inset-0 rounded-[30px]"
-              style={{
-                background: `linear-gradient(135deg, 
-                  #E2AF19 0%, 
-                  #E2AF19 3%,
-                  #2C2C2C 10%, 
-                  #2C2C2C 90%, 
-                  #E2AF19 97%,
-                  #E2AF19 100%)`,
-              }}
-            />
-
-            <div
-              className="relative bg-[#0F0F0F] rounded-[26px] h-full flex"
-              style={{
-                boxShadow: "0 4px 4px 0 rgba(0, 0, 0, 0.25)",
-              }}
-            >
-              {/* Left Side - Chains */}
-              <div className="w-1/3 p-6 border-r border-[#2C2C2C]">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-white font-mayeka text-lg">Networks</h3>
-                </div>
-
-                <div className="space-y-3">
-                  {chains.map((chain) => {
-                    const chainDisplay = chainDisplayData[chain.id] || {
-                      name: chain.name,
-                      color: "bg-gray-500",
-                      icon: chain.name.charAt(0),
-                      fallbackIcon: chain.name.charAt(0),
-                      useBackground: true,
-                    };
-
-                    const isSelected = selectedChain === chain.id;
-
-                    return (
-                      <button
-                        key={chain.id}
-                        onClick={() => setSelectedChain(chain.id)}
-                        className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
-                          isSelected
-                            ? "bg-[#71570C]"
-                            : "border border-[#2C2C2C] hover:bg-[#1A1A1A]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <ChainIcon chainData={chainDisplay} size="md" />
-                          <span
-                            className={`text-base font-satoshi font-medium ${
-                              isSelected ? "text-white" : "text-white"
-                            }`}
-                          >
-                            {chainDisplay.name}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        onClick={onClose}
+      >
+        {/* Modal positioned in center of screen - increased size */}
+        <div
+          className="w-full max-w-4xl h-[550px] mx-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Main container */}
+          <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden">
+            {/* Left Side - Chains */}
+            <div className="w-1/3 p-5">
+              {/* Main heading for the entire left section */}
+              <div className="mb-8">
+                <h2 className="text-white font-mayeka text-xl">
+                  Select a Token
+                </h2>
               </div>
 
-              {/* Right Side - Tokens */}
-              <div className="flex-1 p-6 flex flex-col">
-                {/* Header with Close Button */}
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-white font-mayeka text-lg">
-                    Select Token
-                  </h3>
-                  <button
-                    onClick={onClose}
-                    className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                {/* Search Bar */}
-                <div className="relative mb-6">
-                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                    <Search size={16} className="text-gray-400" />
-                  </div>
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Search tokens..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-[#191919] border border-[#2C2C2C] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi"
+              <div className="flex items-center justify-between mb-4">
+                {/* Networks section with gradient border - moved down */}
+                <div className="relative p-[2px] rounded-[12px] w-full ">
+                  <div
+                    className="absolute inset-0 rounded-[12px]"
+                    style={{
+                      background: `linear-gradient(135deg, 
+                        #E2AF19 0%, 
+                        #E2AF19 10%,
+                        #2C2C2C 25%, 
+                        #2C2C2C 75%, 
+                        #E2AF19 90%,
+                        #E2AF19 100%)`,
+                    }}
                   />
-                </div>
-
-                {/* Your Tokens Heading */}
-                <div className="mb-4">
-                  <h4 className="text-white font-satoshi font-medium text-base">
-                    Your Tokens
-                  </h4>
-                </div>
-
-                {/* Token List */}
-                <div className="flex-1 overflow-y-auto">
-                  {loading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
-                    </div>
-                  ) : filteredTokens.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
-                        <span className="text-gray-400 text-lg">🪙</span>
+                  <div className="relative bg-[#000] rounded-[10px] p-4">
+                    <div className="mb-4">
+                      <div className="bg-[#0F0F0F] p-2 px-3 rounded-[14px] inline-block">
+                        <h3 className="text-white font-mayeka text-[16px]">
+                          Supported Chains
+                        </h3>
                       </div>
-                      <p className="text-gray-400 font-satoshi">
-                        {searchQuery
-                          ? "No tokens found"
-                          : "No tokens available"}
-                      </p>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {filteredTokens.map((token, index) => (
-                        <button
-                          key={`${token.contractAddress}_${index}`}
-                          onClick={() => handleTokenSelect(token)}
-                          className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
-                        >
-                          <div className="flex items-center min-w-0 flex-1">
-                            <TokenImage
-                              src={token.logoUrl}
-                              alt={token.symbol}
-                              symbol={token.symbol}
-                              name={token.name}
-                              className="w-10 h-10 mr-3 flex-shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-white font-medium font-satoshi text-sm">
-                                {token.name}
-                              </div>
-                              <div className="text-gray-400 text-xs font-satoshi">
-                                {token.symbol}
-                              </div>
-                            </div>
-                          </div>
 
-                          <div className="text-right flex-shrink-0">
+                    <div className="space-y-3">
+                      {chains.map((chain) => {
+                        const chainDisplay = chainDisplayData[chain.id] || {
+                          name: chain.name,
+                          color: "bg-gray-500",
+                          icon: chain.name.charAt(0),
+                          fallbackIcon: chain.name.charAt(0),
+                          useBackground: true,
+                        };
+
+                        const isSelected = selectedChain === chain.id;
+
+                        return (
+                          <button
+                            key={chain.id}
+                            onClick={() => setSelectedChain(chain.id)}
+                            className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
+                              isSelected
+                                ? "bg-[#71570C]"
+                                : " hover:bg-[#1A1A1A]"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <ChainIcon chainData={chainDisplay} size="md" />
+                              <span
+                                className={`text-sm font-satoshi font-medium ${
+                                  isSelected ? "text-white" : "text-white"
+                                }`}
+                              >
+                                {chainDisplay.name}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side - Tokens */}
+            <div className="flex-1 p-5 flex flex-col bg-[#000]">
+              {/* Close Button - positioned at top right */}
+              <div className="flex justify-end mb-5">
+                <button
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative mb-5">
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                  <Search size={16} className="text-gray-400" />
+                </div>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search tokens or paste address"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
+                />
+              </div>
+
+              {/* Your Tokens Heading */}
+              <div className="mb-4">
+                <h4 className="text-[#939393] font-satoshi font-medium text-base">
+                  Your Tokens
+                </h4>
+              </div>
+
+              {/* Token List */}
+              <div className="flex-1 overflow-y-auto">
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
+                  </div>
+                ) : filteredTokens.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+                      <span className="text-gray-400 text-lg">🪙</span>
+                    </div>
+                    <p className="text-gray-400 font-satoshi">
+                      {searchQuery ? "No tokens found" : "No tokens available"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredTokens.map((token, index) => (
+                      <button
+                        key={`${token.contractAddress}_${index}`}
+                        onClick={() => handleTokenSelect(token)}
+                        className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
+                      >
+                        <div className="flex items-center min-w-0 flex-1">
+                          <TokenImage
+                            src={token.logoUrl}
+                            alt={token.symbol}
+                            symbol={token.symbol}
+                            name={token.name}
+                            className="w-10 h-10 mr-3 flex-shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
                             <div className="text-white font-medium font-satoshi text-sm">
-                              {formatTokenAmount(token.balance, 4)}
+                              {token.name}
                             </div>
                             <div className="text-gray-400 text-xs font-satoshi">
-                              {formatCurrency(token.value)}
+                              {token.symbol}
                             </div>
                           </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        </div>
+
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-white font-medium font-satoshi text-sm">
+                            {formatTokenAmount(token.balance, 4)}
+                          </div>
+                          <div className="text-gray-400 text-xs font-satoshi">
+                            {formatCurrency(token.value)}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
