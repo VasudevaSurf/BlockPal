@@ -16,21 +16,7 @@ import ExternalLinkIcon from "@/components/icons/ExternalLinkIcon";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 import SwapChainSelector from "@/components/swap/SwapChainSelector";
 import TokenSelector from "@/components/swap/TokenSelectorModal";
-
-// Custom icons as simple components
-const SwapIcon = ({ className, ...props }: any) => (
-  <svg
-    className={className}
-    {...props}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M7 10L12 15L17 10" />
-    <path d="M7 14L12 9L17 14" />
-  </svg>
-);
+import SwapIcon from "@/components/icons/SwapIcon";
 
 const LightningIcon = ({ size = 16, className, ...props }: any) => (
   <svg
