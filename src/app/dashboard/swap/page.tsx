@@ -3,9 +3,52 @@
 import { useState } from "react";
 import { ArrowDownUp, Clock, CheckCircle, History, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import SwapIcon from "@/components/icons/SwapIcon";
-import LightningIcon from "@/components/icons/LightningIcon";
-import FilterIcon from "@/components/icons/FilterIcon";
+import ExternalLinkIcon from "@/components/icons/ExternalLinkIcon";
+
+// Custom icons as simple components
+const SwapIcon = ({ className, ...props }) => (
+  <svg
+    className={className}
+    {...props}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <path d="M7 10L12 15L17 10" />
+    <path d="M7 14L12 9L17 14" />
+  </svg>
+);
+
+const LightningIcon = ({ size = 16, className, ...props }) => (
+  <svg
+    className={className}
+    {...props}
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2" />
+  </svg>
+);
+
+const FilterIcon = ({ size = 16, className, ...props }) => (
+  <svg
+    className={className}
+    {...props}
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46 22,3" />
+  </svg>
+);
 
 // History data moved outside component to prevent recreation
 const historyData = [
@@ -71,7 +114,8 @@ export default function SwapPage() {
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-4 flex flex-col overflow-hidden relative">
-      <div className="flex justify-center mb-4">
+      {/* Tab Navigation */}
+      <div className="flex justify-center mb-4 relative z-20">
         <div className="relative inline-flex py-[6px] px-[6px] gap-[6px] border border-[#4B3A08] rounded-[12px]">
           <motion.div
             className="absolute h-[calc(100%-12px)] w-[calc(50%-3px)] bg-[#E2AF19] rounded-[13px] top-[6px] left-[6px]"
@@ -113,7 +157,7 @@ export default function SwapPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center relative z-20">
         <div className="w-full max-w-xl mx-auto px-4">
           {/* Container with gradient border */}
           <div className="relative p-[3px] rounded-[30px]">
@@ -331,19 +375,19 @@ export default function SwapPage() {
               onClick={() => setActiveTab("swap")}
             />
 
-            {/* History Panel */}
+            {/* History Panel - Aligned with swap box center */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95, x: 50 }}
               animate={{ opacity: 1, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.95, x: 50 }}
               transition={{ type: "spring", damping: 25 }}
-              className="absolute top-1/2 left-1/2 transform -translate-y-1/2 z-30 ml-[150px]"
+              className="absolute top-[55%] left-1/2 transform -translate-y-1/2 z-30 ml-[150px]"
             >
               {/* Container with gradient border matching swap box */}
-              <div className="relative p-[3px] rounded-[30px] w-[400px]">
+              <div className="relative p-[3px] rounded-[20px] w-[400px]">
                 {/* Gradient border background */}
                 <div
-                  className="absolute inset-0 rounded-[30px]"
+                  className="absolute inset-0 rounded-[20px]"
                   style={{
                     background: `linear-gradient(135deg, 
                       #E2AF19 0%, 
@@ -356,82 +400,80 @@ export default function SwapPage() {
                 />
 
                 <div
-                  className="relative bg-[#0F0F0F] rounded-[26px] p-6 max-h-[80vh] overflow-hidden flex flex-col"
+                  className="relative bg-[#0F0F0F] rounded-[20px] p-6 max-h-[75vh] overflow-hidden flex flex-col"
                   style={{
                     boxShadow: "0 4px 4px 0 rgba(0, 0, 0, 0.25)",
                   }}
                 >
                   {/* Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-white font-medium text-xl">
+                  <div className="flex items-center justify-between mb-7">
+                    <h3 className="text-white font-mayeka-demi-bold-demo text-xl mt-3">
                       Swap History
                     </h3>
-                    <button
-                      onClick={() => setActiveTab("swap")}
-                      className="text-gray-400 hover:text-white transition-colors"
-                    >
-                      <X size={20} />
-                    </button>
                   </div>
 
                   {/* History List */}
-                  <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                    {historyData.map((item) => (
-                      <div
-                        key={item.id}
-                        className="bg-[#191919] rounded-xl p-4 hover:bg-[#252525] transition-all cursor-pointer"
-                      >
+                  <div className="flex-1 overflow-y-auto space-y-6">
+                    {historyData.map((item, index) => (
+                      <div key={item.id}>
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {/* Token Icon */}
-                            <div
-                              className={`w-10 h-10 bg-gradient-to-r ${item.color} rounded-full flex items-center justify-center`}
-                            >
-                              <span className="text-white text-xs font-bold">
-                                {item.symbol[0]}
+                          <div className="flex flex-col items-start gap-2">
+                            <div className="flex items-start ">
+                              <span className="text-white text-[14px] font-satoshi">
+                                {item.type === "sell" ? "Sell" : "Buy"} Token
                               </span>
                             </div>
-
-                            {/* Transaction Details */}
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-400 text-sm">
-                                  {item.type === "sell" ? "Sell" : "Buy"} Token
+                            <div className="flex flex-row gap-2">
+                              <div
+                                className={`w-10 h-10 bg-gradient-to-r ${item.color} rounded-full flex items-center justify-center`}
+                              >
+                                <span className="text-white text-xs font-bold">
+                                  {item.symbol[0]}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-white font-medium">
-                                  {item.token}
-                                </span>
-                                <span className="text-gray-400 text-sm">
-                                  {item.symbol}
-                                </span>
+
+                              {/* Transaction Details */}
+                              <div>
+                                <div className="flex items-start flex-col">
+                                  <span className="text-white text-[15px] font-satoshi">
+                                    {item.token}
+                                  </span>
+                                  <span className="text-white text-[10px] font-satoshi">
+                                    {item.symbol}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
 
                           {/* Right Side Info */}
                           <div className="text-right">
-                            <div className="text-gray-400 text-xs mb-1">
+                            <div className="text-white text-[14px] font-satoshi mb-1">
                               {item.date}
                             </div>
                             <div
-                              className={`font-medium ${
+                              className={`font-satoshi ${
                                 item.type === "sell"
-                                  ? "text-red-400"
+                                  ? "text-white"
                                   : "text-green-400"
                               }`}
                             >
                               {item.amount} {item.value}
                             </div>
                             {item.status === "completed" && (
-                              <div className="inline-flex items-center gap-1 bg-[#E2AF19]/10 text-[#E2AF19] text-xs px-2 py-1 rounded mt-1">
-                                <CheckCircle size={10} />
-                                <span>Completed</span>
+                              <div className="inline-flex items-center gap-1 bg-[#E2AF19] text-[#000] text-xs p-[2px] rounded mt-1">
+                                <span className="font-satoshi text-[8px] flex flex-row items-center gap-0.5">
+                                  Explorer
+                                  <ExternalLinkIcon />
+                                </span>
                               </div>
                             )}
                           </div>
                         </div>
+                        {/* Divider line - only show if not the last item */}
+                        {index < historyData.length - 1 && (
+                          <div className="w-full h-px mt-2"></div>
+                        )}
                       </div>
                     ))}
                   </div>

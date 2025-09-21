@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - COMPLETE VERSION with WalletIntegration
+// src/app/dashboard/layout.tsx - COMPLETE VERSION with WalletIntegration and Swap Effect
 "use client";
 
 import { useSelector } from "react-redux";
@@ -24,11 +24,27 @@ export default function DashboardLayout({
 
   // Check if we're on AI chat page for special styling
   const isAIChatPage = pathname === "/dashboard/ai-chat";
+  // Check if we're on Swap page to show the effect
+  const isSwapPage = pathname === "/dashboard/swap";
 
   return (
     <NavigationLoadingProvider>
       <WalletIntegration>
-        <div className="h-screen bg-[#0F0F0F] flex flex-col lg:flex-row p-2 sm:p-3 lg:p-5 overflow-hidden">
+        <div className="h-screen bg-[#0F0F0F] flex flex-col lg:flex-row p-2 sm:p-3 lg:p-5 overflow-hidden relative">
+          {/* Swap Effect Image - Top Right Corner of Application (only on swap page) */}
+          {isSwapPage && (
+            <div className="fixed top-0 right-0 z-[60] pointer-events-none">
+              <img
+                src="/swapEffect.png"
+                alt=""
+                className="w-80 h-80 md:w-96 md:h-96 lg:w-[32rem] lg:h-[32rem] xl:w-[40rem] xl:h-[40rem] 2xl:w-[48rem] 2xl:h-[48rem] opacity-50"
+                style={{
+                  filter: "blur(0px)",
+                }}
+              />
+            </div>
+          )}
+
           {/* Navigation Loading Indicator */}
           <NavigationLoadingIndicator />
 
