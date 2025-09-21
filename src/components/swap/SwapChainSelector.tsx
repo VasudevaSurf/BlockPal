@@ -291,33 +291,61 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
                 onClick={() => handleChainSelect(chain.id)}
                 disabled={isSwitching || isSwitchingChain}
                 className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
-                  isSelected ? "bg-[#71570C]" : " border border-[#2C2C2C]"
+                  isSelected
+                    ? "bg-[#71570C] border border-[#E2AF19]"
+                    : "border border-[#2C2C2C] hover:border-[#4C4C4C]"
                 } ${isSwitching ? "opacity-70" : ""}`}
               >
                 <div className="flex items-center justify-between">
                   {/* Chain Icon and Name */}
                   <div className="flex items-center gap-3">
-                    <ChainIcon chainData={chainDisplay} size="sm" />
+                    <ChainIcon chainData={chainDisplay} size="md" />
                     <span
                       className={`text-base font-satoshi font-medium ${
-                        isSelected ? "text-[#fff]" : "text-white"
+                        isSelected ? "text-[#E2AF19]" : "text-white"
                       }`}
                     >
                       {chainDisplay.name}
+                      {isSwitching && (
+                        <span className="ml-2 text-xs text-gray-400">
+                          (Switching...)
+                        </span>
+                      )}
                     </span>
                   </div>
+
+                  {/* Selection Indicator */}
+                  {isSelected && (
+                    <div className="w-5 h-5 bg-[#E2AF19] rounded-full flex items-center justify-center">
+                      <svg
+                        className="w-3 h-3 text-black"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                  )}
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* Confirm Button (no divider) */}
+        {/* Confirm Button */}
         <div className="p-3 pt-1">
           <button
             onClick={handleConfirm}
             disabled={isSwitchingChain || switchingChain}
-            className="w-full py-3 bg-[#E2AF19] text-black font-mayeka-demi-bold-demo font-medium text-base rounded-[10px] hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full py-3 font-mayeka-demi-bold-demo font-medium text-base rounded-[10px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              selectedChain === chainId
+                ? "bg-[#2C2C2C] text-gray-400 cursor-not-allowed"
+                : "bg-[#E2AF19] text-black hover:bg-[#D4A853]"
+            }`}
           >
             {isSwitchingChain || switchingChain ? (
               <div className="flex items-center justify-center gap-2">
@@ -327,7 +355,7 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
             ) : selectedChain === chainId ? (
               "Current Chain"
             ) : (
-              "Confirm"
+              "Switch to " + (chainDisplayData[selectedChain]?.name || "Chain")
             )}
           </button>
         </div>

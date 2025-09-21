@@ -489,10 +489,10 @@ export default function SwapPage() {
                 <button
                   ref={chainButtonRef}
                   onClick={() => setShowChainSelector(true)}
-                  className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit justify-center"
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-fit justify-center px-3 py-2"
                 >
                   <ChainIcon chainData={currentChainDisplay} size="md" />
-                  <span className="text-white text-base font-satoshi">
+                  <span className="text-white text-base font-satoshi font-medium">
                     {currentChainDisplay.name}
                   </span>
                   <svg
@@ -901,12 +901,13 @@ export default function SwapPage() {
         )}
       </AnimatePresence>
 
-      {/* Token Selectors */}
+      {/* Token Selectors - UPDATED WITH showChainSelector PROP */}
       <TokenSelector
         isOpen={showFromTokenSelector}
         onClose={() => setShowFromTokenSelector(false)}
         onTokenSelect={handleFromTokenSelect}
         selectedToken={selectedFromToken}
+        showChainSelector={true} // Show chain selector for "SWAP" token selection
       />
 
       <TokenSelector
@@ -914,6 +915,7 @@ export default function SwapPage() {
         onClose={() => setShowToTokenSelector(false)}
         onTokenSelect={handleToTokenSelect}
         selectedToken={selectedToToken}
+        showChainSelector={false} // Hide chain selector for "GET" token selection
       />
 
       {/* Chain Selector Modal */}

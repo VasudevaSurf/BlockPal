@@ -231,6 +231,7 @@ interface TokenSelectorProps {
   onClose: () => void;
   onTokenSelect: (token: TokenBalance) => void;
   selectedToken?: TokenBalance | null;
+  showChainSelector?: boolean; // NEW: Control whether to show chain selector
 }
 
 const TokenSelector: React.FC<TokenSelectorProps> = ({
@@ -238,6 +239,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   onClose,
   onTokenSelect,
   selectedToken,
+  showChainSelector = true, // NEW: Default to true for backward compatibility
 }) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -338,94 +340,109 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
         className="fixed inset-0 z-50 flex items-center justify-center"
         onClick={onClose}
       >
-        {/* Modal positioned in center of screen - increased size */}
+        {/* Modal positioned in center of screen - width adjusted based on showChainSelector */}
         <div
-          className="w-full max-w-4xl h-[550px] mx-4"
+          className={`h-[550px] mx-4 ${
+            showChainSelector ? "w-full max-w-4xl" : "w-full max-w-2xl"
+          }`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Main container */}
+          {/* Main container - layout changes based on showChainSelector */}
           <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden">
-            {/* Left Side - Chains */}
-            <div className="w-1/3 p-5">
-              {/* Main heading for the entire left section */}
-              <div className="mb-8">
-                <h2 className="text-white font-mayeka text-xl">
-                  Select a Token
-                </h2>
-              </div>
+            {/* Left Side - Chains (only show if showChainSelector is true) */}
+            {showChainSelector && (
+              <div className="w-1/3 p-5">
+                {/* Main heading for the entire left section */}
+                <div className="mb-8">
+                  <h2 className="text-white font-mayeka text-xl">
+                    Select a Token
+                  </h2>
+                </div>
 
-              <div className="flex items-center justify-between mb-4">
-                {/* Networks section with gradient border - moved down */}
-                <div className="relative p-[2px] rounded-[12px] w-full ">
-                  <div
-                    className="absolute inset-0 rounded-[12px]"
-                    style={{
-                      background: `linear-gradient(135deg, 
-                        #E2AF19 0%, 
-                        #E2AF19 10%,
-                        #2C2C2C 25%, 
-                        #2C2C2C 75%, 
-                        #E2AF19 90%,
-                        #E2AF19 100%)`,
-                    }}
-                  />
-                  <div className="relative bg-[#000] rounded-[10px] p-4">
-                    <div className="mb-4">
-                      <div className="bg-[#0F0F0F] p-2 px-3 rounded-[14px] inline-block">
-                        <h3 className="text-white font-mayeka text-[16px]">
-                          Supported Chains
-                        </h3>
+                <div className="flex items-center justify-between mb-4">
+                  {/* Networks section with gradient border - moved down */}
+                  <div className="relative p-[2px] rounded-[12px] w-full ">
+                    <div
+                      className="absolute inset-0 rounded-[12px]"
+                      style={{
+                        background: `linear-gradient(135deg, 
+                          #E2AF19 0%, 
+                          #E2AF19 10%,
+                          #2C2C2C 25%, 
+                          #2C2C2C 75%, 
+                          #E2AF19 90%,
+                          #E2AF19 100%)`,
+                      }}
+                    />
+                    <div className="relative bg-[#000] rounded-[10px] p-4">
+                      <div className="mb-4">
+                        <div className="bg-[#0F0F0F] p-2 px-3 rounded-[14px] inline-block">
+                          <h3 className="text-white font-mayeka text-[16px]">
+                            Supported Chains
+                          </h3>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-3">
-                      {chains.map((chain) => {
-                        const chainDisplay = chainDisplayData[chain.id] || {
-                          name: chain.name,
-                          color: "bg-gray-500",
-                          icon: chain.name.charAt(0),
-                          fallbackIcon: chain.name.charAt(0),
-                          useBackground: true,
-                        };
+                      <div className="space-y-3">
+                        {chains.map((chain) => {
+                          const chainDisplay = chainDisplayData[chain.id] || {
+                            name: chain.name,
+                            color: "bg-gray-500",
+                            icon: chain.name.charAt(0),
+                            fallbackIcon: chain.name.charAt(0),
+                            useBackground: true,
+                          };
 
-                        const isSelected = selectedChain === chain.id;
+                          const isSelected = selectedChain === chain.id;
 
-                        return (
-                          <button
-                            key={chain.id}
-                            onClick={() => setSelectedChain(chain.id)}
-                            className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
-                              isSelected
-                                ? "bg-[#71570C]"
-                                : " hover:bg-[#1A1A1A]"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <ChainIcon chainData={chainDisplay} size="md" />
-                              <span
-                                className={`text-sm font-satoshi font-medium ${
-                                  isSelected ? "text-white" : "text-white"
-                                }`}
-                              >
-                                {chainDisplay.name}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                          return (
+                            <button
+                              key={chain.id}
+                              onClick={() => setSelectedChain(chain.id)}
+                              className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
+                                isSelected
+                                  ? "bg-[#71570C]"
+                                  : " hover:bg-[#1A1A1A]"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <ChainIcon chainData={chainDisplay} size="md" />
+                                <span
+                                  className={`text-sm font-satoshi font-medium ${
+                                    isSelected ? "text-white" : "text-white"
+                                  }`}
+                                >
+                                  {chainDisplay.name}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Right Side - Tokens */}
-            <div className="flex-1 p-5 flex flex-col bg-[#000]">
-              {/* Close Button - positioned at top right */}
-              <div className="flex justify-end mb-5">
+            {/* Right Side - Tokens (takes full width if showChainSelector is false) */}
+            <div
+              className={`flex flex-col bg-[#000] p-5 ${
+                showChainSelector ? "flex-1" : "w-full"
+              }`}
+            >
+              {/* Header with title and close button */}
+              <div className="flex justify-between items-center mb-5">
+                {/* Show title only when chain selector is hidden */}
+                {!showChainSelector && (
+                  <h2 className="text-white font-mayeka text-xl">
+                    Select a Token
+                  </h2>
+                )}
+                {/* Close Button */}
                 <button
                   onClick={onClose}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg ml-auto"
                 >
                   <X size={20} />
                 </button>
