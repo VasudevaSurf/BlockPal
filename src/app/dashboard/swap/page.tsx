@@ -15,6 +15,7 @@ import { chains } from "@/components/wallet/WalletProvider";
 import ExternalLinkIcon from "@/components/icons/ExternalLinkIcon";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 import SwapChainSelector from "@/components/swap/SwapChainSelector";
+import TokenSelector from "@/components/swap/TokenSelectorModal";
 
 // Custom icons as simple components
 const SwapIcon = ({ className, ...props }: any) => (
@@ -211,6 +212,59 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   );
 };
 
+// Token Image Component for selected tokens
+const TokenImage = ({
+  src,
+  alt,
+  symbol,
+  name,
+  className = "",
+}: {
+  src?: string | null;
+  alt: string;
+  symbol: string;
+  name?: string;
+  className?: string;
+}) => {
+  const [hasError, setHasError] = useState(false);
+
+  const getFirstWord = () => {
+    const text = name || symbol || "?";
+    const firstWord = text.split(/[\s\-_]+/)[0];
+
+    if (firstWord.length > 6) {
+      return firstWord.substring(0, 6);
+    }
+
+    return firstWord;
+  };
+
+  if (!src || hasError) {
+    const firstWord = getFirstWord();
+
+    return (
+      <div
+        className={`${className} rounded-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600`}
+        title={name || symbol}
+      >
+        <span className="text-white font-bold text-xs text-center px-1">
+          {firstWord.charAt(0)}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`${className} rounded-full object-cover`}
+      onError={() => setHasError(true)}
+      loading="lazy"
+    />
+  );
+};
+
 // History data moved outside component to prevent recreation
 const historyData = [
   {
@@ -275,13 +329,20 @@ export default function SwapPage() {
   const [isSwapping, setIsSwapping] = useState(false);
   const [swipeCompleted, setSwipeCompleted] = useState(false);
   const [showChainSelector, setShowChainSelector] = useState(false);
+  const [showFromTokenSelector, setShowFromTokenSelector] = useState(false);
+  const [showToTokenSelector, setShowToTokenSelector] = useState(false);
+  const [selectedFromToken, setSelectedFromToken] = useState<any>(null);
+  const [selectedToToken, setSelectedToToken] = useState<any>(null);
+  const [fromAmount, setFromAmount] = useState("0.684");
+  const [toAmount, setToAmount] = useState("0.684");
+
   const { isConnected } = useAccount();
   const chainId = useChainId();
 
   // Motion values for swipe functionality
   const x = useMotionValue(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const chainButtonRef = useRef<HTMLButtonElement>(null); // Add ref for chain button
+  const chainButtonRef = useRef<HTMLButtonElement>(null);
 
   // Get chain display data
   const chainDisplayData = getChainDisplayData();
@@ -327,6 +388,32 @@ export default function SwapPage() {
     } else {
       x.set(0);
     }
+  };
+
+  // Handle token selection
+  const handleFromTokenSelect = (token: any) => {
+    setSelectedFromToken(token);
+    console.log("Selected from token:", token);
+  };
+
+  const handleToTokenSelect = (token: any) => {
+    setSelectedToToken(token);
+    console.log("Selected to token:", token);
+  };
+
+  // Format token amount for display
+  const formatTokenAmount = (amount: number, decimals: number = 4) => {
+    if (amount === 0) return "0";
+    if (amount < 0.000001) return amount.toExponential(2);
+
+    if (amount >= 1000000) {
+      return `${(amount / 1000000).toFixed(2)}M`;
+    }
+    if (amount >= 1000) {
+      return `${(amount / 1000).toFixed(2)}K`;
+    }
+
+    return amount.toFixed(Math.min(decimals, 8));
   };
 
   return (
@@ -451,18 +538,32 @@ export default function SwapPage() {
                     <div className="flex items-center justify-between">
                       <input
                         type="text"
-                        defaultValue="0.684"
+                        value={fromAmount}
+                        onChange={(e) => setFromAmount(e.target.value)}
                         className="bg-transparent text-white text-3xl font-satoshi outline-none w-full"
                         placeholder="0"
                       />
                     </div>
                   </div>
-                  <button className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] bg-[rgba(255,255,255,0.03)] rounded-[25px]">
-                    <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">E</span>
-                    </div>
+                  <button
+                    onClick={() => setShowFromTokenSelector(true)}
+                    className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] bg-[rgba(255,255,255,0.03)] rounded-[25px]"
+                  >
+                    {selectedFromToken ? (
+                      <TokenImage
+                        src={selectedFromToken.logoUrl}
+                        alt={selectedFromToken.symbol}
+                        symbol={selectedFromToken.symbol}
+                        name={selectedFromToken.name}
+                        className="w-7 h-7"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">E</span>
+                      </div>
+                    )}
                     <span className="text-white text-base font-satoshi">
-                      ETH
+                      {selectedFromToken?.symbol || "ETH"}
                     </span>
                     <svg
                       className="w-3.5 h-3.5 text-gray-400"
@@ -487,13 +588,22 @@ export default function SwapPage() {
                         Available:
                       </span>
                       <span className="text-[#FFFFFF] font-satoshi">
-                        {" "}
-                        8.04 ETH
+                        {selectedFromToken
+                          ? `${formatTokenAmount(
+                              selectedFromToken.balance,
+                              4
+                            )} ${selectedFromToken.symbol}`
+                          : "8.04 ETH"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[#FFFFFF] font-satoshi">
-                        8.04 ETH
+                        {selectedFromToken
+                          ? `${formatTokenAmount(
+                              selectedFromToken.balance,
+                              4
+                            )} ${selectedFromToken.symbol}`
+                          : "8.04 ETH"}
                       </span>
                       <button className="text-xs bg-[#000] hover:bg-[#3C3C3C] text-white px-2 py-1 rounded-md transition-colors">
                         MAX
@@ -523,18 +633,32 @@ export default function SwapPage() {
                     <div className="flex items-center justify-between">
                       <input
                         type="text"
-                        defaultValue="0.684"
+                        value={toAmount}
+                        onChange={(e) => setToAmount(e.target.value)}
                         className="bg-transparent text-white text-3xl font-satoshi outline-none w-full"
                         placeholder="0"
                       />
                     </div>
                   </div>
-                  <button className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] bg-[rgba(255,255,255,0.03)] rounded-[25px]">
-                    <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">E</span>
-                    </div>
+                  <button
+                    onClick={() => setShowToTokenSelector(true)}
+                    className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] bg-[rgba(255,255,255,0.03)] rounded-[25px]"
+                  >
+                    {selectedToToken ? (
+                      <TokenImage
+                        src={selectedToToken.logoUrl}
+                        alt={selectedToToken.symbol}
+                        symbol={selectedToToken.symbol}
+                        name={selectedToToken.name}
+                        className="w-7 h-7"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">E</span>
+                      </div>
+                    )}
                     <span className="text-white text-base font-satoshi">
-                      ETH
+                      {selectedToToken?.symbol || "ETH"}
                     </span>
                     <svg
                       className="w-3.5 h-3.5 text-gray-400"
@@ -561,7 +685,12 @@ export default function SwapPage() {
                     </div>
                     <span className="text-gray-500 font-satoshi flex items-center gap-4">
                       <span className="text-[#FFFFFF] font-satoshi">
-                        $200.04
+                        {selectedToToken
+                          ? `$${(
+                              parseFloat(toAmount) *
+                              (selectedToToken.price || 0)
+                            ).toFixed(2)}`
+                          : "$200.04"}
                       </span>
                       <div className="flex flex-row items-center bg-[rgba(255,255,255,0.02)] p-[4px] rounded-[15px]">
                         <LightningIcon size={15} />
@@ -599,14 +728,34 @@ export default function SwapPage() {
                     disabled={isSwapping}
                   >
                     <div className="w-10 h-10 rounded-full flex items-center justify-center border-4 border-[#797878]">
-                      <span className="text-white text-xs font-bold">E</span>
+                      {selectedFromToken ? (
+                        <TokenImage
+                          src={selectedFromToken.logoUrl}
+                          alt={selectedFromToken.symbol}
+                          symbol={selectedFromToken.symbol}
+                          name={selectedFromToken.name}
+                          className="w-6 h-6"
+                        />
+                      ) : (
+                        <span className="text-white text-xs font-bold">E</span>
+                      )}
                     </div>
                   </motion.div>
 
                   {/* Fixed Token Icon (Right) */}
                   <div className="absolute right-1 top-1/2 transform -translate-y-1/2 z-10">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center border-4 border-white/10">
-                      <span className="text-white text-xs font-bold">E</span>
+                      {selectedToToken ? (
+                        <TokenImage
+                          src={selectedToToken.logoUrl}
+                          alt={selectedToToken.symbol}
+                          symbol={selectedToToken.symbol}
+                          name={selectedToToken.name}
+                          className="w-6 h-6"
+                        />
+                      ) : (
+                        <span className="text-white text-xs font-bold">E</span>
+                      )}
                     </div>
                   </div>
 
@@ -751,6 +900,21 @@ export default function SwapPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Token Selectors */}
+      <TokenSelector
+        isOpen={showFromTokenSelector}
+        onClose={() => setShowFromTokenSelector(false)}
+        onTokenSelect={handleFromTokenSelect}
+        selectedToken={selectedFromToken}
+      />
+
+      <TokenSelector
+        isOpen={showToTokenSelector}
+        onClose={() => setShowToTokenSelector(false)}
+        onTokenSelect={handleToTokenSelect}
+        selectedToken={selectedToToken}
+      />
 
       {/* Chain Selector Modal */}
       <SwapChainSelector

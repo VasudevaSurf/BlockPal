@@ -1,449 +1,508 @@
+// src/components/swap/TokenSelector.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Search } from "lucide-react";
-import Input from "@/components/ui/Input";
+import { useAccount, useChainId } from "wagmi";
+import { chains } from "@/components/wallet/WalletProvider";
+import { tokenService } from "@/services/tokenService";
 
-interface Token {
+// Chain data with proper image paths and conditional background colors
+const getChainDisplayData = () => {
+  const chainDisplayData: {
+    [key: number]: {
+      name: string;
+      color: string;
+      icon: string;
+      image?: string;
+      fallbackIcon: string;
+      useBackground: boolean;
+    };
+  } = {
+    1: {
+      name: "Ethereum",
+      color: "bg-blue-500",
+      icon: "Ξ",
+      image: "/chains/Ethereum.png",
+      fallbackIcon: "Ξ",
+      useBackground: true,
+    },
+    8453: {
+      name: "Base",
+      color: "bg-blue-600",
+      icon: "B",
+      image: "/chains/Base.png",
+      fallbackIcon: "B",
+      useBackground: false,
+    },
+    137: {
+      name: "Polygon",
+      color: "bg-purple-500",
+      icon: "◆",
+      image: "/chains/Polygon.png",
+      fallbackIcon: "◆",
+      useBackground: false,
+    },
+    43114: {
+      name: "Avalanche",
+      color: "bg-red-500",
+      icon: "A",
+      image: "/chains/Avalanche.png",
+      fallbackIcon: "A",
+      useBackground: true,
+    },
+    42161: {
+      name: "Arbitrum",
+      color: "bg-blue-400",
+      icon: "◉",
+      image: "/chains/Arbitrum.png",
+      fallbackIcon: "◉",
+      useBackground: false,
+    },
+    56: {
+      name: "BSC",
+      color: "bg-yellow-500",
+      icon: "B",
+      image: "/chains/BSC.png",
+      fallbackIcon: "B",
+      useBackground: true,
+    },
+  };
+
+  return chainDisplayData;
+};
+
+// Chain Icon Component
+interface ChainIconProps {
+  chainData: {
+    name: string;
+    color: string;
+    icon: string;
+    image?: string;
+    fallbackIcon: string;
+    useBackground: boolean;
+  };
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}
+
+const ChainIcon: React.FC<ChainIconProps> = ({
+  chainData,
+  size = "md",
+  className = "",
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  const sizeClasses = {
+    sm: "w-5 h-5",
+    md: "w-6 h-6",
+    lg: "w-8 h-8",
+  };
+
+  const iconSizes = {
+    sm: "text-xs",
+    md: "text-xs",
+    lg: "text-sm",
+  };
+
+  useEffect(() => {
+    setImageError(false);
+    setImageLoaded(false);
+  }, [chainData.image]);
+
+  const handleImageError = () => {
+    setImageError(true);
+  };
+
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+  };
+
+  const shouldShowBackground =
+    !chainData.image || imageError || !imageLoaded || chainData.useBackground;
+  const backgroundClass = shouldShowBackground ? chainData.color : "";
+
+  return (
+    <div
+      className={`${sizeClasses[size]} ${backgroundClass} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
+      title={chainData.name}
+    >
+      {chainData.image && !imageError && (
+        <img
+          src={chainData.image}
+          alt={chainData.name}
+          className={`w-full h-full object-contain transition-opacity duration-200 ${
+            imageLoaded ? "opacity-100" : "opacity-0"
+          } ${!chainData.useBackground && imageLoaded ? "p-0" : "p-1"}`}
+          onError={handleImageError}
+          onLoad={handleImageLoad}
+          loading="lazy"
+        />
+      )}
+
+      {(!chainData.image || imageError || !imageLoaded) && (
+        <span
+          className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
+        >
+          {chainData.fallbackIcon}
+        </span>
+      )}
+    </div>
+  );
+};
+
+// Token Image Component
+const TokenImage = ({
+  src,
+  alt,
+  symbol,
+  name,
+  className = "",
+}: {
+  src?: string | null;
+  alt: string;
+  symbol: string;
+  name?: string;
+  className?: string;
+}) => {
+  const [hasError, setHasError] = React.useState(false);
+
+  const getFirstWord = () => {
+    const text = name || symbol || "?";
+    const firstWord = text.split(/[\s\-_]+/)[0];
+
+    if (firstWord.length > 6) {
+      return firstWord.substring(0, 6);
+    }
+
+    return firstWord;
+  };
+
+  if (!src || hasError) {
+    const firstWord = getFirstWord();
+
+    return (
+      <div
+        className={`${className} rounded-full flex items-center justify-center`}
+        style={{ backgroundColor: "#4A4A4A" }}
+        title={name || symbol}
+      >
+        <span className="text-white font-bold text-xs text-center px-1">
+          {firstWord}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`${className} rounded-full object-cover`}
+      onError={() => setHasError(true)}
+      loading="lazy"
+    />
+  );
+};
+
+interface TokenBalance {
+  id: string;
   symbol: string;
   name: string;
   contractAddress: string;
   decimals: number;
   balance: number;
+  balanceWei: string;
   value: number;
-  logoUrl?: string;
+  change24h: number;
   price: number;
+  isNative: boolean;
+  logoUrl?: string | null;
+  isPopular?: boolean;
+  possibleSpam?: boolean;
+  verifiedContract?: boolean;
 }
 
-interface TokenSelectorModalProps {
+interface TokenSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (token: Token) => void;
-  tokens: Token[];
-  title: string;
-  showBalances: boolean;
-  allowCustomToken?: boolean;
-  showCommonTokens?: boolean;
+  onTokenSelect: (token: TokenBalance) => void;
+  selectedToken?: TokenBalance | null;
 }
 
-// Common tokens for easy selection
-const COMMON_TOKENS = [
-  {
-    symbol: "USDC",
-    name: "USD Coin",
-    contractAddress: "0xA0b86a33E6441f8d72b52C4AB1E0c3d8e9b4b3a5",
-    decimals: 6,
-    logoUrl:
-      "https://coin-images.coingecko.com/coins/images/6319/large/USD_Coin_icon.png",
-    balance: 0,
-    value: 0,
-    price: 1,
-  },
-  {
-    symbol: "USDT",
-    name: "Tether USD",
-    contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-    decimals: 6,
-    logoUrl:
-      "https://coin-images.coingecko.com/coins/images/325/large/Tether.png",
-    balance: 0,
-    value: 0,
-    price: 1,
-  },
-  {
-    symbol: "WBTC",
-    name: "Wrapped Bitcoin",
-    contractAddress: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
-    decimals: 8,
-    logoUrl:
-      "https://coin-images.coingecko.com/coins/images/7598/large/wrapped_bitcoin_wbtc.png",
-    balance: 0,
-    value: 0,
-    price: 45000,
-  },
-  {
-    symbol: "DAI",
-    name: "Dai Stablecoin",
-    contractAddress: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
-    decimals: 18,
-    logoUrl:
-      "https://coin-images.coingecko.com/coins/images/9956/large/Badge_Dai.png",
-    balance: 0,
-    value: 0,
-    price: 1,
-  },
-  {
-    symbol: "LINK",
-    name: "Chainlink",
-    contractAddress: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
-    decimals: 18,
-    logoUrl:
-      "https://coin-images.coingecko.com/coins/images/877/large/chainlink-new-logo.png",
-    balance: 0,
-    value: 0,
-    price: 15,
-  },
-  {
-    symbol: "UNI",
-    name: "Uniswap",
-    contractAddress: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-    decimals: 18,
-    logoUrl:
-      "https://coin-images.coingecko.com/coins/images/12504/large/uniswap-uni.png",
-    balance: 0,
-    value: 0,
-    price: 8,
-  },
-];
-
-export default function TokenSelectorModal({
+const TokenSelector: React.FC<TokenSelectorProps> = ({
   isOpen,
   onClose,
-  onSelect,
-  tokens,
-  title,
-  showBalances,
-  allowCustomToken = false,
-  showCommonTokens = false,
-}: TokenSelectorModalProps) {
+  onTokenSelect,
+  selectedToken,
+}) => {
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const [selectedChain, setSelectedChain] = useState(chainId);
+  const [tokens, setTokens] = useState<TokenBalance[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [customToken, setCustomToken] = useState<Token | null>(null);
-  const [loadingCustom, setLoadingCustom] = useState(false);
-  const [customError, setCustomError] = useState("");
-  const [activeTab, setActiveTab] = useState<"my_tokens" | "common">(
-    showBalances && !showCommonTokens
-      ? "my_tokens"
-      : showCommonTokens
-      ? "common"
-      : "my_tokens"
-  );
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Check if search query is a valid Ethereum address
-  const isValidAddress = (address: string): boolean => {
-    return (
-      address.length === 42 &&
-      address.startsWith("0x") &&
-      /^[0-9a-fA-F]+$/.test(address.slice(2))
-    );
-  };
+  const chainDisplayData = getChainDisplayData();
+  const currentChain = chains.find((c) => c.id === selectedChain);
+  const currentChainDisplay =
+    chainDisplayData[selectedChain] || chainDisplayData[1];
 
-  // Handle custom token lookup for contract addresses
-  const handleCustomTokenLookup = async (address: string) => {
-    if (!isValidAddress(address)) return;
-
-    setLoadingCustom(true);
-    setCustomError("");
-    setCustomToken(null);
-
-    try {
-      const response = await fetch("/api/swap/token-info", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractAddress: address.trim() }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch token info");
-      }
-
-      setCustomToken({
-        symbol: data.symbol,
-        name: data.name,
-        contractAddress: address.trim(),
-        decimals: data.decimals,
-        balance: 0,
-        value: 0,
-        logoUrl: data.logoUrl,
-        price: data.price || 0,
-      });
-    } catch (error: any) {
-      setCustomError(error.message);
-    } finally {
-      setLoadingCustom(false);
-    }
-  };
-
-  // Auto-detect custom token when user types contract address
+  // Load tokens when chain changes
   useEffect(() => {
-    if (allowCustomToken && isValidAddress(searchQuery)) {
-      handleCustomTokenLookup(searchQuery);
-    } else {
-      setCustomToken(null);
-      setCustomError("");
+    if (isOpen && isConnected && address) {
+      loadTokens();
     }
-  }, [searchQuery, allowCustomToken]);
+  }, [isOpen, selectedChain, isConnected, address]);
 
-  // Create a unified token list with proper deduplication
-  const getTokenList = () => {
-    // Always deduplicate, even for user tokens, as the input might have duplicates
-    const tokenMap = new Map<string, Token>();
-
-    // Add user tokens first (they take priority)
-    tokens.forEach((token) => {
-      const key = (token.contractAddress || "native").toLowerCase();
-      if (!tokenMap.has(key)) {
-        tokenMap.set(key, token);
-      }
-    });
-
-    // If not showing balances, also add common tokens
-    if (!showBalances) {
-      COMMON_TOKENS.forEach((token) => {
-        const key = token.contractAddress.toLowerCase();
-        if (!tokenMap.has(key)) {
-          tokenMap.set(key, token);
-        }
-      });
-    }
-
-    return Array.from(tokenMap.values());
-  };
-
-  // Filter tokens based on search query (excluding custom token detection)
-  const filteredTokens = getTokenList().filter((token) => {
-    // Don't show tokens if we're searching for a contract address
-    if (isValidAddress(searchQuery)) return false;
-
-    return (
-      token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      token.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  });
-
-  // Reset search when tab changes
+  // Focus search input when modal opens
   useEffect(() => {
-    setSearchQuery("");
-    setCustomToken(null);
-    setCustomError("");
-  }, [activeTab]);
-
-  // Reset search when modal opens/closes
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchQuery("");
-      setCustomToken(null);
-      setCustomError("");
-    } else {
-      // Set initial loading when modal opens
-      setIsInitialLoading(true);
-      // Simulate minimum loading time for better UX
+    if (isOpen && searchInputRef.current) {
       setTimeout(() => {
-        setIsInitialLoading(false);
-      }, 300);
+        searchInputRef.current?.focus();
+      }, 100);
     }
   }, [isOpen]);
 
-  // Handle image loading
-  const handleImageLoad = (contractAddress: string) => {
-    setLoadedImages((prev) => new Set(prev).add(contractAddress));
+  const loadTokens = async () => {
+    if (!address) return;
+
+    setLoading(true);
+    try {
+      const response = await tokenService.getWalletTokens(
+        address,
+        selectedChain,
+        true
+      );
+      setTokens(response.tokens || []);
+    } catch (error) {
+      console.error("Error loading tokens:", error);
+      setTokens([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Token Item Skeleton
-  const TokenSkeleton = () => (
-    <div className="w-full flex items-center p-4 animate-pulse">
-      <div className="w-10 h-10 bg-gray-700 rounded-full mr-3"></div>
-      <div className="flex-1">
-        <div className="h-4 bg-gray-700 rounded w-16 mb-2"></div>
-        <div className="h-3 bg-gray-700 rounded w-24"></div>
-      </div>
-      {showBalances && (
-        <div className="text-right">
-          <div className="h-4 bg-gray-700 rounded w-20 mb-1"></div>
-          <div className="h-3 bg-gray-700 rounded w-16"></div>
-        </div>
-      )}
-    </div>
-  );
+  // Filter tokens based on search
+  const filteredTokens = tokens.filter((token) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      token.symbol.toLowerCase().includes(query) ||
+      token.name.toLowerCase().includes(query) ||
+      token.contractAddress.toLowerCase().includes(query)
+    );
+  });
+
+  const handleTokenSelect = (token: TokenBalance) => {
+    onTokenSelect(token);
+    onClose();
+  };
+
+  const formatCurrency = (value: number) => {
+    if (value === 0) return "$0.000";
+    if (value < 0.001) return "< $0.001";
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(2)}M`;
+    }
+    if (value >= 1000) {
+      return `$${(value / 1000).toFixed(2)}K`;
+    }
+    return `$${value.toFixed(3)}`;
+  };
+
+  const formatTokenAmount = (amount: number, decimals: number = 6) => {
+    if (amount === 0) return "0";
+    if (amount < 0.000001) return amount.toExponential(2);
+
+    if (amount >= 1000000) {
+      return `${(amount / 1000000).toFixed(2)}M`;
+    }
+    if (amount >= 1000) {
+      return `${(amount / 1000).toFixed(2)}K`;
+    }
+
+    return amount.toFixed(Math.min(decimals, 8));
+  };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-      <div className="bg-black border border-[#2C2C2C] rounded-[20px] w-full max-w-md max-h-[80vh] overflow-hidden shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
-          <h3 className="text-lg font-bold text-white font-mayeka">{title}</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
-          >
-            <X size={18} />
-          </button>
-        </div>
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-white/10 z-50" onClick={onClose} />
 
-        {/* Search */}
-        <div className="p-4 border-b border-[#2C2C2C]">
-          <div className="relative">
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-            />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={
-                allowCustomToken
-                  ? "Search tokens or paste contract address..."
-                  : "Search tokens..."
-              }
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        {/* Loading state for custom token */}
-        {loadingCustom && (
-          <div className="flex items-center justify-center p-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
-            <span className="text-gray-400 text-sm font-satoshi ml-2">
-              Looking up token...
-            </span>
-          </div>
-        )}
-
-        {/* Custom token error */}
-        {customError && (
-          <div className="p-4">
-            <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-              <p className="text-red-400 text-sm font-satoshi">{customError}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Custom token result */}
-        {customToken && (
-          <div className="p-4">
+      {/* Modal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-4xl h-[600px] relative">
+          {/* Container with gradient border */}
+          <div className="relative p-[3px] rounded-[30px] h-full">
+            {/* Gradient border background */}
             <div
-              onClick={() => onSelect(customToken)}
-              className="flex items-center p-4 rounded-lg border border-[#2C2C2C] hover:border-[#E2AF19] transition-colors cursor-pointer bg-[#0F0F0F]"
+              className="absolute inset-0 rounded-[30px]"
+              style={{
+                background: `linear-gradient(135deg, 
+                  #E2AF19 0%, 
+                  #E2AF19 3%,
+                  #2C2C2C 10%, 
+                  #2C2C2C 90%, 
+                  #E2AF19 97%,
+                  #E2AF19 100%)`,
+              }}
+            />
+
+            <div
+              className="relative bg-[#0F0F0F] rounded-[26px] h-full flex"
+              style={{
+                boxShadow: "0 4px 4px 0 rgba(0, 0, 0, 0.25)",
+              }}
             >
-              {customToken.logoUrl ? (
-                <div className="relative w-10 h-10 mr-3">
-                  {!loadedImages.has(customToken.contractAddress) && (
-                    <div className="absolute inset-0 bg-gray-700 rounded-full animate-pulse"></div>
-                  )}
-                  <img
-                    src={customToken.logoUrl}
-                    alt={customToken.symbol}
-                    className={`w-10 h-10 rounded-full transition-opacity duration-300 ${
-                      loadedImages.has(customToken.contractAddress)
-                        ? "opacity-100"
-                        : "opacity-0"
-                    }`}
-                    onLoad={() => handleImageLoad(customToken.contractAddress)}
-                    onError={() => handleImageLoad(customToken.contractAddress)}
+              {/* Left Side - Chains */}
+              <div className="w-1/3 p-6 border-r border-[#2C2C2C]">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-white font-mayeka text-lg">Networks</h3>
+                </div>
+
+                <div className="space-y-3">
+                  {chains.map((chain) => {
+                    const chainDisplay = chainDisplayData[chain.id] || {
+                      name: chain.name,
+                      color: "bg-gray-500",
+                      icon: chain.name.charAt(0),
+                      fallbackIcon: chain.name.charAt(0),
+                      useBackground: true,
+                    };
+
+                    const isSelected = selectedChain === chain.id;
+
+                    return (
+                      <button
+                        key={chain.id}
+                        onClick={() => setSelectedChain(chain.id)}
+                        className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
+                          isSelected
+                            ? "bg-[#71570C]"
+                            : "border border-[#2C2C2C] hover:bg-[#1A1A1A]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <ChainIcon chainData={chainDisplay} size="md" />
+                          <span
+                            className={`text-base font-satoshi font-medium ${
+                              isSelected ? "text-white" : "text-white"
+                            }`}
+                          >
+                            {chainDisplay.name}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Right Side - Tokens */}
+              <div className="flex-1 p-6 flex flex-col">
+                {/* Header with Close Button */}
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-white font-mayeka text-lg">
+                    Select Token
+                  </h3>
+                  <button
+                    onClick={onClose}
+                    className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative mb-6">
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                    <Search size={16} className="text-gray-400" />
+                  </div>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search tokens..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-[#191919] border border-[#2C2C2C] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-satoshi"
                   />
                 </div>
-              ) : (
-                <div className="w-10 h-10 bg-gray-700 rounded-full mr-3 animate-pulse"></div>
-              )}
-              <div className="flex-1">
-                <div className="text-white font-semibold font-satoshi">
-                  {customToken.symbol}
+
+                {/* Your Tokens Heading */}
+                <div className="mb-4">
+                  <h4 className="text-white font-satoshi font-medium text-base">
+                    Your Tokens
+                  </h4>
                 </div>
-                <div className="text-gray-400 text-sm font-satoshi">
-                  {customToken.name}
-                </div>
-                <div className="text-gray-400 text-xs font-satoshi font-mono">
-                  {customToken.contractAddress.slice(0, 10)}...
-                  {customToken.contractAddress.slice(-8)}
+
+                {/* Token List */}
+                <div className="flex-1 overflow-y-auto">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
+                    </div>
+                  ) : filteredTokens.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+                        <span className="text-gray-400 text-lg">🪙</span>
+                      </div>
+                      <p className="text-gray-400 font-satoshi">
+                        {searchQuery
+                          ? "No tokens found"
+                          : "No tokens available"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredTokens.map((token, index) => (
+                        <button
+                          key={`${token.contractAddress}_${index}`}
+                          onClick={() => handleTokenSelect(token)}
+                          className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
+                        >
+                          <div className="flex items-center min-w-0 flex-1">
+                            <TokenImage
+                              src={token.logoUrl}
+                              alt={token.symbol}
+                              symbol={token.symbol}
+                              name={token.name}
+                              className="w-10 h-10 mr-3 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-white font-medium font-satoshi text-sm">
+                                {token.name}
+                              </div>
+                              <div className="text-gray-400 text-xs font-satoshi">
+                                {token.symbol}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-white font-medium font-satoshi text-sm">
+                              {formatTokenAmount(token.balance, 4)}
+                            </div>
+                            <div className="text-gray-400 text-xs font-satoshi">
+                              {formatCurrency(token.value)}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Token List */}
-        {!loadingCustom && !customToken && (
-          <div className="overflow-y-auto max-h-96 scrollbar-hide">
-            {isInitialLoading ? (
-              // Show skeleton loaders while initial loading
-              <>
-                {[...Array(6)].map((_, index) => (
-                  <TokenSkeleton key={`skeleton-${index}`} />
-                ))}
-              </>
-            ) : (
-              <>
-                {filteredTokens.map((token) => (
-                  <button
-                    key={`token-${token.contractAddress}`}
-                    onClick={() => onSelect(token)}
-                    className="w-full flex items-center p-4 hover:bg-[#1A1A1A] transition-colors text-left"
-                  >
-                    {token.logoUrl ? (
-                      <div className="relative w-10 h-10 mr-3">
-                        {!loadedImages.has(token.contractAddress) && (
-                          <div className="absolute inset-0 bg-gray-700 rounded-full animate-pulse"></div>
-                        )}
-                        <img
-                          src={token.logoUrl}
-                          alt={token.symbol}
-                          className={`w-10 h-10 rounded-full transition-opacity duration-300 ${
-                            loadedImages.has(token.contractAddress)
-                              ? "opacity-100"
-                              : "opacity-0"
-                          }`}
-                          onLoad={() => handleImageLoad(token.contractAddress)}
-                          onError={() => handleImageLoad(token.contractAddress)}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-10 h-10 bg-gray-700 rounded-full mr-3 animate-pulse"></div>
-                    )}
-                    <div className="flex-1">
-                      <div className="text-white font-semibold font-satoshi">
-                        {token.symbol}
-                      </div>
-                      <div className="text-gray-400 text-sm font-satoshi">
-                        {token.name}
-                      </div>
-                    </div>
-                    {/* Only show balances for user's tokens when showBalances is true */}
-                    {showBalances && (
-                      <div className="text-right">
-                        <div className="text-white font-satoshi">
-                          {token.balance.toFixed(6)}
-                        </div>
-                        <div className="text-gray-400 text-sm font-satoshi">
-                          ${token.value.toFixed(2)}
-                        </div>
-                      </div>
-                    )}
-                  </button>
-                ))}
-
-                {/* No results message */}
-                {filteredTokens.length === 0 &&
-                  !isValidAddress(searchQuery) && (
-                    <div className="p-8 text-center">
-                      <p className="text-gray-400 font-satoshi">
-                        {searchQuery
-                          ? "No tokens found matching your search"
-                          : "No tokens available"}
-                      </p>
-                    </div>
-                  )}
-              </>
-            )}
-          </div>
-        )}
+        </div>
       </div>
-
-      <style jsx global>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
-    </div>
+    </>
   );
-}
+};
+
+export default TokenSelector;
