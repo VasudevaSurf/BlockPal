@@ -1,777 +1,493 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import {
-  ArrowUpDown,
-  ChevronDown,
-  Settings,
-  RefreshCw,
-  AlertCircle,
-} from "lucide-react";
-import TokenSelectorModal from "@/components/swap/TokenSelectorModal";
-import SwapPreviewModal from "@/components/swap/SwapPreviewModal";
-import { SkeletonSwapSection } from "@/components/ui/Skeleton";
-import { useCoinGecko, TrendingToken, TopGainer } from "@/hooks/useCoinGecko";
+import { useState } from "react";
+import { ArrowDownUp, Clock, CheckCircle, History, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import SwapIcon from "@/components/icons/SwapIcon";
+import LightningIcon from "@/components/icons/LightningIcon";
+import FilterIcon from "@/components/icons/FilterIcon";
+import { createPortal } from "react-dom";
 
-// Mock token data
-const mockTokens = [
+// History data moved outside component to prevent recreation
+const historyData = [
   {
+    id: 1,
+    type: "sell",
+    token: "Ethereum",
     symbol: "ETH",
-    name: "Ethereum",
-    contractAddress: "native",
-    decimals: 18,
-    balance: 1.25843,
-    value: 4027.45,
-    logoUrl: "/tokens/eth.png",
-    price: 3200.45,
-    icon: "/tokens/eth.png",
+    amount: "-0.01",
+    value: "ETH",
+    date: "August 20, 2025",
+    status: "completed",
+    color: "from-gray-600 to-gray-400",
   },
   {
-    symbol: "USDT",
-    name: "Tether USD",
-    contractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-    decimals: 6,
-    balance: 1000.5,
-    value: 1000.5,
-    logoUrl: "/tokens/usdt.png",
-    price: 1.0,
-    icon: "/tokens/usdt.png",
+    id: 2,
+    type: "buy",
+    token: "Bitcoin",
+    symbol: "BTC",
+    amount: "+0.31",
+    value: "BTC",
+    date: "August 20, 2025",
+    status: "completed",
+    color: "from-orange-500 to-orange-600",
   },
   {
-    symbol: "USDC",
-    name: "USD Coin",
-    contractAddress: "0xA0b86a33E6417f5a10c4C9a6bd1a0d7AF0DB58a7",
-    decimals: 6,
-    balance: 2500.75,
-    value: 2500.75,
-    logoUrl: "/tokens/usdc.png",
-    price: 1.0,
-    icon: "/tokens/usdc.png",
+    id: 3,
+    type: "buy",
+    token: "Solana",
+    symbol: "SOL",
+    amount: "+0.1",
+    value: "SOL",
+    date: "June 20, 2025",
+    status: "completed",
+    color: "from-purple-500 to-purple-600",
+  },
+  {
+    id: 4,
+    type: "sell",
+    token: "Base",
+    symbol: "ETH",
+    amount: "-0.01",
+    value: "ETH",
+    date: "September 9, 2025",
+    status: "completed",
+    color: "from-blue-500 to-blue-600",
+  },
+  {
+    id: 5,
+    type: "buy",
+    token: "Solana",
+    symbol: "SOL",
+    amount: "+0.1",
+    value: "SOL",
+    date: "August 3, 2025",
+    status: "completed",
+    color: "from-purple-500 to-purple-600",
   },
 ];
 
-interface Token {
-  symbol: string;
-  name: string;
-  contractAddress: string;
-  decimals: number;
-  balance: number;
-  value: number;
-  logoUrl?: string;
-  price: number;
-}
+export default function SwapPage() {
+  const [activeTab, setActiveTab] = useState("swap");
+  const [mounted, setMounted] = useState(false);
 
-interface SwapQuote {
-  sellToken: string;
-  buyToken: string;
-  sellAmount: string;
-  buyAmount: string;
-  price: string;
-  guaranteedPrice: string;
-  to: string;
-  data: string;
-  value: string;
-  gas: string;
-  gasPrice: string;
-  protocolFee: string;
-  minimumProtocolFee: string;
-  buyTokenAddress: string;
-  sellTokenAddress: string;
-  allowanceTarget: string;
-  sources: any[];
-}
-
-// Token Image Component with fallback
-const TokenImage = ({
-  token,
-  size = "w-7 h-7",
-}: {
-  token: TrendingToken | TopGainer;
-  size?: string;
-}) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
-
-  const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
-  };
-
-  const handleImageError = () => {
-    setImageLoading(false);
-    setImageError(true);
-  };
-
-  // Show fallback if no image URL, image failed to load, or still loading
-  if (!token.imageUrl || imageError || imageLoading) {
-    return (
-      <div
-        className={`${size} ${token.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
-      >
-        <span className="text-white text-xs font-bold font-satoshi">
-          {token.icon}
-        </span>
-        {/* Hidden img tag to attempt loading */}
-        {token.imageUrl && imageLoading && (
-          <img
-            src={token.imageUrl}
-            alt={token.name}
-            className="hidden"
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-          />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`${size} rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-800`}
-    >
-      <img
-        src={token.imageUrl}
-        alt={token.name}
-        className="w-full h-full object-cover"
-        onLoad={handleImageLoad}
-        onError={handleImageError}
-      />
-    </div>
-  );
-};
-
-export default function SwapSection() {
-  // Use CoinGecko hook for real data
-  const {
-    data: coinGeckoData,
-    loading: coinGeckoLoading,
-    error: coinGeckoError,
-    refetch,
-  } = useCoinGecko();
-
-  // Use mock data instead of Redux
-  const tokens = mockTokens;
-
-  // Get real trending tokens and top gainers from CoinGecko
-  const trendingTokens = coinGeckoData?.trendingTokens || [];
-  const topGainersData = coinGeckoData?.topGainers || [];
-
-  // State
-  const [sellToken, setSellToken] = useState<Token | null>(null);
-  const [buyToken, setBuyToken] = useState<Token | null>(null);
-  const [sellAmount, setSellAmount] = useState("");
-  const [buyAmount, setBuyAmount] = useState("");
-  const [sellTokenSelectorOpen, setSellTokenSelectorOpen] = useState(false);
-  const [buyTokenSelectorOpen, setBuyTokenSelectorOpen] = useState(false);
-  const [previewModalOpen, setPreviewModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [quoteLoading, setQuoteLoading] = useState(false);
-  const [quote, setQuote] = useState<SwapQuote | null>(null);
-  const [error, setError] = useState("");
-
-  // Settings state
-  const [slippage, setSlippage] = useState("3");
-  const [showSettings, setShowSettings] = useState(false);
-  const [customSlippage, setCustomSlippage] = useState("");
-  const settingsRef = useRef<HTMLDivElement>(null);
-
-  // Top Gainers state
-  const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
-  const [showGainersDropdown, setShowGainersDropdown] = useState(false);
-
-  // Auto-scroll refs and state
-  const trendingScrollRef = useRef<HTMLDivElement>(null);
-  const gainersScrollRef = useRef<HTMLDivElement>(null);
-  const [isPausedTrending, setIsPausedTrending] = useState(false);
-  const [isPausedGainers, setIsPausedGainers] = useState(false);
-
-  // Close settings dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        settingsRef.current &&
-        !settingsRef.current.contains(event.target as Node)
-      ) {
-        setShowSettings(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+  // Ensure component is mounted before using portal
+  useState(() => {
+    setMounted(true);
   }, []);
 
-  // Auto-scroll for Trending Tokens
-  useEffect(() => {
-    const scrollContainer = trendingScrollRef.current;
-    if (!scrollContainer || isPausedTrending || trendingTokens.length === 0)
-      return;
+  // Create the history overlay that covers the entire screen
+  const historyOverlay =
+    mounted && activeTab === "history"
+      ? createPortal(
+          <AnimatePresence>
+            {activeTab === "history" && (
+              <>
+                {/* Full-screen Background Overlay */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
+                  onClick={() => setActiveTab("swap")}
+                  style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                  }}
+                />
 
-    const scroll = () => {
-      if (
-        scrollContainer.scrollTop + scrollContainer.clientHeight >=
-        scrollContainer.scrollHeight - 1
-      ) {
-        scrollContainer.scrollTop = 0;
-      } else {
-        scrollContainer.scrollTop += 1;
-      }
-    };
+                {/* History Panel centered on screen */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  transition={{ type: "spring", damping: 25 }}
+                  className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999]"
+                  style={{
+                    position: "fixed",
+                  }}
+                >
+                  {/* Container with gradient border matching swap box */}
+                  <div className="relative p-[3px] rounded-[30px] w-[90vw] max-w-[400px]">
+                    {/* Gradient border background */}
+                    <div
+                      className="absolute inset-0 rounded-[30px]"
+                      style={{
+                        background: `linear-gradient(135deg, 
+                    #E2AF19 0%, 
+                    #E2AF19 3%,
+                    #2C2C2C 10%, 
+                    #2C2C2C 90%, 
+                    #E2AF19 97%,
+                    #E2AF19 100%)`,
+                      }}
+                    />
 
-    const interval = setInterval(scroll, 50);
-    return () => clearInterval(interval);
-  }, [isPausedTrending, trendingTokens]);
+                    <div
+                      className="relative bg-[#0F0F0F] rounded-[26px] p-6 max-h-[80vh] overflow-hidden flex flex-col"
+                      style={{
+                        boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.5)",
+                      }}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-white font-medium text-xl">
+                          Swap History
+                        </h3>
+                        <button
+                          onClick={() => setActiveTab("swap")}
+                          className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded-lg"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
 
-  // Auto-scroll for Top Gainers
-  useEffect(() => {
-    const scrollContainer = gainersScrollRef.current;
-    if (!scrollContainer || isPausedGainers || topGainersData.length === 0)
-      return;
+                      {/* History List */}
+                      <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                        {historyData.map((item) => (
+                          <div
+                            key={item.id}
+                            className="bg-[#191919] rounded-xl p-4 hover:bg-[#252525] transition-all cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {/* Token Icon */}
+                                <div
+                                  className={`w-10 h-10 bg-gradient-to-r ${item.color} rounded-full flex items-center justify-center`}
+                                >
+                                  <span className="text-white text-xs font-bold">
+                                    {item.symbol[0]}
+                                  </span>
+                                </div>
 
-    const scroll = () => {
-      if (
-        scrollContainer.scrollTop + scrollContainer.clientHeight >=
-        scrollContainer.scrollHeight - 1
-      ) {
-        scrollContainer.scrollTop = 0;
-      } else {
-        scrollContainer.scrollTop += 1;
-      }
-    };
+                                {/* Transaction Details */}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 text-sm">
+                                      {item.type === "sell" ? "Sell" : "Buy"}{" "}
+                                      Token
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-white font-medium">
+                                      {item.token}
+                                    </span>
+                                    <span className="text-gray-400 text-sm">
+                                      {item.symbol}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
 
-    const interval = setInterval(scroll, 50);
-    return () => clearInterval(interval);
-  }, [isPausedGainers, topGainersData]);
-
-  // Initialize with ETH as default sell token
-  useEffect(() => {
-    if (tokens.length > 0 && !sellToken) {
-      const ethToken = tokens.find(
-        (t) => t.symbol === "ETH" || t.contractAddress === "native"
-      );
-      if (ethToken) {
-        setSellToken({
-          symbol: ethToken.symbol,
-          name: ethToken.name,
-          contractAddress: ethToken.contractAddress || "native",
-          decimals: ethToken.decimals || 18,
-          balance: ethToken.balance,
-          value: ethToken.value,
-          logoUrl: ethToken.logoUrl,
-          price: ethToken.price,
-        });
-      }
-    }
-  }, [tokens, sellToken]);
-
-  // Mock quote generation when amounts change
-  useEffect(() => {
-    if (sellToken && buyToken && sellAmount && parseFloat(sellAmount) > 0) {
-      getMockQuote();
-    } else {
-      setBuyAmount("");
-      setQuote(null);
-    }
-  }, [sellToken, buyToken, sellAmount]);
-
-  const getMockQuote = async () => {
-    if (!sellToken || !buyToken || !sellAmount) return;
-
-    setQuoteLoading(true);
-    setError("");
-
-    // Simulate API delay
-    setTimeout(() => {
-      try {
-        // Mock exchange rate calculation
-        const sellAmountNum = parseFloat(sellAmount);
-        const mockExchangeRate = buyToken.price / sellToken.price;
-        const buyAmountNum = sellAmountNum * mockExchangeRate;
-
-        // Create mock quote
-        const mockQuote: SwapQuote = {
-          sellToken: sellToken.symbol,
-          buyToken: buyToken.symbol,
-          sellAmount: (
-            sellAmountNum * Math.pow(10, sellToken.decimals)
-          ).toString(),
-          buyAmount: (
-            buyAmountNum * Math.pow(10, buyToken.decimals)
-          ).toString(),
-          price: mockExchangeRate.toString(),
-          guaranteedPrice: (mockExchangeRate * 0.97).toString(),
-          to: "0x0000000000000000000000000000000000000000",
-          data: "0x",
-          value: "0",
-          gas: "150000",
-          gasPrice: "20000000000",
-          protocolFee: "0",
-          minimumProtocolFee: "0",
-          buyTokenAddress: buyToken.contractAddress,
-          sellTokenAddress: sellToken.contractAddress,
-          allowanceTarget: "0x0000000000000000000000000000000000000000",
-          sources: [],
-        };
-
-        setQuote(mockQuote);
-        setBuyAmount(buyAmountNum.toFixed(6));
-      } catch (error: any) {
-        console.error("Mock quote error:", error);
-        setError("Failed to get quote");
-        setBuyAmount("");
-        setQuote(null);
-      } finally {
-        setQuoteLoading(false);
-      }
-    }, 800);
-  };
-
-  const handleSellTokenSelect = (token: Token) => {
-    setSellToken(token);
-    setSellTokenSelectorOpen(false);
-    setSellAmount("");
-    setBuyAmount("");
-    setQuote(null);
-  };
-
-  const handleBuyTokenSelect = (token: Token) => {
-    setBuyToken(token);
-    setBuyTokenSelectorOpen(false);
-    setBuyAmount("");
-    setQuote(null);
-  };
-
-  const handleSwapTokens = () => {
-    if (sellToken && buyToken) {
-      const tempToken = sellToken;
-      setSellToken(buyToken);
-      setBuyToken(tempToken);
-      setSellAmount("");
-      setBuyAmount("");
-      setQuote(null);
-    }
-  };
-
-  const handleMaxClick = () => {
-    if (sellToken) {
-      // Reserve small amount for gas if selling ETH
-      const maxAmount =
-        sellToken.contractAddress === "native"
-          ? Math.max(0, sellToken.balance - 0.005)
-          : sellToken.balance;
-      setSellAmount(maxAmount.toString());
-    }
-  };
-
-  const handlePreview = () => {
-    if (quote && sellToken && buyToken) {
-      setPreviewModalOpen(true);
-    }
-  };
-
-  const handleSlippageSelect = (value: string) => {
-    if (value === "custom") {
-      setSlippage(customSlippage || "3");
-    } else {
-      setSlippage(value);
-      setCustomSlippage("");
-    }
-    setShowSettings(false);
-  };
-
-  const handleCustomSlippageChange = (value: string) => {
-    // Only allow valid number inputs
-    if (/^\d*\.?\d*$/.test(value) || value === "") {
-      setCustomSlippage(value);
-      if (value && parseFloat(value) >= 0.1 && parseFloat(value) <= 50) {
-        setSlippage(value);
-      }
-    }
-  };
-
-  const canSwap =
-    sellToken &&
-    buyToken &&
-    sellAmount &&
-    quote &&
-    parseFloat(sellAmount) > 0 &&
-    parseFloat(sellAmount) <= sellToken.balance;
-
-  if (loading) {
-    return <SkeletonSwapSection />;
-  }
+                              {/* Right Side Info */}
+                              <div className="text-right">
+                                <div className="text-gray-400 text-xs mb-1">
+                                  {item.date}
+                                </div>
+                                <div
+                                  className={`font-medium ${
+                                    item.type === "sell"
+                                      ? "text-red-400"
+                                      : "text-green-400"
+                                  }`}
+                                >
+                                  {item.amount} {item.value}
+                                </div>
+                                {item.status === "completed" && (
+                                  <div className="inline-flex items-center gap-1 bg-[#E2AF19]/10 text-[#E2AF19] text-xs px-2 py-1 rounded mt-1">
+                                    <CheckCircle size={10} />
+                                    <span>Completed</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>,
+          document.body
+        )
+      : null;
 
   return (
     <>
-      <div className="space-y-3 lg:space-y-4 h-full flex flex-col">
-        {/* First Box - Trending Tokens */}
-        <div className="bg-black rounded-[12px] lg:rounded-[16px] border border-[#2C2C2C] flex-1 flex flex-col p-2 lg:p-3 overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-white text-sm font-mayeka">Trending Tokens</h2>
-            <div className="flex items-center gap-1 border border-[#0F0F0F] rounded-xl px-1 py-1">
-              <span className="text-gray-400 text-[10px] font-satoshi">
-                Change in the last 24h
-              </span>
-              <button
-                onClick={refetch}
-                className="p-0.5 hover:bg-gray-800 rounded transition-colors"
-                disabled={coinGeckoLoading}
-                title="Refresh data"
-              >
-                <RefreshCw
-                  size={12}
-                  className={`text-[#E7BC3F] ${
-                    coinGeckoLoading ? "animate-spin" : ""
-                  }`}
-                />
-              </button>
-            </div>
+      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-4 flex flex-col overflow-hidden relative">
+        <div className="flex justify-center mb-4">
+          <div className="relative inline-flex py-[6px] px-[6px] gap-[6px] border border-[#4B3A08] rounded-[12px]">
+            <motion.div
+              className="absolute h-[calc(100%-12px)] w-[calc(50%-3px)] bg-[#E2AF19] rounded-[13px] top-[6px] left-[6px]"
+              initial={false}
+              animate={activeTab}
+              variants={{
+                swap: { x: 0 },
+                history: { x: "100%" },
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 500,
+                damping: 30,
+              }}
+            />
+
+            {/* Tab Buttons */}
+            <button
+              onClick={() => setActiveTab("swap")}
+              className={`relative z-10 px-6 py-2.5 font-medium text-sm rounded-[13px] transition-colors duration-200 ${
+                activeTab === "swap"
+                  ? "text-black"
+                  : "text-white hover:text-gray-300"
+              }`}
+            >
+              Swap
+            </button>
+
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`relative z-10 px-6 py-2.5 font-medium text-sm rounded-[13px] transition-colors duration-200 ${
+                activeTab === "history"
+                  ? "text-black"
+                  : "text-white hover:text-gray-300"
+              }`}
+            >
+              History
+            </button>
           </div>
+        </div>
 
-          {/* Border between header and content */}
-          <div className="border-t border-[#2C2C2C] mb-1"></div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-full max-w-xl mx-auto px-4">
+            {/* Container with gradient border */}
+            <div className="relative p-[3px] rounded-[30px]">
+              {/* Gradient border background with subtle fade */}
+              <div
+                className="absolute inset-0 rounded-[30px]"
+                style={{
+                  background: `linear-gradient(135deg, 
+                    #E2AF19 0%, 
+                    #E2AF19 3%,
+                    #2C2C2C 10%, 
+                    #2C2C2C 90%, 
+                    #E2AF19 97%,
+                    #E2AF19 100%)`,
+                }}
+              />
 
-          {/* Error State */}
-          {coinGeckoError && (
-            <div className="flex items-center justify-center p-4">
-              <div className="text-center">
-                <AlertCircle size={24} className="text-red-400 mx-auto mb-2" />
-                <p className="text-red-400 text-xs font-satoshi mb-2">
-                  {coinGeckoError}
-                </p>
-                <button
-                  onClick={refetch}
-                  className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-xs"
+              <div
+                className="relative bg-[#0F0F0F] rounded-[26px] py-6 px-16"
+                style={{
+                  boxShadow: "0 4px 4px 0 rgba(0, 0, 0, 0.25)",
+                }}
+              >
+                <div className="flex flex-row items-center justify-between mb-4">
+                  <button className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit justify-center">
+                    <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">E</span>
+                    </div>
+                    <span className="text-white text-base font-satoshi">
+                      Ethereum
+                    </span>
+                    <svg
+                      className="w-3.5 h-3.5 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+                  {/* Slippage Settings */}
+                  <div className="flex justify-end items-center gap-2 text-xs bg-[rgba(255,255,255,0.03)] p-2 rounded-[20px]">
+                    <span className="text-[#977511] font-satoshi">
+                      Slippage %
+                    </span>
+                    <button className="text-[#fff] hover:text-[#D4A853] transition-colors font-satoshi">
+                      Auto
+                    </button>
+                    <button className="text-gray-500 hover:text-gray-300 transition-colors flex flex-row items-center justify-center font-satoshi">
+                      Custom
+                      <FilterIcon size={12} className="mt-[2px] ml-0.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Swap Box */}
+                <div
+                  className="bg-[#191919] p-5"
+                  style={{ borderRadius: "26.066px" }}
                 >
-                  Try Again
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h2 className="text-[#E2AF19] text-base font-mayeka mb-2">
+                        Swap
+                      </h2>
+
+                      <div className="flex items-center justify-between">
+                        <input
+                          type="text"
+                          defaultValue="0.684"
+                          className="bg-transparent text-white text-3xl font-satoshi outline-none w-full"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    <button className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] bg-[rgba(255,255,255,0.03)] rounded-[25px]">
+                      <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">E</span>
+                      </div>
+                      <span className="text-white text-base font-satoshi">
+                        ETH
+                      </span>
+                      <svg
+                        className="w-3.5 h-3.5 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#939393] font-satoshi">
+                          Available:
+                        </span>
+                        <span className="text-[#FFFFFF] font-satoshi">
+                          {" "}
+                          8.04 ETH
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#FFFFFF] font-satoshi">
+                          8.04 ETH
+                        </span>
+                        <button className="text-xs bg-[#000] hover:bg-[#3C3C3C] text-white px-2 py-1 rounded-md transition-colors">
+                          MAX
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-center relative -my-[22px] z-10">
+                  <button className="bg-[#E2AF19] p-3 rounded-full hover:bg-[#D4A853] transition-colors group border-4 border-[#0F0F0F]">
+                    <SwapIcon className="text-black w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Get Box */}
+                <div
+                  className="bg-[#191919] p-5 mb-2"
+                  style={{ borderRadius: "26.066px" }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h2 className="text-[#E2AF19] text-base font-mayeka mb-2">
+                        GET
+                      </h2>
+
+                      <div className="flex items-center justify-between">
+                        <input
+                          type="text"
+                          defaultValue="0.684"
+                          className="bg-transparent text-white text-3xl font-satoshi outline-none w-full"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    <button className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] bg-[rgba(255,255,255,0.03)] rounded-[25px]">
+                      <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">E</span>
+                      </div>
+                      <span className="text-white text-base font-satoshi">
+                        ETH
+                      </span>
+                      <svg
+                        className="w-3.5 h-3.5 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#939393] font-satoshi">
+                          Estimated Fee:
+                        </span>
+                        <span className="text-[#FFFFFF] font-satoshi"> $0</span>
+                      </div>
+                      <span className="text-gray-500 font-satoshi flex items-center gap-4">
+                        <span className="text-[#FFFFFF] font-satoshi">
+                          $200.04
+                        </span>
+                        <div className="flex flex-row items-center bg-[rgba(255,255,255,0.02)] p-[4px] rounded-[15px]">
+                          <LightningIcon size={15} />
+                          Fast
+                        </div>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Connect Wallet Button */}
+                <button className="w-full bg-[#E2AF19] hover:bg-[#D4A853] text-black font-mayeka-bold-demo py-3.5 rounded-[20px] transition-all text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02]">
+                  CONNECT WALLET
                 </button>
               </div>
             </div>
-          )}
-
-          {/* Loading State */}
-          {coinGeckoLoading && !trendingTokens.length && (
-            <div className="flex-1 overflow-y-auto space-y-2">
-              {Array.from({ length: 7 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between py-1.5 animate-pulse"
-                >
-                  <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
-                    <div className="w-7 h-7 bg-gray-600 rounded-full"></div>
-                    <div className="min-w-0 flex-1">
-                      <div className="h-2 bg-gray-600 rounded mb-1"></div>
-                      <div className="h-1.5 bg-gray-700 rounded"></div>
-                    </div>
-                  </div>
-                  <div className="w-20 h-2 bg-gray-600 rounded"></div>
-                  <div className="w-20 h-7 bg-gray-600 rounded"></div>
-                  <div className="w-16 h-2 bg-gray-600 rounded"></div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Token List */}
-          {!coinGeckoLoading && !coinGeckoError && (
-            <div
-              ref={trendingScrollRef}
-              className="flex-1 overflow-y-auto space-y-2 scrollbar-hide"
-              onMouseEnter={() => setIsPausedTrending(true)}
-              onMouseLeave={() => setIsPausedTrending(false)}
-            >
-              {trendingTokens.length > 0 ? (
-                trendingTokens.map((token: TrendingToken) => (
-                  <div
-                    key={token.index}
-                    className="flex items-center justify-between py-1.5"
-                  >
-                    {/* Token info with fixed width - NOW WITH IMAGES */}
-                    <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
-                      <TokenImage token={token} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-white text-[11px] font-medium font-satoshi truncate">
-                          {token.name}
-                        </div>
-                        <div className="text-gray-400 text-[8px] font-satoshi">
-                          {token.symbol}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Price with fixed width */}
-                    <div className="text-white text-[13px] font-medium font-satoshi w-20 text-center flex-shrink-0">
-                      {token.price}
-                    </div>
-
-                    {/* Chart with fixed width */}
-                    <div className="w-20 h-7 flex-shrink-0 flex items-center justify-center">
-                      <img
-                        src="/graph.png"
-                        alt="chart"
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-
-                    {/* Change percentage with fixed width */}
-                    <div
-                      className={`text-xs font-medium font-satoshi w-16 text-center flex-shrink-0 ${
-                        token.changeType === "positive"
-                          ? "text-green-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {token.change}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center p-4">
-                  <p className="text-gray-400 text-sm font-satoshi">
-                    No trending tokens available
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Second Box - Top Gainers */}
-        <div className="bg-black rounded-[12px] lg:rounded-[16px] border border-[#2C2C2C] flex-1 flex flex-col p-2 lg:p-3 overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="relative">
-              <button
-                onClick={() => setShowGainersDropdown(!showGainersDropdown)}
-                className="flex items-center gap-2 bg-[#0F0F0F] rounded-[20px] px-4 py-2 text-white text-sm font-mayeka hover:bg-[#222] transition-colors"
-              >
-                Top Gainers
-                <ChevronDown className="w-4 h-4" />
-              </button>
-
-              {/* Dropdown */}
-              {showGainersDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg py-1 min-w-[120px] z-10">
-                  <button className="w-full text-left px-3 py-1.5 text-white text-sm font-satoshi hover:bg-[#2C2C2C] transition-colors">
-                    Top Gainers
-                  </button>
-                  <button className="w-full text-left px-3 py-1.5 text-gray-400 text-sm font-satoshi hover:bg-[#2C2C2C] transition-colors">
-                    Top Losers
-                  </button>
-                  <button className="w-full text-left px-3 py-1.5 text-gray-400 text-sm font-satoshi hover:bg-[#2C2C2C] transition-colors">
-                    Most Active
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Time Filter */}
-            <div className="flex items-center bg-[#000000] border border-[#2C2C2C] rounded-[20px] p-1">
-              {["1hr", "24h", "7d"].map((timeframe) => (
-                <button
-                  key={timeframe}
-                  onClick={() => setSelectedTimeframe(timeframe)}
-                  className={`px-3 py-1 text-xs font-satoshi rounded-[200px] transition-colors ${
-                    selectedTimeframe === timeframe
-                      ? "bg-[#0F0F0F] text-white"
-                      : "text-gray-400 hover:text-white"
-                  }`}
-                >
-                  {timeframe}
-                </button>
-              ))}
-            </div>
           </div>
-
-          {/* Table Header */}
-          <div className="flex items-center justify-between py-2 border-b border-[#2C2C2C] mb-2">
-            <div className="text-gray-400 text-xs font-satoshi w-[100px] text-center">
-              Name
-            </div>
-            <div className="text-gray-400 text-xs font-satoshi w-[80px] text-center">
-              Price
-            </div>
-            <div className="text-gray-400 text-xs font-satoshi w-[100px] text-center">
-              Market Cap
-            </div>
-            <div className="text-gray-400 text-xs font-satoshi w-[60px] text-center">
-              {selectedTimeframe}
-            </div>
-          </div>
-
-          {/* Loading State for Top Gainers */}
-          {coinGeckoLoading && !topGainersData.length && (
-            <div className="flex-1 overflow-y-auto space-y-1">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between py-1.5 animate-pulse"
-                >
-                  <div className="flex items-center gap-2.5 w-[100px]">
-                    <div className="w-6 h-6 bg-gray-600 rounded-full"></div>
-                    <div className="min-w-0 flex-1">
-                      <div className="h-2 bg-gray-600 rounded mb-1"></div>
-                      <div className="h-1.5 bg-gray-700 rounded"></div>
-                    </div>
-                  </div>
-                  <div className="w-[80px] h-2 bg-gray-600 rounded"></div>
-                  <div className="w-[100px] h-2 bg-gray-600 rounded"></div>
-                  <div className="w-[60px] h-2 bg-gray-600 rounded"></div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Token List */}
-          {!coinGeckoLoading && (
-            <div
-              ref={gainersScrollRef}
-              className="flex-1 overflow-y-auto space-y-1 scrollbar-hide"
-              onMouseEnter={() => setIsPausedGainers(true)}
-              onMouseLeave={() => setIsPausedGainers(false)}
-            >
-              {topGainersData.length > 0 ? (
-                topGainersData.map((token: TopGainer) => (
-                  <div
-                    key={token.index}
-                    className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
-                  >
-                    {/* Token info - NOW WITH IMAGES */}
-                    <div className="flex items-center gap-2.5 w-[100px] flex-shrink-0">
-                      <TokenImage token={token} size="w-6 h-6" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-white text-[11px] font-medium font-satoshi truncate">
-                          {token.name}
-                        </div>
-                        <div className="text-gray-400 text-[9px] font-satoshi">
-                          {token.symbol}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Price */}
-                    <div className="text-white text-[11px] font-medium font-satoshi w-[80px] text-center flex-shrink-0">
-                      {token.price}
-                    </div>
-
-                    {/* Market Cap */}
-                    <div className="text-white text-[11px] font-medium font-satoshi w-[100px] text-center flex-shrink-0">
-                      {token.marketCap}
-                    </div>
-
-                    {/* Change percentage */}
-                    <div className="w-[60px] text-center flex-shrink-0">
-                      <div
-                        className={`text-[11px] font-medium font-satoshi ${
-                          token.changeType === "positive"
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {token.changeType === "positive" ? "▲" : "▼"}{" "}
-                        {token.change}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center p-4">
-                  <p className="text-gray-400 text-sm font-satoshi">
-                    No top gainers available
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
-
-        <style jsx global>{`
-          .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-          .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-          }
-
-          /* Remove number input spinners */
-          input[type="number"]::-webkit-inner-spin-button,
-          input[type="number"]::-webkit-outer-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-          }
-
-          input[type="number"] {
-            -moz-appearance: textfield;
-          }
-
-          /* Mobile specific styles */
-          @media (max-width: 640px) {
-            input {
-              font-size: 14px !important; /* Prevents zoom on iOS */
-            }
-          }
-        `}</style>
       </div>
 
-      {/* Token Selector Modals - Use mock data */}
-      <TokenSelectorModal
-        isOpen={sellTokenSelectorOpen}
-        onClose={() => setSellTokenSelectorOpen(false)}
-        onSelect={handleSellTokenSelect}
-        tokens={tokens.map((t) => ({
-          symbol: t.symbol,
-          name: t.name,
-          contractAddress: t.contractAddress || "native",
-          decimals: t.decimals || 18,
-          balance: t.balance,
-          value: t.value,
-          logoUrl: t.logoUrl,
-          price: t.price,
-        }))}
-        title="Select Token"
-        showBalances={true}
-      />
+      {/* History Overlay Portal - Renders at body level */}
+      {historyOverlay}
 
-      <TokenSelectorModal
-        isOpen={buyTokenSelectorOpen}
-        onClose={() => setBuyTokenSelectorOpen(false)}
-        onSelect={handleBuyTokenSelect}
-        tokens={tokens.map((t) => ({
-          symbol: t.symbol,
-          name: t.name,
-          contractAddress: t.contractAddress || "native",
-          decimals: t.decimals || 18,
-          balance: t.balance,
-          value: t.value,
-          logoUrl: t.logoUrl,
-          price: t.price,
-        }))}
-        title="Select Token"
-        showBalances={false}
-        allowCustomToken={true}
-      />
-
-      {/* Preview Modal - Demo functionality */}
-      <SwapPreviewModal
-        isOpen={previewModalOpen}
-        onClose={() => setPreviewModalOpen(false)}
-        sellToken={sellToken}
-        buyToken={buyToken}
-        sellAmount={sellAmount}
-        buyAmount={buyAmount}
-        quote={quote}
-        onConfirm={() => {
-          setPreviewModalOpen(false);
-          // Reset form after demo swap
-          setSellAmount("");
-          setBuyAmount("");
-          setQuote(null);
-          console.log("Demo swap completed!");
-        }}
-      />
+      {/* Custom Scrollbar Styles */}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #0f0f0f;
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #2c2c2c;
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #404040;
+        }
+      `}</style>
     </>
   );
 }
