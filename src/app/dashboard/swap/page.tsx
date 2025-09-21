@@ -1,9 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ArrowDownUp, Clock, CheckCircle, History, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useTransform,
+  PanInfo,
+} from "framer-motion";
+import { useAccount } from "wagmi";
 import ExternalLinkIcon from "@/components/icons/ExternalLinkIcon";
+import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 
 // Custom icons as simple components
 const SwapIcon = ({ className, ...props }) => (
@@ -111,6 +119,39 @@ const historyData = [
 
 export default function SwapPage() {
   const [activeTab, setActiveTab] = useState("swap");
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [swipeCompleted, setSwipeCompleted] = useState(false);
+  const { isConnected } = useAccount();
+
+  // Motion values for swipe functionality
+  const x = useMotionValue(0);
+  const containerRef = useRef(null);
+
+  const handleSwipeEnd = (event: any, info: PanInfo) => {
+    const containerWidth = containerRef.current?.offsetWidth || 300;
+    const currentX = x.get(); // Get current position
+    const threshold = 200; // Simple fixed threshold that's achievable
+
+    if (currentX >= threshold && !isSwapping) {
+      // Complete the swap
+      setSwipeCompleted(true);
+      setIsSwapping(true);
+
+      // Animate to end position
+      x.set(containerWidth - 50);
+
+      // Simulate swap process
+      setTimeout(() => {
+        setIsSwapping(false);
+        setSwipeCompleted(false);
+        x.set(0); // Reset position
+        // Add actual swap logic here
+      }, 2000);
+    } else {
+      // Snap back to start
+      x.set(0);
+    }
+  };
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-4 flex flex-col overflow-hidden relative">
@@ -353,10 +394,58 @@ export default function SwapPage() {
                 </div>
               </div>
 
-              {/* Connect Wallet Button */}
-              <button className="w-full bg-[#E2AF19] hover:bg-[#D4A853] text-black font-mayeka-bold-demo py-3.5 rounded-[20px] transition-all text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02]">
-                CONNECT WALLET
-              </button>
+              {/* Wallet Connect / Swap Button */}
+              {!isConnected ? (
+                <div className="w-full">
+                  <WalletConnectButton />
+                </div>
+              ) : (
+                <div
+                  className="relative w-full h-[50px] overflow-hidden"
+                  style={{
+                    borderRadius: "100px",
+                    background:
+                      "linear-gradient(90deg, rgba(110, 110, 110, 0.37) 0%, rgba(256, 175, 25, 0.25) 100%)",
+                  }}
+                  ref={containerRef}
+                >
+                  {/* Draggable Token Icon (Left) */}
+                  <motion.div
+                    className="absolute left-1 top-1/2 transform -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing"
+                    style={{ x }}
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 350 }} // Much higher constraint
+                    dragElastic={0.1}
+                    onDragEnd={handleSwipeEnd}
+                    disabled={isSwapping}
+                  >
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center border-4 border-[#797878]">
+                      <span className="text-white text-xs font-bold">E</span>
+                    </div>
+                  </motion.div>
+
+                  {/* Fixed Token Icon (Right) */}
+                  <div className="absolute right-1 top-1/2 transform -translate-y-1/2 z-10">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center border-4 border-white/10">
+                      <span className="text-white text-xs font-bold">E</span>
+                    </div>
+                  </div>
+
+                  {/* Center Text */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-white font-mayeka-bold-demo text-base">
+                      {isSwapping ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          SWAPPING...
+                        </div>
+                      ) : (
+                        "Swap >>>"
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-// src/components/wallet/WalletConnectButton.tsx - COMPLETE VERSION with minimized support
+// src/components/wallet/WalletConnectButton.tsx - COMPLETE VERSION with height customization
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -9,10 +9,12 @@ import { chains } from "./WalletProvider";
 
 interface WalletConnectButtonProps {
   isMinimized?: boolean;
+  height?: string; // New prop to control button height
 }
 
 export default function WalletConnectButton({
   isMinimized = false,
+  height = "h-10", // Default height, can be overridden
 }: WalletConnectButtonProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -62,8 +64,8 @@ export default function WalletConnectButton({
         type="button"
         className={`flex items-center rounded-[12px] bg-[#E2AF19] text-black font-medium font-satoshi text-xs transition-all duration-200 hover:bg-[#D4A118] active:bg-[#C69516] disabled:opacity-50 disabled:cursor-not-allowed ${
           isMinimized
-            ? "w-10 h-10 justify-center"
-            : "w-full px-3 py-1.5 justify-center"
+            ? `w-10 ${height} justify-center`
+            : `w-full px-3 py-1.5 ${height} justify-center`
         }`}
         disabled
         title={isMinimized ? "Connect Wallet" : undefined}
@@ -121,8 +123,8 @@ export default function WalletConnectButton({
                       type="button"
                       className={`flex items-center rounded-[12px] bg-[#E2AF19] text-black font-medium font-satoshi text-xs transition-all duration-200 hover:bg-[#D4A118] active:bg-[#C69516] disabled:opacity-50 disabled:cursor-not-allowed ${
                         isMinimized
-                          ? "w-10 h-10 justify-center"
-                          : "w-full px-3 py-1.5 justify-center"
+                          ? `w-10 ${height} justify-center`
+                          : `w-full px-3 py-1.5 ${height} justify-center`
                       }`}
                       title={isMinimized ? "Connect Wallet" : undefined}
                     >
@@ -141,7 +143,9 @@ export default function WalletConnectButton({
                       }}
                       type="button"
                       className={`bg-red-500 hover:bg-red-600 text-white rounded-[12px] font-satoshi text-xs flex items-center justify-center ${
-                        isMinimized ? "w-10 h-10" : "w-full py-2 px-4"
+                        isMinimized
+                          ? `w-10 ${height}`
+                          : `w-full py-2 px-4 ${height}`
                       }`}
                       title={isMinimized ? "Wrong Network" : undefined}
                     >
@@ -156,7 +160,7 @@ export default function WalletConnectButton({
                     <div className="flex flex-col gap-2">
                       {/* Connected status indicator */}
                       <div
-                        className="w-10 h-10 bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] flex items-center justify-center relative group cursor-pointer hover:bg-[#D4A118] transition-colors"
+                        className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] flex items-center justify-center relative group cursor-pointer hover:bg-[#D4A118] transition-colors`}
                         title={`Connected: ${account.displayName}`}
                       >
                         <div className="w-2 h-2 bg-green-400 rounded-full"></div>
@@ -173,7 +177,7 @@ export default function WalletConnectButton({
                       {/* Copy address button */}
                       <button
                         onClick={handleCopyAddress}
-                        className="w-10 h-10 bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] hover:bg-[#D4A118] transition-colors flex items-center justify-center group relative"
+                        className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] hover:bg-[#D4A118] transition-colors flex items-center justify-center group relative`}
                         title="Copy Address"
                       >
                         {copied ? (
@@ -191,7 +195,7 @@ export default function WalletConnectButton({
                       {/* Disconnect button */}
                       <button
                         onClick={handleDisconnect}
-                        className="w-10 h-10 bg-[#F9EFD1] border border-[#F9EFD1] rounded-[12px] hover:bg-[#F5E8C4] transition-colors flex items-center justify-center group relative"
+                        className={`w-10 ${height} bg-[#F9EFD1] border border-[#F9EFD1] rounded-[12px] hover:bg-[#F5E8C4] transition-colors flex items-center justify-center group relative`}
                         title="Disconnect"
                       >
                         <LogOut size={14} className="text-black" />
