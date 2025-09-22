@@ -48,7 +48,7 @@ interface UseCoinGeckoReturn {
   refetch: () => void;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL_COIN || "https://amusing-freedom-production-92a5.up.railway.app";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL_COIN || "http://localhost:5002";
 
 export function useCoinGecko(): UseCoinGeckoReturn {
   const [data, setData] = useState<CoinGeckoData | null>(null);

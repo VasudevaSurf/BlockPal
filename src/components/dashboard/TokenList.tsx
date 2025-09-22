@@ -283,7 +283,7 @@ class EnhancedTokenService {
 
   constructor() {
     this.baseURL =
-      process.env.NEXT_PUBLIC_API_URL || "https://amusing-freedom-production-92a5.up.railway.app/api/tokens";
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api/tokens";
     this.debugMode = process.env.NODE_ENV === "development";
   }
 

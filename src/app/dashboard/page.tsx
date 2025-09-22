@@ -1,3 +1,4 @@
+// src/app/dashboard/page.tsx - Updated with WalletDataProvider
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,7 +6,8 @@ import { useRouter } from "next/navigation";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
-import WalletStats from "@/components/dashboard/WalletStats"; // NEW: Optional stats component
+import WalletStats from "@/components/dashboard/WalletStats";
+import { WalletDataProvider } from "@/contexts/WalletDataContext";
 import {
   SkeletonWalletBalance,
   SkeletonTokenList,
@@ -14,7 +16,7 @@ import {
 
 // Mock authentication state
 const mockAuth = {
-  isAuthenticated: true, // Set to false to test auth redirect
+  isAuthenticated: true,
   loading: false,
   user: {
     id: "user123",
@@ -48,13 +50,13 @@ interface DashboardState {
   hasWallets: boolean;
   error: string | null;
   isAuthenticating: boolean;
-  showStats: boolean; // NEW: Toggle for wallet stats
+  showStats: boolean;
 }
 
-export default function DashboardPage() {
+// Dashboard Content Component (wrapped with provider)
+function DashboardContent() {
   const router = useRouter();
 
-  // Use mock auth data instead of Redux
   const { isAuthenticated, loading: authLoading, user } = mockAuth;
   const wallets = mockWallets;
   const activeWallet = mockActiveWallet;
@@ -65,14 +67,13 @@ export default function DashboardPage() {
     hasWallets: false,
     error: null,
     isAuthenticating: true,
-    showStats: false, // NEW: Default to false
+    showStats: false,
   });
 
   // Simulate authentication check
   useEffect(() => {
     console.log("🔍 Dashboard - Checking auth status");
 
-    // Simulate auth loading
     setTimeout(() => {
       if (!isAuthenticated) {
         console.log("🚪 Dashboard - Not authenticated, redirecting to auth");
@@ -80,7 +81,6 @@ export default function DashboardPage() {
         return;
       }
 
-      // Simulate wallet loading
       setTimeout(() => {
         setDashboardState({
           isLoading: false,
@@ -88,7 +88,7 @@ export default function DashboardPage() {
           hasWallets: wallets.length > 0,
           error: null,
           isAuthenticating: false,
-          showStats: localStorage.getItem("show-wallet-stats") === "true", // Persist preference
+          showStats: localStorage.getItem("show-wallet-stats") === "true",
         });
         console.log("📊 Dashboard initialized with mock data");
       }, 1000);
@@ -100,7 +100,6 @@ export default function DashboardPage() {
     console.log("🔄 Manual refresh requested");
     setDashboardState((prev) => ({ ...prev, isLoading: true }));
 
-    // Simulate refresh
     setTimeout(() => {
       setDashboardState((prev) => ({
         ...prev,
@@ -108,14 +107,6 @@ export default function DashboardPage() {
         error: null,
       }));
     }, 1000);
-  };
-
-  // Toggle wallet stats visibility
-  const toggleWalletStats = () => {
-    const newShowStats = !dashboardState.showStats;
-    setDashboardState((prev) => ({ ...prev, showStats: newShowStats }));
-    localStorage.setItem("show-wallet-stats", newShowStats.toString());
-    console.log(`📊 Wallet stats ${newShowStats ? "enabled" : "disabled"}`);
   };
 
   // Show loading skeleton during initial setup
@@ -147,7 +138,7 @@ export default function DashboardPage() {
     );
   }
 
-  // Don't render if not authenticated (should redirect)
+  // Don't render if not authenticated
   if (!isAuthenticated) {
     return null;
   }
@@ -169,18 +160,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* NEW: Stats Toggle (Debug/Development) */}
-      {/* {process.env.NODE_ENV === "development" && (
-        <div className="mb-2 flex items-center justify-end">
-          <button
-            onClick={toggleWalletStats}
-            className="text-xs text-gray-400 hover:text-white transition-colors underline"
-          >
-            {dashboardState.showStats ? "Hide" : "Show"} Wallet Stats
-          </button>
-        </div>
-      )} */}
-
       {/* Main Dashboard Content */}
       {dashboardState.hasWallets && activeWallet ? (
         <div className="flex flex-col xl:flex-row gap-3 lg:gap-4 flex-1 min-h-0">
@@ -192,7 +171,6 @@ export default function DashboardPage() {
             <div className="flex-shrink-0">
               <TokenList />
             </div>
-            {/* NEW: Optional wallet stats on mobile */}
             {dashboardState.showStats && (
               <div className="flex-shrink-0">
                 <WalletStats />
@@ -211,7 +189,6 @@ export default function DashboardPage() {
             <div className="flex-1 min-h-0">
               <TokenList />
             </div>
-            {/* NEW: Optional wallet stats on desktop */}
             {dashboardState.showStats && (
               <div className="flex-shrink-0">
                 <WalletStats />
@@ -238,7 +215,6 @@ export default function DashboardPage() {
             </p>
             <button
               onClick={() => {
-                // Simulate wallet creation
                 console.log("🆕 Creating wallet (demo)");
                 setDashboardState((prev) => ({
                   ...prev,
@@ -263,5 +239,14 @@ export default function DashboardPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+// Main Dashboard Page Component with Provider
+export default function DashboardPage() {
+  return (
+    <WalletDataProvider>
+      <DashboardContent />
+    </WalletDataProvider>
   );
 }
