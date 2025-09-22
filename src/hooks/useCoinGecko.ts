@@ -13,9 +13,13 @@ export interface TrendingToken {
   marketCap: string;
   rank: string;
   imageUrl?: string | null;
+  thumbUrl?: string | null;
+  smallUrl?: string | null;
+  largeUrl?: string | null;
   bgColor: string;
   icon: string;
   sparklineUrl?: string | null;
+  coinId?: string | null;
 }
 
 export interface TopGainer {
@@ -28,6 +32,10 @@ export interface TopGainer {
   changeType: "positive" | "negative";
   icon: string;
   bgColor: string;
+  imageUrl?: string | null;
+  thumbUrl?: string | null;
+  smallUrl?: string | null;
+  largeUrl?: string | null;
 }
 
 export interface CoinGeckoData {
@@ -48,7 +56,8 @@ interface UseCoinGeckoReturn {
   refetch: () => void;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL_COIN || "http://localhost:5002";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL_COIN || "http://localhost:5002";
 
 export function useCoinGecko(): UseCoinGeckoReturn {
   const [data, setData] = useState<CoinGeckoData | null>(null);

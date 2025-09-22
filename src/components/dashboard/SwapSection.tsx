@@ -414,7 +414,7 @@ export default function SwapSection() {
               <span className="text-gray-400 text-[10px] font-satoshi">
                 Change in the last 24h
               </span>
-              <button
+              {/* <button
                 onClick={refetch}
                 className="p-0.5 hover:bg-gray-800 rounded transition-colors"
                 disabled={coinGeckoLoading}
@@ -426,7 +426,7 @@ export default function SwapSection() {
                     coinGeckoLoading ? "animate-spin" : ""
                   }`}
                 />
-              </button>
+              </button> */}
             </div>
           </div>
 
@@ -506,13 +506,25 @@ export default function SwapSection() {
                       {token.price}
                     </div>
 
-                    {/* Chart with fixed width */}
+                    {/* Chart with fixed width - FIXED to use actual sparkline URLs */}
                     <div className="w-20 h-7 flex-shrink-0 flex items-center justify-center">
-                      <img
-                        src="/graph.png"
-                        alt="chart"
-                        className="w-full h-full object-contain"
-                      />
+                      {token.sparklineUrl ? (
+                        <img
+                          src={token.sparklineUrl}
+                          alt={`${token.name} chart`}
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            // Fallback to placeholder if sparkline fails to load
+                            (e.target as HTMLImageElement).src = "/graph.png";
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src="/graph.png"
+                          alt="chart placeholder"
+                          className="w-full h-full object-contain opacity-50"
+                        />
+                      )}
                     </div>
 
                     {/* Change percentage with fixed width */}

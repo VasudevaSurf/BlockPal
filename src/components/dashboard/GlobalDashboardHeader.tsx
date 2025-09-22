@@ -82,7 +82,7 @@ const getChainDisplayData = () => {
       icon: "Ξ",
       image: "/chains/Ethereum.png",
       fallbackIcon: "Ξ",
-      useBackground: true, // Ethereum keeps background
+      useBackground: false, // Ethereum keeps background
     },
     8453: {
       name: "Base",
