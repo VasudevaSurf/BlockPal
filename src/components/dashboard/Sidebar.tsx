@@ -1,10 +1,15 @@
-// src/components/dashboard/Sidebar.tsx - COMPLETE VERSION with minimized wallet support
+// src/components/dashboard/Sidebar.tsx - Updated with animated arrow toggle
 "use client";
 
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, usePathname } from "next/navigation";
-import { ExternalLink, RefreshCw, Menu } from "lucide-react";
+import {
+  ExternalLink,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { RootState } from "@/store";
 import { toggleTheme } from "@/store/slices/uiSlice";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
@@ -16,7 +21,6 @@ import FriendsIcon from "@/components/icons/FriendsIcon";
 import WebsiteIcon from "@/components/icons/WebsiteIcon";
 import DarkModeIcon from "@/components/icons/DarkModeIcon";
 import LogoutIcon from "@/components/icons/LogoutIcon";
-import { logoutUser } from "@/store/slices/authSlice";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 import SwapIcon from "../icons/SwapIcon";
 
@@ -162,23 +166,31 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
         <div className="flex items-center justify-between">
           {isMinimized ? (
-            /* Mini Logo when minimized */
-            <button
-              onClick={toggleMinimized}
-              className="w-full flex justify-center"
-              title="Expand sidebar"
-            >
-              <img
+            /* Mini Logo and arrow when minimized */
+            <div className="w-full flex flex-col items-center gap-2">
+              {/* <img
                 src="/minLogo.png"
                 alt="Blockpal Mini"
                 className="brightness-110 h-6 lg:h-8"
                 style={{
                   width: "auto",
                 }}
-              />
-            </button>
+              /> */}
+
+              {/* Arrow button when minimized */}
+              <button
+                onClick={toggleMinimized}
+                className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-all duration-300 text-gray-400 hover:text-white group"
+                title="Expand sidebar"
+              >
+                <ChevronRight
+                  size={18}
+                  className="lg:w-5 lg:h-5 transition-all duration-300 group-hover:translate-x-0.5"
+                />
+              </button>
+            </div>
           ) : (
-            /* Full logo and hamburger when expanded */
+            /* Full logo and arrow when expanded */
             <>
               <img
                 src="/blockName.png"
@@ -189,13 +201,16 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 }}
               />
 
-              {/* Hamburger Menu Button */}
+              {/* Arrow Toggle Button */}
               <button
                 onClick={toggleMinimized}
-                className="p-1.5 lg:p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors text-gray-400 hover:text-white"
+                className="p-1.5 lg:p-2 hover:bg-[#2C2C2C] rounded-lg transition-all duration-300 text-gray-400 hover:text-white group"
                 title="Minimize sidebar"
               >
-                <Menu size={16} className="lg:w-5 lg:h-5" />
+                <ChevronLeft
+                  size={18}
+                  className="lg:w-5 lg:h-5 transition-all duration-300 group-hover:-translate-x-0.5"
+                />
               </button>
             </>
           )}
@@ -260,6 +275,21 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         }
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
+        }
+
+        /* Optional: Add a subtle pulse animation to the arrow when minimized */
+        @keyframes pulse-arrow {
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          50% {
+            transform: translateX(2px);
+          }
+        }
+
+        .animate-pulse-arrow {
+          animation: pulse-arrow 2s ease-in-out infinite;
         }
       `}</style>
     </div>
