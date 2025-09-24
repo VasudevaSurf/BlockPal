@@ -356,26 +356,59 @@ export async function POST(request: NextRequest) {
     console.log(`📝 Message: ${message}`);
     console.log(`💬 Conversation ID: ${conversationId || "NEW"}`);
 
+    // Initialize messages array with system instructions
+    const messages: any[] = [
+      {
+        role: "system" as const,
+        content: getSystemInstructions(),
+      },
+    ];
+
     // Only create new conversation if conversationId is null/undefined
     if (!conversationId) {
       conversationId = await db.createConversation(userId);
       console.log(`✅ Created NEW conversation: ${conversationId}`);
     } else {
       console.log(`📌 Using existing conversation: ${conversationId}`);
+
+      // CRITICAL FIX: Load conversation history to maintain context
+      const conversationHistory = await db.loadConversationHistory(
+        conversationId
+      );
+
+      if (conversationHistory && conversationHistory.messages) {
+        console.log(
+          `📚 Loading ${conversationHistory.messages.length} previous messages for context`
+        );
+
+        // Add all previous messages to the context
+        conversationHistory.messages.forEach((msg: any) => {
+          messages.push({
+            role: msg.role,
+            content: msg.content,
+          });
+        });
+
+        console.log(`✅ Context loaded with ${messages.length - 1} messages`);
+
+        // Log the last response ID for debugging
+        if (conversationHistory.last_response_id) {
+          console.log(
+            `🔖 Last response ID: ${conversationHistory.last_response_id}`
+          );
+        }
+      } else {
+        console.log(`⚠️ No previous conversation history found`);
+      }
     }
 
-    const inputTokens = countTokens(message);
+    // Add the current user message
+    messages.push({
+      role: "user" as const,
+      content: message,
+    });
 
-    const messages = [
-      {
-        role: "system" as const,
-        content: getSystemInstructions(),
-      },
-      {
-        role: "user" as const,
-        content: message,
-      },
-    ];
+    const inputTokens = countTokens(message);
 
     // Save user message
     await db.saveMessage(
@@ -443,17 +476,22 @@ export async function POST(request: NextRequest) {
 
     const outputTokens = countTokens(finalContent);
 
-    // Save assistant message
+    // Generate response ID for this assistant message
+    const responseId = Date.now().toString();
+
+    // Save assistant message with response ID
     await db.saveMessage(
       userId,
       conversationId,
       { role: "assistant", content: finalContent },
-      Date.now().toString(),
+      responseId, // This will update the last_response_id in the database
       functionNames,
       { output: outputTokens }
     );
 
-    console.log(`✅ AI response saved for conversation: ${conversationId}`);
+    console.log(
+      `✅ AI response saved with ID: ${responseId} for conversation: ${conversationId}`
+    );
 
     return NextResponse.json({
       message: finalContent,
