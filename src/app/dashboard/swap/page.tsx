@@ -19,6 +19,7 @@ import SwapChainSelector from "@/components/swap/SwapChainSelector";
 import TokenSelector from "@/components/swap/TokenSelectorModal";
 import SwapIcon from "@/components/icons/SwapIcon";
 import { useSwap } from "@/hooks/useSwap";
+import { swapHistoryService } from "@/services/swapHistoryService";
 
 // Icon Components
 const LightningIcon = ({ size = 16, className = "", ...props }: any) => (
@@ -294,6 +295,8 @@ export default function SwapPage() {
     setGasMode,
     swapHistory,
     getExplorerLink,
+    dbTransactions,
+    loadingHistory,
   } = useSwap();
 
   // Motion values for swipe
@@ -866,12 +869,12 @@ export default function SwapPage() {
                   className="absolute inset-0 rounded-[20px]"
                   style={{
                     background: `linear-gradient(135deg, 
-                      #E2AF19 0%, 
-                      #E2AF19 3%,
-                      #2C2C2C 10%, 
-                      #2C2C2C 90%, 
-                      #E2AF19 97%,
-                      #E2AF19 100%)`,
+                #E2AF19 0%, 
+                #E2AF19 3%,
+                #2C2C2C 10%, 
+                #2C2C2C 90%, 
+                #E2AF19 97%,
+                #E2AF19 100%)`,
                   }}
                 />
 
@@ -885,61 +888,132 @@ export default function SwapPage() {
                     <h3 className="text-white font-mayeka-demi-bold-demo text-xl mt-3">
                       Swap History
                     </h3>
+                    {loadingHistory && (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#E2AF19]"></div>
+                    )}
                   </div>
 
                   <div className="flex-1 max-h-[350px] overflow-y-auto space-y-6 custom-scrollbar">
-                    {swapHistory.length === 0 ? (
+                    {dbTransactions.length === 0 && !loadingHistory ? (
                       <div className="text-center text-gray-400 py-8">
                         No swap history yet
                       </div>
                     ) : (
-                      swapHistory.slice(0, 10).map((item, index) => (
-                        <div key={item.txHash}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-col items-start gap-2">
-                              <div className="flex items-start">
-                                <span className="text-white text-[14px] font-satoshi">
-                                  Swap {item.fromToken} → {item.toToken}
-                                </span>
-                              </div>
-                              <div className="flex flex-row gap-2">
-                                <div className="text-white text-[15px] font-satoshi">
-                                  {item.fromAmount} {item.fromToken}
+                      dbTransactions.slice(0, 10).map((item) => {
+                        // Format display values
+                        const fromAmount =
+                          parseFloat(item.fromAmount) /
+                          Math.pow(10, item.fromToken.decimals);
+                        const toAmount =
+                          parseFloat(item.toAmount) /
+                          Math.pow(10, item.toToken.decimals);
+                        const displayDate = new Date(
+                          item.createdAt
+                        ).toLocaleDateString();
+
+                        // Status color
+                        const statusColors = {
+                          success: "text-green-400",
+                          failed: "text-red-400",
+                          pending: "text-yellow-400",
+                          cancelled: "text-orange-400",
+                          expired: "text-gray-400",
+                        };
+
+                        return (
+                          <div key={item._id}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col items-start gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-white text-[14px] font-satoshi">
+                                    {item.fromToken.symbol} →{" "}
+                                    {item.toToken.symbol}
+                                  </span>
+                                  <span
+                                    className={`text-xs ${
+                                      statusColors[item.status]
+                                    }`}
+                                  >
+                                    {item.status === "success" && "✓"}
+                                    {item.status === "failed" && "✗"}
+                                    {item.status === "pending" && "⏳"}
+                                    {item.status === "cancelled" && "⊘"}
+                                    {item.status === "expired" && "⏱"}
+                                  </span>
+                                </div>
+                                <div className="flex flex-row gap-2">
+                                  <div className="text-white text-[15px] font-satoshi">
+                                    {fromAmount.toFixed(4)}{" "}
+                                    {item.fromToken.symbol}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            <div className="text-right">
-                              <div className="text-white text-[14px] font-satoshi mb-1">
-                                {new Date(item.timestamp).toLocaleDateString()}
-                              </div>
-                              <div className="text-green-400 font-satoshi">
-                                +{item.toAmount} {item.toToken}
-                              </div>
-                              {item.status === "success" && (
-                                <a
-                                  href={getExplorerLink(
-                                    item.txHash,
-                                    item.chainId
-                                  )}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 bg-[#E2AF19] text-[#000] text-xs p-[2px] rounded mt-1"
+                              <div className="text-right">
+                                <div className="text-white text-[14px] font-satoshi mb-1">
+                                  {displayDate}
+                                </div>
+                                <div
+                                  className={
+                                    item.status === "success"
+                                      ? "text-green-400"
+                                      : "text-gray-400"
+                                  }
+                                  className="font-satoshi"
                                 >
-                                  <span className="font-satoshi text-[8px] flex flex-row items-center gap-0.5">
-                                    Explorer
-                                    <ExternalLinkIcon />
-                                  </span>
-                                </a>
-                              )}
+                                  {item.status === "success"
+                                    ? `+${toAmount.toFixed(4)} ${
+                                        item.toToken.symbol
+                                      }`
+                                    : item.status}
+                                </div>
+                                {item.txHash && item.explorerLink && (
+                                  <a
+                                    href={item.explorerLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 bg-[#E2AF19] text-[#000] text-xs p-[2px] rounded mt-1"
+                                  >
+                                    <span className="font-satoshi text-[8px] flex flex-row items-center gap-0.5">
+                                      Explorer
+                                      <ExternalLinkIcon />
+                                    </span>
+                                  </a>
+                                )}
+                              </div>
                             </div>
+                            {/* Divider */}
+                            <div className="w-full h-px mt-2 bg-[#2C2C2C]"></div>
                           </div>
-                          {index < swapHistory.length - 1 && (
-                            <div className="w-full h-px mt-2"></div>
-                          )}
-                        </div>
-                      ))
+                        );
+                      })
                     )}
+                  </div>
+
+                  {/* Statistics Footer */}
+                  <div className="mt-4 pt-4 border-t border-[#2C2C2C]">
+                    <div className="flex justify-between text-xs">
+                      <div>
+                        <span className="text-gray-400">Total Swaps:</span>
+                        <span className="text-white ml-2">
+                          {dbTransactions.length}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Success Rate:</span>
+                        <span className="text-green-400 ml-2">
+                          {dbTransactions.length > 0
+                            ? `${(
+                                (dbTransactions.filter(
+                                  (t) => t.status === "success"
+                                ).length /
+                                  dbTransactions.length) *
+                                100
+                              ).toFixed(0)}%`
+                            : "0%"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

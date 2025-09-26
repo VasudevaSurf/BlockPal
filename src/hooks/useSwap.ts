@@ -1,4 +1,4 @@
-// Complete updated src/hooks/useSwap.ts with EXACT gas calculation from working version
+// src/hooks/useSwap.ts - Complete Enhanced Version
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   useAccount,
@@ -8,8 +8,14 @@ import {
   useBalance,
 } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
+import {
+  swapHistoryService,
+  SwapTransaction,
+} from "@/services/swapHistoryService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://amusing-freedom-production-92a5.up.railway.app";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
 
 export interface SwapToken {
   address: string;
@@ -55,6 +61,7 @@ export function useSwap() {
   const chainId = useChainId();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
+  const { user } = useSelector((state: RootState) => state.auth);
 
   // Token states
   const [fromToken, setFromToken] = useState<SwapToken | null>(null);
@@ -70,7 +77,9 @@ export function useSwap() {
   // Settings states
   const [slippage, setSlippage] = useState("1");
   const [customSlippage, setCustomSlippage] = useState(false);
-  const [gasMode, setGasMode] = useState<"safe" | "medium" | "high" | "instant">("high");
+  const [gasMode, setGasMode] = useState<
+    "safe" | "medium" | "high" | "instant"
+  >("high");
   const [gasPrice, setGasPrice] = useState<GasPrice | null>(null);
 
   // Loading and error states
@@ -80,11 +89,144 @@ export function useSwap() {
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [insufficientBalance, setInsufficientBalance] = useState(false);
 
+  const [dbTransactions, setDbTransactions] = useState<SwapTransaction[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [currentTransactionId, setCurrentTransactionId] = useState<
+    string | null
+  >(null);
+
   // History state
   const [swapHistory, setSwapHistory] = useState<SwapHistoryItem[]>([]);
 
   // Quote refresh timer
   const quoteTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const getChainName = useCallback((chain: number) => {
+    const chainNames: { [key: number]: string } = {
+      1: "Ethereum",
+      137: "Polygon",
+      56: "BSC",
+      43114: "Avalanche",
+      8453: "Base",
+      42161: "Arbitrum",
+    };
+    return chainNames[chain] || "Unknown";
+  }, []);
+
+  const loadSwapHistory = useCallback(async () => {
+    if (!address) return;
+
+    setLoadingHistory(true);
+    try {
+      const response = await swapHistoryService.getWalletHistory(address, {
+        limit: 50,
+        chainId: chainId,
+      });
+
+      setDbTransactions(response.transactions);
+      console.log(
+        `✅ Loaded ${response.transactions.length} transactions from database`
+      );
+    } catch (error) {
+      console.error("Error loading swap history:", error);
+      setDbTransactions([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [address, chainId]);
+
+  useEffect(() => {
+    if (address && isConnected) {
+      loadSwapHistory();
+    }
+  }, [address, isConnected, loadSwapHistory]);
+
+  const createDbTransaction = useCallback(async () => {
+    if (!fromToken || !toToken || !fromAmount || !address) return null;
+
+    try {
+      const transactionData = {
+        walletAddress: address,
+        username: user?.username,
+        fromToken: {
+          address: fromToken.address,
+          symbol: fromToken.symbol,
+          name: fromToken.name,
+          decimals: fromToken.decimals,
+          logoUrl: fromToken.logoURI,
+        },
+        toToken: {
+          address: toToken.address,
+          symbol: toToken.symbol,
+          name: toToken.name,
+          decimals: toToken.decimals,
+          logoUrl: toToken.logoURI,
+        },
+        fromAmount,
+        toAmount: toAmount || "0",
+        fromAmountUSD: 0, // Calculate if you have price data
+        toAmountUSD: 0, // Calculate if you have price data
+        chainId,
+        chainName: getChainName(chainId),
+        gasPrice: gasPrice?.gasPriceGwei,
+        gasCostETH: gasPrice?.gasCostEth,
+        gasCostUSD: parseFloat(gasPrice?.gasCostUSD || "0"),
+        gasMode,
+        slippage: parseFloat(slippage),
+        route: quote?.protocols?.[0]?.[0]?.name || "Unknown",
+        protocol: "1inch",
+      };
+
+      const result = await swapHistoryService.createTransaction(
+        transactionData
+      );
+      console.log("✅ Transaction created in database:", result.id);
+      return result.id;
+    } catch (error) {
+      console.error("Error creating database transaction:", error);
+      return null;
+    }
+  }, [
+    fromToken,
+    toToken,
+    fromAmount,
+    toAmount,
+    address,
+    user,
+    chainId,
+    gasPrice,
+    gasMode,
+    slippage,
+    quote,
+    getChainName,
+  ]);
+
+  const updateDbTransaction = useCallback(
+    async (
+      id: string,
+      status: "success" | "failed" | "cancelled",
+      txHash?: string,
+      errorMessage?: string
+    ) => {
+      try {
+        await swapHistoryService.updateTransaction(id, {
+          status,
+          txHash,
+          errorMessage,
+          gasUsed: gasPrice?.estimatedGas,
+          toAmount: status === "success" ? toAmount : undefined,
+        });
+
+        console.log(`✅ Transaction ${id} updated to ${status}`);
+
+        // Reload history to show updated status
+        await loadSwapHistory();
+      } catch (error) {
+        console.error("Error updating database transaction:", error);
+      }
+    },
+    [gasPrice, toAmount, loadSwapHistory]
+  );
 
   // Get balance for from token
   const { data: fromTokenBalance } = useBalance({
@@ -111,7 +253,8 @@ export function useSwap() {
         symbol: "ETH",
         name: "Ethereum",
         decimals: 18,
-        logoURI: "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+        logoURI:
+          "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
       });
       loadTokens();
       getSpenderAddress();
@@ -177,7 +320,9 @@ export function useSwap() {
   // Get spender address
   const getSpenderAddress = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/swap/spender/${chainId}`);
+      const response = await fetch(
+        `${API_BASE_URL}/api/swap/spender/${chainId}`
+      );
       const data = await response.json();
       if (data.success && data.data) {
         setSpenderAddress(data.data.address);
@@ -190,7 +335,9 @@ export function useSwap() {
   // Load tokens for current chain
   const loadTokens = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/swap/tokens/${chainId}`);
+      const response = await fetch(
+        `${API_BASE_URL}/api/swap/tokens/${chainId}`
+      );
       const data = await response.json();
 
       if (data.success && data.data?.tokens) {
@@ -198,7 +345,19 @@ export function useSwap() {
 
         // Sort popular tokens first
         const popularTokens = tokenList.sort((a: any, b: any) => {
-          const priority = ["ETH", "WETH", "USDT", "USDC", "DAI", "WBTC", "UNI", "LINK", "MATIC", "BNB", "AVAX"];
+          const priority = [
+            "ETH",
+            "WETH",
+            "USDT",
+            "USDC",
+            "DAI",
+            "WBTC",
+            "UNI",
+            "LINK",
+            "MATIC",
+            "BNB",
+            "AVAX",
+          ];
           const aIndex = priority.indexOf(a.symbol);
           const bIndex = priority.indexOf(b.symbol);
 
@@ -222,7 +381,9 @@ export function useSwap() {
     async (query: string) => {
       try {
         const response = await fetch(
-          `${API_BASE_URL}/api/swap/search/${chainId}?query=${encodeURIComponent(query)}`
+          `${API_BASE_URL}/api/swap/search/${chainId}?query=${encodeURIComponent(
+            query
+          )}`
         );
         const data = await response.json();
         return data.success ? data.data : [];
@@ -251,14 +412,14 @@ export function useSwap() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/swap/price/${chainId}`);
       const data = await response.json();
-      return data.success && data.data ? data.data.price : 2500; // Default ETH price
+      return data.success ? data.data.price : 2500; // Default ETH price
     } catch (error) {
       console.error("Error fetching native price:", error);
       return 2500;
     }
   }, [chainId]);
 
-  // Calculate max amount - EXACT COPY from App.jsx
+  // Calculate max amount based on actual gas from quote
   const calculateMaxAmount = useCallback(async () => {
     if (!fromTokenBalance || !fromToken) return;
 
@@ -303,26 +464,25 @@ export function useSwap() {
         throw new Error("No gas data available");
       }
 
-      // Get current gas price - EXACT from App.jsx
-      const gasResponse = await fetch(`${API_BASE_URL}/api/swap/gas/${chainId}`);
-      if (!gasResponse.ok) {
+      // Get current gas price
+      const gasPrices = await fetchGasPrice();
+      if (!gasPrices) {
         throw new Error("Failed to get gas price");
       }
 
-      const gasData = await gasResponse.json();
-      if (!gasData.success || !gasData.data) {
-        throw new Error("Invalid gas price data");
-      }
+      const gasPriceGwei =
+        gasMode === "instant"
+          ? gasPrices.instant
+          : gasMode === "high"
+          ? gasPrices.high
+          : gasMode === "medium"
+          ? gasPrices.medium
+          : gasPrices.safe;
 
-      const gasPriceGwei = gasMode === "instant" ? gasData.data.instant : gasData.data.high;
-
-      if (!gasPriceGwei) {
-        throw new Error("Invalid gas price data");
-      }
-
-      // Calculate actual gas cost correctly
+      // Calculate actual gas cost
       const gasUnits = parseInt(data.data.gas);
       const gasCostETH = (gasUnits * gasPriceGwei) / 1e9;
+
       console.log("MAX button gas calculation:", {
         gasUnits,
         gasPriceGwei,
@@ -336,7 +496,9 @@ export function useSwap() {
       const maxAmount = Math.max(0, balance - gasWithBuffer);
 
       if (maxAmount <= 0) {
-        setQuoteError(`Insufficient balance for gas (need ~${gasWithBuffer.toFixed(6)} ETH)`);
+        setQuoteError(
+          `Insufficient balance for gas (need ~${gasWithBuffer.toFixed(6)} ETH)`
+        );
         setFromAmount("0");
       } else {
         setFromAmount(maxAmount.toFixed(8).replace(/\.?0+$/, ""));
@@ -346,9 +508,18 @@ export function useSwap() {
       setQuoteError("Unable to calculate max amount. Please enter manually.");
       setFromAmount("");
     }
-  }, [fromTokenBalance, fromToken, toToken, address, chainId, slippage, gasMode]);
+  }, [
+    fromTokenBalance,
+    fromToken,
+    toToken,
+    address,
+    chainId,
+    slippage,
+    gasMode,
+    fetchGasPrice,
+  ]);
 
-  // Get quote with EXACT gas calculation from App.jsx
+  // Get quote
   const getQuote = useCallback(async () => {
     if (!fromToken || !toToken || !fromAmount || !address) {
       setQuoteError(null);
@@ -369,7 +540,7 @@ export function useSwap() {
       return;
     }
 
-    // Early balance check for from token
+    // Early balance check
     if (fromTokenBalance) {
       const userBalance = parseFloat(fromTokenBalance.formatted);
       if (userBalance < amount) {
@@ -430,102 +601,77 @@ export function useSwap() {
       setQuote(data.data);
 
       const toDecimals = toToken?.decimals || 18;
-      const outputAmount = parseFloat(data.data.dstAmount) / Math.pow(10, toDecimals);
+      const outputAmount =
+        parseFloat(data.data.dstAmount) / Math.pow(10, toDecimals);
       setToAmount(outputAmount > 0 ? outputAmount.toFixed(6) : "0");
 
-      // EXACT GAS CALCULATION FROM App.jsx
-      let calculatedGasPrice = null;
-      let gasCostInEth = 0;
+      // Calculate gas cost from quote
+      if (data.data.gas && !isNaN(parseInt(data.data.gas))) {
+        const gasUnits = parseInt(data.data.gas);
+        const gasPrices = await fetchGasPrice();
+        const nativePrice = await fetchNativePrice();
 
-      if (data.data.gas && !isNaN(parseInt(data.data.gas)) && parseInt(data.data.gas) > 0) {
-        try {
-          const gasUnits = parseInt(data.data.gas);
-          console.log("Gas units from quote:", gasUnits);
+        if (gasPrices) {
+          const gasPriceGwei =
+            gasMode === "instant"
+              ? gasPrices.instant
+              : gasMode === "high"
+              ? gasPrices.high
+              : gasMode === "medium"
+              ? gasPrices.medium
+              : gasPrices.safe;
 
-          const gasResponse = await fetch(`${API_BASE_URL}/api/swap/gas/${chainId}`);
-          if (gasResponse.ok) {
-            const gasData = await gasResponse.json();
-            
-            if (gasData.success && gasData.data) {
-              const gasPriceGwei =
-                gasMode === "instant"
-                  ? gasData.data.instant
-                  : gasMode === "high"
-                  ? gasData.data.high
-                  : gasMode === "medium"
-                  ? gasData.data.medium
-                  : gasData.data.low;
-              
-              console.log("Gas price in Gwei:", gasPriceGwei);
+          const gasCostInEth = (gasUnits * gasPriceGwei) / 1e9;
+          const gasCostUSD = (gasCostInEth * nativePrice).toFixed(2);
 
-              if (gasPriceGwei && !isNaN(gasPriceGwei)) {
-                // CORRECT CALCULATION: (gasUnits * gasPriceGwei) / 1e9
-                gasCostInEth = (gasUnits * gasPriceGwei) / 1e9;
-                console.log("Calculated gas cost in ETH:", gasCostInEth);
+          setGasPrice({
+            estimatedGas: gasUnits.toString(),
+            gasPrice: (gasPriceGwei * 1e9).toString(),
+            gasCostWei: (gasUnits * gasPriceGwei * 1e9).toString(),
+            gasCostEth: gasCostInEth.toFixed(6),
+            gasCostUSD: gasCostUSD,
+            nativeTokenPriceUSD: nativePrice.toString(),
+            gasPriceGwei: gasPriceGwei.toFixed(2),
+          });
 
-                const priceResponse = await fetch(`${API_BASE_URL}/api/swap/price/${chainId}`);
-                if (priceResponse.ok) {
-                  const priceData = await priceResponse.json();
-                  const nativeTokenPrice = priceData.success && priceData.data ? priceData.data.price : 2500;
+          // Check sufficient balance for gas
+          const isNativeToken =
+            fromToken.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
-                  if (nativeTokenPrice && !isNaN(nativeTokenPrice)) {
-                    const gasCostUSD = (gasCostInEth * nativeTokenPrice).toFixed(2);
+          if (isNativeToken) {
+            const ethBalanceValue = ethBalance
+              ? parseFloat(ethBalance.formatted)
+              : 0;
+            const totalNeeded = amount + gasCostInEth;
 
-                    calculatedGasPrice = {
-                      estimatedGas: gasUnits.toString(),
-                      gasPrice: (gasPriceGwei * 1e9).toString(),
-                      gasCostWei: (gasUnits * gasPriceGwei * 1e9).toString(),
-                      gasCostEth: gasCostInEth.toFixed(6),
-                      gasCostUSD: gasCostUSD,
-                      nativeTokenPriceUSD: nativeTokenPrice.toString(),
-                      gasPriceGwei: gasPriceGwei.toFixed(2),
-                    };
+            if (ethBalanceValue < totalNeeded) {
+              setInsufficientBalance(true);
+              setQuoteError(
+                `Insufficient ETH. Need ${totalNeeded.toFixed(
+                  6
+                )} ETH (${amount.toFixed(6)} for swap + ${gasCostInEth.toFixed(
+                  6
+                )} for gas)`
+              );
+            }
+          } else {
+            const tokenBalance = fromTokenBalance
+              ? parseFloat(fromTokenBalance.formatted)
+              : 0;
+            const ethBalanceValue = ethBalance
+              ? parseFloat(ethBalance.formatted)
+              : 0;
 
-                    setGasPrice(calculatedGasPrice);
-                  }
-                }
-              }
+            if (tokenBalance < amount) {
+              setInsufficientBalance(true);
+              setQuoteError(`Insufficient ${fromToken.symbol} balance`);
+            } else if (gasCostInEth > 0 && ethBalanceValue < gasCostInEth) {
+              setInsufficientBalance(true);
+              setQuoteError(
+                `Insufficient ETH for gas. Need ${gasCostInEth.toFixed(6)} ETH`
+              );
             }
           }
-        } catch (gasError) {
-          console.error("Error calculating gas:", gasError);
-        }
-      }
-
-      // Check sufficient balance using actual gas costs - EXACT from App.jsx
-      const isNativeToken = fromToken.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-
-      if (isNativeToken) {
-        // Swapping from ETH: need amount + gas
-        const ethBalanceValue = ethBalance ? parseFloat(ethBalance.formatted) : 0;
-        const totalNeeded = amount + gasCostInEth;
-
-        console.log("Balance check:", {
-          ethBalance: ethBalanceValue,
-          swapAmount: amount,
-          gasCost: gasCostInEth,
-          totalNeeded: totalNeeded,
-        });
-
-        if (ethBalanceValue < totalNeeded) {
-          setInsufficientBalance(true);
-          setQuoteError(
-            `Insufficient ETH. Need ${totalNeeded.toFixed(6)} ETH (${amount.toFixed(
-              6
-            )} for swap + ${gasCostInEth.toFixed(6)} for gas)`
-          );
-        }
-      } else {
-        // Swapping from ERC20: need token amount, check ETH for gas
-        const tokenBalance = fromTokenBalance ? parseFloat(fromTokenBalance.formatted) : 0;
-        const ethBalanceValue = ethBalance ? parseFloat(ethBalance.formatted) : 0;
-
-        if (tokenBalance < amount) {
-          setInsufficientBalance(true);
-          setQuoteError(`Insufficient ${fromToken.symbol} balance`);
-        } else if (gasCostInEth > 0 && ethBalanceValue < gasCostInEth) {
-          setInsufficientBalance(true);
-          setQuoteError(`Insufficient ETH for gas. Need ${gasCostInEth.toFixed(6)} ETH`);
         }
       }
     } catch (error: any) {
@@ -538,8 +684,6 @@ export function useSwap() {
         setQuoteError("Amount too small for this trade");
       } else if (error.message?.includes("fetch")) {
         setQuoteError("Network error. Please check your connection.");
-      } else if (error.message?.includes("HTTP error")) {
-        setQuoteError("Service unavailable. Please try again later.");
       } else {
         setQuoteError("Failed to get quote. Please try again.");
       }
@@ -556,6 +700,8 @@ export function useSwap() {
     gasMode,
     fromTokenBalance,
     ethBalance,
+    fetchGasPrice,
+    fetchNativePrice,
   ]);
 
   // Auto-refresh quote
@@ -641,15 +787,28 @@ export function useSwap() {
     [walletClient, publicClient, fromToken, chainId]
   );
 
-  // Execute swap - EXACT from App.jsx
+  // Execute swap
   const executeSwap = useCallback(async () => {
-    if (!fromToken || !toToken || !fromAmount || !address || !walletClient || !publicClient) {
+    if (
+      !fromToken ||
+      !toToken ||
+      !fromAmount ||
+      !address ||
+      !walletClient ||
+      !publicClient
+    ) {
       return false;
     }
 
     if (insufficientBalance) {
       alert("Insufficient balance to complete this swap");
       return false;
+    }
+
+    // Create transaction record in database first
+    const transactionId = await createDbTransaction();
+    if (transactionId) {
+      setCurrentTransactionId(transactionId);
     }
 
     setSwapping(true);
@@ -702,13 +861,21 @@ export function useSwap() {
       const tx = await walletClient.sendTransaction({
         to: swapData.data.tx.to as `0x${string}`,
         data: swapData.data.tx.data as `0x${string}`,
-        value: swapData.data.tx.value ? BigInt(swapData.data.tx.value) : undefined,
+        value: swapData.data.tx.value
+          ? BigInt(swapData.data.tx.value)
+          : undefined,
         gas: swapData.data.tx.gas ? BigInt(swapData.data.tx.gas) : undefined,
-        gasPrice: swapData.data.tx.gasPrice ? BigInt(swapData.data.tx.gasPrice) : undefined,
+        gasPrice: swapData.data.tx.gasPrice
+          ? BigInt(swapData.data.tx.gasPrice)
+          : undefined,
       });
 
-      // Save to history as pending
-      saveSwapToHistory(tx, fromToken, toToken, fromAmount, toAmount, chainId, "pending");
+      console.log("Transaction sent:", tx);
+
+      // Update database with pending tx hash
+      if (transactionId) {
+        await updateDbTransaction(transactionId, "pending", tx);
+      }
 
       // Wait for confirmation
       const receipt = await publicClient.waitForTransactionReceipt({
@@ -719,7 +886,11 @@ export function useSwap() {
       console.log("Transaction confirmed:", receipt);
 
       const finalStatus = receipt.status === "success" ? "success" : "failed";
-      saveSwapToHistory(tx, fromToken, toToken, fromAmount, toAmount, chainId, finalStatus);
+
+      // Update database with final status
+      if (transactionId) {
+        await updateDbTransaction(transactionId, finalStatus, tx);
+      }
 
       if (receipt.status !== "success") {
         throw new Error("Transaction failed on chain");
@@ -731,11 +902,15 @@ export function useSwap() {
       setQuote(null);
       setQuoteError(null);
       setInsufficientBalance(false);
+      setCurrentTransactionId(null);
 
       // Show success message
       const explorerLink = getExplorerLink(tx, chainId);
       alert(
-        `Swap successful! \nTransaction: ${tx.substring(0, 10)}...${tx.substring(
+        `Swap successful! \nTransaction: ${tx.substring(
+          0,
+          10
+        )}...${tx.substring(
           tx.length - 8
         )}\n\nView on explorer: ${explorerLink}`
       );
@@ -748,14 +923,39 @@ export function useSwap() {
 
       if (errorMessage.includes("insufficient funds")) {
         errorMessage = "Insufficient funds for gas";
-      } else if (errorMessage.includes("user rejected") || errorMessage.includes("User denied")) {
+      } else if (
+        errorMessage.includes("user rejected") ||
+        errorMessage.includes("User denied")
+      ) {
         errorMessage = "Transaction cancelled by user";
+
+        // Update database as cancelled
+        if (currentTransactionId) {
+          await updateDbTransaction(
+            currentTransactionId,
+            "cancelled",
+            undefined,
+            errorMessage
+          );
+        }
       } else if (errorMessage.includes("intrinsic gas too low")) {
-        errorMessage = "Gas estimation failed. Please try again with higher gas.";
+        errorMessage =
+          "Gas estimation failed. Please try again with higher gas.";
+      }
+
+      // Update database as failed
+      if (currentTransactionId && !errorMessage.includes("cancelled")) {
+        await updateDbTransaction(
+          currentTransactionId,
+          "failed",
+          undefined,
+          errorMessage
+        );
       }
 
       setError(errorMessage);
       alert(`Swap failed: ${errorMessage}`);
+      setCurrentTransactionId(null);
 
       return false;
     } finally {
@@ -775,7 +975,9 @@ export function useSwap() {
     insufficientBalance,
     checkAllowance,
     approveToken,
-    saveSwapToHistory,
+    createDbTransaction,
+    updateDbTransaction,
+    currentTransactionId,
     getExplorerLink,
   ]);
 
@@ -839,5 +1041,9 @@ export function useSwap() {
     checkAllowance,
     approveToken,
     getQuote,
+    dbTransactions,
+    loadingHistory,
+    loadSwapHistory,
+    currentTransactionId,
   };
 }
