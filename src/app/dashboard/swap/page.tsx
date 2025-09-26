@@ -796,42 +796,75 @@ export default function SwapPage() {
                         disabled={swapping}
                       />
                     </div>
-                    <button
-                      onClick={() => setShowFromTokenSelector(true)}
-                      className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] bg-[rgba(255,255,255,0.03)] rounded-[25px]"
-                    >
-                      {fromToken ? (
-                        <TokenImage
-                          src={fromToken.logoURI}
-                          alt={fromToken.symbol}
-                          symbol={fromToken.symbol}
-                          name={fromToken.name}
-                          className="w-7 h-7"
+
+                    {/* Updated token select button with glacier effect */}
+                    <div className="relative">
+                      <div className="relative p-[1px] rounded-[25px] overflow-hidden">
+                        {/* Animated gradient border */}
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            background: `linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.3) 0%,
+            rgba(255, 255, 255, 0.1) 20%,
+            rgba(226, 175, 25, 0.2) 40%,
+            rgba(255, 255, 255, 0.05) 60%,
+            rgba(226, 175, 25, 0.15) 80%,
+            rgba(255, 255, 255, 0.2) 100%)`,
+                          }}
                         />
-                      ) : (
-                        <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                          <span className="text-white text-xs font-bold">
-                            E
+
+                        {/* Inner button with glass effect */}
+                        <button
+                          onClick={() => setShowFromTokenSelector(true)}
+                          className="relative flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] rounded-[24px]"
+                          style={{
+                            background: `linear-gradient(135deg, 
+            rgba(25, 25, 25, 0.85) 0%,
+            rgba(40, 40, 40, 0.75) 50%,
+            rgba(25, 25, 25, 0.85) 100%)`,
+                            backdropFilter: "blur(1px)",
+                            boxShadow: `
+            inset 0 1px 2px rgba(255, 255, 255, 0.05),
+            inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+            0 2px 8px rgba(0, 0, 0, 0.3)
+          `,
+                          }}
+                        >
+                          {fromToken ? (
+                            <TokenImage
+                              src={fromToken.logoURI}
+                              alt={fromToken.symbol}
+                              symbol={fromToken.symbol}
+                              name={fromToken.name}
+                              className="w-7 h-7"
+                            />
+                          ) : (
+                            <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">
+                                E
+                              </span>
+                            </div>
+                          )}
+                          <span className="text-white text-base font-satoshi">
+                            {fromToken?.symbol || "ETH"}
                           </span>
-                        </div>
-                      )}
-                      <span className="text-white text-base font-satoshi">
-                        {fromToken?.symbol || "ETH"}
-                      </span>
-                      <svg
-                        className="w-3.5 h-3.5 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </button>
+                          <svg
+                            className="w-3.5 h-3.5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
@@ -885,42 +918,75 @@ export default function SwapPage() {
                         placeholder="0"
                       />
                     </div>
-                    <button
-                      onClick={() => setShowToTokenSelector(true)}
-                      className="flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] bg-[rgba(255,255,255,0.03)] rounded-[25px]"
-                    >
-                      {toToken ? (
-                        <TokenImage
-                          src={toToken.logoURI}
-                          alt={toToken.symbol}
-                          symbol={toToken.symbol}
-                          name={toToken.name}
-                          className="w-7 h-7"
+
+                    {/* Updated token select button with glacier effect */}
+                    <div className="relative">
+                      <div className="relative p-[1px] rounded-[25px] overflow-hidden">
+                        {/* Animated gradient border */}
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            background: `linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.3) 0%,
+            rgba(255, 255, 255, 0.1) 20%,
+            rgba(226, 175, 25, 0.2) 40%,
+            rgba(255, 255, 255, 0.05) 60%,
+            rgba(226, 175, 25, 0.15) 80%,
+            rgba(255, 255, 255, 0.2) 100%)`,
+                          }}
                         />
-                      ) : (
-                        <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                          <span className="text-white text-xs font-bold">
-                            E
+
+                        {/* Inner button with glass effect */}
+                        <button
+                          onClick={() => setShowToTokenSelector(true)}
+                          className="relative flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] rounded-[24px]"
+                          style={{
+                            background: `linear-gradient(135deg, 
+            rgba(25, 25, 25, 0.85) 0%,
+            rgba(40, 40, 40, 0.75) 50%,
+            rgba(25, 25, 25, 0.85) 100%)`,
+                            backdropFilter: "blur(1px)",
+                            boxShadow: `
+            inset 0 1px 2px rgba(255, 255, 255, 0.05),
+            inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+            0 2px 8px rgba(0, 0, 0, 0.3)
+          `,
+                          }}
+                        >
+                          {toToken ? (
+                            <TokenImage
+                              src={toToken.logoURI}
+                              alt={toToken.symbol}
+                              symbol={toToken.symbol}
+                              name={toToken.name}
+                              className="w-7 h-7"
+                            />
+                          ) : (
+                            <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">
+                                E
+                              </span>
+                            </div>
+                          )}
+                          <span className="text-white text-base font-satoshi">
+                            {toToken?.symbol || "ETH"}
                           </span>
-                        </div>
-                      )}
-                      <span className="text-white text-base font-satoshi">
-                        {toToken?.symbol || "ETH"}
-                      </span>
-                      <svg
-                        className="w-3.5 h-3.5 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </button>
+                          <svg
+                            className="w-3.5 h-3.5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
@@ -929,22 +995,37 @@ export default function SwapPage() {
                         Estimated Fee:
                       </span>
                       <span className="text-[#FFFFFF] font-satoshi">
-                        {gasPrice
-                          ? `${gasPrice.gasCostEth} ETH (~$${gasPrice.gasCostUSD})`
-                          : "0.0005 ETH (~$1.25)"}
+                        {gasPrice ? `(~$${gasPrice.gasCostUSD})` : "(~$1.25)"}
                       </span>
                     </div>
-                    <div className="flex flex-row items-center bg-[rgba(255,255,255,0.02)] p-[4px] rounded-[15px]">
-                      <LightningIcon size={15} />
-                      <span className="text-[#FFFFFF] font-satoshi ml-1">
-                        {gasMode === "instant"
-                          ? "Instant"
-                          : gasMode === "high"
-                          ? "Fast"
-                          : gasMode === "medium"
-                          ? "Medium"
-                          : "Safe"}
-                      </span>
+                    {/* Gas Mode Selection Buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setGasMode("high")}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-[12px] transition-all ${
+                          gasMode === "high"
+                            ? "bg-[#FF9800] text-black"
+                            : "bg-[rgba(255,255,255,0.05)] text-white hover:bg-[rgba(255,255,255,0.1)]"
+                        }`}
+                      >
+                        <LightningIcon size={14} />
+                        <span className="text-xs font-satoshi font-medium">
+                          Fast
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => setGasMode("instant")}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-[12px] transition-all ${
+                          gasMode === "instant"
+                            ? "bg-[#F44336] text-white"
+                            : "bg-[rgba(255,255,255,0.05)] text-white hover:bg-[rgba(255,255,255,0.1)]"
+                        }`}
+                      >
+                        <LightningIcon size={14} />
+                        <span className="text-xs font-satoshi font-medium">
+                          Instant
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>
