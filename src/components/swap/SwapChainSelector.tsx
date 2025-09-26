@@ -246,7 +246,9 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
 
     try {
       if (switchChain) {
-        switchChain({ chainId: selectedChain });
+        // The chain switch will automatically trigger chainId update
+        // which will cascade to TokenSelector via useChainId hook
+        await switchChain({ chainId: selectedChain });
       }
     } catch (error) {
       console.error("Failed to switch chain:", error);

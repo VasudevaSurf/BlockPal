@@ -788,7 +788,7 @@ export function useSwap() {
   );
 
   // Execute swap
-  const executeSwap = useCallback(async () => {
+  const executeSwap = async () => {
     if (
       !fromToken ||
       !toToken ||
@@ -796,34 +796,49 @@ export function useSwap() {
       !address ||
       !walletClient ||
       !publicClient
-    ) {
+    )
       return false;
-    }
 
     if (insufficientBalance) {
       alert("Insufficient balance to complete this swap");
       return false;
     }
 
-    // Create transaction record in database first
-    const transactionId = await createDbTransaction();
-    if (transactionId) {
-      setCurrentTransactionId(transactionId);
-    }
-
     setSwapping(true);
-    setError(null);
+    let transactionId: string | null = null;
 
     try {
-      const decimals = fromToken.decimals || 18;
-      const amount = parseFloat(fromAmount);
-      const factor = Math.pow(10, decimals);
-      const amountInWei = Math.floor(amount * factor);
-      const amountWei = amountInWei.toString();
+      // Create transaction record FIRST (as pending)
+      const createResult = await swapHistoryService.createTransaction({
+        walletAddress: address,
+        fromToken: {
+          address: fromToken.address,
+          symbol: fromToken.symbol,
+          name: fromToken.name,
+          decimals: fromToken.decimals,
+          logoUrl: fromToken.logoURI,
+        },
+        toToken: {
+          address: toToken.address,
+          symbol: toToken.symbol,
+          name: toToken.name,
+          decimals: toToken.decimals,
+          logoUrl: toToken.logoURI,
+        },
+        fromAmount: amountWei,
+        toAmount: quote?.dstAmount || "0",
+        chainId,
+        chainName: currentChain?.name || "Unknown",
+        gasPrice: gasPrice?.gasPrice,
+        gasCostETH: gasPrice?.gasCostEth,
+        gasCostUSD: parseFloat(gasPrice?.gasCostUSD || "0"),
+        gasMode,
+        slippage: parseFloat(slippage),
+      });
 
-      console.log("Executing swap with amount:", amountWei);
+      transactionId = createResult?.id || null;
 
-      // Check and handle approval for ERC20 tokens
+      // Check allowance for ERC20 tokens
       if (fromToken.address !== "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") {
         const allowance = await checkAllowance();
         const allowanceNum = parseFloat(allowance);
@@ -833,14 +848,22 @@ export function useSwap() {
           console.log("Approving token...");
           const approved = await approveToken(amountWei);
           if (!approved) {
+            // Update status to failed
+            if (transactionId) {
+              await swapHistoryService.updateTransaction(transactionId, {
+                status: "failed",
+                errorMessage: "Token approval failed",
+                errorCode: "APPROVAL_FAILED",
+              });
+            }
             throw new Error("Token approval failed");
           }
         }
       }
 
-      // Get swap transaction
+      // Get swap transaction data
       const response = await fetch(
-        `${API_BASE_URL}/api/swap/swap/${chainId}?` +
+        `${API_BASE_URL}/swap/${chainId}?` +
           `src=${fromToken.address}&` +
           `dst=${toToken.address}&` +
           `amount=${amountWei}&` +
@@ -851,71 +874,94 @@ export function useSwap() {
 
       const swapData = await response.json();
 
-      if (!swapData.success || !swapData.data?.tx) {
-        throw new Error(swapData.message || swapData.error || "Swap failed");
+      if (swapData.error) {
+        // Update status to failed
+        if (transactionId) {
+          await swapHistoryService.updateTransaction(transactionId, {
+            status: "failed",
+            errorMessage:
+              swapData.error.description ||
+              swapData.error.message ||
+              "Swap failed",
+            errorCode: "SWAP_API_ERROR",
+          });
+        }
+        throw new Error(
+          swapData.error.description || swapData.error.message || "Swap failed"
+        );
       }
 
-      console.log("Swap transaction data:", swapData.data.tx);
+      if (swapData.tx) {
+        try {
+          // Send transaction
+          const tx = await walletClient.sendTransaction({
+            to: swapData.tx.to,
+            data: swapData.tx.data,
+            value: swapData.tx.value || undefined,
+            gas: swapData.tx.gas,
+            gasPrice: swapData.tx.gasPrice,
+          });
 
-      // Execute the swap transaction
-      const tx = await walletClient.sendTransaction({
-        to: swapData.data.tx.to as `0x${string}`,
-        data: swapData.data.tx.data as `0x${string}`,
-        value: swapData.data.tx.value
-          ? BigInt(swapData.data.tx.value)
-          : undefined,
-        gas: swapData.data.tx.gas ? BigInt(swapData.data.tx.gas) : undefined,
-        gasPrice: swapData.data.tx.gasPrice
-          ? BigInt(swapData.data.tx.gasPrice)
-          : undefined,
-      });
+          // Update with transaction hash
+          if (transactionId) {
+            await swapHistoryService.updateTransaction(transactionId, {
+              status: "pending",
+              txHash: tx,
+            });
+          }
 
-      console.log("Transaction sent:", tx);
+          // Wait for confirmation
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash: tx,
+            confirmations: 1,
+          });
 
-      // Update database with pending tx hash
-      if (transactionId) {
-        await updateDbTransaction(transactionId, "pending", tx);
+          const finalStatus =
+            receipt.status === "success" ? "success" : "failed";
+
+          // Update final status
+          if (transactionId) {
+            await swapHistoryService.updateTransaction(transactionId, {
+              status: finalStatus,
+              gasUsed: receipt.gasUsed?.toString(),
+            });
+          }
+
+          if (receipt.status !== "success") {
+            throw new Error("Transaction failed on chain");
+          }
+
+          // Clear form on success
+          setFromAmount("");
+          setToAmount("");
+          setQuote(null);
+          setQuoteError(null);
+          setInsufficientBalance(false);
+
+          // Refresh history
+          loadDbHistory();
+
+          return true;
+        } catch (txError: any) {
+          // Handle transaction errors
+          const errorMessage = txError.message || "Transaction failed";
+          const errorCode = errorMessage.includes("rejected")
+            ? "USER_REJECTED"
+            : errorMessage.includes("insufficient")
+            ? "INSUFFICIENT_FUNDS"
+            : "TRANSACTION_FAILED";
+
+          if (transactionId) {
+            await swapHistoryService.updateTransaction(transactionId, {
+              status: errorCode === "USER_REJECTED" ? "rejected" : "failed",
+              errorMessage,
+              errorCode,
+            });
+          }
+
+          throw txError;
+        }
       }
-
-      // Wait for confirmation
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash: tx,
-        confirmations: 1,
-      });
-
-      console.log("Transaction confirmed:", receipt);
-
-      const finalStatus = receipt.status === "success" ? "success" : "failed";
-
-      // Update database with final status
-      if (transactionId) {
-        await updateDbTransaction(transactionId, finalStatus, tx);
-      }
-
-      if (receipt.status !== "success") {
-        throw new Error("Transaction failed on chain");
-      }
-
-      // Reset state after successful swap
-      setFromAmount("");
-      setToAmount("");
-      setQuote(null);
-      setQuoteError(null);
-      setInsufficientBalance(false);
-      setCurrentTransactionId(null);
-
-      // Show success message
-      const explorerLink = getExplorerLink(tx, chainId);
-      alert(
-        `Swap successful! \nTransaction: ${tx.substring(
-          0,
-          10
-        )}...${tx.substring(
-          tx.length - 8
-        )}\n\nView on explorer: ${explorerLink}`
-      );
-
-      return true;
     } catch (error: any) {
       console.error("Swap error:", error);
 
@@ -928,58 +974,17 @@ export function useSwap() {
         errorMessage.includes("User denied")
       ) {
         errorMessage = "Transaction cancelled by user";
-
-        // Update database as cancelled
-        if (currentTransactionId) {
-          await updateDbTransaction(
-            currentTransactionId,
-            "cancelled",
-            undefined,
-            errorMessage
-          );
-        }
       } else if (errorMessage.includes("intrinsic gas too low")) {
         errorMessage =
           "Gas estimation failed. Please try again with higher gas.";
       }
 
-      // Update database as failed
-      if (currentTransactionId && !errorMessage.includes("cancelled")) {
-        await updateDbTransaction(
-          currentTransactionId,
-          "failed",
-          undefined,
-          errorMessage
-        );
-      }
-
-      setError(errorMessage);
       alert(`Swap failed: ${errorMessage}`);
-      setCurrentTransactionId(null);
-
       return false;
     } finally {
       setSwapping(false);
     }
-  }, [
-    fromToken,
-    toToken,
-    fromAmount,
-    toAmount,
-    address,
-    walletClient,
-    publicClient,
-    chainId,
-    slippage,
-    gasMode,
-    insufficientBalance,
-    checkAllowance,
-    approveToken,
-    createDbTransaction,
-    updateDbTransaction,
-    currentTransactionId,
-    getExplorerLink,
-  ]);
+  };
 
   // Swap token positions
   const swapTokenPositions = useCallback(() => {

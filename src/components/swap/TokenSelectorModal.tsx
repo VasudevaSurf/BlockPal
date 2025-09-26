@@ -6,6 +6,7 @@ import { X, Search } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
 import { chains } from "@/components/wallet/WalletProvider";
 import { tokenService } from "@/services/tokenService";
+import { swapService } from "@/services/swapService";
 
 // Chain data with proper PNG image paths
 const getChainDisplayData = () => {
@@ -23,7 +24,7 @@ const getChainDisplayData = () => {
       name: "Ethereum",
       color: "bg-blue-500",
       icon: "Ξ",
-      image: "/chains/ethereum.png", // Updated to lowercase .png
+      image: "/chains/ethereum.png",
       fallbackIcon: "Ξ",
       useBackground: true,
     },
@@ -31,7 +32,7 @@ const getChainDisplayData = () => {
       name: "Base",
       color: "bg-blue-600",
       icon: "B",
-      image: "/chains/base.png", // Updated to lowercase .png
+      image: "/chains/base.png",
       fallbackIcon: "B",
       useBackground: false,
     },
@@ -39,7 +40,7 @@ const getChainDisplayData = () => {
       name: "Polygon",
       color: "bg-purple-500",
       icon: "◆",
-      image: "/chains/polygon.png", // Updated to lowercase .png
+      image: "/chains/polygon.png",
       fallbackIcon: "◆",
       useBackground: false,
     },
@@ -47,7 +48,7 @@ const getChainDisplayData = () => {
       name: "Avalanche",
       color: "bg-red-500",
       icon: "A",
-      image: "/chains/avalanche.png", // Updated to lowercase .png
+      image: "/chains/avalanche.png",
       fallbackIcon: "A",
       useBackground: true,
     },
@@ -55,7 +56,7 @@ const getChainDisplayData = () => {
       name: "Arbitrum",
       color: "bg-blue-400",
       icon: "◉",
-      image: "/chains/arbitrum.png", // Updated to lowercase .png
+      image: "/chains/arbitrum.png",
       fallbackIcon: "◉",
       useBackground: false,
     },
@@ -63,7 +64,7 @@ const getChainDisplayData = () => {
       name: "BSC",
       color: "bg-yellow-500",
       icon: "B",
-      image: "/chains/bsc.png", // Updated to lowercase .png
+      image: "/chains/bsc.png",
       fallbackIcon: "B",
       useBackground: true,
     },
@@ -229,9 +230,9 @@ interface TokenBalance {
 interface TokenSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onTokenSelect: (token: TokenBalance) => void;
-  selectedToken?: TokenBalance | null;
-  showChainSelector?: boolean; // NEW: Control whether to show chain selector
+  onTokenSelect: (token: any) => void;
+  selectedToken?: any | null;
+  showChainSelector?: boolean;
 }
 
 const TokenSelector: React.FC<TokenSelectorProps> = ({
@@ -239,27 +240,64 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   onClose,
   onTokenSelect,
   selectedToken,
-  showChainSelector = true, // NEW: Default to true for backward compatibility
+  showChainSelector = true,
 }) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const [selectedChain, setSelectedChain] = useState(chainId);
-  const [tokens, setTokens] = useState<TokenBalance[]>([]);
+  const [tokens, setTokens] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const chainDisplayData = getChainDisplayData();
   const currentChain = chains.find((c) => c.id === selectedChain);
   const currentChainDisplay =
     chainDisplayData[selectedChain] || chainDisplayData[1];
 
-  // Load tokens when chain changes
+  // IMPORTANT FIX: Sync selectedChain with actual chainId changes
   useEffect(() => {
-    if (isOpen && isConnected && address) {
-      loadTokens();
+    setSelectedChain(chainId);
+  }, [chainId]);
+
+  // Clear search and tokens when chain changes
+  useEffect(() => {
+    if (isOpen) {
+      setSearchQuery(""); // Clear search when chain changes
+      setTokens([]); // Clear tokens to force reload
     }
-  }, [isOpen, selectedChain, isConnected, address]);
+  }, [selectedChain]);
+
+  // Load tokens when modal opens or dependencies change
+  useEffect(() => {
+    if (isOpen) {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      searchTimeoutRef.current = setTimeout(
+        () => {
+          loadTokens();
+        },
+        searchQuery ? 300 : 0
+      );
+
+      return () => {
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+        }
+      };
+    }
+  }, [isOpen, selectedChain, searchQuery, isConnected, address]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset search when modal closes
+      setSearchQuery("");
+    }
+  }, [isOpen]);
 
   // Focus search input when modal opens
   useEffect(() => {
@@ -271,16 +309,107 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   }, [isOpen]);
 
   const loadTokens = async () => {
-    if (!address) return;
-
     setLoading(true);
     try {
-      const response = await tokenService.getWalletTokens(
-        address,
-        selectedChain,
-        true
+      let fetchedTokens = [];
+
+      if (searchQuery.trim()) {
+        // When there's a search query, search ALL tokens via 1inch API
+        console.log(
+          `🔍 Searching all tokens for: ${searchQuery} on chain ${selectedChain}`
+        );
+
+        const searchResults = await swapService.searchTokens(
+          selectedChain,
+          searchQuery
+        );
+        fetchedTokens = searchResults.map((token) => ({
+          id: token.address,
+          symbol: token.symbol,
+          name: token.name,
+          contractAddress: token.address,
+          decimals: token.decimals,
+          balance: 0,
+          value: 0,
+          logoUrl: token.logoURI,
+          isNative:
+            token.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        }));
+
+        // If user is connected, also get their balances for these tokens
+        if (isConnected && address && fetchedTokens.length > 0) {
+          try {
+            const walletResponse = await tokenService.getWalletTokens(
+              address,
+              selectedChain,
+              true
+            );
+
+            // Merge balance data with search results
+            const walletTokensMap = new Map(
+              walletResponse.tokens.map((t) => [
+                t.contractAddress.toLowerCase(),
+                t,
+              ])
+            );
+
+            fetchedTokens = fetchedTokens.map((token) => {
+              const walletToken = walletTokensMap.get(
+                token.contractAddress.toLowerCase()
+              );
+              if (walletToken) {
+                return {
+                  ...token,
+                  balance: walletToken.balance,
+                  value: walletToken.value,
+                };
+              }
+              return token;
+            });
+
+            // Sort to show tokens with balance first
+            fetchedTokens.sort((a, b) => {
+              if (a.balance > 0 && b.balance === 0) return -1;
+              if (a.balance === 0 && b.balance > 0) return 1;
+              return b.value - a.value;
+            });
+          } catch (error) {
+            console.warn("Could not fetch wallet balances for search results");
+          }
+        }
+      } else {
+        // No search query - show user's wallet tokens if connected, otherwise show popular tokens
+        if (isConnected && address) {
+          console.log(`📦 Loading wallet tokens for chain ${selectedChain}`);
+          const response = await tokenService.getWalletTokens(
+            address,
+            selectedChain,
+            true
+          );
+          fetchedTokens = response.tokens || [];
+        } else {
+          // Show popular tokens from 1inch when not connected
+          console.log(`📦 Loading popular tokens for chain ${selectedChain}`);
+          const popularTokens = await swapService.searchTokens(selectedChain);
+          fetchedTokens = popularTokens.slice(0, 20).map((token) => ({
+            id: token.address,
+            symbol: token.symbol,
+            name: token.name,
+            contractAddress: token.address,
+            decimals: token.decimals,
+            balance: 0,
+            value: 0,
+            logoUrl: token.logoURI,
+            isNative:
+              token.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          }));
+        }
+      }
+
+      setTokens(fetchedTokens);
+      console.log(
+        `✅ Loaded ${fetchedTokens.length} tokens for chain ${selectedChain}`
       );
-      setTokens(response.tokens || []);
     } catch (error) {
       console.error("Error loading tokens:", error);
       setTokens([]);
@@ -289,19 +418,18 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     }
   };
 
-  // Filter tokens based on search
-  const filteredTokens = tokens.filter((token) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      token.symbol.toLowerCase().includes(query) ||
-      token.name.toLowerCase().includes(query) ||
-      token.contractAddress.toLowerCase().includes(query)
-    );
-  });
-
-  const handleTokenSelect = (token: TokenBalance) => {
-    onTokenSelect(token);
+  const handleTokenSelect = (token: any) => {
+    // Convert to expected format for swap
+    const formattedToken = {
+      address: token.contractAddress || token.address,
+      symbol: token.symbol,
+      name: token.name,
+      decimals: token.decimals,
+      logoURI: token.logoUrl || token.logoURI,
+      balance: token.balance,
+      value: token.value,
+    };
+    onTokenSelect(formattedToken);
     onClose();
   };
 
@@ -340,16 +468,16 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
         className="fixed inset-0 z-50 flex items-center justify-center"
         onClick={onClose}
       >
-        {/* Modal positioned in center of screen - width adjusted based on showChainSelector */}
+        {/* Modal positioned in center of screen */}
         <div
           className={`h-[550px] mx-4 ${
             showChainSelector ? "w-full max-w-4xl" : "w-full max-w-2xl"
           }`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Main container - layout changes based on showChainSelector */}
+          {/* Main container */}
           <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden">
-            {/* Left Side - Chains (only show if showChainSelector is true) */}
+            {/* Left Side - Chains */}
             {showChainSelector && (
               <div className="w-1/3 p-5">
                 {/* Main heading for the entire left section */}
@@ -360,7 +488,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between mb-4">
-                  {/* Networks section with gradient border - moved down */}
+                  {/* Networks section with gradient border */}
                   <div className="relative p-[2px] rounded-[12px] w-full ">
                     <div
                       className="absolute inset-0 rounded-[12px]"
@@ -425,7 +553,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
               </div>
             )}
 
-            {/* Right Side - Tokens (takes full width if showChainSelector is false) */}
+            {/* Right Side - Tokens */}
             <div
               className={`flex flex-col bg-[#000] p-5 ${
                 showChainSelector ? "flex-1" : "w-full"
@@ -456,17 +584,21 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search tokens or paste address"
+                  placeholder="Search name, symbol, or paste address"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
                 />
               </div>
 
-              {/* Your Tokens Heading */}
+              {/* Dynamic Heading */}
               <div className="mb-4">
                 <h4 className="text-[#939393] font-satoshi font-medium text-base">
-                  Your Tokens
+                  {searchQuery
+                    ? "Search Results"
+                    : isConnected
+                    ? "Your Tokens"
+                    : "Popular Tokens"}
                 </h4>
               </div>
 
@@ -476,26 +608,35 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
                   </div>
-                ) : filteredTokens.length === 0 ? (
+                ) : tokens.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
                       <span className="text-gray-400 text-lg">🪙</span>
                     </div>
                     <p className="text-gray-400 font-satoshi">
-                      {searchQuery ? "No tokens found" : "No tokens available"}
+                      {searchQuery
+                        ? "No tokens found. Try a different search."
+                        : "No tokens available"}
                     </p>
+                    {!isConnected && !searchQuery && (
+                      <p className="text-gray-500 text-sm mt-2">
+                        Connect wallet to see your tokens
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {filteredTokens.map((token, index) => (
+                    {tokens.map((token, index) => (
                       <button
-                        key={`${token.contractAddress}_${index}`}
+                        key={`${
+                          token.contractAddress || token.address
+                        }_${index}`}
                         onClick={() => handleTokenSelect(token)}
                         className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
                       >
                         <div className="flex items-center min-w-0 flex-1">
                           <TokenImage
-                            src={token.logoUrl}
+                            src={token.logoUrl || token.logoURI}
                             alt={token.symbol}
                             symbol={token.symbol}
                             name={token.name}
@@ -512,12 +653,24 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                         </div>
 
                         <div className="text-right flex-shrink-0">
-                          <div className="text-white font-medium font-satoshi text-sm">
-                            {formatTokenAmount(token.balance, 4)}
-                          </div>
-                          <div className="text-gray-400 text-xs font-satoshi">
-                            {formatCurrency(token.value)}
-                          </div>
+                          {token.balance > 0 ? (
+                            <>
+                              <div className="text-white font-medium font-satoshi text-sm">
+                                {formatTokenAmount(token.balance, 4)}
+                              </div>
+                              <div className="text-gray-400 text-xs font-satoshi">
+                                {formatCurrency(token.value)}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-gray-400 text-xs font-satoshi">
+                              {searchQuery && isConnected
+                                ? "No balance"
+                                : token.isNative
+                                ? "Native"
+                                : "ERC-20"}
+                            </div>
+                          )}
                         </div>
                       </button>
                     ))}
