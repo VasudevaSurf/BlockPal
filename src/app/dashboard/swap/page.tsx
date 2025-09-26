@@ -1,4 +1,4 @@
-// src/app/dashboard/swap/page.tsx - Complete Fixed Version
+// src/app/dashboard/swap/page.tsx - History UI Restored Version
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -245,6 +245,23 @@ const TokenImage: React.FC<TokenImageProps> = ({
   );
 };
 
+// Helper function to get token color gradient
+const getTokenColorGradient = (symbol: string): string => {
+  const colorMap: { [key: string]: string } = {
+    ETH: "from-gray-600 to-gray-400",
+    BTC: "from-orange-500 to-orange-600",
+    SOL: "from-purple-500 to-purple-600",
+    USDC: "from-blue-500 to-blue-600",
+    USDT: "from-green-500 to-green-600",
+    DAI: "from-yellow-500 to-yellow-600",
+    MATIC: "from-purple-600 to-purple-700",
+    AVAX: "from-red-500 to-red-600",
+    BNB: "from-yellow-500 to-yellow-600",
+  };
+
+  return colorMap[symbol] || "from-blue-500 to-purple-600";
+};
+
 // Add this CSS to your global styles or as a style tag
 const scrollbarStyles = `
   .custom-scrollbar {
@@ -336,7 +353,7 @@ export default function SwapPage() {
     }
   };
 
-  // FIXED: Handle token selection with proper address formatting
+  // Handle token selection
   const handleFromTokenSelect = (token: any) => {
     console.log("From token selected:", token);
     setFromToken({
@@ -849,7 +866,7 @@ export default function SwapPage() {
         </div>
       </div>
 
-      {/* History Overlay */}
+      {/* History Overlay - Restored UI from original */}
       <AnimatePresence>
         {activeTab === "history" && (
           <>
@@ -873,21 +890,22 @@ export default function SwapPage() {
                   className="absolute inset-0 rounded-[20px]"
                   style={{
                     background: `linear-gradient(135deg, 
-                #E2AF19 0%, 
-                #E2AF19 3%,
-                #2C2C2C 10%, 
-                #2C2C2C 90%, 
-                #E2AF19 97%,
-                #E2AF19 100%)`,
+                      #E2AF19 0%, 
+                      #E2AF19 3%,
+                      #2C2C2C 10%, 
+                      #2C2C2C 90%, 
+                      #E2AF19 97%,
+                      #E2AF19 100%)`,
                   }}
                 />
 
                 <div
-                  className="relative bg-[#0F0F0F] rounded-[20px] overflow-hidden flex flex-col p-6"
+                  className="relative bg-[#0F0F0F] rounded-[20px] p-6 max-h-[75vh] overflow-hidden flex flex-col"
                   style={{
                     boxShadow: "0 4px 4px 0 rgba(0, 0, 0, 0.25)",
                   }}
                 >
+                  {/* Header */}
                   <div className="flex items-center justify-between mb-7">
                     <h3 className="text-white font-mayeka-demi-bold-demo text-xl mt-3">
                       Swap History
@@ -897,13 +915,14 @@ export default function SwapPage() {
                     )}
                   </div>
 
-                  <div className="flex-1 max-h-[350px] overflow-y-auto space-y-6 custom-scrollbar">
+                  {/* History List */}
+                  <div className="flex-1 overflow-y-auto space-y-6">
                     {dbTransactions.length === 0 && !loadingHistory ? (
                       <div className="text-center text-gray-400 py-8">
                         No swap history yet
                       </div>
                     ) : (
-                      dbTransactions.slice(0, 10).map((item) => {
+                      dbTransactions.slice(0, 10).map((item, index) => {
                         // Format display values
                         const fromAmount =
                           parseFloat(item.fromAmount) /
@@ -913,111 +932,110 @@ export default function SwapPage() {
                           Math.pow(10, item.toToken.decimals);
                         const displayDate = new Date(
                           item.createdAt
-                        ).toLocaleDateString();
+                        ).toLocaleDateString("en-US", {
+                          month: "long",
+                          day: "numeric",
+                          year: "numeric",
+                        });
 
-                        // Status color
-                        const statusColors = {
-                          success: "text-green-400",
-                          failed: "text-red-400",
-                          pending: "text-yellow-400",
-                          cancelled: "text-orange-400",
-                          expired: "text-gray-400",
-                        };
+                        // Determine if it's a sell or buy (based on the from token)
+                        const isSell =
+                          item.fromToken.symbol !== "USDC" &&
+                          item.fromToken.symbol !== "USDT" &&
+                          item.fromToken.symbol !== "DAI";
+                        const transactionType = isSell ? "Sell" : "Buy";
+                        const displayToken = isSell
+                          ? item.fromToken
+                          : item.toToken;
+                        const displayAmount = isSell
+                          ? `-${fromAmount.toFixed(4)}`
+                          : `+${toAmount.toFixed(4)}`;
+                        const displaySymbol = displayToken.symbol;
+
+                        // Get color gradient for the token
+                        const tokenGradient =
+                          getTokenColorGradient(displaySymbol);
 
                         return (
                           <div key={item._id}>
                             <div className="flex items-center justify-between">
                               <div className="flex flex-col items-start gap-2">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-start">
                                   <span className="text-white text-[14px] font-satoshi">
-                                    {item.fromToken.symbol} →{" "}
-                                    {item.toToken.symbol}
-                                  </span>
-                                  <span
-                                    className={`text-xs ${
-                                      statusColors[item.status]
-                                    }`}
-                                  >
-                                    {item.status === "success" && "✓"}
-                                    {item.status === "failed" && "✗"}
-                                    {item.status === "pending" && "⏳"}
-                                    {item.status === "cancelled" && "⊘"}
-                                    {item.status === "expired" && "⏱"}
+                                    {transactionType} Token
                                   </span>
                                 </div>
                                 <div className="flex flex-row gap-2">
-                                  <div className="text-white text-[15px] font-satoshi">
-                                    {fromAmount.toFixed(4)}{" "}
-                                    {item.fromToken.symbol}
+                                  {/* Token Icon with gradient */}
+                                  {displayToken.logoURI ? (
+                                    <TokenImage
+                                      src={displayToken.logoURI}
+                                      alt={displaySymbol}
+                                      symbol={displaySymbol}
+                                      name={displayToken.name}
+                                      className="w-10 h-10"
+                                    />
+                                  ) : (
+                                    <div
+                                      className={`w-10 h-10 bg-gradient-to-r ${tokenGradient} rounded-full flex items-center justify-center`}
+                                    >
+                                      <span className="text-white text-xs font-bold">
+                                        {displaySymbol[0]}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Transaction Details */}
+                                  <div>
+                                    <div className="flex items-start flex-col">
+                                      <span className="text-white text-[15px] font-satoshi">
+                                        {displayToken.name}
+                                      </span>
+                                      <span className="text-white text-[10px] font-satoshi">
+                                        {displaySymbol}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
 
+                              {/* Right Side Info */}
                               <div className="text-right">
                                 <div className="text-white text-[14px] font-satoshi mb-1">
                                   {displayDate}
                                 </div>
                                 <div
-                                  className={
-                                    item.status === "success"
-                                      ? "text-green-400"
-                                      : "text-gray-400"
-                                  }
-                                  className="font-satoshi"
+                                  className={`font-satoshi ${
+                                    isSell ? "text-white" : "text-green-400"
+                                  }`}
                                 >
-                                  {item.status === "success"
-                                    ? `+${toAmount.toFixed(4)} ${
-                                        item.toToken.symbol
-                                      }`
-                                    : item.status}
+                                  {displayAmount} {displaySymbol}
                                 </div>
-                                {item.txHash && item.explorerLink && (
-                                  <a
-                                    href={item.explorerLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 bg-[#E2AF19] text-[#000] text-xs p-[2px] rounded mt-1"
-                                  >
-                                    <span className="font-satoshi text-[8px] flex flex-row items-center gap-0.5">
-                                      Explorer
-                                      <ExternalLinkIcon />
-                                    </span>
-                                  </a>
-                                )}
+                                {item.status === "success" &&
+                                  item.txHash &&
+                                  item.explorerLink && (
+                                    <a
+                                      href={item.explorerLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 bg-[#E2AF19] text-[#000] text-xs p-[2px] rounded mt-1"
+                                    >
+                                      <span className="font-satoshi text-[8px] flex flex-row items-center gap-0.5">
+                                        Explorer
+                                        <ExternalLinkIcon />
+                                      </span>
+                                    </a>
+                                  )}
                               </div>
                             </div>
-                            {/* Divider */}
-                            <div className="w-full h-px mt-2 bg-[#2C2C2C]"></div>
+                            {/* Divider line - only show if not the last item */}
+                            {index < Math.min(dbTransactions.length - 1, 9) && (
+                              <div className="w-full h-px mt-2"></div>
+                            )}
                           </div>
                         );
                       })
                     )}
-                  </div>
-
-                  {/* Statistics Footer */}
-                  <div className="mt-4 pt-4 border-t border-[#2C2C2C]">
-                    <div className="flex justify-between text-xs">
-                      <div>
-                        <span className="text-gray-400">Total Swaps:</span>
-                        <span className="text-white ml-2">
-                          {dbTransactions.length}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Success Rate:</span>
-                        <span className="text-green-400 ml-2">
-                          {dbTransactions.length > 0
-                            ? `${(
-                                (dbTransactions.filter(
-                                  (t) => t.status === "success"
-                                ).length /
-                                  dbTransactions.length) *
-                                100
-                              ).toFixed(0)}%`
-                            : "0%"}
-                        </span>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,6 @@
-// src/services/swapHistoryService.ts - Fixed Version
+// src/services/swapHistoryService.ts - SIMPLIFIED VERSION
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+
 interface SwapToken {
   address: string;
   symbol: string;
@@ -25,26 +27,17 @@ interface SwapTransactionCreate {
   slippage?: number;
   route?: string;
   protocol?: string;
-  priceImpact?: number;
-  quoteId?: string;
 }
 
 interface SwapTransactionUpdate {
-  status:
-    | "pending"
-    | "success"
-    | "failed"
-    | "cancelled"
-    | "expired"
-    | "rejected";
+  status: string;
   txHash?: string;
   gasUsed?: string;
   errorMessage?: string;
-  errorCode?: string;
   toAmount?: string;
 }
 
-interface SwapTransaction {
+export interface SwapTransaction {
   _id: string;
   walletAddress: string;
   username?: string;
@@ -57,13 +50,7 @@ interface SwapTransaction {
   toAmountUSD?: number;
   chainId: number;
   chainName: string;
-  status:
-    | "pending"
-    | "success"
-    | "failed"
-    | "cancelled"
-    | "expired"
-    | "rejected";
+  status: string;
   gasUsed?: string;
   gasPrice?: string;
   gasCostETH?: string;
@@ -72,13 +59,9 @@ interface SwapTransaction {
   slippage?: number;
   route?: string;
   protocol?: string;
-  priceImpact?: number;
   errorMessage?: string;
-  errorCode?: string;
   createdAt: string;
   updatedAt: string;
-  confirmedAt?: string;
-  failedAt?: string;
   explorerLink?: string;
 }
 
@@ -93,64 +76,39 @@ interface SwapHistoryResponse {
 }
 
 class SwapHistoryService {
-  private baseURL: string;
-  private isEnabled: boolean;
-
-  constructor() {
-    // Check if we have a proper API URL for history service
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
-    this.baseURL = `${apiUrl}/api/swap-history`;
-    // Enable/disable based on environment
-    this.isEnabled = process.env.NEXT_PUBLIC_ENABLE_SWAP_HISTORY !== "false";
-
-    if (!this.isEnabled) {
-      console.warn("⚠️ Swap history service is disabled");
-    }
-  }
-
   async createTransaction(
     data: SwapTransactionCreate
   ): Promise<{ id: string; status: string } | null> {
-    if (!this.isEnabled) {
-      console.log("Swap history disabled - skipping transaction creation");
-      return null;
-    }
-
     try {
-      const response = await fetch(`${this.baseURL}/create`, {
+      console.log("📤 Sending swap transaction to backend:", data);
+
+      const response = await fetch(`${API_BASE_URL}/api/swap-history/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify(data),
       });
 
-      // Check if the endpoint exists
-      if (response.status === 404) {
-        console.warn(
-          "Swap history endpoint not found - transactions won't be saved to database"
-        );
-        this.isEnabled = false; // Disable for future calls
+      if (!response.ok) {
+        console.error(`Backend returned status ${response.status}`);
         return null;
       }
 
       const result = await response.json();
+      console.log("📥 Backend response:", result);
 
-      if (!result || !result.success) {
-        console.warn(
-          "Failed to create transaction in database:",
-          result?.message || "Unknown error"
-        );
-        return null;
+      if (result.success && result.data) {
+        return {
+          id: result.data.id,
+          status: result.data.status,
+        };
       }
 
-      return result.data || { id: "temp-" + Date.now(), status: "pending" };
+      return null;
     } catch (error) {
-      console.warn(
-        "Error creating swap transaction (DB might be offline):",
-        error
-      );
-      // Don't throw - just return null so swap can continue
+      console.error("❌ Failed to save transaction to database:", error);
       return null;
     }
   }
@@ -158,40 +116,37 @@ class SwapHistoryService {
   async updateTransaction(
     id: string,
     update: SwapTransactionUpdate
-  ): Promise<{
-    id: string;
-    status: string;
-    txHash?: string;
-    explorerLink?: string;
-  } | null> {
-    if (!this.isEnabled || !id || id.startsWith("temp-")) {
+  ): Promise<any> {
+    if (!id || id.startsWith("temp-")) {
       return null;
     }
 
     try {
-      const response = await fetch(`${this.baseURL}/update/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(update),
-      });
+      console.log(`📤 Updating transaction ${id}:`, update);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/swap-history/update/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(update),
+        }
+      );
 
       if (!response.ok) {
-        console.warn("Failed to update transaction in database");
+        console.error(`Failed to update transaction: ${response.status}`);
         return null;
       }
 
       const result = await response.json();
-
-      if (!result.success) {
-        console.warn("Failed to update transaction:", result.message);
-        return null;
-      }
+      console.log("📥 Update response:", result);
 
       return result.data;
     } catch (error) {
-      console.warn("Error updating swap transaction:", error);
+      console.error("❌ Failed to update transaction:", error);
       return null;
     }
   }
@@ -203,14 +158,8 @@ class SwapHistoryService {
       status?: string;
       limit?: number;
       offset?: number;
-      startDate?: string;
-      endDate?: string;
     }
   ): Promise<SwapHistoryResponse> {
-    if (!this.isEnabled) {
-      return this.getEmptyHistory();
-    }
-
     try {
       const params = new URLSearchParams();
 
@@ -219,215 +168,64 @@ class SwapHistoryService {
       if (options?.status) params.append("status", options.status);
       if (options?.limit) params.append("limit", options.limit.toString());
       if (options?.offset) params.append("offset", options.offset.toString());
-      if (options?.startDate) params.append("startDate", options.startDate);
-      if (options?.endDate) params.append("endDate", options.endDate);
+
+      console.log(`📤 Fetching history for ${walletAddress}`);
 
       const response = await fetch(
-        `${this.baseURL}/wallet/${walletAddress}?${params.toString()}`,
+        `${API_BASE_URL}/api/swap-history/wallet/${walletAddress}?${params.toString()}`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
+            Accept: "application/json",
           },
         }
       );
 
       if (!response.ok) {
-        console.warn(`History API returned status ${response.status}`);
-        return this.getEmptyHistory();
+        console.error(`Failed to fetch history: ${response.status}`);
+        return {
+          transactions: [],
+          pagination: {
+            total: 0,
+            limit: 50,
+            offset: 0,
+            hasMore: false,
+          },
+        };
       }
 
       const result = await response.json();
+      console.log(
+        `📥 Retrieved ${result.data?.transactions?.length || 0} transactions`
+      );
 
       if (result.success && result.data) {
         return result.data;
-      } else {
-        console.warn("History API returned unexpected format:", result);
-        return this.getEmptyHistory();
       }
-    } catch (error) {
-      console.warn("Error fetching swap history:", error);
-      return this.getEmptyHistory();
-    }
-  }
 
-  private getEmptyHistory(): SwapHistoryResponse {
-    return {
-      transactions: [],
-      pagination: {
-        total: 0,
-        limit: 50,
-        offset: 0,
-        hasMore: false,
-      },
-    };
-  }
-
-  async getTransaction(id: string): Promise<SwapTransaction | null> {
-    if (!this.isEnabled || !id || id.startsWith("temp-")) {
-      return null;
-    }
-
-    try {
-      const response = await fetch(`${this.baseURL}/transaction/${id}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
+      return {
+        transactions: [],
+        pagination: {
+          total: 0,
+          limit: 50,
+          offset: 0,
+          hasMore: false,
         },
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        return null;
-      }
-
-      return result.data;
+      };
     } catch (error) {
-      console.warn("Error fetching transaction:", error);
-      return null;
-    }
-  }
-
-  // ... rest of the methods remain the same
-  async getStatistics(
-    walletAddress: string,
-    options?: { chainId?: number; days?: number }
-  ): Promise<any> {
-    if (!this.isEnabled) {
-      return this.getDefaultStatistics();
-    }
-
-    try {
-      const params = new URLSearchParams();
-      if (options?.chainId)
-        params.append("chainId", options.chainId.toString());
-      if (options?.days) params.append("days", options.days.toString());
-
-      const response = await fetch(
-        `${this.baseURL}/stats/${walletAddress}?${params.toString()}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        return this.getDefaultStatistics();
-      }
-
-      const result = await response.json();
-      if (!result.success) {
-        return this.getDefaultStatistics();
-      }
-
-      return result.data;
-    } catch (error) {
-      console.warn("Error fetching statistics:", error);
-      return this.getDefaultStatistics();
-    }
-  }
-
-  private getDefaultStatistics() {
-    return {
-      totalSwaps: 0,
-      successfulSwaps: 0,
-      failedSwaps: 0,
-      totalVolumeUSD: 0,
-      totalGasUSD: 0,
-      avgGasUSD: 0,
-      uniqueTokens: [],
-      successRate: "0",
-    };
-  }
-
-  formatTransaction(transaction: SwapTransaction) {
-    return {
-      ...transaction,
-      displayFromAmount: this.formatAmount(
-        transaction.fromAmount,
-        transaction.fromToken.decimals
-      ),
-      displayToAmount: this.formatAmount(
-        transaction.toAmount,
-        transaction.toToken.decimals
-      ),
-      displayDate: new Date(transaction.createdAt).toLocaleString(),
-      age: this.getTransactionAge(transaction.createdAt),
-      statusColor: this.getStatusColor(transaction.status),
-      statusText: this.getStatusText(transaction.status),
-    };
-  }
-
-  private formatAmount(amount: string, decimals: number): string {
-    const value = parseFloat(amount) / Math.pow(10, decimals);
-    if (value < 0.000001) return value.toExponential(2);
-    if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(2)}K`;
-    return value.toFixed(6);
-  }
-
-  private getTransactionAge(createdAt: string): string {
-    const age = Date.now() - new Date(createdAt).getTime();
-    const minutes = Math.floor(age / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return "Just now";
-  }
-
-  private getStatusColor(status: string): string {
-    switch (status) {
-      case "success":
-        return "text-green-400";
-      case "failed":
-        return "text-red-400";
-      case "cancelled":
-        return "text-orange-400";
-      case "rejected":
-        return "text-red-300";
-      case "expired":
-        return "text-gray-400";
-      case "pending":
-        return "text-yellow-400";
-      default:
-        return "text-gray-400";
-    }
-  }
-
-  private getStatusText(status: string): string {
-    switch (status) {
-      case "success":
-        return "✓";
-      case "failed":
-        return "✗";
-      case "cancelled":
-        return "⊘";
-      case "rejected":
-        return "⊗";
-      case "expired":
-        return "⏱";
-      case "pending":
-        return "⏳";
-      default:
-        return status;
+      console.error("❌ Failed to fetch history:", error);
+      return {
+        transactions: [],
+        pagination: {
+          total: 0,
+          limit: 50,
+          offset: 0,
+          hasMore: false,
+        },
+      };
     }
   }
 }
 
 export const swapHistoryService = new SwapHistoryService();
-export type {
-  SwapTransaction,
-  SwapTransactionCreate,
-  SwapTransactionUpdate,
-  SwapHistoryResponse,
-};

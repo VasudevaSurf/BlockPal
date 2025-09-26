@@ -118,6 +118,7 @@ export function useSwap() {
 
     setLoadingHistory(true);
     try {
+      console.log("Loading swap history for:", address);
       const response = await swapHistoryService.getWalletHistory(address, {
         limit: 50,
         chainId: chainId,
@@ -142,12 +143,36 @@ export function useSwap() {
   }, [address, isConnected, loadSwapHistory]);
 
   const createDbTransaction = useCallback(async () => {
-    if (!fromToken || !toToken || !fromAmount || !address) return null;
+    if (!fromToken || !toToken || !fromAmount || !address) {
+      console.log("Missing required data for DB transaction:", {
+        fromToken: !!fromToken,
+        toToken: !!toToken,
+        fromAmount: !!fromAmount,
+        address: !!address,
+      });
+      return null;
+    }
 
     try {
+      // Calculate amountWei properly
+      const decimals = fromToken.decimals || 18;
+      const amount = parseFloat(fromAmount);
+      const factor = Math.pow(10, decimals);
+      const amountInWei = Math.floor(amount * factor);
+      const amountWei = amountInWei.toString();
+
+      console.log("Creating DB transaction with:", {
+        fromAmount,
+        amountWei,
+        fromToken: fromToken.symbol,
+        toToken: toToken.symbol,
+        chainId,
+        user: user?.username,
+      });
+
       const transactionData = {
         walletAddress: address,
-        username: user?.username,
+        username: user?.username || "Anonymous",
         fromToken: {
           address: fromToken.address,
           symbol: fromToken.symbol,
@@ -162,27 +187,32 @@ export function useSwap() {
           decimals: toToken.decimals,
           logoUrl: toToken.logoURI,
         },
-        fromAmount: amountWei, // Make sure this is defined
+        fromAmount: amountWei, // Now properly defined
         toAmount: quote?.dstAmount || "0",
-        fromAmountUSD: 0,
-        toAmountUSD: 0,
+        fromAmountUSD: 0, // You can calculate this if you have price data
+        toAmountUSD: 0, // You can calculate this if you have price data
         chainId,
         chainName: getChainName(chainId),
-        gasPrice: gasPrice?.gasPriceGwei,
-        gasCostETH: gasPrice?.gasCostEth,
+        gasPrice: gasPrice?.gasPriceGwei || "0",
+        gasCostETH: gasPrice?.gasCostEth || "0",
         gasCostUSD: parseFloat(gasPrice?.gasCostUSD || "0"),
         gasMode,
         slippage: parseFloat(slippage),
         route: quote?.protocols?.[0]?.[0]?.name || "Unknown",
         protocol: "1inch",
+        priceImpact: 0, // You can calculate this if available
+        quoteId: Date.now().toString(), // Add a unique quote ID
       };
+
+      console.log("Sending transaction data to DB:", transactionData);
 
       const result = await swapHistoryService.createTransaction(
         transactionData
       );
 
       if (result && result.id) {
-        console.log("✅ Transaction created in database:", result.id);
+        console.log("✅ Transaction created in database with ID:", result.id);
+        setCurrentTransactionId(result.id);
         return result.id;
       } else {
         console.log(
@@ -191,7 +221,7 @@ export function useSwap() {
         return null;
       }
     } catch (error) {
-      console.warn(
+      console.error(
         "Error creating database transaction (non-critical):",
         error
       );
@@ -214,7 +244,7 @@ export function useSwap() {
   const updateDbTransaction = useCallback(
     async (
       id: string | null,
-      status: "success" | "failed" | "cancelled",
+      status: "success" | "failed" | "cancelled" | "pending",
       txHash?: string,
       errorMessage?: string
     ) => {
@@ -224,6 +254,8 @@ export function useSwap() {
       }
 
       try {
+        console.log(`Updating transaction ${id} to status: ${status}`);
+
         await swapHistoryService.updateTransaction(id, {
           status,
           txHash,
@@ -233,6 +265,7 @@ export function useSwap() {
         });
 
         console.log(`✅ Transaction ${id} updated to ${status}`);
+        // Reload history to show the update
         await loadSwapHistory();
       } catch (error) {
         console.warn(
@@ -333,7 +366,7 @@ export function useSwap() {
     return explorers[chain] + txHash;
   }, []);
 
-  // FIXED: Get spender address with correct API path
+  // Get spender address
   const getSpenderAddress = useCallback(async () => {
     try {
       const response = await fetch(
@@ -348,7 +381,7 @@ export function useSwap() {
     }
   }, [chainId]);
 
-  // FIXED: Load tokens with correct API path
+  // Load tokens
   const loadTokens = useCallback(async () => {
     try {
       const response = await fetch(
@@ -392,7 +425,7 @@ export function useSwap() {
     }
   }, [chainId]);
 
-  // FIXED: Search tokens with correct API path
+  // Search tokens
   const searchTokens = useCallback(
     async (query: string) => {
       try {
@@ -411,7 +444,7 @@ export function useSwap() {
     [chainId]
   );
 
-  // FIXED: Fetch gas prices with correct API path
+  // Fetch gas prices
   const fetchGasPrice = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/swap/gas/${chainId}`);
@@ -423,7 +456,7 @@ export function useSwap() {
     }
   }, [chainId]);
 
-  // FIXED: Fetch native token price with correct API path
+  // Fetch native token price
   const fetchNativePrice = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/swap/price/${chainId}`);
@@ -534,7 +567,7 @@ export function useSwap() {
     fetchGasPrice,
   ]);
 
-  // FIXED: Get quote with correct API path and response handling
+  // Get quote
   const getQuote = useCallback(async () => {
     if (!fromToken || !toToken || !fromAmount || !address) {
       setQuoteError(null);
@@ -582,7 +615,6 @@ export function useSwap() {
 
       const amountWei = amountInWei.toString();
 
-      // FIXED: Use correct API endpoint path
       const response = await fetch(
         `${API_BASE_URL}/api/swap/quote/${chainId}?` +
           `src=${fromToken.address}&` +
@@ -744,7 +776,7 @@ export function useSwap() {
     };
   }, [fromAmount, fromToken, toToken, address, slippage, gasMode, getQuote]);
 
-  // FIXED: Check allowance with correct API path
+  // Check allowance
   const checkAllowance = useCallback(async () => {
     if (
       !fromToken ||
@@ -768,7 +800,7 @@ export function useSwap() {
     }
   }, [fromToken, address, chainId]);
 
-  // FIXED: Approve token with correct API path
+  // Approve token
   const approveToken = useCallback(
     async (amount: string) => {
       if (!walletClient || !fromToken || !publicClient) return false;
@@ -803,7 +835,7 @@ export function useSwap() {
     [walletClient, publicClient, fromToken, chainId]
   );
 
-  // FIXED: Execute swap with correct API path
+  // Execute swap - FIXED VERSION
   const executeSwap = async () => {
     if (
       !fromToken ||
@@ -812,8 +844,17 @@ export function useSwap() {
       !address ||
       !walletClient ||
       !publicClient
-    )
+    ) {
+      console.log("Missing requirements for swap:", {
+        fromToken: !!fromToken,
+        toToken: !!toToken,
+        fromAmount: !!fromAmount,
+        address: !!address,
+        walletClient: !!walletClient,
+        publicClient: !!publicClient,
+      });
       return false;
+    }
 
     if (insufficientBalance) {
       alert("Insufficient balance to complete this swap");
@@ -824,22 +865,40 @@ export function useSwap() {
     let transactionId: string | null = null;
 
     try {
+      // Calculate amounts
       const decimals = fromToken.decimals || 18;
       const amount = parseFloat(fromAmount);
       const factor = Math.pow(10, decimals);
       const amountInWei = Math.floor(amount * factor);
       const amountWei = amountInWei.toString();
 
-      console.log("Executing swap with amount:", amountWei);
+      console.log("Starting swap execution:", {
+        fromToken: fromToken.symbol,
+        toToken: toToken.symbol,
+        amount: fromAmount,
+        amountWei,
+        chainId,
+        gasMode,
+        slippage,
+      });
 
       // Create transaction record first
       transactionId = await createDbTransaction();
+      console.log(
+        "DB Transaction ID:",
+        transactionId || "Not created (DB might be offline)"
+      );
 
       // Check allowance for ERC20 tokens
       if (fromToken.address !== "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") {
         const allowance = await checkAllowance();
         const allowanceNum = parseFloat(allowance);
         const amountNum = parseFloat(amountWei);
+
+        console.log("Allowance check:", {
+          allowance: allowanceNum,
+          needed: amountNum,
+        });
 
         if (allowanceNum < amountNum) {
           console.log("Approving token...");
@@ -855,10 +914,12 @@ export function useSwap() {
             }
             throw new Error("Token approval failed");
           }
+          console.log("Token approved successfully");
         }
       }
 
-      // FIXED: Use correct API endpoint path for swap
+      // Get swap transaction data
+      console.log("Getting swap transaction data...");
       const response = await fetch(
         `${API_BASE_URL}/api/swap/swap/${chainId}?` +
           `src=${fromToken.address}&` +
@@ -870,26 +931,30 @@ export function useSwap() {
       );
 
       const swapData = await response.json();
+      console.log("Swap data received:", {
+        success: swapData.success,
+        hasData: !!swapData.data,
+        hasTx: !!swapData.data?.tx,
+      });
 
       if (!swapData.success || swapData.error) {
+        const errorMessage =
+          swapData.error?.description || swapData.message || "Swap failed";
+        console.error("Swap failed:", errorMessage);
+
         if (transactionId) {
           await updateDbTransaction(
             transactionId,
             "failed",
             undefined,
-            swapData.error?.description || swapData.message || "Swap failed"
+            errorMessage
           );
         }
-        throw new Error(
-          swapData.error?.description ||
-            swapData.message ||
-            swapData.details ||
-            "Swap failed"
-        );
+        throw new Error(errorMessage);
       }
 
       if (swapData.data && swapData.data.tx) {
-        console.log("Swap transaction data:", swapData.data.tx);
+        console.log("Executing blockchain transaction...");
 
         const tx = await walletClient.sendTransaction({
           to: swapData.data.tx.to as `0x${string}`,
@@ -903,10 +968,14 @@ export function useSwap() {
             : undefined,
         });
 
+        console.log("Transaction sent, hash:", tx);
+
+        // Update DB with pending status and tx hash
         if (transactionId) {
           await updateDbTransaction(transactionId, "pending", tx);
         }
 
+        // Also save to local history
         saveSwapToHistory(
           tx,
           fromToken,
@@ -917,19 +986,27 @@ export function useSwap() {
           "pending"
         );
 
+        // Wait for confirmation
+        console.log("Waiting for transaction confirmation...");
         const receipt = await publicClient.waitForTransactionReceipt({
           hash: tx,
           confirmations: 1,
         });
 
-        console.log("Transaction confirmed:", receipt);
+        console.log("Transaction confirmed:", {
+          status: receipt.status,
+          blockNumber: receipt.blockNumber,
+          gasUsed: receipt.gasUsed?.toString(),
+        });
 
         const finalStatus = receipt.status === "success" ? "success" : "failed";
 
+        // Update DB with final status
         if (transactionId) {
           await updateDbTransaction(transactionId, finalStatus, tx);
         }
 
+        // Update local history
         saveSwapToHistory(
           tx,
           fromToken,
@@ -951,6 +1028,9 @@ export function useSwap() {
         setQuoteError(null);
         setInsufficientBalance(false);
 
+        // Reload history
+        await loadSwapHistory();
+
         const explorerLink = getExplorerLink(tx, chainId);
         alert(
           `Swap successful! \nTransaction: ${tx.substring(
@@ -962,9 +1042,11 @@ export function useSwap() {
         );
 
         return true;
+      } else {
+        throw new Error("No transaction data received from swap API");
       }
     } catch (error: any) {
-      console.error("Swap error:", error);
+      console.error("Swap execution error:", error);
 
       let errorMessage = error.message;
 
@@ -975,12 +1057,22 @@ export function useSwap() {
         errorMessage.includes("User denied")
       ) {
         errorMessage = "Transaction cancelled by user";
+        // Update DB status to cancelled if user rejected
+        if (transactionId) {
+          await updateDbTransaction(
+            transactionId,
+            "cancelled",
+            undefined,
+            errorMessage
+          );
+        }
       } else if (errorMessage.includes("intrinsic gas too low")) {
         errorMessage =
           "Gas estimation failed. Please try again with higher gas.";
       }
 
-      if (transactionId) {
+      // Update DB to failed status if not already updated
+      if (transactionId && !errorMessage.includes("cancelled")) {
         await updateDbTransaction(
           transactionId,
           "failed",
@@ -993,6 +1085,8 @@ export function useSwap() {
       return false;
     } finally {
       setSwapping(false);
+      // Always reload history after swap attempt
+      await loadSwapHistory();
     }
   };
 
@@ -1044,6 +1138,9 @@ export function useSwap() {
 
     // History
     swapHistory,
+    dbTransactions,
+    loadingHistory,
+    currentTransactionId,
 
     // Functions
     searchTokens,
@@ -1056,9 +1153,6 @@ export function useSwap() {
     checkAllowance,
     approveToken,
     getQuote,
-    dbTransactions,
-    loadingHistory,
     loadSwapHistory,
-    currentTransactionId,
   };
 }
