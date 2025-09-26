@@ -1,4 +1,4 @@
-// Complete updated src/app/dashboard/swap/page.tsx with fixed container and hidden scrollbar
+// src/app/dashboard/swap/page.tsx - Complete Fixed Version
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -266,6 +266,7 @@ export default function SwapPage() {
 
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
+  const currentChain = chains.find((c) => c.id === chainId);
 
   // Use the swap hook with all its functionality
   const {
@@ -335,29 +336,32 @@ export default function SwapPage() {
     }
   };
 
+  // FIXED: Handle token selection with proper address formatting
   const handleFromTokenSelect = (token: any) => {
+    console.log("From token selected:", token);
     setFromToken({
       address:
-        token.contractAddress === "native"
-          ? "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-          : token.contractAddress,
+        token.address ||
+        token.contractAddress ||
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       symbol: token.symbol,
       name: token.name,
       decimals: token.decimals,
-      logoURI: token.logoUrl,
+      logoURI: token.logoURI || token.logoUrl,
     });
   };
 
   const handleToTokenSelect = (token: any) => {
+    console.log("To token selected:", token);
     setToToken({
       address:
-        token.contractAddress === "native"
-          ? "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-          : token.contractAddress,
+        token.address ||
+        token.contractAddress ||
+        "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       symbol: token.symbol,
       name: token.name,
       decimals: token.decimals,
-      logoURI: token.logoUrl,
+      logoURI: token.logoURI || token.logoUrl,
     });
   };
 
@@ -380,7 +384,7 @@ export default function SwapPage() {
       : "0";
 
   const minimumReceived = toAmount
-    ? (parseFloat(toAmount) * (1 - parseFloat(slippage) / 100)).toFixed(6)
+    ? ((parseFloat(toAmount) * (100 - parseFloat(slippage))) / 100).toFixed(6)
     : "0";
 
   const slippagePresets = ["0.1", "0.5", "1", "3"];
@@ -456,7 +460,7 @@ export default function SwapPage() {
               }}
             />
 
-            {/* Inner scrollable container - maintaining original size */}
+            {/* Inner scrollable container */}
             <div className="relative bg-[#0F0F0F] rounded-[26px] overflow-hidden">
               <div className="max-h-[500px] overflow-y-auto custom-scrollbar py-6 px-16">
                 {/* Chain selector and slippage */}
@@ -694,7 +698,7 @@ export default function SwapPage() {
                       </span>
                       <span className="text-[#FFFFFF] font-satoshi">
                         {gasPrice
-                          ? `${gasPrice.gasCostEth} ETH (~${gasPrice.gasCostUSD})`
+                          ? `${gasPrice.gasCostEth} ETH (~$${gasPrice.gasCostUSD})`
                           : "0.0005 ETH (~$1.25)"}
                       </span>
                     </div>

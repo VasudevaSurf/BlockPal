@@ -1,4 +1,4 @@
-// src/services/swapHistoryService.ts
+// src/services/swapHistoryService.ts - Fixed Version
 interface SwapToken {
   address: string;
   symbol: string;
@@ -94,16 +94,28 @@ interface SwapHistoryResponse {
 
 class SwapHistoryService {
   private baseURL: string;
+  private isEnabled: boolean;
 
   constructor() {
-    this.baseURL =
-      process.env.NEXT_PUBLIC_API_URL ||
-      "https://amusing-freedom-production-92a5.up.railway.app/api/swap-history";
+    // Check if we have a proper API URL for history service
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+    this.baseURL = `${apiUrl}/api/swap-history`;
+    // Enable/disable based on environment
+    this.isEnabled = process.env.NEXT_PUBLIC_ENABLE_SWAP_HISTORY !== "false";
+
+    if (!this.isEnabled) {
+      console.warn("⚠️ Swap history service is disabled");
+    }
   }
 
   async createTransaction(
     data: SwapTransactionCreate
   ): Promise<{ id: string; status: string } | null> {
+    if (!this.isEnabled) {
+      console.log("Swap history disabled - skipping transaction creation");
+      return null;
+    }
+
     try {
       const response = await fetch(`${this.baseURL}/create`, {
         method: "POST",
@@ -113,16 +125,32 @@ class SwapHistoryService {
         body: JSON.stringify(data),
       });
 
-      const result = await response.json();
-
-      if (!result.success) {
-        console.error("Failed to create transaction:", result.message);
+      // Check if the endpoint exists
+      if (response.status === 404) {
+        console.warn(
+          "Swap history endpoint not found - transactions won't be saved to database"
+        );
+        this.isEnabled = false; // Disable for future calls
         return null;
       }
 
-      return result.data;
+      const result = await response.json();
+
+      if (!result || !result.success) {
+        console.warn(
+          "Failed to create transaction in database:",
+          result?.message || "Unknown error"
+        );
+        return null;
+      }
+
+      return result.data || { id: "temp-" + Date.now(), status: "pending" };
     } catch (error) {
-      console.error("Error creating swap transaction:", error);
+      console.warn(
+        "Error creating swap transaction (DB might be offline):",
+        error
+      );
+      // Don't throw - just return null so swap can continue
       return null;
     }
   }
@@ -136,6 +164,10 @@ class SwapHistoryService {
     txHash?: string;
     explorerLink?: string;
   } | null> {
+    if (!this.isEnabled || !id || id.startsWith("temp-")) {
+      return null;
+    }
+
     try {
       const response = await fetch(`${this.baseURL}/update/${id}`, {
         method: "PUT",
@@ -145,16 +177,21 @@ class SwapHistoryService {
         body: JSON.stringify(update),
       });
 
+      if (!response.ok) {
+        console.warn("Failed to update transaction in database");
+        return null;
+      }
+
       const result = await response.json();
 
       if (!result.success) {
-        console.error("Failed to update transaction:", result.message);
+        console.warn("Failed to update transaction:", result.message);
         return null;
       }
 
       return result.data;
     } catch (error) {
-      console.error("Error updating swap transaction:", error);
+      console.warn("Error updating swap transaction:", error);
       return null;
     }
   }
@@ -170,6 +207,10 @@ class SwapHistoryService {
       endDate?: string;
     }
   ): Promise<SwapHistoryResponse> {
+    if (!this.isEnabled) {
+      return this.getEmptyHistory();
+    }
+
     try {
       const params = new URLSearchParams();
 
@@ -191,7 +232,6 @@ class SwapHistoryService {
         }
       );
 
-      // Check if response is ok
       if (!response.ok) {
         console.warn(`History API returned status ${response.status}`);
         return this.getEmptyHistory();
@@ -199,7 +239,6 @@ class SwapHistoryService {
 
       const result = await response.json();
 
-      // Handle both success and error responses gracefully
       if (result.success && result.data) {
         return result.data;
       } else {
@@ -207,7 +246,7 @@ class SwapHistoryService {
         return this.getEmptyHistory();
       }
     } catch (error) {
-      console.error("Error fetching swap history:", error);
+      console.warn("Error fetching swap history:", error);
       return this.getEmptyHistory();
     }
   }
@@ -225,6 +264,10 @@ class SwapHistoryService {
   }
 
   async getTransaction(id: string): Promise<SwapTransaction | null> {
+    if (!this.isEnabled || !id || id.startsWith("temp-")) {
+      return null;
+    }
+
     try {
       const response = await fetch(`${this.baseURL}/transaction/${id}`, {
         method: "GET",
@@ -245,21 +288,22 @@ class SwapHistoryService {
 
       return result.data;
     } catch (error) {
-      console.error("Error fetching transaction:", error);
+      console.warn("Error fetching transaction:", error);
       return null;
     }
   }
 
+  // ... rest of the methods remain the same
   async getStatistics(
     walletAddress: string,
-    options?: {
-      chainId?: number;
-      days?: number;
-    }
+    options?: { chainId?: number; days?: number }
   ): Promise<any> {
+    if (!this.isEnabled) {
+      return this.getDefaultStatistics();
+    }
+
     try {
       const params = new URLSearchParams();
-
       if (options?.chainId)
         params.append("chainId", options.chainId.toString());
       if (options?.days) params.append("days", options.days.toString());
@@ -279,14 +323,13 @@ class SwapHistoryService {
       }
 
       const result = await response.json();
-
       if (!result.success) {
         return this.getDefaultStatistics();
       }
 
       return result.data;
     } catch (error) {
-      console.error("Error fetching statistics:", error);
+      console.warn("Error fetching statistics:", error);
       return this.getDefaultStatistics();
     }
   }

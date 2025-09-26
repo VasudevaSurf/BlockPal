@@ -1,4 +1,4 @@
-// src/services/swapService.ts
+// src/services/swapService.ts - Fixed Version
 interface SwapToken {
   address: string;
   symbol: string;
@@ -11,8 +11,7 @@ class SwapService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL =
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api/swap";
+    this.baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
   }
 
   /**
@@ -26,9 +25,12 @@ class SwapService {
         }`
       );
 
+      // FIXED: Use correct API endpoint path
       const url = query
-        ? `${this.baseURL}/search/${chainId}?query=${encodeURIComponent(query)}`
-        : `${this.baseURL}/search/${chainId}`;
+        ? `${
+            this.baseURL
+          }/api/swap/search/${chainId}?query=${encodeURIComponent(query)}`
+        : `${this.baseURL}/api/swap/search/${chainId}`;
 
       const response = await fetch(url, {
         method: "GET",
@@ -63,13 +65,17 @@ class SwapService {
     try {
       console.log(`📦 Fetching all tokens for chain ${chainId}`);
 
-      const response = await fetch(`${this.baseURL}/tokens/${chainId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      });
+      // FIXED: Use correct API endpoint path
+      const response = await fetch(
+        `${this.baseURL}/api/swap/tokens/${chainId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
 
       if (!response.ok) {
         console.error(`Failed to fetch tokens: ${response.status}`);
@@ -86,6 +92,82 @@ class SwapService {
     } catch (error) {
       console.error("Error fetching all tokens:", error);
       return {};
+    }
+  }
+
+  /**
+   * Get swap quote
+   */
+  async getQuote(
+    chainId: number,
+    src: string,
+    dst: string,
+    amount: string,
+    from: string,
+    slippage: string = "1",
+    gasMode: string = "high"
+  ): Promise<any> {
+    try {
+      const response = await fetch(
+        `${this.baseURL}/api/swap/quote/${chainId}?` +
+          `src=${src}&` +
+          `dst=${dst}&` +
+          `amount=${amount}&` +
+          `from=${from}&` +
+          `slippage=${slippage}&` +
+          `gasMode=${gasMode}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error getting quote:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get swap transaction
+   */
+  async getSwapTransaction(
+    chainId: number,
+    src: string,
+    dst: string,
+    amount: string,
+    from: string,
+    slippage: string = "1",
+    gasMode: string = "high"
+  ): Promise<any> {
+    try {
+      const response = await fetch(
+        `${this.baseURL}/api/swap/swap/${chainId}?` +
+          `src=${src}&` +
+          `dst=${dst}&` +
+          `amount=${amount}&` +
+          `from=${from}&` +
+          `slippage=${slippage}&` +
+          `gasMode=${gasMode}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error getting swap transaction:", error);
+      throw error;
     }
   }
 }

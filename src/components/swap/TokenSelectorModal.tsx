@@ -1,4 +1,4 @@
-// src/components/swap/TokenSelectorModal.tsx
+// src/components/swap/TokenSelectorModal.tsx - Fixed Version
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -323,7 +323,8 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
           selectedChain,
           searchQuery
         );
-        fetchedTokens = searchResults.map((token) => ({
+
+        fetchedTokens = searchResults.map((token: any) => ({
           id: token.address,
           symbol: token.symbol,
           name: token.name,
@@ -347,13 +348,13 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
 
             // Merge balance data with search results
             const walletTokensMap = new Map(
-              walletResponse.tokens.map((t) => [
+              walletResponse.tokens.map((t: any) => [
                 t.contractAddress.toLowerCase(),
                 t,
               ])
             );
 
-            fetchedTokens = fetchedTokens.map((token) => {
+            fetchedTokens = fetchedTokens.map((token: any) => {
               const walletToken = walletTokensMap.get(
                 token.contractAddress.toLowerCase()
               );
@@ -368,7 +369,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
             });
 
             // Sort to show tokens with balance first
-            fetchedTokens.sort((a, b) => {
+            fetchedTokens.sort((a: any, b: any) => {
               if (a.balance > 0 && b.balance === 0) return -1;
               if (a.balance === 0 && b.balance > 0) return 1;
               return b.value - a.value;
@@ -391,7 +392,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
           // Show popular tokens from 1inch when not connected
           console.log(`📦 Loading popular tokens for chain ${selectedChain}`);
           const popularTokens = await swapService.searchTokens(selectedChain);
-          fetchedTokens = popularTokens.slice(0, 20).map((token) => ({
+          fetchedTokens = popularTokens.slice(0, 20).map((token: any) => ({
             id: token.address,
             symbol: token.symbol,
             name: token.name,
@@ -418,10 +419,14 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     }
   };
 
+  // FIXED: Handle token selection with proper address formatting
   const handleTokenSelect = (token: any) => {
     // Convert to expected format for swap
     const formattedToken = {
-      address: token.contractAddress || token.address,
+      address:
+        token.contractAddress === "native"
+          ? "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          : token.contractAddress || token.address,
       symbol: token.symbol,
       name: token.name,
       decimals: token.decimals,
@@ -429,6 +434,8 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
       balance: token.balance,
       value: token.value,
     };
+
+    console.log("Token selected in TokenSelector:", formattedToken);
     onTokenSelect(formattedToken);
     onClose();
   };
