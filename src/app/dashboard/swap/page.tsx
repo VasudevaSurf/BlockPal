@@ -418,16 +418,21 @@ export default function SwapPage() {
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-4 flex flex-col overflow-hidden relative">
+      <div className="flex justify-center mb-6 relative z-20">
+        <h1 className="text-[#E2AF19] text-[30px] font-mayeka">
+          Secure and Best Rates Everytime
+        </h1>
+      </div>
       {/* Tab Navigation */}
       <div className="flex justify-center mb-4 relative z-20">
         <div className="relative inline-flex py-[6px] px-[6px] gap-[6px] border border-[#4B3A08] rounded-[12px]">
           <motion.div
-            className="absolute h-[calc(100%-12px)] w-[calc(50%-3px)] bg-[#E2AF19] rounded-[13px] top-[6px] left-[6px]"
+            className="absolute h-[calc(100%-12px)] bg-[#E2AF19] rounded-[13px] top-[6px]"
             initial={false}
             animate={activeTab}
             variants={{
-              swap: { x: 0 },
-              history: { x: "100%" },
+              swap: { x: 0, width: "calc(50% - 3px)" },
+              history: { x: "calc(80% + 3px)", width: "calc(52% - 3px)" },
             }}
             transition={{
               type: "spring",
@@ -438,7 +443,7 @@ export default function SwapPage() {
 
           <button
             onClick={() => setActiveTab("swap")}
-            className={`relative z-10 px-6 py-2.5 font-medium text-sm rounded-[13px] transition-colors duration-200 ${
+            className={`relative z-10 px-6 py-2.5 font-mayeka text-md rounded-[13px] transition-colors duration-200 ${
               activeTab === "swap"
                 ? "text-black"
                 : "text-white hover:text-gray-300"
@@ -449,7 +454,7 @@ export default function SwapPage() {
 
           <button
             onClick={() => setActiveTab("history")}
-            className={`relative z-10 px-6 py-2.5 font-medium text-sm rounded-[13px] transition-colors duration-200 ${
+            className={`relative z-10 px-6 py-2.5 font-mayeka text-md rounded-[13px] transition-colors duration-200 ${
               activeTab === "history"
                 ? "text-black"
                 : "text-white hover:text-gray-300"
@@ -479,7 +484,7 @@ export default function SwapPage() {
 
             {/* Inner scrollable container */}
             <div className="relative bg-[#0F0F0F] rounded-[26px] overflow-hidden">
-              <div className="max-h-[500px] overflow-y-auto custom-scrollbar py-6 px-16">
+              <div className="max-h-[450px] overflow-y-auto custom-scrollbar py-4 px-16">
                 {/* Chain selector and slippage */}
                 <div className="flex flex-row items-center justify-between mb-4">
                   <button
@@ -506,19 +511,229 @@ export default function SwapPage() {
                     </svg>
                   </button>
 
-                  <div className="flex justify-end items-center gap-2 text-xs bg-[rgba(255,255,255,0.03)] p-2 rounded-[20px]">
-                    <span className="text-[#977511] font-satoshi">
-                      Slippage %
-                    </span>
-                    <button
-                      onClick={() =>
-                        setShowSlippageSettings(!showSlippageSettings)
-                      }
-                      className="text-[#fff] hover:text-[#D4A853] transition-colors font-satoshi"
-                    >
-                      {slippage}%
-                    </button>
-                    <FilterIcon size={12} className="mt-[2px] ml-0.5" />
+                  <div className="relative">
+                    {/* Glacier effect container */}
+                    <div className="relative p-[1px] rounded-[25px] overflow-hidden">
+                      {/* Animated gradient border */}
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          background: `linear-gradient(135deg, 
+                            rgba(255, 255, 255, 0.3) 0%,
+                            rgba(255, 255, 255, 0.1) 20%,
+                            rgba(226, 175, 25, 0.2) 40%,
+                            rgba(255, 255, 255, 0.05) 60%,
+                            rgba(226, 175, 25, 0.15) 80%,
+                            rgba(255, 255, 255, 0.2) 100%)`,
+                        }}
+                      />
+
+                      {/* Inner container with glass effect */}
+                      {/* Inner container with glass effect */}
+                      <div
+                        className="relative flex items-center gap-3 px-3 py-2 rounded-[24px]"
+                        style={{
+                          background: `linear-gradient(135deg, 
+                            rgba(25, 25, 25, 0.85) 0%,
+                            rgba(40, 40, 40, 0.75) 0%,
+                            rgba(25, 25, 25, 0.85) 0%)`,
+                          backdropFilter: "blur(1px)",
+                          boxShadow: `
+                            inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                            inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                            0 2px 8px rgba(0, 0, 0, 0.3)
+                          `,
+                        }}
+                      >
+                        <span className="text-[#E2AF19] text-xs font-satoshi font-medium">
+                          Slippage%
+                        </span>
+
+                        {/* Toggle container */}
+                        <div className="relative flex items-center gap-1">
+                          {/* Auto button with conditional border */}
+                          <button
+                            onClick={() => {
+                              setSlippage("5.5");
+                              setCustomSlippage(false);
+                              setShowSlippageSettings(false); // Close modal when Auto is clicked
+                            }}
+                            className="relative"
+                          >
+                            {!customSlippage && (
+                              <div
+                                className="absolute inset-0 p-[0.5px] rounded-full"
+                                style={{
+                                  background: `linear-gradient(135deg, 
+                                    rgba(255, 255, 255, 0.4) 0%,
+                                    rgba(255, 255, 255, 0.15) 25%,
+                                    rgba(226, 175, 25, 0.3) 50%,
+                                    rgba(255, 255, 255, 0.1) 75%,
+                                    rgba(255, 255, 255, 0.3) 100%)`,
+                                }}
+                              >
+                                <div
+                                  className="w-full h-full rounded-full"
+                                  style={{
+                                    background: `linear-gradient(135deg, 
+                                      rgba(25, 25, 25, 0.85) 0%,
+                                      rgba(40, 40, 40, 0.75) 50%,
+                                      rgba(25, 25, 25, 0.85) 100%)`,
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <span className="relative z-10 block px-3 py-1 text-[10px] font-satoshi font-medium text-white hover:text-white transition-colors">
+                              Auto
+                            </span>
+                          </button>
+
+                          {/* Custom button with conditional border */}
+                          <button
+                            onClick={() => {
+                              setShowSlippageSettings(!showSlippageSettings);
+                              setCustomSlippage(true);
+                            }}
+                            className="relative"
+                          >
+                            {customSlippage && (
+                              <div
+                                className="absolute inset-0 p-[0.5px] rounded-full"
+                                style={{
+                                  background: `linear-gradient(135deg, 
+                                    rgba(255, 255, 255, 0.4) 0%,
+                                    rgba(255, 255, 255, 0.15) 25%,
+                                    rgba(226, 175, 25, 0.3) 50%,
+                                    rgba(255, 255, 255, 0.1) 75%,
+                                    rgba(255, 255, 255, 0.3) 100%)`,
+                                }}
+                              >
+                                <div
+                                  className="w-full h-full rounded-full"
+                                  style={{
+                                    background: `linear-gradient(135deg, 
+                                      rgba(25, 25, 25, 0.85) 0%,
+                                      rgba(40, 40, 40, 0.75) 50%,
+                                      rgba(25, 25, 25, 0.85) 100%)`,
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <span className="relative z-10 block px-3 py-1 text-[10px] font-satoshi font-medium text-white hover:text-white transition-colors">
+                              Custom
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Slippage Settings Overlay */}
+                    {showSlippageSettings && (
+                      <div className="absolute top-full mt-2 right-0 z-50">
+                        <div className="relative p-[1px] rounded-[20px] overflow-hidden">
+                          {/* Animated gradient border - glacier effect */}
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              background: `linear-gradient(135deg, 
+                                rgba(255, 255, 255, 0.3) 0%,
+                                rgba(255, 255, 255, 0.1) 20%,
+                                rgba(226, 175, 25, 0.2) 40%,
+                                rgba(255, 255, 255, 0.05) 60%,
+                                rgba(226, 175, 25, 0.15) 80%,
+                                rgba(255, 255, 255, 0.2) 100%)`,
+                            }}
+                          />
+
+                          {/* Inner container with glass effect */}
+                          <div
+                            className="relative rounded-[19px] p-4 min-w-[250px]"
+                            style={{
+                              background: `linear-gradient(135deg, 
+                                rgba(25, 25, 25, 0.95) 0%,
+                                rgba(40, 40, 40, 0.85) 50%,
+                                rgba(25, 25, 25, 0.95) 100%)`,
+                              backdropFilter: "blur(10px)",
+                              boxShadow: `
+                                inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                                inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                                0 4px 12px rgba(0, 0, 0, 0.5)
+                              `,
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[#E2AF19] text-sm font-mayeka">
+                                Set Slippage
+                              </span>
+                              <button
+                                onClick={() => setShowSlippageSettings(false)}
+                                className="text-gray-400 hover:text-white transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+
+                            <div className="flex gap-2 mb-3">
+                              {slippagePresets.map((preset) => (
+                                <button
+                                  key={preset}
+                                  onClick={() => {
+                                    setSlippage(preset);
+                                    setCustomSlippage(false);
+                                    setShowSlippageSettings(false);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-satoshi transition-all ${
+                                    slippage === preset && !customSlippage
+                                      ? "bg-[#E2AF19] text-black"
+                                      : "bg-[#191919] text-white hover:bg-[#2C2C2C] border border-[#2C2C2C]"
+                                  }`}
+                                >
+                                  {preset}%
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs font-satoshi">
+                                Custom:
+                              </span>
+                              <div className="relative flex-1">
+                                <input
+                                  type="number"
+                                  placeholder="0.0"
+                                  value={customSlippage ? slippage : ""}
+                                  onChange={(e) => {
+                                    const value = parseFloat(e.target.value);
+                                    if (!isNaN(value) && value < 49) {
+                                      setSlippage(e.target.value);
+                                      setCustomSlippage(true);
+                                    }
+                                  }}
+                                  onKeyPress={(e) => {
+                                    if (e.key === "Enter" && customSlippage) {
+                                      setShowSlippageSettings(false);
+                                    }
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-[#191919] text-white rounded-lg text-xs border border-[#2C2C2C] focus:border-[#E2AF19] focus:outline-none"
+                                  min="0"
+                                  max="49"
+                                  step="0.1"
+                                />
+                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">
+                                  %
+                                </span>
+                              </div>
+                            </div>
+
+                            {customSlippage && parseFloat(slippage) >= 49 && (
+                              <p className="text-red-400 text-[10px] mt-2 font-satoshi">
+                                Maximum slippage is 49%
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -564,12 +779,12 @@ export default function SwapPage() {
 
                 {/* From Token Box */}
                 <div
-                  className="bg-[#191919] p-5"
+                  className="bg-[#191919] p-4"
                   style={{ borderRadius: "26.066px" }}
                 >
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="flex-1">
-                      <h2 className="text-[#E2AF19] text-base font-mayeka mb-2">
+                      <h2 className="text-[#E2AF19] text-base font-mayeka mb-1">
                         Swap
                       </h2>
                       <input
@@ -883,7 +1098,7 @@ export default function SwapPage() {
               animate={{ opacity: 1, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.95, x: 50 }}
               transition={{ type: "spring", damping: 25 }}
-              className="absolute top-[55%] left-1/2 transform -translate-y-1/2 z-30 ml-[150px]"
+              className="absolute top-[62%] left-1/2 transform -translate-y-1/2 z-30 ml-[150px]"
             >
               <div className="relative p-[3px] rounded-[20px] w-[400px]">
                 <div
