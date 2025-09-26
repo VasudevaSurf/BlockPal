@@ -738,7 +738,7 @@ export default function SwapPage() {
                 </div>
 
                 {/* Slippage Settings */}
-                {showSlippageSettings && (
+                {/* {showSlippageSettings && (
                   <div className="mb-4 p-3 bg-[#191919] rounded-lg">
                     <div className="flex gap-2 mb-2">
                       {slippagePresets.map((preset) => (
@@ -775,7 +775,7 @@ export default function SwapPage() {
                       Close
                     </button>
                   </div>
-                )}
+                )} */}
 
                 {/* From Token Box */}
                 <div
@@ -1000,32 +1000,133 @@ export default function SwapPage() {
                     </div>
                     {/* Gas Mode Selection Buttons */}
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => setGasMode("high")}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-[12px] transition-all ${
-                          gasMode === "high"
-                            ? "bg-[#FF9800] text-black"
-                            : "bg-[rgba(255,255,255,0.05)] text-white hover:bg-[rgba(255,255,255,0.1)]"
-                        }`}
-                      >
-                        <LightningIcon size={14} />
-                        <span className="text-xs font-satoshi font-medium">
-                          Fast
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => setGasMode("instant")}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-[12px] transition-all ${
-                          gasMode === "instant"
-                            ? "bg-[#F44336] text-white"
-                            : "bg-[rgba(255,255,255,0.05)] text-white hover:bg-[rgba(255,255,255,0.1)]"
-                        }`}
-                      >
-                        <LightningIcon size={14} />
-                        <span className="text-xs font-satoshi font-medium">
-                          Instant
-                        </span>
-                      </button>
+                      {/* Fast Button */}
+                      <div className="relative">
+                        <div className="relative p-[1px] rounded-[12px] overflow-hidden">
+                          {/* Animated gradient border */}
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              background:
+                                gasMode === "high"
+                                  ? `linear-gradient(135deg, 
+                rgba(255, 152, 0, 0.6) 0%,
+                rgba(255, 152, 0, 0.3) 20%,
+                rgba(255, 152, 0, 0.4) 40%,
+                rgba(255, 152, 0, 0.2) 60%,
+                rgba(255, 152, 0, 0.5) 80%,
+                rgba(255, 152, 0, 0.4) 100%)`
+                                  : `linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.3) 0%,
+                rgba(255, 255, 255, 0.1) 20%,
+                rgba(226, 175, 25, 0.2) 40%,
+                rgba(255, 255, 255, 0.05) 60%,
+                rgba(226, 175, 25, 0.15) 80%,
+                rgba(255, 255, 255, 0.2) 100%)`,
+                            }}
+                          />
+
+                          {/* Inner button with glass effect */}
+                          <button
+                            onClick={() => setGasMode("high")}
+                            className={`relative flex items-center gap-1 px-3 py-1.5 rounded-[11px] transition-all ${
+                              gasMode === "high"
+                                ? "text-black"
+                                : "text-white hover:opacity-80"
+                            }`}
+                            style={{
+                              background:
+                                gasMode === "high"
+                                  ? `linear-gradient(135deg, 
+                rgba(255, 152, 0, 0.9) 0%,
+                rgba(255, 152, 0, 1) 50%,
+                rgba(255, 152, 0, 0.9) 100%)`
+                                  : `linear-gradient(135deg, 
+                rgba(25, 25, 25, 0.85) 0%,
+                rgba(40, 40, 40, 0.75) 50%,
+                rgba(25, 25, 25, 0.85) 100%)`,
+                              backdropFilter: "blur(1px)",
+                              boxShadow:
+                                gasMode === "high"
+                                  ? `0 2px 8px rgba(255, 152, 0, 0.3)`
+                                  : `
+                inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                0 2px 8px rgba(0, 0, 0, 0.3)
+              `,
+                            }}
+                          >
+                            <LightningIcon size={14} />
+                            <span className="text-xs font-satoshi font-medium">
+                              Fast
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Instant Button */}
+                      <div className="relative">
+                        <div className="relative p-[1px] rounded-[12px] overflow-hidden">
+                          {/* Animated gradient border */}
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              background:
+                                gasMode === "instant"
+                                  ? `linear-gradient(135deg, 
+                rgba(244, 67, 54, 0.6) 0%,
+                rgba(244, 67, 54, 0.3) 20%,
+                rgba(244, 67, 54, 0.4) 40%,
+                rgba(244, 67, 54, 0.2) 60%,
+                rgba(244, 67, 54, 0.5) 80%,
+                rgba(244, 67, 54, 0.4) 100%)`
+                                  : `linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.3) 0%,
+                rgba(255, 255, 255, 0.1) 20%,
+                rgba(226, 175, 25, 0.2) 40%,
+                rgba(255, 255, 255, 0.05) 60%,
+                rgba(226, 175, 25, 0.15) 80%,
+                rgba(255, 255, 255, 0.2) 100%)`,
+                            }}
+                          />
+
+                          {/* Inner button with glass effect */}
+                          <button
+                            onClick={() => setGasMode("instant")}
+                            className={`relative flex items-center gap-1 px-3 py-1.5 rounded-[11px] transition-all ${
+                              gasMode === "instant"
+                                ? "text-white"
+                                : "text-white hover:opacity-80"
+                            }`}
+                            style={{
+                              background:
+                                gasMode === "instant"
+                                  ? `linear-gradient(135deg, 
+                rgba(244, 67, 54, 0.9) 0%,
+                rgba(244, 67, 54, 1) 50%,
+                rgba(244, 67, 54, 0.9) 100%)`
+                                  : `linear-gradient(135deg, 
+                rgba(25, 25, 25, 0.85) 0%,
+                rgba(40, 40, 40, 0.75) 50%,
+                rgba(25, 25, 25, 0.85) 100%)`,
+                              backdropFilter: "blur(1px)",
+                              boxShadow:
+                                gasMode === "instant"
+                                  ? `0 2px 8px rgba(244, 67, 54, 0.3)`
+                                  : `
+                inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                0 2px 8px rgba(0, 0, 0, 0.3)
+              `,
+                            }}
+                          >
+                            <LightningIcon size={14} />
+                            <span className="text-xs font-satoshi font-medium">
+                              Instant
+                            </span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
