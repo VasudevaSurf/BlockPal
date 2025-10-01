@@ -61,6 +61,12 @@ const menuItems = [
     href: "/dashboard/swap",
     comingSoon: false,
   },
+  {
+    icon: CodeLens,
+    label: "Swap",
+    href: "/dashboard/code-lens",
+    comingSoon: false,
+  },
 ];
 
 interface SidebarProps {
