@@ -62,8 +62,8 @@ const menuItems = [
     comingSoon: false,
   },
   {
-    icon: CodeLens,
-    label: "Swap",
+    icon: SwapIcon,
+    label: "CodeLens",
     href: "/dashboard/code-lens",
     comingSoon: false,
   },

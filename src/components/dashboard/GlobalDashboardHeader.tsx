@@ -56,6 +56,11 @@ const getPageTitle = (
         title: "Swap",
         subtitle: "Make Swap Payments",
       };
+    case "/dashboard/code-lens":
+      return {
+        title: "CodeLens",
+        subtitle: "Analyze Tokens",
+      };
     default:
       return {
         title: "Dashboard",
