@@ -1,10 +1,13 @@
+// src/app/dashboard/code-lens/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Search, Plus, SlidersHorizontal, MoreVertical } from "lucide-react";
+import TokenActionsMenu from "@/components/dashboard/TokenActionsMenu";
+import AddTokensModal from "@/components/dashboard/AddTokensModal";
 
 // Mock token data matching the image
-const mockTokens = [
+const initialMockTokens = [
   {
     id: 1,
     name: "Ethereum",
@@ -93,14 +96,21 @@ const mockTokens = [
 
 export default function CodeLens() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredTokens, setFilteredTokens] = useState(mockTokens);
+  const [tokens, setTokens] = useState(initialMockTokens);
+  const [filteredTokens, setFilteredTokens] = useState(initialMockTokens);
+  const [activeMenuTokenId, setActiveMenuTokenId] = useState<number | null>(
+    null
+  );
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
+  const buttonRefs = useRef<{ [key: number]: HTMLButtonElement | null }>({});
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (query.trim() === "") {
-      setFilteredTokens(mockTokens);
+      setFilteredTokens(tokens);
     } else {
-      const filtered = mockTokens.filter(
+      const filtered = tokens.filter(
         (token) =>
           token.name.toLowerCase().includes(query.toLowerCase()) ||
           token.symbol.toLowerCase().includes(query.toLowerCase())
@@ -122,6 +132,78 @@ export default function CodeLens() {
     return `$${num.toFixed(2)}`;
   };
 
+  const handleMoreClick = (tokenId: number, event: React.MouseEvent) => {
+    event.stopPropagation();
+    const button = buttonRefs.current[tokenId];
+    if (button) {
+      const rect = button.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.top,
+        left: rect.left - 200 - 8, // Adjusted for new width (200px) + 8px gap
+      });
+      setActiveMenuTokenId(tokenId);
+    }
+  };
+
+  const handleCopy = () => {
+    const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
+    if (token) {
+      const tokenInfo = `${token.name} (${
+        token.symbol
+      }) - $${token.price.toLocaleString()}`;
+      navigator.clipboard.writeText(tokenInfo);
+      console.log("✅ Copied token info:", tokenInfo);
+
+      // You can add a toast notification here
+      alert(`Copied: ${tokenInfo}`);
+    }
+  };
+
+  const handleRemove = () => {
+    const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
+    if (token) {
+      // Remove from both tokens and filteredTokens
+      const newTokens = tokens.filter((t) => t.id !== activeMenuTokenId);
+      setTokens(newTokens);
+
+      const newFilteredTokens = filteredTokens.filter(
+        (t) => t.id !== activeMenuTokenId
+      );
+      setFilteredTokens(newFilteredTokens);
+
+      console.log("🗑️ Removed token:", token.name);
+
+      // You can add a toast notification here
+      alert(`Removed: ${token.name}`);
+    }
+  };
+
+  const handleAddToken = (token: any) => {
+    console.log("➕ Adding token:", token);
+
+    // Create a new token object with a unique ID
+    const newToken = {
+      id: Date.now(), // Use timestamp as unique ID
+      name: token.name,
+      symbol: token.symbol,
+      icon: "", // You can add icon URL if available
+      price: Math.random() * 1000, // Random price for demo
+      change24h: token.change24h,
+      volume24h: Math.random() * 10000000,
+      marketCap: Math.random() * 10000000000,
+      buys: Math.floor(Math.random() * 100),
+      sells: Math.floor(Math.random() * 100),
+    };
+
+    // Add to both tokens and filteredTokens
+    const updatedTokens = [...tokens, newToken];
+    setTokens(updatedTokens);
+    setFilteredTokens(updatedTokens);
+
+    // You can add a toast notification here
+    alert(`Added: ${token.name}`);
+  };
+
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] p-4 flex flex-col overflow-hidden">
       {/* Search Bar */}
@@ -135,11 +217,18 @@ export default function CodeLens() {
             onChange={(e) => handleSearch(e.target.value)}
             className="w-full bg-black border border-[#2C2C2C] rounded-xl pl-12 pr-14 py-3 text-gray-300 text-sm font-satoshi placeholder-gray-600 focus:outline-none focus:border-[#E2AF19] transition-colors"
           />
-          <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] p-2 rounded-lg transition-colors">
+          <button
+            onClick={() => setAddTokensModalOpen(true)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] p-2 rounded-lg transition-colors"
+            title="Add Tokens"
+          >
             <Plus className="w-4 h-4 text-black" />
           </button>
         </div>
-        <button className="bg-black border border-[#2C2C2C] hover:border-[#E2AF19] p-3 rounded-xl transition-colors">
+        <button
+          className="bg-black border border-[#2C2C2C] hover:border-[#E2AF19] p-3 rounded-xl transition-colors"
+          title="Filters"
+        >
           <SlidersHorizontal className="w-5 h-5 text-white" />
         </button>
       </div>
@@ -159,79 +248,102 @@ export default function CodeLens() {
         </div>
 
         {/* Table Body */}
-        <div className="flex-1 overflow-y-auto">
-          {filteredTokens.map((token) => (
-            <div
-              key={token.id}
-              className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.5fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors"
-            >
-              {/* Token */}
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">
-                    {token.symbol.charAt(0)}
-                  </span>
-                </div>
-                <div className="flex flex-row items-baseline gap-1.5">
-                  <div className="text-white font-satoshi font-medium text-sm">
-                    {token.name}
-                  </div>
-                  <div className="text-gray-500 font-satoshi text-xs">
-                    {token.symbol}
-                  </div>
-                </div>
-              </div>
-
-              {/* Price */}
-              <div className="flex items-center justify-center text-white font-satoshi font-medium text-sm">
-                ${token.price.toLocaleString()}
-              </div>
-
-              {/* 24h Change */}
-              <div
-                className={`flex items-center justify-center font-satoshi font-medium text-sm ${
-                  token.change24h > 0 ? "text-green-500" : "text-red-500"
-                }`}
-              >
-                {token.change24h > 0 ? "▲" : "▼"} {Math.abs(token.change24h)}%
-              </div>
-
-              {/* 24h Volume */}
-              <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                ${token.volume24h.toLocaleString()}
-              </div>
-
-              {/* Market Cap */}
-              <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                {formatNumber(token.marketCap)}
-              </div>
-
-              {/* Buys */}
-              <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                {token.buys}
-              </div>
-
-              {/* Sells */}
-              <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                {token.sells}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-center">
-                <button className="p-1 hover:bg-[#2C2C2C] rounded transition-colors">
-                  <MoreVertical className="w-4 h-4 text-gray-400" />
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {filteredTokens.length === 0 && (
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
+          {filteredTokens.length === 0 ? (
             <div className="flex items-center justify-center h-64">
               <p className="text-gray-500 font-satoshi">No tokens found</p>
             </div>
+          ) : (
+            filteredTokens.map((token) => (
+              <div
+                key={token.id}
+                className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.5fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors"
+              >
+                {/* Token */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">
+                      {token.symbol.charAt(0)}
+                    </span>
+                  </div>
+                  <div className="flex flex-row items-baseline gap-1.5">
+                    <div className="text-white font-satoshi font-medium text-sm">
+                      {token.name}
+                    </div>
+                    <div className="text-gray-500 font-satoshi text-xs">
+                      {token.symbol}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price */}
+                <div className="flex items-center justify-center text-white font-satoshi font-medium text-sm">
+                  ${token.price.toLocaleString()}
+                </div>
+
+                {/* 24h Change */}
+                <div
+                  className={`flex items-center justify-center font-satoshi font-medium text-sm ${
+                    token.change24h > 0 ? "text-green-500" : "text-red-500"
+                  }`}
+                >
+                  {token.change24h > 0 ? "▲" : "▼"} {Math.abs(token.change24h)}%
+                </div>
+
+                {/* 24h Volume */}
+                <div className="flex items-center justify-center text-white font-satoshi text-sm">
+                  ${token.volume24h.toLocaleString()}
+                </div>
+
+                {/* Market Cap */}
+                <div className="flex items-center justify-center text-white font-satoshi text-sm">
+                  {formatNumber(token.marketCap)}
+                </div>
+
+                {/* Buys */}
+                <div className="flex items-center justify-center text-white font-satoshi text-sm">
+                  {token.buys}
+                </div>
+
+                {/* Sells */}
+                <div className="flex items-center justify-center text-white font-satoshi text-sm">
+                  {token.sells}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-center">
+                  <button
+                    ref={(el) => {
+                      buttonRefs.current[token.id] = el;
+                    }}
+                    onClick={(e) => handleMoreClick(token.id, e)}
+                    className="p-1 hover:bg-[#2C2C2C] rounded transition-colors"
+                    title="More actions"
+                  >
+                    <MoreVertical className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </div>
+
+      {/* Token Actions Menu */}
+      <TokenActionsMenu
+        isOpen={activeMenuTokenId !== null}
+        onClose={() => setActiveMenuTokenId(null)}
+        position={menuPosition}
+        onCopy={handleCopy}
+        onRemove={handleRemove}
+      />
+
+      {/* Add Tokens Modal */}
+      <AddTokensModal
+        isOpen={addTokensModalOpen}
+        onClose={() => setAddTokensModalOpen(false)}
+        onAddToken={handleAddToken}
+      />
 
       <style jsx global>{`
         .scrollbar-hide {
