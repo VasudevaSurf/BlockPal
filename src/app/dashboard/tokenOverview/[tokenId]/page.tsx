@@ -1291,7 +1291,13 @@ export default function TokenOverviewPage() {
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-base font-satoshi">
-                    {tokenInfo.name} /{tokenInfo.symbol}
+                    {tokenInfo.name}
+                    <span className="text-[#939393] font-bold text-base font-satoshi">
+                      /
+                    </span>
+                    <span className="text-[#939393] font-satoshi text-[10px]">
+                      {tokenInfo.symbol}
+                    </span>
                   </h3>
                   <p className="text-gray-400 text-xs font-satoshi">
                     {tokenInfo.name} price
@@ -1301,10 +1307,8 @@ export default function TokenOverviewPage() {
 
               {/* Price and Balance */}
               <div className="mb-3">
-                <div className="text-2xl font-bold text-white mb-1 font-satoshi">
+                <div className="flex flex-row items-center justify-start text-2xl font-bold text-white mb-1 font-satoshi gap-1">
                   ${tokenInfo.price.toLocaleString()}
-                </div>
-                <div className="flex items-center gap-2">
                   <div
                     className={`text-sm font-satoshi ${
                       priceChange >= 0 ? "text-green-400" : "text-red-400"
@@ -1313,6 +1317,8 @@ export default function TokenOverviewPage() {
                     {priceChange >= 0 ? "↑" : "↓"}(
                     {Math.abs(priceChange).toFixed(2)}%)
                   </div>
+                </div>
+                <div className="flex items-center gap-2">
                   <div className="text-gray-400 text-xs font-satoshi">
                     {tokenBalance.toFixed(4)} {tokenInfo.symbol}
                   </div>
