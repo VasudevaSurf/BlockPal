@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Search, Plus, SlidersHorizontal, MoreVertical } from "lucide-react";
 import TokenActionsMenu from "@/components/dashboard/TokenActionsMenu";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
@@ -95,6 +96,7 @@ const initialMockTokens = [
 ];
 
 export default function CodeLens() {
+  const router = useRouter(); // ← Router hook for navigation
   const [searchQuery, setSearchQuery] = useState("");
   const [tokens, setTokens] = useState(initialMockTokens);
   const [filteredTokens, setFilteredTokens] = useState(initialMockTokens);
@@ -133,13 +135,13 @@ export default function CodeLens() {
   };
 
   const handleMoreClick = (tokenId: number, event: React.MouseEvent) => {
-    event.stopPropagation();
+    event.stopPropagation(); // ← Prevent row click when clicking actions menu
     const button = buttonRefs.current[tokenId];
     if (button) {
       const rect = button.getBoundingClientRect();
       setMenuPosition({
         top: rect.top,
-        left: rect.left - 200 - 8, // Adjusted for new width (200px) + 8px gap
+        left: rect.left - 200 - 8,
       });
       setActiveMenuTokenId(tokenId);
     }
@@ -153,8 +155,6 @@ export default function CodeLens() {
       }) - $${token.price.toLocaleString()}`;
       navigator.clipboard.writeText(tokenInfo);
       console.log("✅ Copied token info:", tokenInfo);
-
-      // You can add a toast notification here
       alert(`Copied: ${tokenInfo}`);
     }
   };
@@ -162,7 +162,6 @@ export default function CodeLens() {
   const handleRemove = () => {
     const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
     if (token) {
-      // Remove from both tokens and filteredTokens
       const newTokens = tokens.filter((t) => t.id !== activeMenuTokenId);
       setTokens(newTokens);
 
@@ -172,8 +171,6 @@ export default function CodeLens() {
       setFilteredTokens(newFilteredTokens);
 
       console.log("🗑️ Removed token:", token.name);
-
-      // You can add a toast notification here
       alert(`Removed: ${token.name}`);
     }
   };
@@ -181,13 +178,12 @@ export default function CodeLens() {
   const handleAddToken = (token: any) => {
     console.log("➕ Adding token:", token);
 
-    // Create a new token object with a unique ID
     const newToken = {
-      id: Date.now(), // Use timestamp as unique ID
+      id: Date.now(),
       name: token.name,
       symbol: token.symbol,
-      icon: "", // You can add icon URL if available
-      price: Math.random() * 1000, // Random price for demo
+      icon: "",
+      price: Math.random() * 1000,
       change24h: token.change24h,
       volume24h: Math.random() * 10000000,
       marketCap: Math.random() * 10000000000,
@@ -195,13 +191,16 @@ export default function CodeLens() {
       sells: Math.floor(Math.random() * 100),
     };
 
-    // Add to both tokens and filteredTokens
     const updatedTokens = [...tokens, newToken];
     setTokens(updatedTokens);
     setFilteredTokens(updatedTokens);
 
-    // You can add a toast notification here
     alert(`Added: ${token.name}`);
+  };
+
+  // ✅ THIS IS THE CLICK HANDLER - Navigates to token overview page
+  const handleTokenClick = (tokenId: number) => {
+    router.push(`/dashboard/tokenOverview/${tokenId}`);
   };
 
   return (
@@ -257,7 +256,8 @@ export default function CodeLens() {
             filteredTokens.map((token) => (
               <div
                 key={token.id}
-                className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.5fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors"
+                onClick={() => handleTokenClick(token.id)} // ✅ CLICK HANDLER HERE - Entire row is clickable
+                className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.5fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer" // ✅ cursor-pointer shows it's clickable
               >
                 {/* Token */}
                 <div className="flex items-center gap-3">
@@ -316,7 +316,7 @@ export default function CodeLens() {
                     ref={(el) => {
                       buttonRefs.current[token.id] = el;
                     }}
-                    onClick={(e) => handleMoreClick(token.id, e)}
+                    onClick={(e) => handleMoreClick(token.id, e)} // ✅ stopPropagation prevents row click
                     className="p-1 hover:bg-[#2C2C2C] rounded transition-colors"
                     title="More actions"
                   >
