@@ -1,4 +1,4 @@
-// src/services/coinlesService.ts - COMPLETE FIXED VERSION
+// src/services/coinlesService.ts - COMPLETE UPDATED VERSION
 interface TokenSearchResult {
   poolAddress: string;
   contractAddress: string;
@@ -86,6 +86,20 @@ interface WatchlistToken {
   tokenSymbol: string;
   addedAt?: string;
   lastViewed?: string;
+  marketData?: {
+    price: number;
+    change24h: number;
+    volume24h: number;
+    marketCap: number;
+    liquidity: number;
+  };
+  transactions?: {
+    buys24h: number;
+    sells24h: number;
+  };
+  metadata?: {
+    logo: string;
+  };
 }
 
 class CoinLesService {
@@ -110,7 +124,7 @@ class CoinLesService {
       const url = `${
         this.baseURL
       }/api/coinles/search?chain=${chain}&query=${encodeURIComponent(query)}`;
-      console.log("Searching tokens:", { chain, query, url });
+      console.log("Searching tokens:", { chain, query });
 
       const response = await fetch(url, {
         method: "GET",
@@ -119,8 +133,6 @@ class CoinLesService {
         },
         signal: AbortSignal.timeout(15000),
       });
-
-      console.log("Search response status:", response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -153,7 +165,7 @@ class CoinLesService {
         url += `&pool=${pool}`;
       }
 
-      console.log("Getting token info:", url);
+      console.log("Getting token info:", { network, contract, pool });
 
       const response = await fetch(url, {
         method: "GET",
@@ -164,6 +176,8 @@ class CoinLesService {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Token info failed:", errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -173,6 +187,7 @@ class CoinLesService {
         throw new Error(data.message || "Failed to get token info");
       }
 
+      console.log("Got token info:", data.data?.metadata?.name);
       return data.data;
     } catch (error: any) {
       console.error("Error getting token info:", error);
@@ -188,7 +203,7 @@ class CoinLesService {
     try {
       const url = `${this.baseURL}/api/coinles/chart-data?network=${network}&pool=${pool}&timeframe=${timeframe}`;
 
-      console.log("Getting chart data:", url);
+      console.log("Getting chart data:", { network, pool, timeframe });
 
       const response = await fetch(url, {
         method: "GET",
@@ -215,10 +230,12 @@ class CoinLesService {
     }
   }
 
-  async getUserWatchlist(email: string): Promise<WatchlistToken[]> {
+  async getUserWatchlist(email: string, refresh: boolean = false): Promise<WatchlistToken[]> {
     try {
-      const url = `${this.baseURL}/api/user-watchlist/${email}`;
-      console.log("Getting watchlist:", url);
+      const url = `${this.baseURL}/api/user-watchlist/${encodeURIComponent(
+        email
+      )}?refresh=${refresh}`;
+      console.log("Getting watchlist:", { email, refresh });
 
       const response = await fetch(url, {
         method: "GET",
@@ -226,8 +243,6 @@ class CoinLesService {
           "Content-Type": "application/json",
         },
       });
-
-      console.log("Watchlist response status:", response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -255,10 +270,12 @@ class CoinLesService {
 
   async addTokenToWatchlist(
     email: string,
-    token: WatchlistToken
-  ): Promise<boolean> {
+    token: Omit<WatchlistToken, 'marketData' | 'transactions' | 'metadata'>
+  ): Promise<{ success: boolean; token?: WatchlistToken }> {
     try {
-      const url = `${this.baseURL}/api/user-watchlist/${email}/add-token`;
+      const url = `${this.baseURL}/api/user-watchlist/${encodeURIComponent(
+        email
+      )}/add-token`;
       console.log("Adding token to watchlist:", { email, token });
 
       const response = await fetch(url, {
@@ -275,10 +292,14 @@ class CoinLesService {
 
       const data = await response.json();
       console.log("Token added:", data.success);
-      return data.success;
+      
+      return {
+        success: data.success,
+        token: data.data?.addedToken,
+      };
     } catch (error: any) {
       console.error("Error adding token to watchlist:", error);
-      return false;
+      return { success: false };
     }
   }
 
@@ -288,7 +309,9 @@ class CoinLesService {
     contractAddress: string
   ): Promise<boolean> {
     try {
-      const url = `${this.baseURL}/api/user-watchlist/${email}/remove-token?chainId=${chainId}&contractAddress=${contractAddress}`;
+      const url = `${this.baseURL}/api/user-watchlist/${encodeURIComponent(
+        email
+      )}/remove-token?chainId=${chainId}&contractAddress=${contractAddress}`;
       console.log("Removing token from watchlist:", {
         email,
         chainId,
@@ -315,9 +338,38 @@ class CoinLesService {
     }
   }
 
+  async refreshWatchlist(email: string): Promise<boolean> {
+    try {
+      const url = `${this.baseURL}/api/user-watchlist/${encodeURIComponent(
+        email
+      )}/refresh`;
+      console.log("Refreshing watchlist:", email);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("Watchlist refreshed:", data.data);
+      return data.success;
+    } catch (error: any) {
+      console.error("Error refreshing watchlist:", error);
+      return false;
+    }
+  }
+
   async addRecentSearch(email: string, search: any): Promise<void> {
     try {
-      const url = `${this.baseURL}/api/user-watchlist/${email}/add-search`;
+      const url = `${this.baseURL}/api/user-watchlist/${encodeURIComponent(
+        email
+      )}/add-search`;
 
       await fetch(url, {
         method: "POST",
