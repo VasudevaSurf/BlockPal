@@ -1,111 +1,86 @@
-// src/app/dashboard/code-lens/page.tsx
+// src/app/dashboard/code-lens/page.tsx - COMPLETE CODE WITH COINLES INTEGRATION
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
 import { Search, Plus, SlidersHorizontal, MoreVertical } from "lucide-react";
 import TokenActionsMenu from "@/components/dashboard/TokenActionsMenu";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
+import { coinlesService, WatchlistToken } from "@/services/coinlesService";
 
-// Mock token data matching the image
-const initialMockTokens = [
-  {
-    id: 1,
-    name: "Ethereum",
-    symbol: "ETH",
-    icon: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
-    price: 4478.78,
-    change24h: -1.06,
-    volume24h: 8478788,
-    marketCap: 12478088345,
-    buys: 12,
-    sells: 12,
-  },
-  {
-    id: 2,
-    name: "Polkadot",
-    symbol: "DOT",
-    icon: "https://cryptologos.cc/logos/polkadot-new-dot-logo.png",
-    price: 478.78,
-    change24h: -1.06,
-    volume24h: 8478788,
-    marketCap: 78088345,
-    buys: 12,
-    sells: 234,
-  },
-  {
-    id: 3,
-    name: "Cardano",
-    symbol: "CAR",
-    icon: "https://cryptologos.cc/logos/cardano-ada-logo.png",
-    price: 8.7,
-    change24h: 1.06,
-    volume24h: 76788,
-    marketCap: 8088345,
-    buys: 12,
-    sells: 39,
-  },
-  {
-    id: 4,
-    name: "Dodge",
-    symbol: "DOG",
-    icon: "https://cryptologos.cc/logos/dogecoin-doge-logo.png",
-    price: 0.378,
-    change24h: -1.06,
-    volume24h: 478788,
-    marketCap: 128345,
-    buys: 4,
-    sells: 3,
-  },
-  {
-    id: 5,
-    name: "Avalanche",
-    symbol: "AVAX",
-    icon: "https://cryptologos.cc/logos/avalanche-avax-logo.png",
-    price: 8.78,
-    change24h: -1.06,
-    volume24h: 8478788,
-    marketCap: 12478088345,
-    buys: 12,
-    sells: 12,
-  },
-  {
-    id: 6,
-    name: "Solana",
-    symbol: "SOL",
-    icon: "https://cryptologos.cc/logos/solana-sol-logo.png",
-    price: 201.7,
-    change24h: 1.06,
-    volume24h: 8478788,
-    marketCap: 9478088345,
-    buys: 12,
-    sells: 12,
-  },
-  {
-    id: 7,
-    name: "SUI",
-    symbol: "SUI",
-    icon: "https://cryptologos.cc/logos/sui-sui-logo.png",
-    price: 9.02,
-    change24h: 1.06,
-    volume24h: 8478788,
-    marketCap: 12478345,
-    buys: 12,
-    sells: 12,
-  },
-];
+interface Token {
+  id: string;
+  chainId: string;
+  contractAddress: string;
+  poolAddress: string;
+  name: string;
+  symbol: string;
+  price: number;
+  change24h: number;
+  volume24h: number;
+  marketCap: number;
+  liquidity: number;
+  buys24h: number;
+  sells24h: number;
+  logo?: string;
+}
 
 export default function CodeLens() {
-  const router = useRouter(); // ← Router hook for navigation
+  const router = useRouter();
+  const { user } = useSelector((state: RootState) => state.auth);
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [tokens, setTokens] = useState(initialMockTokens);
-  const [filteredTokens, setFilteredTokens] = useState(initialMockTokens);
-  const [activeMenuTokenId, setActiveMenuTokenId] = useState<number | null>(
+  const [tokens, setTokens] = useState<Token[]>([]);
+  const [filteredTokens, setFilteredTokens] = useState<Token[]>([]);
+  const [activeMenuTokenId, setActiveMenuTokenId] = useState<string | null>(
     null
   );
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
-  const buttonRefs = useRef<{ [key: number]: HTMLButtonElement | null }>({});
+  const [loading, setLoading] = useState(true);
+  const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+
+  // Load user's watchlist on mount
+  useEffect(() => {
+    if (user?.email) {
+      loadUserWatchlist();
+    }
+  }, [user]);
+
+  const loadUserWatchlist = async () => {
+    if (!user?.email) return;
+
+    try {
+      setLoading(true);
+      const watchlist = await coinlesService.getUserWatchlist(user.email);
+
+      // Transform watchlist to Token format
+      const transformedTokens: Token[] = watchlist.map((item) => ({
+        id: `${item.chainId}_${item.contractAddress}`,
+        chainId: item.chainId,
+        contractAddress: item.contractAddress,
+        poolAddress: item.poolAddress,
+        name: item.tokenName,
+        symbol: item.tokenSymbol,
+        price: 0, // Will be updated by real-time data
+        change24h: 0,
+        volume24h: 0,
+        marketCap: 0,
+        liquidity: 0,
+        buys24h: 0,
+        sells24h: 0,
+      }));
+
+      setTokens(transformedTokens);
+      setFilteredTokens(transformedTokens);
+    } catch (error) {
+      console.error("Error loading watchlist:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -134,8 +109,8 @@ export default function CodeLens() {
     return `$${num.toFixed(2)}`;
   };
 
-  const handleMoreClick = (tokenId: number, event: React.MouseEvent) => {
-    event.stopPropagation(); // ← Prevent row click when clicking actions menu
+  const handleMoreClick = (tokenId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
     const button = buttonRefs.current[tokenId];
     if (button) {
       const rect = button.getBoundingClientRect();
@@ -155,53 +130,95 @@ export default function CodeLens() {
       }) - $${token.price.toLocaleString()}`;
       navigator.clipboard.writeText(tokenInfo);
       console.log("✅ Copied token info:", tokenInfo);
-      alert(`Copied: ${tokenInfo}`);
     }
   };
 
-  const handleRemove = () => {
+  const handleRemove = async () => {
     const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
-    if (token) {
-      const newTokens = tokens.filter((t) => t.id !== activeMenuTokenId);
-      setTokens(newTokens);
+    if (token && user?.email) {
+      try {
+        const success = await coinlesService.removeTokenFromWatchlist(
+          user.email,
+          token.chainId,
+          token.contractAddress
+        );
 
-      const newFilteredTokens = filteredTokens.filter(
-        (t) => t.id !== activeMenuTokenId
-      );
-      setFilteredTokens(newFilteredTokens);
+        if (success) {
+          const newTokens = tokens.filter((t) => t.id !== activeMenuTokenId);
+          setTokens(newTokens);
 
-      console.log("🗑️ Removed token:", token.name);
-      alert(`Removed: ${token.name}`);
+          const newFilteredTokens = filteredTokens.filter(
+            (t) => t.id !== activeMenuTokenId
+          );
+          setFilteredTokens(newFilteredTokens);
+
+          console.log("🗑️ Removed token:", token.name);
+        }
+      } catch (error) {
+        console.error("Error removing token:", error);
+      }
     }
   };
 
-  const handleAddToken = (token: any) => {
-    console.log("➕ Adding token:", token);
+  const handleAddToken = async (tokenData: any) => {
+    if (!user?.email) return;
 
-    const newToken = {
-      id: Date.now(),
-      name: token.name,
-      symbol: token.symbol,
-      icon: "",
-      price: Math.random() * 1000,
-      change24h: token.change24h,
-      volume24h: Math.random() * 10000000,
-      marketCap: Math.random() * 10000000000,
-      buys: Math.floor(Math.random() * 100),
-      sells: Math.floor(Math.random() * 100),
-    };
+    console.log("➕ Adding token:", tokenData);
 
-    const updatedTokens = [...tokens, newToken];
-    setTokens(updatedTokens);
-    setFilteredTokens(updatedTokens);
+    try {
+      const watchlistToken: WatchlistToken = {
+        chainId: tokenData.chainId,
+        contractAddress: tokenData.contractAddress,
+        poolAddress: tokenData.poolAddress,
+        tokenName: tokenData.name,
+        tokenSymbol: tokenData.symbol,
+      };
 
-    alert(`Added: ${token.name}`);
+      const success = await coinlesService.addTokenToWatchlist(
+        user.email,
+        watchlistToken
+      );
+
+      if (success) {
+        const newToken: Token = {
+          id: `${tokenData.chainId}_${tokenData.contractAddress}`,
+          chainId: tokenData.chainId,
+          contractAddress: tokenData.contractAddress,
+          poolAddress: tokenData.poolAddress,
+          name: tokenData.name,
+          symbol: tokenData.symbol,
+          price: tokenData.price || 0,
+          change24h: tokenData.change24h || 0,
+          volume24h: tokenData.volume24h || 0,
+          marketCap: 0,
+          liquidity: tokenData.liquidity || 0,
+          buys24h: tokenData.buys24h || 0,
+          sells24h: tokenData.sells24h || 0,
+          logo: tokenData.logo,
+        };
+
+        const updatedTokens = [...tokens, newToken];
+        setTokens(updatedTokens);
+        setFilteredTokens(updatedTokens);
+      }
+    } catch (error) {
+      console.error("Error adding token:", error);
+    }
   };
 
-  // ✅ THIS IS THE CLICK HANDLER - Navigates to token overview page
-  const handleTokenClick = (tokenId: number) => {
-    router.push(`/dashboard/tokenOverview/${tokenId}`);
+  const handleTokenClick = (token: Token) => {
+    router.push(
+      `/dashboard/tokenOverview/${token.chainId}/${token.contractAddress}?pool=${token.poolAddress}`
+    );
   };
+
+  if (loading) {
+    return (
+      <div className="h-full bg-[#0F0F0F] rounded-[16px] p-4 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full bg-[#0F0F0F] rounded-[16px] p-4 flex flex-col overflow-hidden">
@@ -240,9 +257,9 @@ export default function CodeLens() {
           <div className="flex items-center justify-center">Price</div>
           <div className="flex items-center justify-center">24h</div>
           <div className="flex items-center justify-center">24h Volume</div>
-          <div className="flex items-center justify-center">Market Cap</div>
-          <div className="flex items-center justify-center">No of buys</div>
-          <div className="flex items-center justify-center">No of sells</div>
+          <div className="flex items-center justify-center">Liquidity</div>
+          <div className="flex items-center justify-center">Buys</div>
+          <div className="flex items-center justify-center">Sells</div>
           <div className="flex items-center justify-center">Actions</div>
         </div>
 
@@ -250,21 +267,33 @@ export default function CodeLens() {
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           {filteredTokens.length === 0 ? (
             <div className="flex items-center justify-center h-64">
-              <p className="text-gray-500 font-satoshi">No tokens found</p>
+              <p className="text-gray-500 font-satoshi">
+                {searchQuery
+                  ? "No tokens found"
+                  : "No tokens in watchlist. Click + to add tokens."}
+              </p>
             </div>
           ) : (
             filteredTokens.map((token) => (
               <div
                 key={token.id}
-                onClick={() => handleTokenClick(token.id)} // ✅ CLICK HANDLER HERE - Entire row is clickable
-                className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.5fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer" // ✅ cursor-pointer shows it's clickable
+                onClick={() => handleTokenClick(token)}
+                className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.5fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer"
               >
                 {/* Token */}
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">
-                      {token.symbol.charAt(0)}
-                    </span>
+                    {token.logo ? (
+                      <img
+                        src={token.logo}
+                        alt={token.symbol}
+                        className="w-8 h-8 rounded-full"
+                      />
+                    ) : (
+                      <span className="text-white text-xs font-bold">
+                        {token.symbol.charAt(0)}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-row items-baseline gap-1.5">
                     <div className="text-white font-satoshi font-medium text-sm">
@@ -287,27 +316,28 @@ export default function CodeLens() {
                     token.change24h > 0 ? "text-green-500" : "text-red-500"
                   }`}
                 >
-                  {token.change24h > 0 ? "▲" : "▼"} {Math.abs(token.change24h)}%
+                  {token.change24h > 0 ? "▲" : "▼"}{" "}
+                  {Math.abs(token.change24h).toFixed(2)}%
                 </div>
 
                 {/* 24h Volume */}
                 <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                  ${token.volume24h.toLocaleString()}
+                  {formatNumber(token.volume24h)}
                 </div>
 
-                {/* Market Cap */}
+                {/* Liquidity */}
                 <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                  {formatNumber(token.marketCap)}
+                  {formatNumber(token.liquidity)}
                 </div>
 
                 {/* Buys */}
-                <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                  {token.buys}
+                <div className="flex items-center justify-center text-green-500 font-satoshi text-sm">
+                  {token.buys24h}
                 </div>
 
                 {/* Sells */}
-                <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                  {token.sells}
+                <div className="flex items-center justify-center text-red-500 font-satoshi text-sm">
+                  {token.sells24h}
                 </div>
 
                 {/* Actions */}
@@ -316,7 +346,7 @@ export default function CodeLens() {
                     ref={(el) => {
                       buttonRefs.current[token.id] = el;
                     }}
-                    onClick={(e) => handleMoreClick(token.id, e)} // ✅ stopPropagation prevents row click
+                    onClick={(e) => handleMoreClick(token.id, e)}
                     className="p-1 hover:bg-[#2C2C2C] rounded transition-colors"
                     title="More actions"
                   >

@@ -23,6 +23,7 @@ import DarkModeIcon from "@/components/icons/DarkModeIcon";
 import LogoutIcon from "@/components/icons/LogoutIcon";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 import SwapIcon from "../icons/SwapIcon";
+import UsersIcon from "../icons/UsersIcon";
 
 const menuItems = [
   {
@@ -65,6 +66,12 @@ const menuItems = [
     icon: SwapIcon,
     label: "CodeLens",
     href: "/dashboard/code-lens",
+    comingSoon: false,
+  },
+  {
+    icon: UsersIcon,
+    label: "NewsFeed",
+    href: "/dashboard/news-feed",
     comingSoon: false,
   },
 ];

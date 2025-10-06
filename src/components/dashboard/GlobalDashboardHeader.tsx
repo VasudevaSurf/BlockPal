@@ -61,6 +61,11 @@ const getPageTitle = (
         title: "CodeLens",
         subtitle: "Analyze Tokens",
       };
+    case "/dashboard/news-feed":
+      return {
+        title: "News Feed",
+        subtitle: "News Feed",
+      };
     default:
       return {
         title: "Dashboard",
