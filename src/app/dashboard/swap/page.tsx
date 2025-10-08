@@ -736,7 +736,6 @@ export default function SwapPage() {
                     )}
                   </div>
                 </div>
-
                 {/* Slippage Settings */}
                 {/* {showSlippageSettings && (
                   <div className="mb-4 p-3 bg-[#191919] rounded-lg">
@@ -776,7 +775,6 @@ export default function SwapPage() {
                     </button>
                   </div>
                 )} */}
-
                 {/* From Token Box */}
                 <div
                   className="bg-[#191919] p-4"
@@ -889,7 +887,6 @@ export default function SwapPage() {
                     </button>
                   </div>
                 </div>
-
                 {/* Swap Icon */}
                 <div className="flex justify-center relative -my-[22px] z-10">
                   <button
@@ -899,8 +896,8 @@ export default function SwapPage() {
                     <SwapIcon className="text-black w-5 h-5" />
                   </button>
                 </div>
-
                 {/* To Token Box */}
+                /* To Token Box - FIXED VERSION */
                 <div
                   className="bg-[#191919] p-5 mb-2"
                   style={{ borderRadius: "26.066px" }}
@@ -919,7 +916,7 @@ export default function SwapPage() {
                       />
                     </div>
 
-                    {/* Updated token select button with glacier effect */}
+                    {/* FIXED: Updated token select button - only show icon when token is selected */}
                     <div className="relative">
                       <div className="relative p-[1px] rounded-[25px] overflow-hidden">
                         {/* Animated gradient border */}
@@ -927,12 +924,12 @@ export default function SwapPage() {
                           className="absolute inset-0"
                           style={{
                             background: `linear-gradient(135deg, 
-            rgba(255, 255, 255, 0.3) 0%,
-            rgba(255, 255, 255, 0.1) 20%,
-            rgba(226, 175, 25, 0.2) 40%,
-            rgba(255, 255, 255, 0.05) 60%,
-            rgba(226, 175, 25, 0.15) 80%,
-            rgba(255, 255, 255, 0.2) 100%)`,
+              rgba(255, 255, 255, 0.3) 0%,
+              rgba(255, 255, 255, 0.1) 20%,
+              rgba(226, 175, 25, 0.2) 40%,
+              rgba(255, 255, 255, 0.05) 60%,
+              rgba(226, 175, 25, 0.15) 80%,
+              rgba(255, 255, 255, 0.2) 100%)`,
                           }}
                         />
 
@@ -942,18 +939,19 @@ export default function SwapPage() {
                           className="relative flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] rounded-[24px]"
                           style={{
                             background: `linear-gradient(135deg, 
-            rgba(25, 25, 25, 0.85) 0%,
-            rgba(40, 40, 40, 0.75) 50%,
-            rgba(25, 25, 25, 0.85) 100%)`,
+              rgba(25, 25, 25, 0.85) 0%,
+              rgba(40, 40, 40, 0.75) 50%,
+              rgba(25, 25, 25, 0.85) 100%)`,
                             backdropFilter: "blur(1px)",
                             boxShadow: `
-            inset 0 1px 2px rgba(255, 255, 255, 0.05),
-            inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-            0 2px 8px rgba(0, 0, 0, 0.3)
-          `,
+              inset 0 1px 2px rgba(255, 255, 255, 0.05),
+              inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+              0 2px 8px rgba(0, 0, 0, 0.3)
+            `,
                           }}
                         >
-                          {toToken ? (
+                          {/* FIXED: Only show TokenImage when toToken is selected */}
+                          {toToken && (
                             <TokenImage
                               src={toToken.logoURI}
                               alt={toToken.symbol}
@@ -961,16 +959,17 @@ export default function SwapPage() {
                               name={toToken.name}
                               className="w-7 h-7"
                             />
-                          ) : (
-                            <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">
-                                E
-                              </span>
-                            </div>
                           )}
-                          <span className="text-white text-base font-satoshi">
+
+                          {/* FIXED: Show text with conditional styling */}
+                          <span
+                            className={`text-white text-base font-satoshi ${
+                              !toToken ? "pl-1" : ""
+                            }`}
+                          >
                             {toToken?.symbol || "Select Token"}
                           </span>
+
                           <svg
                             className="w-3.5 h-3.5 text-gray-400"
                             fill="none"
@@ -1130,7 +1129,6 @@ export default function SwapPage() {
                     </div>
                   </div>
                 </div>
-
                 {/* Error Display */}
                 {quoteError && (
                   <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg mb-2">
@@ -1139,7 +1137,6 @@ export default function SwapPage() {
                     </p>
                   </div>
                 )}
-
                 {/* Quote Info with proper gas display */}
                 {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
                   <div className="p-3 bg-[#191919] rounded-lg mb-2 text-sm">
@@ -1175,7 +1172,6 @@ export default function SwapPage() {
                     </div>
                   </div>
                 )}
-
                 {/* Swap Button */}
                 {!isConnected ? (
                   <WalletConnectButton />

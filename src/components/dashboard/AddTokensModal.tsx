@@ -162,7 +162,8 @@ export default function AddTokensModal({
           name: item.tokenName,
           symbol: item.tokenSymbol,
           price: item.marketData?.price || 0,
-          logo: item.metadata?.logo || "",
+          // FIXED: Use cachedLogo for recently added tokens
+          logo: item.cachedLogo || item.metadata?.logo || "",
           change24h: item.marketData?.change24h || 0,
           liquidity: item.marketData?.liquidity || 0,
           volume24h: item.marketData?.volume24h || 0,
