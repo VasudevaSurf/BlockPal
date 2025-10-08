@@ -5,7 +5,13 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { Search, Plus, SlidersHorizontal, MoreVertical, RefreshCw } from "lucide-react";
+import {
+  Search,
+  Plus,
+  SlidersHorizontal,
+  MoreVertical,
+  RefreshCw,
+} from "lucide-react";
 import TokenActionsMenu from "@/components/dashboard/TokenActionsMenu";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
 import { coinlesService, WatchlistToken } from "@/services/coinlesService";
@@ -34,7 +40,9 @@ export default function CodeLens() {
   const [searchQuery, setSearchQuery] = useState("");
   const [tokens, setTokens] = useState<Token[]>([]);
   const [filteredTokens, setFilteredTokens] = useState<Token[]>([]);
-  const [activeMenuTokenId, setActiveMenuTokenId] = useState<string | null>(null);
+  const [activeMenuTokenId, setActiveMenuTokenId] = useState<string | null>(
+    null
+  );
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -65,8 +73,11 @@ export default function CodeLens() {
 
     try {
       if (!isRefresh) setLoading(true);
-      
-      const watchlist = await coinlesService.getUserWatchlist(user.email, isRefresh);
+
+      const watchlist = await coinlesService.getUserWatchlist(
+        user.email,
+        isRefresh
+      );
 
       const transformedTokens: Token[] = watchlist.map((item) => ({
         id: `${item.chainId}_${item.contractAddress}`,
@@ -87,7 +98,7 @@ export default function CodeLens() {
 
       setTokens(transformedTokens);
       setFilteredTokens(transformedTokens);
-      
+
       console.log(`Loaded ${transformedTokens.length} tokens`);
     } catch (error) {
       console.error("Error loading watchlist:", error);
@@ -155,7 +166,9 @@ export default function CodeLens() {
   const handleCopy = () => {
     const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
     if (token) {
-      const tokenInfo = `${token.name} (${token.symbol})\nContract: ${token.contractAddress}\nPrice: $${token.price.toLocaleString()}`;
+      const tokenInfo = `${token.name} (${token.symbol})\nContract: ${
+        token.contractAddress
+      }\nPrice: $${token.price.toLocaleString()}`;
       navigator.clipboard.writeText(tokenInfo);
       console.log("Copied token info:", tokenInfo);
     }
@@ -228,7 +241,7 @@ export default function CodeLens() {
         const updatedTokens = [...tokens, newToken];
         setTokens(updatedTokens);
         setFilteredTokens(updatedTokens);
-        
+
         console.log("Token added successfully:", newToken.name);
       }
     } catch (error) {
@@ -283,7 +296,9 @@ export default function CodeLens() {
           className="bg-black border border-[#2C2C2C] hover:border-[#E2AF19] p-3 rounded-xl transition-colors disabled:opacity-50"
           title="Refresh tokens"
         >
-          <RefreshCw className={`w-5 h-5 text-white ${refreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw
+            className={`w-5 h-5 text-white ${refreshing ? "animate-spin" : ""}`}
+          />
         </button>
         <button
           className="bg-black border border-[#2C2C2C] hover:border-[#E2AF19] p-3 rounded-xl transition-colors"
@@ -326,14 +341,14 @@ export default function CodeLens() {
               >
                 {/* Token */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center">
                     {token.logo ? (
                       <img
                         src={token.logo}
                         alt={token.symbol}
                         className="w-8 h-8 rounded-full"
                         onError={(e) => {
-                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.style.display = "none";
                         }}
                       />
                     ) : (
@@ -354,7 +369,11 @@ export default function CodeLens() {
 
                 {/* Price */}
                 <div className="flex items-center justify-center text-white font-satoshi font-medium text-sm">
-                  ${token.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                  $
+                  {token.price.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 6,
+                  })}
                 </div>
 
                 {/* 24h Change */}

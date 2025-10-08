@@ -1,9 +1,10 @@
-// src/components/dashboard/AddTokensModal.tsx - COMPLETE WITH BACKEND
+// src/components/dashboard/AddTokensModal.tsx - ENHANCED WITH COINGECKO TRENDING + RECENTLY ADDED
 import { useState, useEffect } from "react";
 import { X, Search, Loader2 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { coinlesService, TokenSearchResult } from "@/services/coinlesService";
+import { useCoinGecko, TrendingToken } from "@/hooks/useCoinGecko";
 
 interface AddTokensModalProps {
   isOpen: boolean;
@@ -87,80 +88,11 @@ const TopGainersIcon = () => (
   </svg>
 );
 
-const TopLosersIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-  >
-    <g clipPath="url(#clip0_1230_8187)">
-      <path
-        d="M16.5 14.5L12.3 10.3L10.7 12.7L7.5 9.5"
-        stroke="#B7B7B7"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M14.5 14.5H16.5V12.5"
-        stroke="#B7B7B7"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z"
-        stroke="#B7B7B7"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </g>
-    <defs>
-      <clipPath id="clip0_1230_8187">
-        <rect width="24" height="24" fill="white" />
-      </clipPath>
-    </defs>
-  </svg>
-);
-
-const RecentlyAddedIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-  >
-    <path
-      d="M15.59 12.26C18.4232 12.26 20.72 9.96323 20.72 7.13C20.72 4.29678 18.4232 2 15.59 2C12.7567 2 10.46 4.29678 10.46 7.13C10.46 9.96323 12.7567 12.26 15.59 12.26Z"
-      stroke="#B7B7B7"
-      strokeWidth="1.5"
-      strokeMiterlimit="10"
-    />
-    <path
-      d="M6.35977 19.4393C8.06081 19.4393 9.43979 18.0603 9.43979 16.3593C9.43979 14.6583 8.06081 13.2793 6.35977 13.2793C4.65873 13.2793 3.27979 14.6583 3.27979 16.3593C3.27979 18.0603 4.65873 19.4393 6.35977 19.4393Z"
-      stroke="#B7B7B7"
-      strokeWidth="1.5"
-      strokeMiterlimit="10"
-    />
-    <path
-      d="M16.6201 22.0009C18.0339 22.0009 19.1801 20.8547 19.1801 19.4409C19.1801 18.027 18.0339 16.8809 16.6201 16.8809C15.2062 16.8809 14.0601 18.027 14.0601 19.4409C14.0601 20.8547 15.2062 22.0009 16.6201 22.0009Z"
-      stroke="#B7B7B7"
-      strokeWidth="1.5"
-      strokeMiterlimit="10"
-    />
-  </svg>
-);
-
 const TABS = [
-  { id: "recent", label: "Recently Searched", icon: ClockIcon },
   { id: "trending", label: "Trending", icon: TrendingIcon },
   { id: "eth", label: "Ethereum", icon: TopGainersIcon },
-  { id: "bsc", label: "BSC", icon: TopLosersIcon },
-  { id: "sol", label: "Solana", icon: RecentlyAddedIcon },
+  { id: "bsc", label: "BSC", icon: TopGainersIcon },
+  { id: "sol", label: "Solana", icon: TopGainersIcon },
 ];
 
 const CHAIN_MAPPING: { [key: string]: string } = {
@@ -168,7 +100,6 @@ const CHAIN_MAPPING: { [key: string]: string } = {
   eth: "eth",
   bsc: "bsc",
   sol: "sol",
-  recent: "eth",
 };
 
 export default function AddTokensModal({
@@ -176,18 +107,77 @@ export default function AddTokensModal({
   onClose,
   onAddToken,
 }: AddTokensModalProps) {
+  // Get user from Redux
   const { user } = useSelector((state: RootState) => state.auth);
+
+  // Get real trending tokens from CoinGecko
+  const { data: coinGeckoData, loading: coinGeckoLoading } = useCoinGecko();
 
   const [activeTab, setActiveTab] = useState("trending");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set());
   const [searchResults, setSearchResults] = useState<TokenSearchResult[]>([]);
-  const [trendingTokens, setTrendingTokens] = useState<TokenSearchResult[]>([]);
   const [recentlyAdded, setRecentlyAdded] = useState<TokenSearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchDebounceTimer, setSearchDebounceTimer] =
     useState<NodeJS.Timeout | null>(null);
+
+  // Get trending tokens from CoinGecko
+  const trendingTokens = coinGeckoData?.trendingTokens || [];
+
+  // Load recently added tokens when modal opens
+  useEffect(() => {
+    if (isOpen && user?.email) {
+      loadRecentlyAdded();
+    }
+  }, [isOpen, user?.email]);
+
+  // Load recently added tokens from user's watchlist
+  const loadRecentlyAdded = async () => {
+    if (!user?.email) return;
+
+    try {
+      const watchlist = await coinlesService.getUserWatchlist(
+        user.email,
+        false
+      );
+
+      // Get last 5 added tokens
+      const recent = watchlist
+        .sort((a, b) => {
+          const dateA = new Date(a.addedAt || 0).getTime();
+          const dateB = new Date(b.addedAt || 0).getTime();
+          return dateB - dateA;
+        })
+        .slice(0, 5)
+        .map((item) => ({
+          poolAddress: item.poolAddress,
+          contractAddress: item.contractAddress,
+          contractAddressDisplay: `${item.contractAddress.substring(
+            0,
+            6
+          )}...${item.contractAddress.substring(
+            item.contractAddress.length - 4
+          )}`,
+          name: item.tokenName,
+          symbol: item.tokenSymbol,
+          price: item.marketData?.price || 0,
+          logo: item.metadata?.logo || "",
+          change24h: item.marketData?.change24h || 0,
+          liquidity: item.marketData?.liquidity || 0,
+          volume24h: item.marketData?.volume24h || 0,
+          buys24h: item.transactions?.buys24h || 0,
+          sells24h: item.transactions?.sells24h || 0,
+          poolCount: 1,
+          displayName: item.tokenName,
+        }));
+
+      setRecentlyAdded(recent);
+    } catch (error) {
+      console.error("Error loading recently added tokens:", error);
+      setRecentlyAdded([]);
+    }
+  };
 
   // Reset state when modal closes
   useEffect(() => {
@@ -196,9 +186,6 @@ export default function AddTokensModal({
       setSelectedTokens(new Set());
       setActiveTab("trending");
       setSearchResults([]);
-    } else {
-      // Load trending tokens when modal opens
-      loadTrendingTokens();
     }
   }, [isOpen]);
 
@@ -236,46 +223,6 @@ export default function AddTokensModal({
     };
   }, [searchQuery]);
 
-  // Load trending tokens
-  const loadTrendingTokens = async () => {
-    try {
-      setLoading(true);
-      const chain = CHAIN_MAPPING[activeTab] || "eth";
-
-      // Don't search with empty string - use popular token names
-      const popularSearchTerms: { [key: string]: string } = {
-        eth: "ethereum",
-        bsc: "bnb",
-        sol: "solana",
-        trending: "weth",
-        recent: "usdt",
-      };
-
-      const searchTerm = popularSearchTerms[activeTab] || "ethereum";
-
-      console.log(
-        "Loading trending tokens for",
-        chain,
-        "searching:",
-        searchTerm
-      );
-
-      const results = await coinlesService.searchTokens(chain, searchTerm);
-
-      if (results && results.length > 0) {
-        setTrendingTokens(results.slice(0, 10));
-        console.log("Loaded trending tokens:", results.length);
-      } else {
-        setTrendingTokens([]);
-      }
-    } catch (error) {
-      console.error("Error loading trending tokens:", error);
-      setTrendingTokens([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Handle search
   const handleSearch = async (query: string) => {
     if (!query) {
@@ -306,19 +253,9 @@ export default function AddTokensModal({
     }
   };
 
-  // Load tokens based on active tab
-  useEffect(() => {
-    if (isOpen && activeTab !== "recent") {
-      loadTrendingTokens();
-    }
-  }, [activeTab, isOpen]);
-
   if (!isOpen) return null;
 
   const hasSearchResults = searchQuery.trim().length > 0;
-
-  // Get tokens to display based on active tab or search
-  const tokensToDisplay = hasSearchResults ? searchResults : trendingTokens;
 
   const toggleTokenSelection = (tokenKey: string) => {
     const newSelected = new Set(selectedTokens);
@@ -336,13 +273,36 @@ export default function AddTokensModal({
       return;
     }
 
-    const tokensToAdd = tokensToDisplay.filter((token) =>
+    // Add tokens from trending list
+    const trendingToAdd = trendingTokens.filter((token: TrendingToken) => {
+      const tokenKey = `trending_${token.symbol}`;
+      return selectedTokens.has(tokenKey);
+    });
+
+    // Add tokens from search results
+    const searchToAdd = searchResults.filter((token) =>
       selectedTokens.has(`${token.contractAddress}_${token.poolAddress}`)
     );
 
-    console.log("Adding tokens:", tokensToAdd.length);
+    console.log("Adding tokens:", {
+      trending: trendingToAdd.length,
+      search: searchToAdd.length,
+    });
 
-    for (const token of tokensToAdd) {
+    // Add trending tokens (with dummy addresses for now)
+    for (const token of trendingToAdd) {
+      const tokenData = {
+        chainId: "eth",
+        contractAddress: `0x${token.symbol.toLowerCase().padEnd(40, "0")}`,
+        poolAddress: `0x${token.symbol.toLowerCase().padEnd(40, "1")}`,
+        name: token.name,
+        symbol: token.symbol,
+      };
+      await onAddToken(tokenData);
+    }
+
+    // Add search result tokens
+    for (const token of searchToAdd) {
       const tokenData = {
         chainId: CHAIN_MAPPING[activeTab] || "eth",
         contractAddress: token.contractAddress,
@@ -350,7 +310,6 @@ export default function AddTokensModal({
         name: token.name,
         symbol: token.symbol,
       };
-
       await onAddToken(tokenData);
     }
 
@@ -372,12 +331,6 @@ export default function AddTokensModal({
 
   const handleRemoveFromRecent = (tokenKey: string) => {
     setRecentlyAdded((prev) =>
-      prev.filter((t) => `${t.contractAddress}_${t.poolAddress}` !== tokenKey)
-    );
-  };
-
-  const handleRemoveFromSearch = (tokenKey: string) => {
-    setSearchResults((prev) =>
       prev.filter((t) => `${t.contractAddress}_${t.poolAddress}` !== tokenKey)
     );
   };
@@ -404,7 +357,7 @@ export default function AddTokensModal({
             </button>
           </div>
 
-          {/* Search Bar - Full Width */}
+          {/* Search Bar */}
           <div className="px-8 pb-4 flex-shrink-0">
             <div className="relative">
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -424,35 +377,10 @@ export default function AddTokensModal({
             </div>
           </div>
 
-          {/* Tab Badges */}
-          <div className="px-8 pb-4 flex-shrink-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              {TABS.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[12px] transition-all border text-[11px] ${
-                      isActive
-                        ? "bg-[#281E01] text-[#E2AF19]"
-                        : "bg-transparent text-white border-transparent"
-                    }`}
-                  >
-                    <Icon />
-                    <span className="font-mayeka font-medium">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Two Boxes Side by Side */}
           <div className="flex-1 px-8 pb-4 overflow-hidden flex flex-col min-h-0">
             <div className="flex gap-4 flex-1 min-h-0">
-              {/* Left Box - Trending/Active Tab */}
+              {/* Left Box - Search Results (ALWAYS VISIBLE) */}
               <div className="flex-1 relative p-[2px] rounded-[16px] min-h-0">
                 <div
                   className="absolute inset-0 rounded-[16px]"
@@ -463,31 +391,33 @@ export default function AddTokensModal({
                 <div className="relative bg-black rounded-[14px] h-full p-3 flex flex-col overflow-hidden">
                   <div className="mb-2 flex-shrink-0">
                     <h3 className="text-white font-satoshi font-medium text-xs">
-                      {TABS.find((t) => t.id === activeTab)?.label}
+                      Search Results
                     </h3>
                   </div>
 
                   <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide pr-1">
-                    {loading ? (
+                    {searchLoading ? (
                       <div className="flex flex-col items-center justify-center py-8">
                         <Loader2 className="w-8 h-8 text-[#E2AF19] animate-spin mb-2" />
                         <p className="text-gray-400 font-satoshi text-[10px]">
-                          Loading tokens...
+                          Searching tokens...
                         </p>
                       </div>
-                    ) : tokensToDisplay.length === 0 ? (
+                    ) : searchResults.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-2">
-                          <span className="text-xl">🔍</span>
+                          <span className="text-xl">
+                            {searchQuery ? "🔍" : "💭"}
+                          </span>
                         </div>
                         <p className="text-gray-400 font-satoshi text-[10px]">
-                          {hasSearchResults
-                            ? "No tokens found"
-                            : "No tokens available"}
+                          {searchQuery
+                            ? "No results found"
+                            : "Start typing to search"}
                         </p>
                       </div>
                     ) : (
-                      tokensToDisplay.map((token) => {
+                      searchResults.map((token) => {
                         const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
                         const isSelected = selectedTokens.has(tokenKey);
 
@@ -559,7 +489,7 @@ export default function AddTokensModal({
                 </div>
               </div>
 
-              {/* Right Box - Search Results & Recently Added */}
+              {/* Right Box - Trending Tokens & Recently Added */}
               <div className="flex-1 relative p-[2px] rounded-[16px] min-h-0">
                 <div
                   className="absolute inset-0 rounded-[16px]"
@@ -568,23 +498,30 @@ export default function AddTokensModal({
                   }}
                 />
                 <div className="relative bg-black rounded-[14px] h-full p-3 flex flex-col overflow-hidden">
-                  {/* Search Results Section */}
+                  {/* Trending Tokens Section */}
                   <div className="flex-shrink-0 mb-2">
                     <h3 className="text-white font-satoshi font-medium text-xs mb-2">
-                      Search Results
+                      Trending Tokens
                     </h3>
                     <div className="space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide">
-                      {searchResults.length === 0 ? (
+                      {coinGeckoLoading ? (
+                        <div className="flex flex-col items-center justify-center py-4">
+                          <Loader2 className="w-6 h-6 text-[#E2AF19] animate-spin mb-2" />
+                          <p className="text-gray-400 font-satoshi text-[10px]">
+                            Loading trending...
+                          </p>
+                        </div>
+                      ) : trendingTokens.length === 0 ? (
                         <div className="text-center py-4">
                           <p className="text-gray-400 font-satoshi text-[10px]">
-                            {searchQuery
-                              ? "No results"
-                              : "Start typing to search"}
+                            No trending tokens
                           </p>
                         </div>
                       ) : (
-                        searchResults.map((token) => {
-                          const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
+                        trendingTokens.map((token: TrendingToken) => {
+                          const tokenKey = `trending_${token.symbol}`;
+                          const isSelected = selectedTokens.has(tokenKey);
+
                           return (
                             <div
                               key={tokenKey}
@@ -592,23 +529,24 @@ export default function AddTokensModal({
                             >
                               <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <div
-                                  className={`w-7 h-7 rounded-full bg-gradient-to-br ${getColorForSymbol(
-                                    token.symbol
-                                  )} flex items-center justify-center flex-shrink-0`}
+                                  className={`w-7 h-7 rounded-full ${token.bgColor} flex items-center justify-center flex-shrink-0`}
                                 >
-                                  {token.logo ? (
+                                  {token.imageUrl ? (
                                     <img
-                                      src={token.logo}
+                                      src={token.imageUrl}
                                       alt={token.symbol}
                                       className="w-7 h-7 rounded-full"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = "none";
+                                      }}
                                     />
                                   ) : (
                                     <span className="text-white text-[10px] font-bold">
-                                      {token.symbol.charAt(0)}
+                                      {token.icon}
                                     </span>
                                   )}
                                 </div>
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                   <div className="text-white font-satoshi font-medium text-[11px] truncate">
                                     {token.name}
                                   </div>
@@ -618,15 +556,35 @@ export default function AddTokensModal({
                                 </div>
                               </div>
 
-                              <button
-                                onClick={() => handleRemoveFromSearch(tokenKey)}
-                                className="p-0.5 bg-transparent hover:bg-[#2C2C2C] rounded-md transition-colors flex-shrink-0"
-                              >
-                                <X
-                                  size={12}
-                                  className="text-gray-400 hover:text-white"
-                                />
-                              </button>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <div
+                                  className={`font-satoshi text-[10px] font-medium ${
+                                    token.changeType === "positive"
+                                      ? "text-green-500"
+                                      : "text-red-500"
+                                  }`}
+                                >
+                                  {token.changeType === "positive" ? "▲" : "▼"}{" "}
+                                  {token.change
+                                    .replace("+", "")
+                                    .replace("-", "")}
+                                </div>
+
+                                <button
+                                  onClick={() => toggleTokenSelection(tokenKey)}
+                                  className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
+                                    isSelected
+                                      ? "bg-[#E2AF19]"
+                                      : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-2 h-2 rounded-full ${
+                                      isSelected ? "bg-black" : ""
+                                    }`}
+                                  />
+                                </button>
+                              </div>
                             </div>
                           );
                         })
@@ -678,7 +636,7 @@ export default function AddTokensModal({
                                     </span>
                                   )}
                                 </div>
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                   <div className="text-white font-satoshi font-medium text-[11px] truncate">
                                     {token.name}
                                   </div>
@@ -726,9 +684,6 @@ export default function AddTokensModal({
               </div>
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="px-8 pb-6 flex-shrink-0"></div>
         </div>
       </div>
 

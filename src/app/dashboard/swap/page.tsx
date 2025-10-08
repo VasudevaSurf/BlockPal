@@ -953,7 +953,7 @@ export default function SwapPage() {
           `,
                           }}
                         >
-                          {toToken ? (
+                          {toToken && (
                             <TokenImage
                               src={toToken.logoURI}
                               alt={toToken.symbol}
@@ -961,15 +961,9 @@ export default function SwapPage() {
                               name={toToken.name}
                               className="w-7 h-7"
                             />
-                          ) : (
-                            <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">
-                                E
-                              </span>
-                            </div>
                           )}
                           <span className="text-white text-base font-satoshi">
-                            {toToken?.symbol || "ETH"}
+                            {toToken?.symbol || "Select Token"}
                           </span>
                           <svg
                             className="w-3.5 h-3.5 text-gray-400"
@@ -995,7 +989,7 @@ export default function SwapPage() {
                         Estimated Fee:
                       </span>
                       <span className="text-[#FFFFFF] font-satoshi">
-                        {gasPrice ? `(~$${gasPrice.gasCostUSD})` : "(~$1.25)"}
+                        {gasPrice ? `(~$${gasPrice.gasCostUSD})` : "(~$0.00)"}
                       </span>
                     </div>
                     {/* Gas Mode Selection Buttons */}
