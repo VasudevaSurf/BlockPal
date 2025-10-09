@@ -290,19 +290,43 @@ export default function AddTokensModal({
       search: searchToAdd.length,
     });
 
-    // Add trending tokens (with dummy addresses for now)
+    // ✅ Auto-search and add trending tokens with real contract addresses
     for (const token of trendingToAdd) {
-      const tokenData = {
-        chainId: "eth",
-        contractAddress: `0x${token.symbol.toLowerCase().padEnd(40, "0")}`,
-        poolAddress: `0x${token.symbol.toLowerCase().padEnd(40, "1")}`,
-        name: token.name,
-        symbol: token.symbol,
-      };
-      await onAddToken(tokenData);
+      try {
+        console.log(`🔍 Searching for trending token: ${token.symbol}`);
+
+        // Search for the token to get real contract address
+        const chain = CHAIN_MAPPING[activeTab] || "eth";
+        const results = await coinlesService.searchTokens(chain, token.symbol);
+
+        if (results && results.length > 0) {
+          // Use the first result (most relevant)
+          const realToken = results[0];
+
+          const tokenData = {
+            chainId: chain,
+            contractAddress: realToken.contractAddress,
+            poolAddress: realToken.poolAddress,
+            name: realToken.name,
+            symbol: realToken.symbol,
+          };
+
+          console.log(`✅ Adding trending token: ${token.symbol}`, tokenData);
+          await onAddToken(tokenData);
+        } else {
+          console.warn(
+            `⚠️ No results found for trending token: ${token.symbol}`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `❌ Failed to add trending token ${token.symbol}:`,
+          error
+        );
+      }
     }
 
-    // Add search result tokens
+    // Add search result tokens (these have real contract addresses)
     for (const token of searchToAdd) {
       const tokenData = {
         chainId: CHAIN_MAPPING[activeTab] || "eth",
