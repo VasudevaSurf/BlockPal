@@ -897,7 +897,6 @@ export default function SwapPage() {
                   </button>
                 </div>
                 {/* To Token Box */}
-                /* To Token Box - FIXED VERSION */
                 <div
                   className="bg-[#191919] p-5 mb-2"
                   style={{ borderRadius: "26.066px" }}

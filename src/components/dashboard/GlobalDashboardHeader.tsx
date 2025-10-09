@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED with chain images
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED with correct tokenOverview detection
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -20,6 +20,14 @@ interface GlobalDashboardHeaderProps {
 const getPageTitle = (
   pathname: string
 ): { title: string; subtitle?: string } => {
+  // Check for token overview page first
+  if (pathname.startsWith("/dashboard/tokenOverview/")) {
+    return {
+      title: "Token Overview",
+      subtitle: "Detailed token analysis and metrics",
+    };
+  }
+
   switch (pathname) {
     case "/dashboard":
       return {
@@ -74,7 +82,7 @@ const getPageTitle = (
   }
 };
 
-// UPDATED: Chain data with proper image paths and conditional background colors
+// Chain data with proper image paths and conditional background colors
 const getChainDisplayData = () => {
   const chainDisplayData: {
     [key: number]: {
@@ -83,7 +91,7 @@ const getChainDisplayData = () => {
       icon: string;
       image?: string;
       fallbackIcon: string;
-      useBackground: boolean; // New property to control background usage
+      useBackground: boolean;
     };
   } = {
     1: {
@@ -92,7 +100,7 @@ const getChainDisplayData = () => {
       icon: "Ξ",
       image: "/chains/Ethereum.png",
       fallbackIcon: "Ξ",
-      useBackground: false, // Ethereum keeps background
+      useBackground: false,
     },
     8453: {
       name: "Base",
@@ -100,7 +108,7 @@ const getChainDisplayData = () => {
       icon: "B",
       image: "/chains/Base.png",
       fallbackIcon: "B",
-      useBackground: false, // Base no background
+      useBackground: false,
     },
     137: {
       name: "Polygon",
@@ -108,7 +116,7 @@ const getChainDisplayData = () => {
       icon: "◆",
       image: "/chains/Polygon.png",
       fallbackIcon: "◆",
-      useBackground: false, // Polygon no background
+      useBackground: false,
     },
     43114: {
       name: "Avalanche",
@@ -116,7 +124,7 @@ const getChainDisplayData = () => {
       icon: "A",
       image: "/chains/Avalanche.png",
       fallbackIcon: "A",
-      useBackground: true, // Avalanche keeps background
+      useBackground: true,
     },
     42161: {
       name: "Arbitrum",
@@ -124,7 +132,7 @@ const getChainDisplayData = () => {
       icon: "◉",
       image: "/chains/Arbitrum.png",
       fallbackIcon: "◉",
-      useBackground: false, // Arbitrum no background
+      useBackground: false,
     },
     56: {
       name: "BSC",
@@ -132,14 +140,14 @@ const getChainDisplayData = () => {
       icon: "B",
       image: "/chains/BSC.png",
       fallbackIcon: "B",
-      useBackground: true, // BSC keeps background
+      useBackground: true,
     },
   };
 
   return chainDisplayData;
 };
 
-// Chain Icon Component with image support and conditional background
+// Chain Icon Component
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -173,7 +181,6 @@ const ChainIcon = ({
     lg: "text-sm",
   };
 
-  // Reset image error state when chainData changes
   useEffect(() => {
     setImageError(false);
     setImageLoaded(false);
@@ -188,7 +195,6 @@ const ChainIcon = ({
     setImageLoaded(true);
   };
 
-  // Determine if we should show background
   const shouldShowBackground =
     !chainData.image || imageError || !imageLoaded || chainData.useBackground;
   const backgroundClass = shouldShowBackground ? chainData.color : "";
@@ -198,7 +204,6 @@ const ChainIcon = ({
       className={`${sizeClasses[size]} ${backgroundClass} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
-      {/* Chain Image */}
       {chainData.image && !imageError && (
         <img
           src={chainData.image}
@@ -212,7 +217,6 @@ const ChainIcon = ({
         />
       )}
 
-      {/* Fallback Icon - only show when needed */}
       {(!chainData.image || imageError || !imageLoaded) && (
         <span
           className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
@@ -281,7 +285,6 @@ export default function GlobalDashboardHeader({
     },
   });
 
-  // Mock wallet data for UI (keep existing mock data)
   const [selectedWallet] = useState({
     name: "Ethereum",
     address: "0xAD7a4hw64...R8J6153",
@@ -297,8 +300,8 @@ export default function GlobalDashboardHeader({
   const authChecked = useRef(false);
   const chainSelectorRef = useRef<HTMLDivElement>(null);
 
-  // Check if we're on a token overview page
-  const isTokenOverviewPage = pathname.startsWith("/dashboard/token/");
+  // UPDATED: Check if we're on a token overview page - matches your actual route structure
+  const isTokenOverviewPage = pathname.startsWith("/dashboard/tokenOverview/");
 
   // Get page-specific title and subtitle
   const pageInfo = getPageTitle(pathname);
@@ -306,12 +309,10 @@ export default function GlobalDashboardHeader({
   const displaySubtitle =
     propSubtitle !== "Welcome back" ? propSubtitle : pageInfo.subtitle;
 
-  // Ensure component is mounted before accessing wallet state
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Auth check effect - only run once
   useEffect(() => {
     if (!authChecked.current && !isAuthenticated && !authLoading) {
       authChecked.current = true;
@@ -319,7 +320,6 @@ export default function GlobalDashboardHeader({
     }
   }, [dispatch, isAuthenticated, authLoading]);
 
-  // Clear error when component unmounts or auth changes
   useEffect(() => {
     return () => {
       setSwitchError(null);
@@ -327,7 +327,6 @@ export default function GlobalDashboardHeader({
     };
   }, []);
 
-  // Clear error when wallet disconnects
   useEffect(() => {
     if (!isConnected) {
       setSwitchError(null);
@@ -335,7 +334,6 @@ export default function GlobalDashboardHeader({
     }
   }, [isConnected]);
 
-  // Close chain selector when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -353,25 +351,19 @@ export default function GlobalDashboardHeader({
     }
   }, [chainSelectorOpen]);
 
-  // Handle back button click
   const handleBackClick = () => {
     router.back();
   };
 
-  // Handle profile navigation
   const handleProfileClick = () => {
     router.push("/dashboard/profile");
   };
 
-  // Handle logout
   const handleLogout = async () => {
     try {
-      // Clear any local storage
       if (typeof window !== "undefined") {
         localStorage.clear();
       }
-
-      // Dispatch logout action
       await dispatch(logoutUser());
       router.push("/auth");
     } catch (error) {
@@ -380,37 +372,31 @@ export default function GlobalDashboardHeader({
     }
   };
 
-  // Handle chain switch with wagmi v2
   const handleChainSwitch = async (targetChainId: number) => {
-    // Don't proceed if not mounted to avoid hydration issues
     if (!mounted) {
       console.warn("⚠️ Component not mounted, skipping chain switch");
       setSwitchError("Please wait for the page to load completely");
       return;
     }
 
-    // Check if switchChain is available
     if (!switchChain) {
       console.warn("⚠️ switchChain function not available");
       setSwitchError("Chain switching not supported by current wallet");
       return;
     }
 
-    // Check if wallet is connected
     if (!isConnected || !address) {
       console.log("⚠️ Wallet not connected, cannot switch chain");
       setSwitchError("Please connect your wallet first");
       return;
     }
 
-    // Don't switch if already on the target chain
     if (chainId === targetChainId) {
       console.log("ℹ️ Already on target chain:", targetChainId);
       setChainSelectorOpen(false);
       return;
     }
 
-    // Don't allow multiple simultaneous switches
     if (isSwitchingChain || switchingChain) {
       console.log("⚠️ Chain switch already in progress");
       setSwitchError("Chain switch already in progress");
@@ -427,7 +413,6 @@ export default function GlobalDashboardHeader({
     } catch (error: any) {
       console.error(`❌ Chain switch to ${targetChainId} failed:`, error);
 
-      // Handle specific error types
       let userMessage = "Failed to switch chain";
 
       if (error.message?.includes("timeout")) {
@@ -454,18 +439,15 @@ export default function GlobalDashboardHeader({
     }
   };
 
-  // UPDATED: Get chain display data with proper fallbacks
   const chainDisplayData = getChainDisplayData();
   const currentChain =
     mounted && isConnected ? chains.find((c) => c.id === chainId) : null;
 
-  // Get display data for current chain with proper fallback
   const getCurrentChainDisplay = () => {
     if (mounted && isConnected && chainId && chainDisplayData[chainId]) {
       return chainDisplayData[chainId];
     }
 
-    // Fallback to first chain in display data
     return (
       chainDisplayData[1] || {
         name: "Ethereum",
@@ -480,12 +462,10 @@ export default function GlobalDashboardHeader({
 
   const currentChainDisplay = getCurrentChainDisplay();
 
-  // Don't render if not authenticated
   if (!isAuthenticated) {
     return null;
   }
 
-  // Don't render wallet-dependent parts until mounted
   const showWalletInfo = mounted && isConnected;
 
   return (
@@ -494,7 +474,7 @@ export default function GlobalDashboardHeader({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 flex-shrink-0 gap-3 sm:gap-0">
         <div>
           <div className="flex items-center">
-            {/* Back button - only show on specific pages */}
+            {/* Back button - shows on token overview page */}
             {isTokenOverviewPage && (
               <button
                 onClick={handleBackClick}
@@ -515,7 +495,6 @@ export default function GlobalDashboardHeader({
           <div className="relative" ref={chainSelectorRef}>
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] gap-1.5">
               <div className="flex items-center flex-1 min-w-0 bg-[#0F0F0F] rounded-[100px] p-[4px] mr-2">
-                {/* Chain Icon - UPDATED with image support */}
                 <ChainIcon
                   chainData={currentChainDisplay}
                   size="md"
@@ -531,7 +510,6 @@ export default function GlobalDashboardHeader({
                 </div>
               </div>
 
-              {/* Address and Dropdown Button */}
               <button
                 onClick={() => setChainSelectorOpen(!chainSelectorOpen)}
                 className="flex items-center hover:opacity-80 transition-opacity"
@@ -555,15 +533,12 @@ export default function GlobalDashboardHeader({
             {/* Chain Selector Dropdown */}
             {chainSelectorOpen && mounted && (
               <>
-                {/* Backdrop */}
                 <div
                   className="fixed inset-0 z-30 bg-black/20"
                   onClick={() => setChainSelectorOpen(false)}
                 />
 
-                {/* Dropdown */}
                 <div className="absolute top-full right-0 mt-2 w-64 bg-black border border-[#2C2C2C] rounded-[28px] shadow-2xl z-40 overflow-hidden">
-                  {/* Header */}
                   <div className="flex items-center justify-between p-3">
                     <button
                       onClick={() => setChainSelectorOpen(false)}
@@ -574,15 +549,8 @@ export default function GlobalDashboardHeader({
                     <h3 className="text-white font-semibold text-sm font-satoshi absolute left-1/2 transform -translate-x-1/2">
                       Select Chain
                     </h3>
-                    {/* <button
-                      onClick={() => setChainSelectorOpen(false)}
-                      className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded"
-                    >
-                      <X size={14} />
-                    </button> */}
                   </div>
 
-                  {/* Chain List - UPDATED with images */}
                   <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
                     <div className="p-2 space-y-1">
                       {chains.map((chain) => {
@@ -612,14 +580,12 @@ export default function GlobalDashboardHeader({
                             } ${isSwitching ? "opacity-70" : ""}`}
                           >
                             <div className="flex items-center">
-                              {/* Chain Icon with Image */}
                               <ChainIcon
                                 chainData={chainDisplay}
                                 size="lg"
                                 className="mr-2.5"
                               />
 
-                              {/* Chain Name */}
                               <span
                                 className={`text-sm font-satoshi ${
                                   isCurrentChain
@@ -636,7 +602,6 @@ export default function GlobalDashboardHeader({
                               </span>
                             </div>
 
-                            {/* Toggle Switch */}
                             <div
                               className={`w-10 h-5 rounded-full transition-colors relative ${
                                 isCurrentChain ? "bg-[#E2AF19]" : "bg-[#2C2C2C]"
@@ -662,7 +627,6 @@ export default function GlobalDashboardHeader({
                     </div>
                   </div>
 
-                  {/* Footer Note */}
                   {!isConnected && (
                     <div className="p-3 bg-[#0F0F0F]">
                       <p className="text-gray-400 text-xs font-satoshi text-center">
@@ -671,7 +635,6 @@ export default function GlobalDashboardHeader({
                     </div>
                   )}
 
-                  {/* Error Display */}
                   {switchError && (
                     <div className="p-3 bg-red-900/20 border-t border-red-500/50">
                       <div className="flex items-start">
@@ -705,7 +668,6 @@ export default function GlobalDashboardHeader({
           {/* Action Icons Container */}
           <div className="flex items-center space-x-2 relative">
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-1.5 lg:px-2 py-1.5 lg:py-2">
-              {/* Notification Bell */}
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
@@ -718,7 +680,6 @@ export default function GlobalDashboardHeader({
 
               <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
 
-              {/* Profile Icon */}
               <button
                 onClick={handleProfileClick}
                 className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full"
@@ -729,7 +690,6 @@ export default function GlobalDashboardHeader({
 
               <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
 
-              {/* Logout Icon */}
               <button
                 onClick={handleLogout}
                 className="p-1 lg:p-1.5 transition-colors hover:bg-red-900/20 rounded-full"
@@ -745,10 +705,8 @@ export default function GlobalDashboardHeader({
         </div>
       </div>
 
-      {/* Page-specific content below header */}
       {children}
 
-      {/* Custom Scrollbar Styles */}
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
