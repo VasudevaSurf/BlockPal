@@ -143,14 +143,14 @@ const ChainIcon: React.FC<ChainIconProps> = ({
           loading="lazy"
         />
       )}
-
+      {/* 
       {(!chainData.image || imageError || !imageLoaded) && (
         <span
           className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
         >
           {chainData.fallbackIcon}
         </span>
-      )}
+      )} */}
     </div>
   );
 };
@@ -582,7 +582,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                   <X size={20} />
                 </button>
               </div>
-
               {/* Search Bar */}
               <div className="relative mb-5">
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -597,7 +596,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                   className="w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
                 />
               </div>
-
               {/* Dynamic Heading */}
               <div className="mb-4">
                 <h4 className="text-[#939393] font-satoshi font-medium text-base">
@@ -608,7 +606,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                     : "Popular Tokens"}
                 </h4>
               </div>
-
               {/* Token List */}
               <div className="flex-1 overflow-y-auto">
                 {loading ? (
@@ -684,6 +681,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                   </div>
                 )}
               </div>
+              9
             </div>
           </div>
         </div>

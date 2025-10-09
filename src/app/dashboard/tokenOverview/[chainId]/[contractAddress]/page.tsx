@@ -847,7 +847,7 @@ export default function TokenOverviewPage() {
                   About {metadata.name}
                 </h3>
                 <div className="flex-1 overflow-y-auto scrollbar-hide">
-                  <p className="text-gray-400 text-[14px] leading-relaxed font-satoshi">
+                  <p className="text-gray-400 text-[12px] leading-relaxed font-satoshi">
                     {metadata.description || "No description available."}
                   </p>
                 </div>
@@ -897,13 +897,25 @@ export default function TokenOverviewPage() {
               <div className="mb-1">
                 <div className="flex flex-row items-center justify-start text-xl font-bold text-white mb-0.5 font-satoshi gap-1">
                   {formatCurrency(marketData.price || 0)}
-                  <div
+                  {/* <div
                     className={`text-xs font-satoshi ${
                       priceChange >= 0 ? "text-green-400" : "text-red-400"
                     }`}
                   >
                     <span className="mr-1">{priceChange >= 0 ? "▲" : "▼"}</span>
                     {Math.abs(priceChange).toFixed(2)}%
+                  </div> */}
+                  <div
+                    className={`text-xs font-satoshi ${
+                      (marketData.change24h || 0) >= 0
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    <span className="mr-1">
+                      {(marketData.change24h || 0) >= 0 ? "▲" : "▼"}
+                    </span>
+                    {Math.abs(marketData.change24h || 0).toFixed(2)}%
                   </div>
                 </div>
               </div>

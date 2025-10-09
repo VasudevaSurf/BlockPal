@@ -1,4 +1,4 @@
-// src/components/swap/SwapChainSelector.tsx
+// src/components/swap/SwapChainSelector.tsx - WITH SKELETON LOADING
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -6,7 +6,7 @@ import { X } from "lucide-react";
 import { useChainId, useSwitchChain } from "wagmi";
 import { chains } from "@/components/wallet/WalletProvider";
 
-// Chain data with proper image paths and conditional background colors
+// Chain data with proper image paths
 const getChainDisplayData = () => {
   const chainDisplayData: {
     [key: number]: {
@@ -71,7 +71,7 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// Chain Icon Component with image support and conditional background
+// Chain Icon Component with Skeleton Loading
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -90,8 +90,8 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   size = "md",
   className = "",
 }) => {
-  const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const sizeClasses = {
     sm: "w-5 h-5",
@@ -99,58 +99,59 @@ const ChainIcon: React.FC<ChainIconProps> = ({
     lg: "w-8 h-8",
   };
 
-  const iconSizes = {
-    sm: "text-xs",
-    md: "text-xs",
-    lg: "text-sm",
-  };
-
-  // Reset image error state when chainData changes
   useEffect(() => {
-    setImageError(false);
     setImageLoaded(false);
+    setImageError(false);
   }, [chainData.image]);
 
   const handleImageError = () => {
-    console.warn(`Failed to load chain image: ${chainData.image}`);
     setImageError(true);
+    setImageLoaded(true);
   };
 
   const handleImageLoad = () => {
     setImageLoaded(true);
   };
 
-  // Determine if we should show background
-  const shouldShowBackground =
-    !chainData.image || imageError || !imageLoaded || chainData.useBackground;
-  const backgroundClass = shouldShowBackground ? chainData.color : "";
-
   return (
     <div
-      className={`${sizeClasses[size]} ${backgroundClass} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
-      {/* Chain Image */}
+      {/* Skeleton Loader */}
+      {!imageLoaded && !imageError && (
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700 animate-pulse rounded-full" />
+      )}
+
+      {/* Actual Image */}
       {chainData.image && !imageError && (
         <img
           src={chainData.image}
           alt={chainData.name}
-          className={`w-full h-full object-contain transition-opacity duration-200 ${
+          className={`w-full h-full object-contain transition-opacity duration-300 ${
             imageLoaded ? "opacity-100" : "opacity-0"
           } ${!chainData.useBackground && imageLoaded ? "p-0" : "p-1"}`}
+          style={{
+            backgroundColor:
+              chainData.useBackground && imageLoaded
+                ? chainData.color.replace("bg-", "")
+                : "transparent",
+          }}
           onError={handleImageError}
           onLoad={handleImageLoad}
           loading="lazy"
         />
       )}
 
-      {/* Fallback Icon - only show when needed */}
-      {(!chainData.image || imageError || !imageLoaded) && (
-        <span
-          className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
+      {/* Only show fallback if image fails to load */}
+      {imageError && (
+        <div
+          className={`${chainData.color} w-full h-full flex items-center justify-center`}
         >
-          {chainData.fallbackIcon}
-        </span>
+          <span className="text-white text-xs font-bold font-satoshi">
+            {chainData.fallbackIcon}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -160,7 +161,7 @@ interface SwapChainSelectorProps {
   isOpen: boolean;
   onClose: () => void;
   onChainSelect?: (chainId: number) => void;
-  triggerRef?: React.RefObject<HTMLButtonElement>; // Add ref for positioning
+  triggerRef?: React.RefObject<HTMLButtonElement>;
 }
 
 const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
@@ -173,9 +174,8 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain({
     mutation: {
       onSuccess: (data, variables) => {
-        console.log("✅ Chain switched successfully:", data.name);
-        setSwitchingChain(null); // Clear switching state
-        setSelectedChain(variables.chainId); // Update selected chain
+        setSwitchingChain(null);
+        setSelectedChain(variables.chainId);
         if (onChainSelect) {
           onChainSelect(variables.chainId);
         }
@@ -183,10 +183,9 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
       },
       onError: (error) => {
         console.error("❌ Chain switch failed:", error);
-        setSwitchingChain(null); // Clear switching state on error
+        setSwitchingChain(null);
       },
       onSettled: () => {
-        // Always clear switching state when operation completes
         setSwitchingChain(null);
       },
     },
@@ -202,27 +201,23 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
 
   const chainDisplayData = getChainDisplayData();
 
-  // Calculate dropdown position based on trigger button
   useEffect(() => {
     if (isOpen && triggerRef?.current) {
       const triggerRect = triggerRef.current.getBoundingClientRect();
-
       setDropdownPosition({
-        top: triggerRect.bottom + 8, // 8px below the button
+        top: triggerRect.bottom + 8,
         left: triggerRect.left,
-        width: Math.max(triggerRect.width * 1.7, 320), // Bigger width - 1.7x button width or min 320px
+        width: Math.max(triggerRect.width * 1.7, 320),
       });
     }
   }, [isOpen, triggerRef]);
 
-  // Update selected chain when current chain changes
   useEffect(() => {
     if (chainId) {
       setSelectedChain(chainId);
     }
   }, [chainId]);
 
-  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setSwitchingChain(null);
@@ -230,12 +225,10 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
     }
   }, [isOpen, chainId]);
 
-  // Handle chain selection
   const handleChainSelect = (targetChainId: number) => {
     setSelectedChain(targetChainId);
   };
 
-  // Handle confirm chain switch
   const handleConfirm = async () => {
     if (selectedChain === chainId) {
       onClose();
@@ -246,8 +239,6 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
 
     try {
       if (switchChain) {
-        // The chain switch will automatically trigger chainId update
-        // which will cascade to TokenSelector via useChainId hook
         await switchChain({ chainId: selectedChain });
       }
     } catch (error) {
@@ -260,10 +251,8 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
 
   return (
     <>
-      {/* Backdrop with fade effect like history */}
       <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
 
-      {/* Dropdown positioned below button */}
       <div
         className="fixed z-50 bg-[#0F0F0F] rounded-[28px] border border-[#2C2C2C] shadow-2xl"
         style={{
@@ -273,7 +262,6 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
           maxHeight: "350px",
         }}
       >
-        {/* Chain Buttons - Vertical List (no header) */}
         <div className="p-3 space-y-2 max-h-[280px] overflow-y-auto">
           {chains.map((chain) => {
             const chainDisplay = chainDisplayData[chain.id] || {
@@ -299,7 +287,6 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
                 } ${isSwitching ? "opacity-70" : ""}`}
               >
                 <div className="flex items-center justify-between">
-                  {/* Chain Icon and Name */}
                   <div className="flex items-center gap-3">
                     <ChainIcon chainData={chainDisplay} size="md" />
                     <span
@@ -316,7 +303,6 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
                     </span>
                   </div>
 
-                  {/* Selection Indicator */}
                   {isSelected && (
                     <div className="w-5 h-5 bg-[#E2AF19] rounded-full flex items-center justify-center">
                       <svg
@@ -338,7 +324,6 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
           })}
         </div>
 
-        {/* Confirm Button */}
         <div className="p-3 pt-1">
           <button
             onClick={handleConfirm}
