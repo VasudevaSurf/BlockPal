@@ -35,7 +35,7 @@ interface UseNewsReturn {
   searchQuery: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://amusing-freedom-production-92a5.up.railway.app";
 
 export function useNews(): UseNewsReturn {
   const [news, setNews] = useState<NewsArticle[]>([]);

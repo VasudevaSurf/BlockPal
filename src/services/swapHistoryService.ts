@@ -1,5 +1,5 @@
 // src/services/swapHistoryService.ts - SIMPLIFIED VERSION
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://amusing-freedom-production-92a5.up.railway.app";
 
 interface SwapToken {
   address: string;
