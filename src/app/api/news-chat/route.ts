@@ -1,4 +1,4 @@
-// src/app/api/news-chat/route.ts - CORRECTED VERSION
+// src/app/api/news-chat/route.ts - FIXED VERSION matching JavaScript implementation
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
@@ -32,46 +32,109 @@ async function getCurrentUser(request: NextRequest) {
 }
 
 function getSystemInstructions() {
-  return `You are a crypto news analyst AI assistant with access to REAL cryptocurrency news data from MongoDB database.
+  return `You are a friendly crypto news analyst who provides clear, concise market insights.
 
-CRITICAL: When you receive news data, you MUST use it and cite the articles with their actual URLs.
+CRITICAL: You have DIRECT ACCESS to crypto news articles from the database including their URLs.
 
-RESPONSE RULES:
-1. Keep responses SHORT (150-200 words max for most queries)
-2. Use simple, conversational language
-3. Focus on the 2-3 most important points only
-4. ALWAYS provide clickable links to news articles when referencing them
-5. Use bullet points for clarity when listing information
-6. End EVERY response with a relevant follow-up question
+CRITICAL TOOL USAGE RULES FOR searchNews:
+When user asks for "any news" or "news about X":
+- Only use parameters: tickers (array), timeRange ("24h" or "7d"), limit (10)
+- DO NOT add sentiment parameter unless specifically asked (bullish/bearish/positive/negative)
+- DO NOT add newsType unless specifically asked
+- DO NOT add searchText unless searching for specific keywords
 
-WHEN YOU HAVE NEWS DATA:
-- Summarize the key points from the provided articles
-- Include article titles and clickable links: [Article Title](URL)
-- Mention the source and how recent the news is
-- Provide insights based on the actual news content
-- Connect multiple news items if relevant
+Example correct function calls:
+- "any news on BTC?" → searchNews({ tickers: ["BTC"], timeRange: "24h", limit: 10 })
+- "bearish news on ETH" → searchNews({ tickers: ["ETH"], sentiment: "Negative", timeRange: "24h", limit: 10 })
+- "trending news" → searchNews({ newsType: "trending", timeRange: "24h", limit: 10 })
 
-RESPONSE STRUCTURE WITH NEWS:
-- Start with: "Here's what I found from recent crypto news:"
-- List 2-3 key articles with titles and links
-- Provide brief analysis of each
-- End with a follow-up question
+NEVER add sentiment: "Neutral" - most news doesn't have this label!
 
-Example format:
-"Here are recent news articles about Bitcoin:
+CRITICAL RESPONSE RULES - URLs:
+1. When presenting news articles initially: DO NOT include URLs or "Read full article" links
+2. ONLY provide URLs when user explicitly asks for them with phrases like:
+   - "Can I have the URLs?"
+   - "Give me the links"
+   - "Show me the sources"
+   - "Where can I read more?"
+   - "Can I get the article links?"
+3. When URLs are requested, provide BOTH the title summary AND the clickable link
+4. Format as: **Title** - Brief summary with sentiment/time info
+   [Read more](url)
 
-1. **[Article Title]** - Brief summary of the article
-   [Read more here](actual-url)
+EXAMPLE RESPONSE FORMAT (NO URLS):
 
-2. **[Another Article Title]** - Brief summary
-   [Read more here](actual-url)
+User: "Any news on BTC?"
 
-Would you like more details about any of these?"
+Your Response:
+"Here are the latest Bitcoin (BTC) news articles from the past 24 hours:
 
-IMPORTANT: 
-- NEVER say you don't have data when news articles are provided to you
-- ALWAYS include working URLs from the news data
-- Be specific and cite sources properly`;
+• **Bitcoin Surges Past $45K** - BTC breaks through resistance level amid institutional buying
+
+• **MicroStrategy Adds More Bitcoin** - Company purchases additional 500 BTC to treasury
+
+• **Mining Difficulty Reaches New High** - Network security strengthens as hashrate increases
+
+Would you like the article links to read more?"
+
+EXAMPLE WHEN USER ASKS FOR URLS:
+
+User: "Can I have the URLs?"
+
+Your Response:
+"Here are the Bitcoin news articles with links:
+
+• **Bitcoin Surges Past $45K** - BTC breaks through resistance level. Positive sentiment, posted 3 hours ago
+  [Read more](https://cryptonews.com/article-123)
+
+• **MicroStrategy Adds More Bitcoin** - Company purchases 500 BTC. Positive sentiment, posted 5 hours ago
+  [Read more](https://cryptonews.com/article-456)
+
+• **Mining Difficulty Reaches New High** - Network security strengthens. Neutral sentiment, posted 8 hours ago
+  [Read more](https://cryptonews.com/article-789)
+
+Click any link to read the full article!"
+
+CRITICAL RESPONSE RULES:
+1. Keep responses SHORT (150-200 words max)
+2. DO NOT include URLs unless explicitly requested
+3. Focus on 2-3 most important articles (or more if user asks for links)
+4. Bold article titles: **Title**
+5. One sentence summary per article
+6. When providing URLs, include: title, brief summary, sentiment, and time
+7. End with a helpful follow-up question
+
+Response Structure for Initial News Query (NO URLS):
+**Recent news about [topic]:**
+
+• **[Article Title]** - Brief 1-sentence summary
+
+• **[Another Title]** - Brief summary
+
+Would you like the article links to read more?
+
+Response Structure When URLs Are Requested (WITH CONTEXT):
+**Here are the [topic] news articles with links:**
+
+• **[Article Title]** - Brief summary. [Sentiment] sentiment, posted [time ago]
+  [Read more](url)
+
+• **[Another Title]** - Brief summary. [Sentiment] sentiment, posted [time ago]
+  [Read more](url)
+
+Click any link to read the full article!
+
+Formatting:
+- Use bullet points (•) for article lists
+- Bold article titles with **Title**
+- NO URLs in initial news responses
+- When showing URLs, include title, summary, sentiment, and time information
+- Format URLs as: [Read more](url) on a new line after the description
+- Include sentiment (Positive/Negative/Neutral) and time_ago information when showing URLs
+- No emojis
+- Mention coins as "Bitcoin (BTC)" first time, then just "BTC"
+
+Remember: When user asks for URLs, provide rich context (title, summary, sentiment, time) along with the clickable link!`;
 }
 
 function countTokens(text: string): number {
@@ -79,6 +142,178 @@ function countTokens(text: string): number {
     return encode(text).length;
   } catch {
     return Math.ceil(text.length / 4);
+  }
+}
+
+// Define tools matching the JavaScript implementation
+function getTools() {
+  return [
+    {
+      type: "function" as const,
+      function: {
+        name: "searchNews",
+        description:
+          "Search crypto news articles with advanced filters. Use this for general news queries.",
+        parameters: {
+          type: "object",
+          properties: {
+            tickers: {
+              type: "array",
+              items: { type: "string" },
+              description: "Cryptocurrency ticker symbols like BTC, ETH, SOL",
+            },
+            sentiment: {
+              type: "string",
+              enum: ["Positive", "Negative", "Neutral"],
+              description: "Filter by sentiment",
+            },
+            timeRange: {
+              type: "string",
+              enum: ["1h", "6h", "12h", "24h", "3d", "7d"],
+              description: "Time range for news",
+            },
+            newsType: {
+              type: "string",
+              enum: ["all", "trending", "breaking", "events"],
+              description: "Type of news to retrieve",
+            },
+            searchText: {
+              type: "string",
+              description: "Text to search for in news articles",
+            },
+            limit: {
+              type: "number",
+              default: 10,
+              description: "Number of results to return",
+            },
+          },
+          required: [],
+        },
+      },
+    },
+    {
+      type: "function" as const,
+      function: {
+        name: "getTickerAnalytics",
+        description:
+          "Get detailed mention statistics and sentiment analysis for specific cryptocurrencies",
+        parameters: {
+          type: "object",
+          properties: {
+            tickers: {
+              type: "array",
+              items: { type: "string" },
+              description: "List of ticker symbols to analyze",
+            },
+            period: {
+              type: "string",
+              enum: ["24h", "7d"],
+              default: "24h",
+              description: "Time period for analysis",
+            },
+          },
+          required: ["tickers"],
+        },
+      },
+    },
+    {
+      type: "function" as const,
+      function: {
+        name: "getTrendingTopics",
+        description: "Get trending headlines and breaking crypto news",
+        parameters: {
+          type: "object",
+          properties: {
+            limit: {
+              type: "number",
+              default: 5,
+              description: "Number of trending topics to return",
+            },
+          },
+          required: [],
+        },
+      },
+    },
+  ];
+}
+
+// Execute function calls
+async function executeFunction(name: string, args: any) {
+  try {
+    let result;
+
+    switch (name) {
+      case "searchNews":
+        result = await db.searchNews(args);
+        if (Array.isArray(result)) {
+          // Format articles with ALL information including URLs
+          result = result.map((article) => {
+            const timeAgo = getTimeAgo(article.date);
+            return {
+              title: article.title,
+              text: article.text.substring(0, 200) + "...", // Trim text to save tokens
+              source: article.source_name,
+              date: article.date,
+              time_ago: timeAgo,
+              sentiment: article.sentiment,
+              tickers: article.tickers,
+              url: article.news_url, // CRITICAL: Include the URL
+            };
+          });
+
+          console.log(`✅ Returning ${result.length} articles with URLs`);
+
+          // Log first article to verify URL is present
+          if (result.length > 0) {
+            console.log(`📰 Sample article URL: ${result[0].url}`);
+          }
+        }
+        break;
+
+      case "getTickerAnalytics":
+        result = await db.getTickerAnalytics(args.tickers, args.period);
+        break;
+
+      case "getTrendingTopics":
+        result = await db.getTrendingTopics(args.limit);
+        if (result.headlines) {
+          result.headlines = result.headlines.map((headline: any) => ({
+            headline: headline.headline,
+            text: headline.text,
+            sentiment: headline.sentiment,
+            date: headline.date,
+            time_ago: getTimeAgo(headline.date),
+            tickers: headline.tickers,
+          }));
+        }
+        break;
+
+      default:
+        result = { error: `Unknown function: ${name}` };
+    }
+
+    return JSON.stringify(result);
+  } catch (error: any) {
+    console.error(`❌ Error in ${name}:`, error);
+    return JSON.stringify({ error: error.message });
+  }
+}
+
+// Helper function to calculate time ago
+function getTimeAgo(date: string | Date): string {
+  const now = new Date();
+  const articleDate = new Date(date);
+  const diff = now.getTime() - articleDate.getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+
+  if (hours < 1) {
+    const minutes = Math.floor(diff / (1000 * 60));
+    return `${minutes} minutes ago`;
+  } else if (hours < 24) {
+    return `${hours} hours ago`;
+  } else {
+    const days = Math.floor(hours / 24);
+    return `${days} days ago`;
   }
 }
 
@@ -118,47 +353,26 @@ export async function POST(request: NextRequest) {
     console.log(`📝 Message: ${message}`);
     console.log(`💬 Conversation ID: ${conversationId || "NEW"}`);
 
-    // Initialize messages array with system instructions
-    const messages: any[] = [
-      {
-        role: "system" as const,
-        content: getSystemInstructions(),
-      },
-    ];
-
     // Create new conversation if needed
     if (!conversationId) {
       conversationId = await db.createConversation(userId);
       console.log(`✅ Created NEW news conversation: ${conversationId}`);
-    } else {
-      console.log(`📌 Using existing news conversation: ${conversationId}`);
-
-      // Load conversation history
-      const conversationHistory = await db.loadConversationHistory(
-        conversationId
-      );
-
-      if (conversationHistory && conversationHistory.messages) {
-        console.log(
-          `📚 Loading ${conversationHistory.messages.length} previous messages for context`
-        );
-
-        conversationHistory.messages.forEach((msg: any) => {
-          messages.push({
-            role: msg.role,
-            content: msg.content,
-          });
-        });
-
-        console.log(`✅ Context loaded with ${messages.length - 1} messages`);
-      }
     }
 
-    // Add the current user message
-    messages.push({
-      role: "user" as const,
-      content: message,
-    });
+    // Load conversation history
+    let conversationHistory: any[] = [];
+    const historyData = await db.loadConversationHistory(conversationId);
+
+    if (historyData && historyData.messages) {
+      console.log(
+        `📚 Loading ${historyData.messages.length} previous messages for context`
+      );
+
+      conversationHistory = historyData.messages.map((msg: any) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+    }
 
     const inputTokens = countTokens(message);
 
@@ -172,92 +386,123 @@ export async function POST(request: NextRequest) {
       { input: inputTokens }
     );
 
-    // ALWAYS search for news - this is the key difference
-    console.log("🔍 Searching news database for relevant articles...");
+    // Build messages array with conversation history
+    const messages: any[] = [
+      {
+        role: "system" as const,
+        content: getSystemInstructions(),
+      },
+      ...conversationHistory,
+      {
+        role: "user" as const,
+        content: message,
+      },
+    ];
 
+    const tools = getTools();
     let functionsUsed: string[] = [];
+    let assistantMessage = "";
 
-    // Search relevant news - ALWAYS do this, not conditionally
-    const newsResults = await db.searchRelevantNews(message, 20);
+    console.log("🤖 Sending request to OpenAI with conversation context...");
 
-    if (newsResults && newsResults.length > 0) {
-      console.log(`📰 Found ${newsResults.length} relevant news articles`);
-
-      // Format news data for the AI
-      const newsContext = `
-RELEVANT CRYPTO NEWS FROM DATABASE (Use these articles to answer the user's question):
-
-${newsResults
-  .map(
-    (article, idx) => `
-Article ${idx + 1}:
-Title: ${article.title}
-Content: ${article.text}
-Source: ${article.source}
-Date: ${new Date(article.date).toLocaleString()}
-Sentiment: ${article.sentiment}
-Tickers: ${article.tickers.join(", ")}
-URL: ${article.url}
----
-`
-  )
-  .join("\n")}
-
-INSTRUCTIONS:
-- Use the above articles to provide accurate, up-to-date information
-- Include article titles as links: [Title](URL)
-- Reference specific sources when making claims
-- Provide the URLs so users can read more
-`;
-
-      messages.push({
-        role: "system" as const,
-        content: newsContext,
-      });
-
-      functionsUsed.push("searchNews");
-      console.log(`✅ Added ${newsResults.length} news articles to AI context`);
-    } else {
-      console.log("⚠️ No relevant news articles found in database");
-
-      // Even if no results, tell the AI to acknowledge this
-      messages.push({
-        role: "system" as const,
-        content:
-          "No recent news articles found in the database for this query. Inform the user that the news database doesn't have recent articles on this topic, but offer to help with other crypto topics.",
-      });
-    }
-
-    // Get AI completion
-    console.log("🤖 Sending request to OpenAI with news context...");
+    // First completion with function calling
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages,
+      tools,
+      tool_choice: "auto",
       temperature: 0.7,
       max_tokens: 2000,
     });
 
-    const assistantMessage = completion.choices[0]?.message;
+    const responseMessage = completion.choices[0]?.message;
 
-    if (!assistantMessage) {
+    if (!responseMessage) {
       return NextResponse.json(
         { error: "No response from AI" },
         { status: 500 }
       );
     }
 
-    const finalContent =
-      assistantMessage.content ||
-      "Sorry, I couldn't generate a response. Please try again.";
+    // Check if there are function calls
+    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+      console.log(
+        `🔧 Processing ${responseMessage.tool_calls.length} function calls...`
+      );
 
-    const outputTokens = countTokens(finalContent);
+      // Add assistant message with tool calls to history
+      messages.push(responseMessage);
+
+      // Execute each function call
+      for (const toolCall of responseMessage.tool_calls) {
+        const functionName = toolCall.function.name;
+        const functionArgs = JSON.parse(toolCall.function.arguments);
+
+        console.log(`📞 Calling function: ${functionName}`, functionArgs);
+        functionsUsed.push(functionName);
+
+        const functionResult = await executeFunction(
+          functionName,
+          functionArgs
+        );
+
+        // Parse and log the result to verify URLs are present
+        try {
+          const parsedResult = JSON.parse(functionResult);
+          if (Array.isArray(parsedResult) && parsedResult.length > 0) {
+            console.log(`✅ Function returned ${parsedResult.length} items`);
+            if (parsedResult[0].url) {
+              console.log(
+                `✅ URLs confirmed in results: ${parsedResult[0].url}`
+              );
+            } else {
+              console.warn(
+                `⚠️ WARNING: No URL in first result!`,
+                parsedResult[0]
+              );
+            }
+          }
+        } catch (e) {
+          // Just log the raw result if parsing fails
+          console.log(`✅ Function ${functionName} returned result`);
+        }
+
+        // Add function result to messages
+        messages.push({
+          role: "tool" as const,
+          tool_call_id: toolCall.id,
+          content: functionResult,
+        });
+
+        console.log(`✅ Function ${functionName} completed`);
+      }
+
+      // Get final response with function results
+      console.log("🤖 Getting final response with function results...");
+      const finalCompletion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages,
+        temperature: 0.7,
+        max_tokens: 2000,
+      });
+
+      assistantMessage =
+        finalCompletion.choices[0]?.message?.content ||
+        "Sorry, I couldn't generate a response.";
+    } else {
+      // No function calls, use the direct response
+      assistantMessage =
+        responseMessage.content || "Sorry, I couldn't generate a response.";
+    }
+
+    const outputTokens = countTokens(assistantMessage);
     const responseId = Date.now().toString();
 
     // Save assistant message
     await db.saveMessage(
       userId,
       conversationId,
-      { role: "assistant", content: finalContent },
+      { role: "assistant", content: assistantMessage },
       responseId,
       functionsUsed,
       { output: outputTokens }
@@ -268,7 +513,7 @@ INSTRUCTIONS:
     );
 
     return NextResponse.json({
-      message: finalContent,
+      message: assistantMessage,
       conversationId,
       functionCalls: functionsUsed,
       tokens: {

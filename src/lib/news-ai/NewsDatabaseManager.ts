@@ -1,4 +1,4 @@
-// src/lib/news-ai/NewsDatabaseManager.ts
+// src/lib/news-ai/NewsDatabaseManager.ts - FIXED VERSION matching JavaScript implementation
 import { MongoClient, ObjectId, Db } from "mongodb";
 import { v4 as uuidv4 } from "uuid";
 
@@ -16,7 +16,6 @@ class NewsDatabaseManager {
       });
 
       await this.client.connect();
-      // Use BlockPal database
       this.db = this.client.db("BlockPal");
 
       await this.createIndexes();
@@ -36,7 +35,6 @@ class NewsDatabaseManager {
     if (!this.db) return;
 
     try {
-      // Create indexes for newsAI collection
       await this.db.collection("newsAI").createIndex({ user_id: 1 });
       await this.db
         .collection("newsAI")
@@ -54,7 +52,6 @@ class NewsDatabaseManager {
     }
   }
 
-  // Get user's News AI data from newsAI collection
   async getUserNewsAIData(userId: string) {
     if (!this.db) throw new Error("Database not connected");
 
@@ -62,7 +59,6 @@ class NewsDatabaseManager {
       .collection("newsAI")
       .findOne({ user_id: userId });
 
-    // Create if doesn't exist
     if (!aiData) {
       const now = new Date();
       aiData = {
@@ -95,7 +91,6 @@ class NewsDatabaseManager {
     );
   }
 
-  // Create new conversation
   async createConversation(
     userId: string,
     openAIConversationId?: string | null
@@ -158,7 +153,6 @@ class NewsDatabaseManager {
     };
   }
 
-  // Save message
   async saveMessage(
     userId: string,
     conversationId: string,
@@ -191,12 +185,10 @@ class NewsDatabaseManager {
       },
     };
 
-    // Only update last_response_id for assistant messages with valid responseId
     if (message.role === "assistant" && responseId) {
       updateQuery.$set["conversations.$.last_response_id"] = responseId;
     }
 
-    // Update in newsAI collection
     await this.db.collection("newsAI").updateOne(
       {
         user_id: userId,
@@ -205,7 +197,6 @@ class NewsDatabaseManager {
       updateQuery
     );
 
-    // Update token usage if provided
     if (tokens.input || tokens.output) {
       const tokenUpdate: any = {};
       if (tokens.input) tokenUpdate["total_usage.input_tokens"] = tokens.input;
@@ -219,7 +210,6 @@ class NewsDatabaseManager {
       }
     }
 
-    // Update title if first message
     const aiData = await this.db.collection("newsAI").findOne({
       user_id: userId,
       "conversations.conversation_id": conversationId,
@@ -268,7 +258,6 @@ class NewsDatabaseManager {
     }
   }
 
-  // Update conversation star status
   async updateConversationStar(
     userId: string,
     conversationId: string,
@@ -298,7 +287,6 @@ class NewsDatabaseManager {
     }
   }
 
-  // Delete conversation
   async deleteConversation(
     userId: string,
     conversationId: string
@@ -306,7 +294,6 @@ class NewsDatabaseManager {
     if (!this.db) throw new Error("Database not connected");
 
     try {
-      // First, get the conversation to count messages
       const aiData = await this.db.collection("newsAI").findOne({
         user_id: userId,
         "conversations.conversation_id": conversationId,
@@ -326,7 +313,6 @@ class NewsDatabaseManager {
 
       const messageCount = conversation.messages?.length || 0;
 
-      // Remove the conversation from the array
       const result = await this.db.collection("newsAI").updateOne(
         { user_id: userId },
         {
@@ -357,164 +343,139 @@ class NewsDatabaseManager {
     }
   }
 
-  // Search relevant news from news_articles collection - CORRECTED
-  async searchRelevantNews(query: string, limit: number = 20) {
+  // IMPROVED searchNews matching JavaScript implementation
+  async searchNews(params: any = {}) {
     if (!this.db) throw new Error("Database not connected");
 
+    const {
+      tickers = [],
+      sentiment = null,
+      timeRange = "24h",
+      newsType = "all",
+      limit = 10,
+      searchText = null,
+    } = params;
+
     try {
-      console.log(`🔍 Searching news_articles collection for: "${query}"`);
+      console.log(`🔍 Searching news with params:`, params);
 
-      // Extract potential tickers from query
-      const tickers = this.extractTickers(query);
-      console.log(`🏷️ Extracted tickers: ${tickers.join(", ") || "none"}`);
+      const query: any = {};
 
-      // Build comprehensive search query
-      const searchConditions: any[] = [];
-
-      // Text search in title and content
-      const searchTerms = query
-        .toLowerCase()
-        .split(" ")
-        .filter((term) => term.length > 3); // Only use words longer than 3 chars
-
-      if (searchTerms.length > 0) {
-        searchConditions.push({
-          $or: searchTerms.map((term) => ({
-            $or: [
-              { title: { $regex: term, $options: "i" } },
-              { text: { $regex: term, $options: "i" } },
-            ],
-          })),
-        });
+      // Time range filter
+      if (timeRange) {
+        const hours = this.parseTimeRange(timeRange);
+        query.date = { $gte: new Date(Date.now() - hours * 60 * 60 * 1000) };
       }
 
-      // Ticker-based search
-      if (tickers.length > 0) {
-        searchConditions.push({
-          tickers: { $in: tickers },
-        });
+      // Ticker filter
+      if (tickers && tickers.length > 0) {
+        query.tickers = { $in: tickers };
       }
 
-      // Build final query
-      const searchQuery: any = {
-        $and: [
-          // Only search recent articles (last 7 days)
-          {
-            date: {
-              $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-            },
-          },
-        ],
-      };
-
-      // Add search conditions if we have any
-      if (searchConditions.length > 0) {
-        searchQuery.$and.push({ $or: searchConditions });
+      // Sentiment filter (only if explicitly specified)
+      if (sentiment) {
+        query.sentiment = sentiment;
       }
 
-      console.log("🔍 Search query:", JSON.stringify(searchQuery, null, 2));
+      // News type filter
+      if (newsType === "trending") {
+        query.is_trending = true;
+      } else if (newsType === "events") {
+        query.event_ids = { $exists: true, $ne: [] };
+      }
 
-      const newsArticles = await this.db
+      // Text search
+      if (searchText) {
+        query.$text = { $search: searchText };
+      }
+
+      console.log("🔍 Final MongoDB query:", JSON.stringify(query, null, 2));
+
+      const articles = await this.db
         .collection("news_articles")
-        .find(searchQuery)
-        .sort({ date: -1 }) // Most recent first
+        .find(query)
+        .sort({ date: -1 })
         .limit(limit)
         .toArray();
 
-      console.log(`📰 Found ${newsArticles.length} news articles in database`);
+      console.log(`📰 Found ${articles.length} news articles in database`);
 
-      if (newsArticles.length > 0) {
+      if (articles.length > 0) {
         console.log(
-          `📰 Sample article: ${newsArticles[0].title.substring(0, 50)}...`
+          `📰 Sample article: ${articles[0].title.substring(0, 50)}...`
         );
       }
 
-      return newsArticles.map((article) => ({
-        title: article.title,
-        text: article.text,
-        source: article.source_name,
-        date: article.date,
-        sentiment: article.sentiment,
-        tickers: article.tickers || [],
-        url: article.news_url,
-      }));
+      return articles;
     } catch (error) {
       console.error("❌ Error searching news:", error);
       return [];
     }
   }
 
-  private extractTickers(text: string): string[] {
-    const commonTickers = [
-      "BTC",
-      "ETH",
-      "SOL",
-      "BNB",
-      "XRP",
-      "ADA",
-      "DOGE",
-      "DOT",
-      "MATIC",
-      "SHIB",
-      "AVAX",
-      "LINK",
-      "UNI",
-      "ATOM",
-      "LTC",
-      "BCH",
-      "ETC",
-      "XLM",
-      "ALGO",
-      "VET",
-      "FIL",
-      "TRX",
-      "AAVE",
-      "MKR",
-      "SAND",
-      "MANA",
-      "CRO",
-      "NEAR",
-      "APT",
-      "OP",
-      "ARB",
-    ];
+  // IMPROVED getTickerAnalytics matching JavaScript implementation
+  async getTickerAnalytics(tickers: string[], period: string = "24h") {
+    if (!this.db) throw new Error("Database not connected");
 
-    // Look for explicit ticker mentions and common variations
-    const upperText = text.toUpperCase();
-    const found = commonTickers.filter((ticker) => {
-      // Check for ticker with word boundaries
-      const patterns = [
-        new RegExp(`\\b${ticker}\\b`),
-        new RegExp(`${ticker}USD`),
-        new RegExp(`${ticker}/USD`),
-      ];
-      return patterns.some((pattern) => pattern.test(upperText));
-    });
+    try {
+      const query: any = {
+        ticker: { $in: tickers },
+        period: period,
+      };
 
-    // Also check for full names
-    const nameMap: { [key: string]: string } = {
-      BITCOIN: "BTC",
-      ETHEREUM: "ETH",
-      SOLANA: "SOL",
-      CARDANO: "ADA",
-      RIPPLE: "XRP",
-      DOGECOIN: "DOGE",
-      POLKADOT: "DOT",
-      POLYGON: "MATIC",
-      CHAINLINK: "LINK",
-      AVALANCHE: "AVAX",
+      const analytics = await this.db
+        .collection("ticker_metrics")
+        .find(query)
+        .sort({ snapshot_date: -1 })
+        .toArray();
+
+      // Group by ticker and get latest
+      const tickerMap: any = {};
+      analytics.forEach((metric) => {
+        if (
+          !tickerMap[metric.ticker] ||
+          metric.snapshot_date > tickerMap[metric.ticker].snapshot_date
+        ) {
+          tickerMap[metric.ticker] = metric;
+        }
+      });
+
+      return Object.values(tickerMap);
+    } catch (error) {
+      console.error("❌ Error getting ticker analytics:", error);
+      return [];
+    }
+  }
+
+  // getTrendingTopics matching JavaScript implementation
+  async getTrendingTopics(limit: number = 5) {
+    if (!this.db) throw new Error("Database not connected");
+
+    try {
+      const headlines = await this.db
+        .collection("trending_headlines")
+        .find({})
+        .sort({ date: -1 })
+        .limit(limit)
+        .toArray();
+
+      return { headlines, events: [] };
+    } catch (error) {
+      console.error("❌ Error getting trending topics:", error);
+      return { headlines: [], events: [] };
+    }
+  }
+
+  private parseTimeRange(timeRange: string): number {
+    const map: { [key: string]: number } = {
+      "1h": 1,
+      "6h": 6,
+      "12h": 12,
+      "24h": 24,
+      "3d": 72,
+      "7d": 168,
     };
-
-    Object.entries(nameMap).forEach(([name, ticker]) => {
-      if (upperText.includes(name) && !found.includes(ticker)) {
-        found.push(ticker);
-      }
-    });
-
-    console.log(
-      `🏷️ Extracted tickers from "${text}": ${found.join(", ") || "none"}`
-    );
-    return found;
+    return map[timeRange] || 24;
   }
 
   async getUserStats(userId: string) {

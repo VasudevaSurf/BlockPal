@@ -1,4 +1,4 @@
-// src/components/NewsChatPage.tsx - COMPLETE UPDATED VERSION
+// src/components/NewsChatPage.tsx - FIXED VERSION with proper URL rendering
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -203,12 +203,24 @@ export default function NewsChatPage() {
     }
   };
 
+  // IMPROVED: Format message content with proper markdown link rendering
   const formatMessageContent = (content: string) => {
-    return content
+    // First convert markdown bold and italic
+    let formatted = content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
-      .replace(/\n/g, "<br>");
+      .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>');
+
+    // Convert markdown links [text](url) to clickable HTML links
+    formatted = formatted.replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer" class="news-link">$1</a>'
+    );
+
+    // Convert newlines to <br>
+    formatted = formatted.replace(/\n/g, "<br>");
+
+    return formatted;
   };
 
   const showWelcomeScreen = messages.length === 0;
@@ -428,6 +440,17 @@ export default function NewsChatPage() {
           border-radius: 4px;
           font-family: monospace;
           font-size: 0.9em;
+        }
+        /* Style for clickable news links */
+        .message-content .news-link {
+          color: #e2af19;
+          text-decoration: underline;
+          font-weight: 500;
+          transition: all 0.2s ease;
+        }
+        .message-content .news-link:hover {
+          color: #f7b410;
+          text-decoration: none;
         }
       `}</style>
     </div>
