@@ -11,22 +11,137 @@ import {
   ReferenceLine,
 } from "recharts";
 
+function Speedometer({ value = 52 }: { value: number }) {
+  const angle = 180 - (value / 100) * 180;
+
+  return (
+    <div className="flex flex-col items-center justify-center">
+      <div className="relative w-full h-24">
+        <svg viewBox="0 0 200 110" className="w-full h-full">
+          <defs>
+            <linearGradient
+              id="meterGradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="0%"
+            >
+              <stop offset="0%" stopColor="#E74C3C" />
+              <stop offset="25%" stopColor="#FF6B6B" />
+              <stop offset="50%" stopColor="#F7B410" />
+              <stop offset="75%" stopColor="#A8E05F" />
+              <stop offset="100%" stopColor="#2ECC71" />
+            </linearGradient>
+            <radialGradient id="innerGradient" cx="50%" cy="100%">
+              <stop offset="0%" stopColor="#3A3A3A" />
+              <stop offset="100%" stopColor="#1A1A1A" />
+            </radialGradient>
+          </defs>
+
+          <path
+            d="M 20 100 A 80 80 0 0 1 180 100"
+            fill="none"
+            stroke="url(#meterGradient)"
+            strokeWidth="20"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 30 100 A 70 70 0 0 1 170 100"
+            fill="none"
+            stroke="url(#innerGradient)"
+            strokeWidth="18"
+            strokeLinecap="round"
+          />
+
+          {[0, 20, 40, 60, 80, 100].map((tick) => {
+            const tickAngle = 180 - (tick / 100) * 180;
+            const radians = (tickAngle * Math.PI) / 180;
+            const innerRadius = 52;
+            const outerRadius = 60;
+            const x1 = 100 - Math.cos(radians) * innerRadius;
+            const y1 = 100 - Math.sin(radians) * innerRadius;
+            const x2 = 100 - Math.cos(radians) * outerRadius;
+            const y2 = 100 - Math.sin(radians) * outerRadius;
+
+            return (
+              <g key={tick}>
+                <line
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke="#666666"
+                  strokeWidth="2"
+                />
+                <text
+                  x={100 - Math.cos(radians) * 72}
+                  y={100 - Math.sin(radians) * 72 + 4}
+                  textAnchor="middle"
+                  fill="#666666"
+                  fontSize="10"
+                  fontWeight="600"
+                >
+                  {tick}
+                </text>
+              </g>
+            );
+          })}
+
+          <text x="25" y="95" fill="#999999" fontSize="9" fontWeight="600">
+            FEAR
+          </text>
+          <text x="155" y="95" fill="#999999" fontSize="9" fontWeight="600">
+            NEUTRAL
+          </text>
+          <text x="88" y="30" fill="#999999" fontSize="9" fontWeight="600">
+            GREEDY
+          </text>
+
+          <circle cx="100" cy="100" r="8" fill="#2C2C2C" />
+
+          <g
+            style={{
+              transform: `rotate(${angle}deg)`,
+              transformOrigin: "100px 100px",
+              transition: "transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            }}
+          >
+            <path d="M 100 100 L 95 95 L 100 25 L 105 95 Z" fill="white" />
+          </g>
+
+          <circle cx="100" cy="100" r="6" fill="white" />
+        </svg>
+      </div>
+
+      <div className="mt-2">
+        <div className="bg-[#F7B410] text-black text-[10px] font-bold px-3 py-1 rounded">
+          METER
+        </div>
+      </div>
+
+      <div className="text-white text-sm font-light mt-2 tracking-wide">
+        Sentiment Meter
+      </div>
+    </div>
+  );
+}
+
 export default function TokenSidebar() {
   return (
-    <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] p-4 overflow-y-auto scrollbar-hide space-y-4">
+    <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] p-2 overflow-hidden flex flex-col space-y-2">
       {/* Price Chart Section */}
-      <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-3 pb-2">
+      <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-2 pb-1.5 flex-shrink-0">
         {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-[#F7931A] flex items-center justify-center">
-              <span className="text-white text-base font-bold">₿</span>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-[#F7931A] flex items-center justify-center">
+              <span className="text-white text-sm font-bold">₿</span>
             </div>
             <div>
-              <h3 className="text-white text-[15px] font-semibold leading-tight">
+              <h3 className="text-white text-[13px] font-semibold leading-tight">
                 Bitcoin
               </h3>
-              <p className="text-[#999999] text-[11px] leading-tight">BTC</p>
+              <p className="text-[#999999] text-[10px] leading-tight">BTC</p>
             </div>
           </div>
           <div className="flex rounded-[30px] border border-[#2C2C2C] bg-[#0F0F0F] p-0.5">
@@ -43,7 +158,7 @@ export default function TokenSidebar() {
         </div>
 
         {/* Chart */}
-        <div className="h-[140px] -mx-3">
+        <div className="h-[100px] -mx-2 mr-2">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={[
@@ -148,131 +263,15 @@ export default function TokenSidebar() {
       </div>
 
       {/* Sentiment Section */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 flex-shrink-0">
         {/* Sentiment Meter */}
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-3 flex flex-col items-center justify-center">
-          {/* Speedometer */}
-          <div className="relative w-full aspect-square max-w-[140px] mb-2">
-            <svg viewBox="0 0 200 120" className="w-full h-full">
-              {/* Background arc */}
-              <path
-                d="M 20 100 A 80 80 0 0 1 180 100"
-                fill="none"
-                stroke="#2C2C2C"
-                strokeWidth="20"
-                strokeLinecap="round"
-              />
-
-              {/* Fear section (red) */}
-              <path
-                d="M 20 100 A 80 80 0 0 1 53 45"
-                fill="none"
-                stroke="#E74C3C"
-                strokeWidth="20"
-                strokeLinecap="round"
-              />
-
-              {/* Neutral section (yellow-green gradient) */}
-              <path
-                d="M 53 45 A 80 80 0 0 1 147 45"
-                fill="none"
-                stroke="url(#gradient)"
-                strokeWidth="20"
-                strokeLinecap="round"
-              />
-
-              {/* Greed section (green) */}
-              <path
-                d="M 147 45 A 80 80 0 0 1 180 100"
-                fill="none"
-                stroke="#2ECC71"
-                strokeWidth="20"
-                strokeLinecap="round"
-              />
-
-              {/* Gradient definition */}
-              <defs>
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#F7B410" />
-                  <stop offset="100%" stopColor="#A8C740" />
-                </linearGradient>
-              </defs>
-
-              {/* Needle */}
-              <g transform="translate(100, 100)">
-                <line
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="-70"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  transform="rotate(-45)"
-                />
-                <circle cx="0" cy="0" r="6" fill="white" />
-              </g>
-
-              {/* Labels */}
-              <text
-                x="20"
-                y="115"
-                fill="#E74C3C"
-                fontSize="10"
-                fontWeight="bold"
-              >
-                FEAR
-              </text>
-              <text x="20" y="125" fill="#E74C3C" fontSize="10">
-                100
-              </text>
-
-              <text
-                x="88"
-                y="20"
-                fill="#F7B410"
-                fontSize="10"
-                fontWeight="bold"
-              >
-                GREEDY
-              </text>
-
-              <text
-                x="170"
-                y="115"
-                fill="#2ECC71"
-                fontSize="10"
-                fontWeight="bold"
-                textAnchor="end"
-              >
-                NEUTRAL
-              </text>
-              <text
-                x="170"
-                y="125"
-                fill="#2ECC71"
-                fontSize="10"
-                textAnchor="end"
-              >
-                0
-              </text>
-            </svg>
-          </div>
-
-          {/* Meter Badge */}
-          <div className="bg-[#F7B410] px-2.5 py-0.5 rounded-md mb-2">
-            <span className="text-black text-[11px] font-bold">METER</span>
-          </div>
-
-          {/* Title */}
-          <h3 className="text-white text-[18px] font-bold text-center">
-            Sentiment Meter
-          </h3>
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-2 flex flex-col items-center justify-center">
+          <Speedometer value={52} />
         </div>
 
         {/* Sentiment History */}
-        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-3 flex flex-col justify-center">
-          <div className="space-y-2.5">
+        <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-2 flex flex-col justify-center">
+          <div className="space-y-1.5">
             <div className="flex flex-col">
               <p className="text-[#666666] text-[9px] leading-none">
                 1 min ago
@@ -377,7 +376,7 @@ export default function TokenSidebar() {
       </div>
 
       {/* Token Sentiment Bars Section */}
-      <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-4 space-y-4">
+      <div className="bg-black rounded-[16px] border border-[#2C2C2C] p-2 space-y-2 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
         {/* Ethereum */}
         <div className="relative p-[1px] rounded-[16px] overflow-hidden">
           {/* Animated gradient border - glacier effect */}
@@ -396,7 +395,7 @@ export default function TokenSidebar() {
 
           {/* Inner container with glass effect */}
           <div
-            className="relative flex items-center justify-between gap-4 rounded-[15px] p-3"
+            className="relative flex items-center justify-between gap-4 rounded-[15px] p-2"
             style={{
               background: `linear-gradient(135deg, 
                 rgba(15, 15, 15, 0.95) 0%,
@@ -410,33 +409,33 @@ export default function TokenSidebar() {
               `,
             }}
           >
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="w-10 h-10 rounded-full bg-[#627EEA] flex items-center justify-center">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#627EEA] flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
                   <path d="M11.944 17.97L4.58 13.62 11.943 24l7.37-10.38-7.372 4.35h.003zM12.056 0L4.69 12.223l7.365 4.354 7.365-4.35L12.056 0z" />
                 </svg>
               </div>
               <div>
-                <h4 className="text-white text-[14px] font-semibold">
+                <h4 className="text-white text-[12px] font-semibold">
                   Ethereum
                 </h4>
-                <p className="text-[#999999] text-[11px]">ETH</p>
+                <p className="text-[#999999] text-[10px]">ETH</p>
               </div>
             </div>
-            <div className="flex flex-col gap-1 min-w-[200px]">
+            <div className="flex flex-col gap-0.5 min-w-[160px]">
               <div className="flex justify-between items-center px-1">
-                <span className="text-[#666666] text-[11px]">0</span>
-                <span className="text-[#2ECC71] text-[13px] font-bold">50</span>
-                <span className="text-[#666666] text-[11px]">100</span>
+                <span className="text-[#666666] text-[9px]">0</span>
+                <span className="text-[#2ECC71] text-[11px] font-bold">50</span>
+                <span className="text-[#666666] text-[9px]">100</span>
               </div>
-              <div className="h-4 bg-[#2C2C2C] rounded-full overflow-hidden">
+              <div className="h-3 bg-[#2C2C2C] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#2ECC71] rounded-full"
                   style={{ width: "50%" }}
                 />
               </div>
               <div className="text-center">
-                <span className="text-[#2ECC71] text-[13px] font-medium">
+                <span className="text-[#2ECC71] text-[11px] font-medium">
                   Neutral
                 </span>
               </div>
@@ -460,7 +459,7 @@ export default function TokenSidebar() {
           />
 
           <div
-            className="relative flex items-center justify-between gap-4 rounded-[15px] p-3"
+            className="relative flex items-center justify-between gap-4 rounded-[15px] p-2"
             style={{
               background: `linear-gradient(135deg, 
                 rgba(15, 15, 15, 0.95) 0%,
@@ -474,31 +473,31 @@ export default function TokenSidebar() {
               `,
             }}
           >
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="w-10 h-10 rounded-full bg-[#F7931A] flex items-center justify-center">
-                <span className="text-white text-lg font-bold">₿</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#F7931A] flex items-center justify-center">
+                <span className="text-white text-base font-bold">₿</span>
               </div>
               <div>
-                <h4 className="text-white text-[14px] font-semibold">
+                <h4 className="text-white text-[12px] font-semibold">
                   Bitcoin
                 </h4>
-                <p className="text-[#999999] text-[11px]">BTC</p>
+                <p className="text-[#999999] text-[10px]">BTC</p>
               </div>
             </div>
-            <div className="flex flex-col gap-1 min-w-[200px]">
+            <div className="flex flex-col gap-0.5 min-w-[160px]">
               <div className="flex justify-between items-center px-1">
-                <span className="text-[#666666] text-[11px]">0</span>
-                <span className="text-[#F7B410] text-[13px] font-bold">80</span>
-                <span className="text-[#666666] text-[11px]">100</span>
+                <span className="text-[#666666] text-[9px]">0</span>
+                <span className="text-[#F7B410] text-[11px] font-bold">80</span>
+                <span className="text-[#666666] text-[9px]">100</span>
               </div>
-              <div className="h-4 bg-[#2C2C2C] rounded-full overflow-hidden">
+              <div className="h-3 bg-[#2C2C2C] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#F7B410] rounded-full"
                   style={{ width: "80%" }}
                 />
               </div>
               <div className="text-center">
-                <span className="text-[#F7B410] text-[13px] font-medium">
+                <span className="text-[#F7B410] text-[11px] font-medium">
                   Greedy
                 </span>
               </div>
@@ -522,7 +521,7 @@ export default function TokenSidebar() {
           />
 
           <div
-            className="relative flex items-center justify-between gap-4 rounded-[15px] p-3"
+            className="relative flex items-center justify-between gap-4 rounded-[15px] p-2"
             style={{
               background: `linear-gradient(135deg, 
                 rgba(15, 15, 15, 0.95) 0%,
@@ -536,35 +535,35 @@ export default function TokenSidebar() {
               `,
             }}
           >
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#9945FF] via-[#14F195] to-[#00D4FF] flex items-center justify-center">
-                <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center">
-                  <div className="w-6 h-6 bg-gradient-to-br from-[#9945FF] via-[#14F195] to-[#00D4FF] rounded-full" />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#9945FF] via-[#14F195] to-[#00D4FF] flex items-center justify-center">
+                <div className="w-6 h-6 rounded-full bg-black flex items-center justify-center">
+                  <div className="w-4 h-4 bg-gradient-to-br from-[#9945FF] via-[#14F195] to-[#00D4FF] rounded-full" />
                 </div>
               </div>
               <div>
-                <h4 className="text-white text-[14px] font-semibold">
+                <h4 className="text-white text-[12px] font-semibold">
                   Bitcoin
                 </h4>
-                <p className="text-[#999999] text-[11px]">BTC</p>
+                <p className="text-[#999999] text-[10px]">BTC</p>
               </div>
             </div>
-            <div className="flex flex-col gap-1 min-w-[200px]">
+            <div className="flex flex-col gap-0.5 min-w-[160px]">
               <div className="flex justify-between items-center px-1">
-                <span className="text-[#666666] text-[11px]">0</span>
-                <span className="text-[#E74C3C] text-[13px] font-bold">
+                <span className="text-[#666666] text-[9px]">0</span>
+                <span className="text-[#E74C3C] text-[11px] font-bold">
                   100
                 </span>
-                <span className="text-[#E74C3C] text-[11px]">100</span>
+                <span className="text-[#E74C3C] text-[9px]">100</span>
               </div>
-              <div className="h-4 bg-[#2C2C2C] rounded-full overflow-hidden">
+              <div className="h-3 bg-[#2C2C2C] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#E74C3C] rounded-full"
                   style={{ width: "100%" }}
                 />
               </div>
               <div className="text-center">
-                <span className="text-[#E74C3C] text-[13px] font-medium">
+                <span className="text-[#E74C3C] text-[11px] font-medium">
                   Greedy
                 </span>
               </div>
@@ -588,7 +587,7 @@ export default function TokenSidebar() {
           />
 
           <div
-            className="relative flex items-center justify-between gap-4 rounded-[15px] p-3"
+            className="relative flex items-center justify-between gap-4 rounded-[15px] p-2"
             style={{
               background: `linear-gradient(135deg, 
                 rgba(15, 15, 15, 0.95) 0%,
@@ -602,31 +601,31 @@ export default function TokenSidebar() {
               `,
             }}
           >
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="w-10 h-10 rounded-full bg-[#F7931A] flex items-center justify-center">
-                <span className="text-white text-lg font-bold">₿</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#F7931A] flex items-center justify-center">
+                <span className="text-white text-base font-bold">₿</span>
               </div>
               <div>
-                <h4 className="text-white text-[14px] font-semibold">
+                <h4 className="text-white text-[12px] font-semibold">
                   Bitcoin
                 </h4>
-                <p className="text-[#999999] text-[11px]">BTC</p>
+                <p className="text-[#999999] text-[10px]">BTC</p>
               </div>
             </div>
-            <div className="flex flex-col gap-1 min-w-[200px]">
+            <div className="flex flex-col gap-0.5 min-w-[160px]">
               <div className="flex justify-between items-center px-1">
-                <span className="text-[#666666] text-[11px]">0</span>
-                <span className="text-[#F7B410] text-[13px] font-bold">80</span>
-                <span className="text-[#666666] text-[11px]">100</span>
+                <span className="text-[#666666] text-[9px]">0</span>
+                <span className="text-[#F7B410] text-[11px] font-bold">80</span>
+                <span className="text-[#666666] text-[9px]">100</span>
               </div>
-              <div className="h-4 bg-[#2C2C2C] rounded-full overflow-hidden">
+              <div className="h-3 bg-[#2C2C2C] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#F7B410] rounded-full"
                   style={{ width: "80%" }}
                 />
               </div>
               <div className="text-center">
-                <span className="text-[#F7B410] text-[13px] font-medium">
+                <span className="text-[#F7B410] text-[11px] font-medium">
                   Greedy
                 </span>
               </div>
