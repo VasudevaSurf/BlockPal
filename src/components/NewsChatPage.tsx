@@ -1,8 +1,8 @@
-// src/components/NewsChatPage.tsx
+// src/components/NewsChatPage.tsx - COMPLETE UPDATED VERSION
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, RefreshCw, ArrowLeft } from "lucide-react";
+import { Send, RefreshCw } from "lucide-react";
 
 interface Message {
   id: string;
@@ -11,12 +11,15 @@ interface Message {
   timestamp: Date;
   processing?: boolean;
   typing?: boolean;
+  functionCalls?: string[];
 }
 
 export default function NewsChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationId, setConversationId] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -84,6 +87,7 @@ export default function NewsChatPage() {
     const currentInput = textToSend;
     setInputMessage("");
     setIsTyping(true);
+    setError(null);
 
     // Handle clear command
     if (currentInput.toLowerCase().trim() === "clear") {
@@ -106,9 +110,33 @@ export default function NewsChatPage() {
       },
     ]);
 
-    // Simulate AI response
-    setTimeout(async () => {
-      const mockResponse = `Here's some information about "${currentInput}". This is a demo response showing how the chat interface works. The actual AI integration can be added later.`;
+    try {
+      console.log("🤖 Sending message to News AI:", currentInput);
+
+      const response = await fetch("/api/news-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          message: currentInput,
+          conversationId: conversationId || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("📦 News AI Response received:", data);
+
+      // Set conversation ID if this is a new conversation
+      if (data.conversationId && !conversationId) {
+        console.log("📝 Setting conversation ID:", data.conversationId);
+        setConversationId(data.conversationId);
+      }
 
       setMessages((prev) => prev.filter((msg) => !msg.processing));
       const aiId = (Date.now() + 2).toString();
@@ -120,12 +148,52 @@ export default function NewsChatPage() {
           content: "",
           timestamp: new Date(),
           typing: true,
+          functionCalls: data.functionCalls || [],
         },
       ]);
 
-      await typeMessage(mockResponse, aiId);
+      await typeMessage(
+        data.message || "Sorry, I didn't receive a proper response.",
+        aiId
+      );
+      console.log("✅ News AI response completed");
+    } catch (error: any) {
+      console.error("❌ Error sending message:", error);
+
+      setMessages((prev) => prev.filter((msg) => !msg.processing));
+      const errorId = (Date.now() + 2).toString();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: errorId,
+          type: "assistant",
+          content: "",
+          timestamp: new Date(),
+          typing: true,
+        },
+      ]);
+
+      let errorMessage =
+        "❌ **Error**\n\nSomething went wrong while processing your request.";
+
+      if (error.message.includes("fetch")) {
+        errorMessage =
+          "🌐 **Connection Error**\n\nUnable to connect to the AI service. Please check your internet connection and try again.";
+      } else if (error.message.includes("500")) {
+        errorMessage =
+          "⚠️ **Server Error**\n\nThe AI service is temporarily unavailable. Please try again in a few moments.";
+      } else if (error.message.includes("401")) {
+        errorMessage =
+          "🔒 **Authentication Error**\n\nPlease log in to use the News AI chat.";
+      } else {
+        errorMessage += `\n\n**Details:** ${error.message}`;
+      }
+
+      await typeMessage(errorMessage, errorId);
+      setError(error.message);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -135,103 +203,7 @@ export default function NewsChatPage() {
     }
   };
 
-  const copyMessage = async (content: string, messageId: string) => {
-    try {
-      const cleanContent = content
-        .replace(/\*\*(.*?)\*\*/g, "$1")
-        .replace(/\*(.*?)\*/g, "$1")
-        .replace(/`(.*?)`/g, "$1")
-        .replace(/\n/g, "\n");
-
-      await navigator.clipboard.writeText(cleanContent);
-      setCopiedItems((prev) => new Set(prev).add(messageId));
-      setTimeout(() => {
-        setCopiedItems((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(messageId);
-          return newSet;
-        });
-      }, 2000);
-    } catch (err) {
-      console.error("Failed to copy message");
-    }
-  };
-
-  const handleSessionSelect = async (selectedSessionId: string) => {
-    if (selectedSessionId === conversationId) {
-      setActiveTab("chat");
-      return;
-    }
-
-    // Mock loading conversation
-    setConversationId(selectedSessionId);
-    setMessages([]);
-    setActiveTab("chat");
-  };
-
-  const handleNewChat = async () => {
-    setMessages([]);
-    setConversationId("");
-    setActiveTab("chat");
-  };
-
-  const toggleStar = async (conversationId: string) => {
-    setConversations((prev) =>
-      prev.map((conv) =>
-        conv.id === conversationId
-          ? { ...conv, isStarred: !conv.isStarred }
-          : conv
-      )
-    );
-    setOpenMenuId(null);
-  };
-
-  const startRename = (conversationId: string, currentTitle: string) => {
-    setEditingId(conversationId);
-    setEditingTitle(currentTitle);
-    setOpenMenuId(null);
-  };
-
-  const handleRename = async (conversationId: string) => {
-    if (!editingTitle.trim()) {
-      setEditingId(null);
-      setEditingTitle("");
-      return;
-    }
-
-    const newTitle = editingTitle.trim();
-    setConversations((prev) =>
-      prev.map((conv) =>
-        conv.id === conversationId ? { ...conv, title: newTitle } : conv
-      )
-    );
-
-    setEditingId(null);
-    setEditingTitle("");
-  };
-
-  const deleteConversation = async (conversationIdToDelete: string) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this conversation? This action cannot be undone."
-      )
-    ) {
-      setOpenMenuId(null);
-      return;
-    }
-
-    setConversations((prev) =>
-      prev.filter((conv) => conv.id !== conversationIdToDelete)
-    );
-
-    if (conversationIdToDelete === conversationId) {
-      handleNewChat();
-    }
-
-    setOpenMenuId(null);
-  };
-
-  const formatMessage = (content: string) => {
+  const formatMessageContent = (content: string) => {
     return content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
@@ -240,14 +212,6 @@ export default function NewsChatPage() {
   };
 
   const showWelcomeScreen = messages.length === 0;
-
-  const formatMessageContent = (content: string) => {
-    return content
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
-      .replace(/\n/g, "<br>");
-  };
 
   return (
     <div className="h-full relative bg-[#0F0F0F] flex">
@@ -265,21 +229,21 @@ export default function NewsChatPage() {
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 min-h-0">
           {showWelcomeScreen ? (
-            /* Welcome Screen - Removed */
+            /* Welcome Screen */
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
                 <div className="mb-4">
                   <img
                     src="/AImiddleImage.png"
-                    alt="Lumen AI"
+                    alt="News AI"
                     className="w-32 h-32 object-contain mx-auto"
                   />
                 </div>
                 <h1 className="text-white text-[24px] font-mayeka font-bold mb-2">
-                  News Chat
+                  News AI Chat
                 </h1>
                 <p className="text-[#999999] text-[14px] font-satoshi">
-                  Ask questions about crypto news
+                  Ask questions about crypto news and market insights
                 </p>
               </div>
             </div>
@@ -298,7 +262,7 @@ export default function NewsChatPage() {
                               className="text-[#E2AF19] animate-spin"
                             />
                             <span className="text-[#F9EFD1] text-sm font-satoshi">
-                              Thinking...
+                              Analyzing news...
                             </span>
                           </div>
                         ) : (
@@ -312,6 +276,21 @@ export default function NewsChatPage() {
                             {message.typing && (
                               <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
                             )}
+
+                            {message.functionCalls &&
+                              message.functionCalls.length > 0 &&
+                              !message.typing && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {message.functionCalls.map((func, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="text-xs bg-[#E2AF19]/20 text-[#E2AF19] px-2 py-1 rounded"
+                                    >
+                                      📰 {func.replace("_", " ")}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                           </div>
                         )}
                       </div>
@@ -338,7 +317,7 @@ export default function NewsChatPage() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message"
+              placeholder="Ask about crypto news..."
               className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-36 pl-4 py-3 min-h-[48px] max-h-32 text-sm border border-[#71570C] focus:border-[#E2AF19] transition-colors rounded-[100px] disabled:opacity-50"
               rows={1}
               disabled={isTyping}
@@ -433,12 +412,6 @@ export default function NewsChatPage() {
         }
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
-        }
-        .line-clamp-1 {
-          display: -webkit-box;
-          -webkit-line-clamp: 1;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
         }
         .message-content strong {
           font-weight: 700;
