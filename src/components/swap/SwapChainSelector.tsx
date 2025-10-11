@@ -1,4 +1,4 @@
-// src/components/swap/SwapChainSelector.tsx - WITH SKELETON LOADING
+// src/components/swap/SwapChainSelector.tsx - FIXED ICON BACKGROUNDS
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -71,7 +71,7 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// Chain Icon Component with Skeleton Loading
+// FIXED Chain Icon Component - No background when image loads successfully
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -118,35 +118,29 @@ const ChainIcon: React.FC<ChainIconProps> = ({
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
-      {/* Skeleton Loader */}
-      {!imageLoaded && !imageError && (
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700 animate-pulse rounded-full" />
+      {/* Dark background while loading or on error */}
+      {(!imageLoaded || imageError) && (
+        <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
       )}
 
-      {/* Actual Image */}
+      {/* Actual Image - no background when loaded successfully */}
       {chainData.image && !imageError && (
         <img
           src={chainData.image}
           alt={chainData.name}
           className={`w-full h-full object-contain transition-opacity duration-300 ${
             imageLoaded ? "opacity-100" : "opacity-0"
-          } ${!chainData.useBackground && imageLoaded ? "p-0" : "p-1"}`}
-          style={{
-            backgroundColor:
-              chainData.useBackground && imageLoaded
-                ? chainData.color.replace("bg-", "")
-                : "transparent",
-          }}
+          } p-1 relative z-10`}
           onError={handleImageError}
           onLoad={handleImageLoad}
           loading="lazy"
         />
       )}
 
-      {/* Only show fallback if image fails to load */}
+      {/* Only show fallback icon if image fails to load */}
       {imageError && (
         <div
-          className={`${chainData.color} w-full h-full flex items-center justify-center`}
+          className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
           <span className="text-white text-xs font-bold font-satoshi">
             {chainData.fallbackIcon}

@@ -1,3 +1,4 @@
+// src/components/dashboard/SwapSection.tsx - FIXED to keep skeleton until all content ready
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -10,8 +11,8 @@ import {
 } from "lucide-react";
 import TokenSelectorModal from "@/components/swap/TokenSelectorModal";
 import SwapPreviewModal from "@/components/swap/SwapPreviewModal";
-import { SkeletonSwapSection } from "@/components/ui/Skeleton";
 import { useCoinGecko, TrendingToken, TopGainer } from "@/hooks/useCoinGecko";
+import { useDashboardLoading } from "@/contexts/DashboardLoadingContext";
 
 // Mock token data
 const mockTokens = [
@@ -102,7 +103,6 @@ const TokenImage = ({
     setImageError(true);
   };
 
-  // Show fallback if no image URL, image failed to load, or still loading
   if (!token.imageUrl || imageError || imageLoading) {
     return (
       <div
@@ -111,7 +111,6 @@ const TokenImage = ({
         <span className="text-white text-xs font-bold font-satoshi">
           {token.icon}
         </span>
-        {/* Hidden img tag to attempt loading */}
         {token.imageUrl && imageLoading && (
           <img
             src={token.imageUrl}
@@ -149,6 +148,12 @@ export default function SwapSection() {
     refetch,
   } = useCoinGecko();
 
+  // Use dashboard loading context
+  const { allComponentsLoaded, setComponentLoading } = useDashboardLoading();
+
+  // Track initial load
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+
   // Use mock data instead of Redux
   const tokens = mockTokens;
 
@@ -179,11 +184,29 @@ export default function SwapSection() {
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
   const [showGainersDropdown, setShowGainersDropdown] = useState(false);
 
-  // Auto-scroll refs and state
-  const trendingScrollRef = useRef<HTMLDivElement>(null);
-  const gainersScrollRef = useRef<HTMLDivElement>(null);
-  const [isPausedTrending, setIsPausedTrending] = useState(false);
-  const [isPausedGainers, setIsPausedGainers] = useState(false);
+  // Update loading state for dashboard synchronization
+  useEffect(() => {
+    const isLoading = coinGeckoLoading && !hasInitiallyLoaded;
+    setComponentLoading("swapSection", isLoading);
+
+    // Mark as loaded once we have data
+    if (
+      !coinGeckoLoading &&
+      (trendingTokens.length > 0 || topGainersData.length > 0)
+    ) {
+      setHasInitiallyLoaded(true);
+    }
+  }, [
+    coinGeckoLoading,
+    trendingTokens.length,
+    topGainersData.length,
+    hasInitiallyLoaded,
+    setComponentLoading,
+  ]);
+
+  // Determine if we should show content or skeleton
+  const shouldShowContent =
+    allComponentsLoaded && hasInitiallyLoaded && !coinGeckoLoading;
 
   // Close settings dropdown when clicking outside
   useEffect(() => {
@@ -201,48 +224,6 @@ export default function SwapSection() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
-  // Auto-scroll for Trending Tokens
-  useEffect(() => {
-    const scrollContainer = trendingScrollRef.current;
-    if (!scrollContainer || isPausedTrending || trendingTokens.length === 0)
-      return;
-
-    const scroll = () => {
-      if (
-        scrollContainer.scrollTop + scrollContainer.clientHeight >=
-        scrollContainer.scrollHeight - 1
-      ) {
-        scrollContainer.scrollTop = 0;
-      } else {
-        scrollContainer.scrollTop += 1;
-      }
-    };
-
-    const interval = setInterval(scroll, 50);
-    return () => clearInterval(interval);
-  }, [isPausedTrending, trendingTokens]);
-
-  // Auto-scroll for Top Gainers
-  useEffect(() => {
-    const scrollContainer = gainersScrollRef.current;
-    if (!scrollContainer || isPausedGainers || topGainersData.length === 0)
-      return;
-
-    const scroll = () => {
-      if (
-        scrollContainer.scrollTop + scrollContainer.clientHeight >=
-        scrollContainer.scrollHeight - 1
-      ) {
-        scrollContainer.scrollTop = 0;
-      } else {
-        scrollContainer.scrollTop += 1;
-      }
-    };
-
-    const interval = setInterval(scroll, 50);
-    return () => clearInterval(interval);
-  }, [isPausedGainers, topGainersData]);
 
   // Initialize with ETH as default sell token
   useEffect(() => {
@@ -281,15 +262,12 @@ export default function SwapSection() {
     setQuoteLoading(true);
     setError("");
 
-    // Simulate API delay
     setTimeout(() => {
       try {
-        // Mock exchange rate calculation
         const sellAmountNum = parseFloat(sellAmount);
         const mockExchangeRate = buyToken.price / sellToken.price;
         const buyAmountNum = sellAmountNum * mockExchangeRate;
 
-        // Create mock quote
         const mockQuote: SwapQuote = {
           sellToken: sellToken.symbol,
           buyToken: buyToken.symbol,
@@ -355,7 +333,6 @@ export default function SwapSection() {
 
   const handleMaxClick = () => {
     if (sellToken) {
-      // Reserve small amount for gas if selling ETH
       const maxAmount =
         sellToken.contractAddress === "native"
           ? Math.max(0, sellToken.balance - 0.005)
@@ -381,7 +358,6 @@ export default function SwapSection() {
   };
 
   const handleCustomSlippageChange = (value: string) => {
-    // Only allow valid number inputs
     if (/^\d*\.?\d*$/.test(value) || value === "") {
       setCustomSlippage(value);
       if (value && parseFloat(value) >= 0.1 && parseFloat(value) <= 50) {
@@ -398,10 +374,6 @@ export default function SwapSection() {
     parseFloat(sellAmount) > 0 &&
     parseFloat(sellAmount) <= sellToken.balance;
 
-  if (loading) {
-    return <SkeletonSwapSection />;
-  }
-
   return (
     <>
       <div className="space-y-3 lg:space-y-4 h-full flex flex-col">
@@ -414,27 +386,13 @@ export default function SwapSection() {
               <span className="text-gray-400 text-[10px] font-satoshi">
                 Change in the last 24h
               </span>
-              {/* <button
-                onClick={refetch}
-                className="p-0.5 hover:bg-gray-800 rounded transition-colors"
-                disabled={coinGeckoLoading}
-                title="Refresh data"
-              >
-                <RefreshCw
-                  size={12}
-                  className={`text-[#E7BC3F] ${
-                    coinGeckoLoading ? "animate-spin" : ""
-                  }`}
-                />
-              </button> */}
             </div>
           </div>
 
-          {/* Border between header and content */}
           <div className="border-t border-[#2C2C2C] mb-1"></div>
 
-          {/* Error State */}
-          {coinGeckoError && (
+          {/* Error State - only show when content should be visible */}
+          {coinGeckoError && shouldShowContent && (
             <div className="flex items-center justify-center p-4">
               <div className="text-center">
                 <AlertCircle size={24} className="text-red-400 mx-auto mb-2" />
@@ -451,44 +409,38 @@ export default function SwapSection() {
             </div>
           )}
 
-          {/* Loading State */}
-          {coinGeckoLoading && !trendingTokens.length && (
-            <div className="flex-1 overflow-y-auto space-y-2">
+          {/* Loading State - show skeleton until shouldShowContent is true */}
+          {!shouldShowContent && (
+            <div className="flex-1 overflow-y-auto space-y-2 animate-pulse">
               {Array.from({ length: 7 }).map((_, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between py-1.5 animate-pulse"
+                  className="flex items-center justify-between py-1.5"
                 >
                   <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
-                    <div className="w-7 h-7 bg-gray-600 rounded-full"></div>
+                    <div className="w-7 h-7 bg-[#1A1A1A] rounded-full"></div>
                     <div className="min-w-0 flex-1">
-                      <div className="h-2 bg-gray-600 rounded mb-1"></div>
-                      <div className="h-1.5 bg-gray-700 rounded"></div>
+                      <div className="h-2 bg-[#1A1A1A] rounded mb-1"></div>
+                      <div className="h-1.5 bg-[#1A1A1A] rounded"></div>
                     </div>
                   </div>
-                  <div className="w-20 h-2 bg-gray-600 rounded"></div>
-                  <div className="w-20 h-7 bg-gray-600 rounded"></div>
-                  <div className="w-16 h-2 bg-gray-600 rounded"></div>
+                  <div className="w-20 h-2 bg-[#1A1A1A] rounded"></div>
+                  <div className="w-20 h-7 bg-[#1A1A1A] rounded"></div>
+                  <div className="w-16 h-2 bg-[#1A1A1A] rounded"></div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Token List */}
-          {!coinGeckoLoading && !coinGeckoError && (
-            <div
-              ref={trendingScrollRef}
-              className="flex-1 overflow-y-auto space-y-2 scrollbar-hide"
-              onMouseEnter={() => setIsPausedTrending(true)}
-              onMouseLeave={() => setIsPausedTrending(false)}
-            >
+          {/* Token List - only show when shouldShowContent is true */}
+          {shouldShowContent && !coinGeckoError && (
+            <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
               {trendingTokens.length > 0 ? (
                 trendingTokens.map((token: TrendingToken) => (
                   <div
                     key={token.index}
                     className="flex items-center justify-between py-1.5"
                   >
-                    {/* Token info with fixed width - NOW WITH IMAGES */}
                     <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
                       <TokenImage token={token} />
                       <div className="min-w-0 flex-1">
@@ -501,12 +453,10 @@ export default function SwapSection() {
                       </div>
                     </div>
 
-                    {/* Price with fixed width */}
                     <div className="text-white text-[13px] font-medium font-satoshi w-20 text-center flex-shrink-0">
                       {token.price}
                     </div>
 
-                    {/* Chart with fixed width - FIXED to use actual sparkline URLs */}
                     <div className="w-20 h-7 flex-shrink-0 flex items-center justify-center">
                       {token.sparklineUrl ? (
                         <img
@@ -514,7 +464,6 @@ export default function SwapSection() {
                           alt={`${token.name} chart`}
                           className="w-full h-full object-contain"
                           onError={(e) => {
-                            // Fallback to placeholder if sparkline fails to load
                             (e.target as HTMLImageElement).src = "/graph.png";
                           }}
                         />
@@ -527,7 +476,6 @@ export default function SwapSection() {
                       )}
                     </div>
 
-                    {/* Change percentage with fixed width */}
                     <div
                       className={`text-xs font-medium font-satoshi w-16 text-center flex-shrink-0 ${
                         token.changeType === "positive"
@@ -563,7 +511,6 @@ export default function SwapSection() {
                 <ChevronDown className="w-4 h-4" />
               </button>
 
-              {/* Dropdown */}
               {showGainersDropdown && (
                 <div className="absolute top-full left-0 mt-1 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg py-1 min-w-[120px] z-10">
                   <button className="w-full text-left px-3 py-1.5 text-white text-sm font-satoshi hover:bg-[#2C2C2C] transition-colors">
@@ -613,44 +560,38 @@ export default function SwapSection() {
             </div>
           </div>
 
-          {/* Loading State for Top Gainers */}
-          {coinGeckoLoading && !topGainersData.length && (
-            <div className="flex-1 overflow-y-auto space-y-1">
+          {/* Loading State - show skeleton until shouldShowContent is true */}
+          {!shouldShowContent && (
+            <div className="flex-1 overflow-y-auto space-y-1 animate-pulse">
               {Array.from({ length: 6 }).map((_, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between py-1.5 animate-pulse"
+                  className="flex items-center justify-between py-1.5"
                 >
                   <div className="flex items-center gap-2.5 w-[100px]">
-                    <div className="w-6 h-6 bg-gray-600 rounded-full"></div>
+                    <div className="w-6 h-6 bg-[#1A1A1A] rounded-full"></div>
                     <div className="min-w-0 flex-1">
-                      <div className="h-2 bg-gray-600 rounded mb-1"></div>
-                      <div className="h-1.5 bg-gray-700 rounded"></div>
+                      <div className="h-2 bg-[#1A1A1A] rounded mb-1"></div>
+                      <div className="h-1.5 bg-[#1A1A1A] rounded"></div>
                     </div>
                   </div>
-                  <div className="w-[80px] h-2 bg-gray-600 rounded"></div>
-                  <div className="w-[100px] h-2 bg-gray-600 rounded"></div>
-                  <div className="w-[60px] h-2 bg-gray-600 rounded"></div>
+                  <div className="w-[80px] h-2 bg-[#1A1A1A] rounded"></div>
+                  <div className="w-[100px] h-2 bg-[#1A1A1A] rounded"></div>
+                  <div className="w-[60px] h-2 bg-[#1A1A1A] rounded"></div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Token List */}
-          {!coinGeckoLoading && (
-            <div
-              ref={gainersScrollRef}
-              className="flex-1 overflow-y-auto space-y-1 scrollbar-hide"
-              onMouseEnter={() => setIsPausedGainers(true)}
-              onMouseLeave={() => setIsPausedGainers(false)}
-            >
+          {/* Token List - only show when shouldShowContent is true */}
+          {shouldShowContent && (
+            <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide">
               {topGainersData.length > 0 ? (
                 topGainersData.map((token: TopGainer) => (
                   <div
                     key={token.index}
                     className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
                   >
-                    {/* Token info - NOW WITH IMAGES */}
                     <div className="flex items-center gap-2.5 w-[100px] flex-shrink-0">
                       <TokenImage token={token} size="w-6 h-6" />
                       <div className="min-w-0 flex-1">
@@ -663,17 +604,14 @@ export default function SwapSection() {
                       </div>
                     </div>
 
-                    {/* Price */}
                     <div className="text-white text-[11px] font-medium font-satoshi w-[80px] text-center flex-shrink-0">
                       {token.price}
                     </div>
 
-                    {/* Market Cap */}
                     <div className="text-white text-[11px] font-medium font-satoshi w-[100px] text-center flex-shrink-0">
                       {token.marketCap}
                     </div>
 
-                    {/* Change percentage */}
                     <div className="w-[60px] text-center flex-shrink-0">
                       <div
                         className={`text-[11px] font-medium font-satoshi ${
@@ -708,7 +646,6 @@ export default function SwapSection() {
             display: none;
           }
 
-          /* Remove number input spinners */
           input[type="number"]::-webkit-inner-spin-button,
           input[type="number"]::-webkit-outer-spin-button {
             -webkit-appearance: none;
@@ -719,16 +656,15 @@ export default function SwapSection() {
             -moz-appearance: textfield;
           }
 
-          /* Mobile specific styles */
           @media (max-width: 640px) {
             input {
-              font-size: 14px !important; /* Prevents zoom on iOS */
+              font-size: 14px !important;
             }
           }
         `}</style>
       </div>
 
-      {/* Token Selector Modals - Use mock data */}
+      {/* Token Selector Modals */}
       <TokenSelectorModal
         isOpen={sellTokenSelectorOpen}
         onClose={() => setSellTokenSelectorOpen(false)}
@@ -766,7 +702,7 @@ export default function SwapSection() {
         allowCustomToken={true}
       />
 
-      {/* Preview Modal - Demo functionality */}
+      {/* Preview Modal */}
       <SwapPreviewModal
         isOpen={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}
@@ -777,7 +713,6 @@ export default function SwapSection() {
         quote={quote}
         onConfirm={() => {
           setPreviewModalOpen(false);
-          // Reset form after demo swap
           setSellAmount("");
           setBuyAmount("");
           setQuote(null);

@@ -92,8 +92,8 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   size = "md",
   className = "",
 }) => {
-  const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const sizeClasses = {
     sm: "w-5 h-5",
@@ -101,20 +101,15 @@ const ChainIcon: React.FC<ChainIconProps> = ({
     lg: "w-8 h-8",
   };
 
-  const iconSizes = {
-    sm: "text-xs",
-    md: "text-xs",
-    lg: "text-sm",
-  };
-
   useEffect(() => {
-    setImageError(false);
     setImageLoaded(false);
+    setImageError(false);
   }, [chainData.image]);
 
   const handleImageError = () => {
     console.log(`Failed to load image: ${chainData.image}`);
     setImageError(true);
+    setImageLoaded(true);
   };
 
   const handleImageLoad = () => {
@@ -122,35 +117,40 @@ const ChainIcon: React.FC<ChainIconProps> = ({
     setImageLoaded(true);
   };
 
-  const shouldShowBackground =
-    !chainData.image || imageError || !imageLoaded || chainData.useBackground;
-  const backgroundClass = shouldShowBackground ? chainData.color : "";
-
   return (
     <div
-      className={`${sizeClasses[size]} ${backgroundClass} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
+      {/* Dark background while loading or on error */}
+      {(!imageLoaded || imageError) && (
+        <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
+      )}
+
+      {/* Actual Image - no background when loaded successfully */}
       {chainData.image && !imageError && (
         <img
           src={chainData.image}
           alt={chainData.name}
-          className={`w-full h-full object-contain transition-opacity duration-200 ${
+          className={`w-full h-full object-contain transition-opacity duration-300 ${
             imageLoaded ? "opacity-100" : "opacity-0"
-          } ${!chainData.useBackground && imageLoaded ? "p-0" : "p-1"}`}
+          } p-1 relative z-10`}
           onError={handleImageError}
           onLoad={handleImageLoad}
           loading="lazy"
         />
       )}
-      {/* 
-      {(!chainData.image || imageError || !imageLoaded) && (
-        <span
-          className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
+
+      {/* Only show fallback icon if image fails to load */}
+      {imageError && (
+        <div
+          className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
-          {chainData.fallbackIcon}
-        </span>
-      )} */}
+          <span className="text-white text-xs font-bold font-satoshi">
+            {chainData.fallbackIcon}
+          </span>
+        </div>
+      )}
     </div>
   );
 };
@@ -171,29 +171,20 @@ const TokenImage = ({
 }) => {
   const [hasError, setHasError] = React.useState(false);
 
-  const getFirstWord = () => {
-    const text = name || symbol || "?";
-    const firstWord = text.split(/[\s\-_]+/)[0];
-
-    if (firstWord.length > 6) {
-      return firstWord.substring(0, 6);
-    }
-
-    return firstWord;
+  // Get only the first letter of the symbol or name
+  const getFirstLetter = () => {
+    const text = symbol || name || "?";
+    return text.charAt(0).toUpperCase();
   };
 
   if (!src || hasError) {
-    const firstWord = getFirstWord();
-
     return (
       <div
         className={`${className} rounded-full flex items-center justify-center`}
         style={{ backgroundColor: "#4A4A4A" }}
         title={name || symbol}
       >
-        <span className="text-white font-bold text-xs text-center px-1">
-          {firstWord}
-        </span>
+        <span className="text-white font-bold text-xs">{getFirstLetter()}</span>
       </div>
     );
   }

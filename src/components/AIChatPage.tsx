@@ -66,7 +66,15 @@ export default function AIChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  // const menuRef = useRef<HTMLDivElement>(null);
+
+  const [loadingConversationId, setLoadingConversationId] = useState<
+    string | null
+  >(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState<any>(null);
 
   // Suggestion chips data
   const suggestionChips = [
@@ -89,19 +97,90 @@ export default function AIChatPage() {
     (state: RootState) => state.auth
   );
 
+  useEffect(() => {
+    // Check if browser supports speech recognition
+    if (typeof window !== "undefined") {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition ||
+        (window as any).webkitSpeechRecognition;
+
+      if (SpeechRecognition) {
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.continuous = false;
+        recognitionInstance.interimResults = true;
+        recognitionInstance.lang = "en-US";
+
+        recognitionInstance.onstart = () => {
+          setIsListening(true);
+          console.log("🎤 Voice recognition started");
+        };
+
+        recognitionInstance.onresult = (event: any) => {
+          let finalTranscript = "";
+
+          // Only get the final results to avoid duplicates
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + " ";
+            }
+          }
+
+          // Only update if we have final transcript
+          if (finalTranscript) {
+            setInputMessage((prev) => prev + finalTranscript);
+          }
+        };
+
+        recognitionInstance.onerror = (event: any) => {
+          console.error("❌ Speech recognition error:", event.error);
+          setIsListening(false);
+
+          if (event.error === "not-allowed") {
+            setError(
+              "Microphone access denied. Please allow microphone access."
+            );
+          } else if (event.error === "no-speech") {
+            setError("No speech detected. Please try again.");
+          } else {
+            setError("Voice recognition error. Please try again.");
+          }
+          setTimeout(() => setError(null), 3000);
+        };
+
+        recognitionInstance.onend = () => {
+          setIsListening(false);
+          console.log("🎤 Voice recognition ended");
+          // Focus input after speech recognition ends
+          if (inputRef.current) {
+            inputRef.current.focus();
+          }
+        };
+
+        setRecognition(recognitionInstance);
+      } else {
+        console.warn("⚠️ Speech recognition not supported in this browser");
+      }
+    }
+  }, []);
+
   // Close menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement;
+      // Check if click is outside all menus
+      if (!target.closest(".conversation-menu")) {
         setOpenMenuId(null);
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    if (openMenuId) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [openMenuId]);
 
   // Initialize AI chat - ONLY ONCE
   useEffect(() => {
@@ -178,6 +257,27 @@ export default function AIChatPage() {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  const toggleMicrophone = () => {
+    if (!recognition) {
+      setError("Voice recognition is not supported in your browser");
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    if (isListening) {
+      recognition.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error("Error starting recognition:", error);
+        setError("Failed to start voice recognition");
+        setTimeout(() => setError(null), 3000);
+      }
+    }
+  };
 
   const getRelativeTime = (timestamp: string | Date) => {
     try {
@@ -268,6 +368,10 @@ export default function AIChatPage() {
       setConversationId("");
       setCurrentConversationLoaded(false);
       setIsTyping(false);
+      // Focus input after clearing
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
       return;
     }
 
@@ -391,6 +495,12 @@ export default function AIChatPage() {
       await typeMessage(errorMessage, errorId);
     } finally {
       setIsTyping(false);
+      // Focus input after response is complete
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
     }
   };
 
@@ -429,11 +539,14 @@ export default function AIChatPage() {
       return;
     }
 
+    setLoadingConversationId(selectedSessionId);
+
     try {
       const response = await fetch(
         `/api/ai/conversation?conversationId=${selectedSessionId}`,
         { credentials: "include" }
       );
+
       if (response.ok) {
         const data = await response.json();
         if (data.conversation && data.conversation.messages) {
@@ -451,9 +564,15 @@ export default function AIChatPage() {
           setCurrentConversationLoaded(true);
           setActiveTab("chat");
         }
+      } else {
+        throw new Error("Failed to load conversation");
       }
     } catch (error) {
       console.error("Failed to load conversation:", error);
+      setError("Failed to load conversation");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setLoadingConversationId(null);
     }
   };
 
@@ -542,6 +661,9 @@ export default function AIChatPage() {
       (c) => c.id === conversationId
     )?.title;
 
+    // Set loading state
+    setRenamingId(conversationId);
+
     try {
       // Optimistically update UI
       setConversations((prev) =>
@@ -584,6 +706,7 @@ export default function AIChatPage() {
       setError("Failed to rename conversation");
       setTimeout(() => setError(null), 3000);
     } finally {
+      setRenamingId(null);
       setEditingId(null);
       setEditingTitle("");
     }
@@ -648,15 +771,78 @@ export default function AIChatPage() {
   };
 
   const formatMessage = (content: string) => {
-    return content
+    // First apply basic markdown formatting
+    let formatted = content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
-      .replace(/\n/g, "<br>");
+      .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>');
+
+    // Remove markdown link syntax [text](url) and replace with just the URL
+    // This will be processed by the URL button logic below
+    formatted = formatted.replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      (match, text, url) => {
+        // Add protocol if missing
+        const fullUrl = url.startsWith("http") ? url : `https://${url}`;
+        return ` ${fullUrl} `;
+      }
+    );
+
+    // Transform URLs into clickable buttons
+    // More strict: Must have protocol OR be a clear domain with TLD
+    formatted = formatted.replace(
+      /(?:^|\s)((?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)(?=\s|$|<br>)/g,
+      (match, url, offset) => {
+        const leadingSpace = match[0] === " " ? " " : "";
+
+        // Skip if it's part of an email address
+        if (formatted[offset - 1] === "@") {
+          return match;
+        }
+
+        // Add protocol if missing
+        const fullUrl = url.startsWith("http") ? url : `https://${url}`;
+
+        try {
+          const urlObj = new URL(fullUrl);
+          let buttonText = "";
+
+          // Special handling for social media
+          if (
+            urlObj.hostname.includes("twitter.com") ||
+            urlObj.hostname.includes("x.com")
+          ) {
+            const pathParts = urlObj.pathname.split("/").filter((p) => p);
+            buttonText = pathParts[0] ? `@${pathParts[0]}` : "Twitter";
+          } else if (
+            urlObj.hostname.includes("t.me") ||
+            urlObj.hostname.includes("telegram.")
+          ) {
+            const pathParts = urlObj.pathname.split("/").filter((p) => p);
+            buttonText = pathParts[0] ? `@${pathParts[0]}` : "Telegram";
+          } else {
+            buttonText = urlObj.hostname.replace("www.", "");
+          }
+
+          return `${leadingSpace}<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" class="url-button">${buttonText}</a>`;
+        } catch {
+          return match;
+        }
+      }
+    );
+
+    // Apply line breaks last
+    formatted = formatted.replace(/\n/g, "<br>");
+
+    return formatted;
   };
 
   const handleChipClick = (chipText: string) => {
-    handleSendMessage(chipText);
+    setInputMessage(chipText);
+    // Focus the input after setting the message
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   if (initialLoading) return <SkeletonAIChat />;
@@ -768,10 +954,10 @@ export default function AIChatPage() {
                       <div className="max-w-4xl bg-black/40 backdrop-blur-md p-4 rounded-xl border border-[#F9EFD1]/30">
                         {message.processing && !message.content ? (
                           <div className="flex items-center space-x-2">
-                            <RefreshCw
+                            {/* <RefreshCw
                               size={16}
                               className="text-[#E2AF19] animate-spin"
-                            />
+                            /> */}
                             <span className="text-[#F9EFD1] text-sm font-satoshi">
                               Lumen AI is thinking...
                             </span>
@@ -788,7 +974,7 @@ export default function AIChatPage() {
                               <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
                             )}
 
-                            {message.functionCalls &&
+                            {/* {message.functionCalls &&
                               message.functionCalls.length > 0 &&
                               !message.typing && (
                                 <div className="mt-2 flex flex-wrap gap-1">
@@ -801,7 +987,7 @@ export default function AIChatPage() {
                                     </span>
                                   ))}
                                 </div>
-                              )}
+                              )} */}
                           </div>
                         )}
                       </div>
@@ -857,37 +1043,79 @@ export default function AIChatPage() {
 
               {/* Microphone Icon */}
               <button
-                className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
+                onClick={toggleMicrophone}
+                className={`p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 ${
+                  isListening ? "bg-red-500/20" : ""
+                }`}
                 disabled={isTyping || !isInitialized}
+                title={isListening ? "Stop recording" : "Start voice input"}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="25"
-                  height="25"
-                  viewBox="0 0 31 30"
-                  fill="none"
-                >
-                  <path
-                    d="M15.4324 20.3125C12.1574 20.3125 9.49487 17.65 9.49487 14.375V7.5C9.49487 4.225 12.1574 1.5625 15.4324 1.5625C18.7074 1.5625 21.3699 4.225 21.3699 7.5V14.375C21.3699 17.65 18.7074 20.3125 15.4324 20.3125ZM15.4324 3.4375C13.1949 3.4375 11.3699 5.2625 11.3699 7.5V14.375C11.3699 16.6125 13.1949 18.4375 15.4324 18.4375C17.6699 18.4375 19.4949 16.6125 19.4949 14.375V7.5C19.4949 5.2625 17.6699 3.4375 15.4324 3.4375Z"
-                    fill="#939393"
-                  />
-                  <path
-                    d="M15.4324 24.6875C9.64487 24.6875 4.93237 19.975 4.93237 14.1875V12.0625C4.93237 11.55 5.35737 11.125 5.86987 11.125C6.38237 11.125 6.80737 11.55 6.80737 12.0625V14.1875C6.80737 18.9375 10.6824 22.8125 15.4324 22.8125C20.1824 22.8125 24.0574 18.9375 24.0574 14.1875V12.0625C24.0574 11.55 24.4824 11.125 24.9949 11.125C25.5074 11.125 25.9324 11.55 25.9324 12.0625V14.1875C25.9324 19.975 21.2199 24.6875 15.4324 24.6875Z"
-                    fill="#939393"
-                  />
-                  <path
-                    d="M17.1698 8.97539C17.0698 8.97539 16.9573 8.96289 16.8448 8.92539C15.9323 8.58789 14.9323 8.58789 14.0198 8.92539C13.5323 9.10039 12.9948 8.85039 12.8198 8.36289C12.6448 7.87539 12.8948 7.33789 13.3823 7.16289C14.7073 6.68789 16.1698 6.68789 17.4948 7.16289C17.9823 7.33789 18.2323 7.87539 18.0573 8.36289C17.9073 8.73789 17.5448 8.97539 17.1698 8.97539Z"
-                    fill="#939393"
-                  />
-                  <path
-                    d="M16.4323 11.6254C16.3448 11.6254 16.2698 11.6129 16.1823 11.5879C15.6823 11.4504 15.1698 11.4504 14.6698 11.5879C14.1698 11.7254 13.6573 11.4254 13.5198 10.9254C13.3823 10.4379 13.6823 9.92539 14.1823 9.78789C14.9948 9.56289 15.8698 9.56289 16.6823 9.78789C17.1823 9.92539 17.4823 10.4379 17.3448 10.9379C17.2323 11.3504 16.8448 11.6254 16.4323 11.6254Z"
-                    fill="#939393"
-                  />
-                  <path
-                    d="M15.4324 28.4375C14.9199 28.4375 14.4949 28.0125 14.4949 27.5V23.75C14.4949 23.2375 14.9199 22.8125 15.4324 22.8125C15.9449 22.8125 16.3699 23.2375 16.3699 23.75V27.5C16.3699 28.0125 15.9449 28.4375 15.4324 28.4375Z"
-                    fill="#939393"
-                  />
-                </svg>
+                {isListening ? (
+                  <div className="relative">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="25"
+                      height="25"
+                      viewBox="0 0 31 30"
+                      fill="none"
+                    >
+                      <path
+                        d="M15.4324 20.3125C12.1574 20.3125 9.49487 17.65 9.49487 14.375V7.5C9.49487 4.225 12.1574 1.5625 15.4324 1.5625C18.7074 1.5625 21.3699 4.225 21.3699 7.5V14.375C21.3699 17.65 18.7074 20.3125 15.4324 20.3125ZM15.4324 3.4375C13.1949 3.4375 11.3699 5.2625 11.3699 7.5V14.375C11.3699 16.6125 13.1949 18.4375 15.4324 18.4375C17.6699 18.4375 19.4949 16.6125 19.4949 14.375V7.5C19.4949 5.2625 17.6699 3.4375 15.4324 3.4375Z"
+                        fill="#EF4444"
+                      />
+                      <path
+                        d="M15.4324 24.6875C9.64487 24.6875 4.93237 19.975 4.93237 14.1875V12.0625C4.93237 11.55 5.35737 11.125 5.86987 11.125C6.38237 11.125 6.80737 11.55 6.80737 12.0625V14.1875C6.80737 18.9375 10.6824 22.8125 15.4324 22.8125C20.1824 22.8125 24.0574 18.9375 24.0574 14.1875V12.0625C24.0574 11.55 24.4824 11.125 24.9949 11.125C25.5074 11.125 25.9324 11.55 25.9324 12.0625V14.1875C25.9324 19.975 21.2199 24.6875 15.4324 24.6875Z"
+                        fill="#EF4444"
+                      />
+                      <path
+                        d="M17.1698 8.97539C17.0698 8.97539 16.9573 8.96289 16.8448 8.92539C15.9323 8.58789 14.9323 8.58789 14.0198 8.92539C13.5323 9.10039 12.9948 8.85039 12.8198 8.36289C12.6448 7.87539 12.8948 7.33789 13.3823 7.16289C14.7073 6.68789 16.1698 6.68789 17.4948 7.16289C17.9823 7.33789 18.2323 7.87539 18.0573 8.36289C17.9073 8.73789 17.5448 8.97539 17.1698 8.97539Z"
+                        fill="#EF4444"
+                      />
+                      <path
+                        d="M16.4323 11.6254C16.3448 11.6254 16.2698 11.6129 16.1823 11.5879C15.6823 11.4504 15.1698 11.4504 14.6698 11.5879C14.1698 11.7254 13.6573 11.4254 13.5198 10.9254C13.3823 10.4379 13.6823 9.92539 14.1823 9.78789C14.9948 9.56289 15.8698 9.56289 16.6823 9.78789C17.1823 9.92539 17.4823 10.4379 17.3448 10.9379C17.2323 11.3504 16.8448 11.6254 16.4323 11.6254Z"
+                        fill="#EF4444"
+                      />
+                      <path
+                        d="M15.4324 28.4375C14.9199 28.4375 14.4949 28.0125 14.4949 27.5V23.75C14.4949 23.2375 14.9199 22.8125 15.4324 22.8125C15.9449 22.8125 16.3699 23.2375 16.3699 23.75V27.5C16.3699 28.0125 15.9449 28.4375 15.4324 28.4375Z"
+                        fill="#EF4444"
+                      />
+                    </svg>
+                    {/* Pulsing animation indicator */}
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                  </div>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="25"
+                    height="25"
+                    viewBox="0 0 31 30"
+                    fill="none"
+                  >
+                    <path
+                      d="M15.4324 20.3125C12.1574 20.3125 9.49487 17.65 9.49487 14.375V7.5C9.49487 4.225 12.1574 1.5625 15.4324 1.5625C18.7074 1.5625 21.3699 4.225 21.3699 7.5V14.375C21.3699 17.65 18.7074 20.3125 15.4324 20.3125ZM15.4324 3.4375C13.1949 3.4375 11.3699 5.2625 11.3699 7.5V14.375C11.3699 16.6125 13.1949 18.4375 15.4324 18.4375C17.6699 18.4375 19.4949 16.6125 19.4949 14.375V7.5C19.4949 5.2625 17.6699 3.4375 15.4324 3.4375Z"
+                      fill="#939393"
+                    />
+                    <path
+                      d="M15.4324 24.6875C9.64487 24.6875 4.93237 19.975 4.93237 14.1875V12.0625C4.93237 11.55 5.35737 11.125 5.86987 11.125C6.38237 11.125 6.80737 11.55 6.80737 12.0625V14.1875C6.80737 18.9375 10.6824 22.8125 15.4324 22.8125C20.1824 22.8125 24.0574 18.9375 24.0574 14.1875V12.0625C24.0574 11.55 24.4824 11.125 24.9949 11.125C25.5074 11.125 25.9324 11.55 25.9324 12.0625V14.1875C25.9324 19.975 21.2199 24.6875 15.4324 24.6875Z"
+                      fill="#939393"
+                    />
+                    <path
+                      d="M17.1698 8.97539C17.0698 8.97539 16.9573 8.96289 16.8448 8.92539C15.9323 8.58789 14.9323 8.58789 14.0198 8.92539C13.5323 9.10039 12.9948 8.85039 12.8198 8.36289C12.6448 7.87539 12.8948 7.33789 13.3823 7.16289C14.7073 6.68789 16.1698 6.68789 17.4948 7.16289C17.9823 7.33789 18.2323 7.87539 18.0573 8.36289C17.9073 8.73789 17.5448 8.97539 17.1698 8.97539Z"
+                      fill="#939393"
+                    />
+                    <path
+                      d="M16.4323 11.6254C16.3448 11.6254 16.2698 11.6129 16.1823 11.5879C15.6823 11.4504 15.1698 11.4504 14.6698 11.5879C14.1698 11.7254 13.6573 11.4254 13.5198 10.9254C13.3823 10.4379 13.6823 9.92539 14.1823 9.78789C14.9948 9.56289 15.8698 9.56289 16.6823 9.78789C17.1823 9.92539 17.4823 10.4379 17.3448 10.9379C17.2323 11.3504 16.8448 11.6254 16.4323 11.6254Z"
+                      fill="#939393"
+                    />
+                    <path
+                      d="M15.4324 28.4375C14.9199 28.4375 14.4949 28.0125 14.4949 27.5V23.75C14.4949 23.2375 14.9199 22.8125 15.4324 22.8125C15.9449 22.8125 16.3699 23.2375 16.3699 23.75V27.5C16.3699 28.0125 15.9449 28.4375 15.4324 28.4375Z"
+                      fill="#939393"
+                    />
+                  </svg>
+                )}
               </button>
 
               {/* Send Button */}
@@ -956,10 +1184,25 @@ export default function AIChatPage() {
                 currentConversationLoaded && (
                   <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer hover:bg-[#E2AF19]/15 transition-all">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-white text-sm font-medium">
-                          Current Chat
-                        </span>
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        {(() => {
+                          const currentConv = conversations.find(
+                            (conv) => conv.id === conversationId
+                          );
+                          return (
+                            <>
+                              {currentConv?.isStarred && (
+                                <Star
+                                  size={12}
+                                  className="text-[#E2AF19] fill-current flex-shrink-0"
+                                />
+                              )}
+                              <span className="text-white text-sm font-medium line-clamp-1">
+                                {currentConv?.title || "Current Chat"}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -976,98 +1219,151 @@ export default function AIChatPage() {
                     <div className="flex items-center justify-between">
                       <div
                         className="flex-1 min-w-0 pr-2"
-                        onClick={() => handleSessionSelect(conversation.id)}
+                        onClick={() =>
+                          !loadingConversationId &&
+                          handleSessionSelect(conversation.id)
+                        }
                       >
                         {editingId === conversation.id ? (
-                          <input
-                            type="text"
-                            value={editingTitle}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onBlur={() => handleRename(conversation.id)}
-                            onKeyPress={(e) => {
-                              if (e.key === "Enter") {
-                                handleRename(conversation.id);
-                              }
-                              if (e.key === "Escape") {
-                                setEditingId(null);
-                                setEditingTitle("");
-                              }
-                            }}
-                            autoFocus
-                            className="w-full bg-[#2C2C2C] text-white text-sm rounded px-2 py-1 outline-none border border-[#E2AF19]"
-                          />
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            {conversation.isStarred && (
-                              <Star
-                                size={12}
-                                className="text-[#E2AF19] fill-current flex-shrink-0"
+                          <div className="flex items-center gap-2 w-full">
+                            {renamingId === conversation.id ? (
+                              <div className="flex items-center gap-2 w-full">
+                                <RefreshCw
+                                  size={12}
+                                  className="text-[#E2AF19] animate-spin flex-shrink-0"
+                                />
+                                <span className="text-gray-300 text-sm font-medium">
+                                  Saving...
+                                </span>
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                value={editingTitle}
+                                onChange={(e) =>
+                                  setEditingTitle(e.target.value)
+                                }
+                                onBlur={() => {
+                                  if (!renamingId) {
+                                    handleRename(conversation.id);
+                                  }
+                                }}
+                                onKeyPress={(e) => {
+                                  if (e.key === "Enter" && !renamingId) {
+                                    handleRename(conversation.id);
+                                  }
+                                  if (e.key === "Escape" && !renamingId) {
+                                    setEditingId(null);
+                                    setEditingTitle("");
+                                  }
+                                }}
+                                disabled={!!renamingId}
+                                autoFocus
+                                className="w-full bg-[#2C2C2C] text-white text-sm rounded px-2 py-1 outline-none border border-[#E2AF19] disabled:opacity-50"
                               />
                             )}
-                            <span className="text-gray-300 text-sm font-medium line-clamp-1">
-                              {conversation.title}
-                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {loadingConversationId === conversation.id ? (
+                              <>
+                                {/* <RefreshCw
+                                  size={12}
+                                  className="text-[#E2AF19] animate-spin flex-shrink-0"
+                                /> */}
+                                <span className="text-gray-300 text-sm font-medium line-clamp-1">
+                                  Loading...
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {conversation.isStarred && (
+                                  <Star
+                                    size={12}
+                                    className="text-[#E2AF19] fill-current flex-shrink-0"
+                                  />
+                                )}
+                                <span className="text-gray-300 text-sm font-medium line-clamp-1">
+                                  {conversation.title}
+                                </span>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
 
                       {/* Three-dot menu */}
-                      <div className="relative" ref={menuRef}>
+                      <div className="relative conversation-menu">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setOpenMenuId(
-                              openMenuId === conversation.id
-                                ? null
-                                : conversation.id
-                            );
+                            if (!loadingConversationId) {
+                              setOpenMenuId(
+                                openMenuId === conversation.id
+                                  ? null
+                                  : conversation.id
+                              );
+                            }
                           }}
-                          className="p-1 hover:bg-[#2C2C2C] rounded transition-colors opacity-0 group-hover:opacity-100"
+                          disabled={!!loadingConversationId}
+                          className="p-1 hover:bg-[#2C2C2C] rounded transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-30"
                         >
                           <MoreHorizontal size={16} className="text-gray-400" />
                         </button>
 
                         {/* Dropdown Menu */}
-                        {openMenuId === conversation.id && (
-                          <div className="absolute right-0 top-8 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg shadow-lg min-w-[160px] z-50">
-                            <button
-                              onClick={() => toggleStar(conversation.id)}
-                              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                        {openMenuId === conversation.id &&
+                          !loadingConversationId && (
+                            <div
+                              className="absolute right-0 top-8 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg shadow-lg min-w-[160px] z-50"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <Star
-                                size={14}
-                                className={
-                                  conversation.isStarred
-                                    ? "text-[#E2AF19] fill-current"
-                                    : "text-gray-400"
-                                }
-                              />
-                              {conversation.isStarred ? "Unstar" : "Star"}
-                            </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleStar(conversation.id);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                              >
+                                <Star
+                                  size={14}
+                                  className={
+                                    conversation.isStarred
+                                      ? "text-[#E2AF19] fill-current"
+                                      : "text-gray-400"
+                                  }
+                                />
+                                {conversation.isStarred ? "Unstar" : "Star"}
+                              </button>
 
-                            <button
-                              onClick={() =>
-                                startRename(conversation.id, conversation.title)
-                              }
-                              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
-                            >
-                              <Edit3 size={14} className="text-gray-400" />
-                              Rename
-                            </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startRename(
+                                    conversation.id,
+                                    conversation.title
+                                  );
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                              >
+                                <Edit3 size={14} className="text-gray-400" />
+                                Rename
+                              </button>
 
-                            <div className="border-t border-[#2C2C2C] my-1" />
+                              <div className="border-t border-[#2C2C2C] my-1" />
 
-                            <button
-                              onClick={() =>
-                                deleteConversation(conversation.id)
-                              }
-                              className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
-                            >
-                              <Trash2 size={14} className="text-red-400" />
-                              Delete
-                            </button>
-                          </div>
-                        )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteConversation(conversation.id);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                              >
+                                <Trash2 size={14} className="text-red-400" />
+                                Delete
+                              </button>
+                            </div>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -1150,6 +1446,27 @@ export default function AIChatPage() {
         }
         ::-webkit-scrollbar-thumb:hover {
           background: #404040;
+        }
+        .message-content .url-button {
+          display: inline-flex;
+          align-items: center;
+          background: #e2af19;
+          color: #000000;
+          padding: 4px 12px;
+          border-radius: 6px;
+          font-size: 0.85em;
+          font-weight: 500;
+          text-decoration: none;
+          transition: all 0.2s ease;
+          margin: 2px 4px;
+        }
+        .message-content .url-button:hover {
+          background: #d4a853;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(226, 175, 25, 0.3);
+        }
+        .message-content .url-button:active {
+          transform: translateY(0);
         }
       `}</style>
     </div>

@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - Updated with WalletDataProvider
+// src/app/dashboard/page.tsx - UPDATED with synchronized loading
 "use client";
 
 import { useEffect, useState } from "react";
@@ -8,11 +8,8 @@ import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
 import WalletStats from "@/components/dashboard/WalletStats";
 import { WalletDataProvider } from "@/contexts/WalletDataContext";
-import {
-  SkeletonWalletBalance,
-  SkeletonTokenList,
-  SkeletonSwapSection,
-} from "@/components/ui/Skeleton";
+import { DashboardLoadingProvider } from "@/contexts/DashboardLoadingContext";
+import { DashboardSkeleton } from "@/components/ui/Skeleton1";
 
 // Mock authentication state
 const mockAuth = {
@@ -109,33 +106,13 @@ function DashboardContent() {
     }, 1000);
   };
 
-  // Show loading skeleton during initial setup
+  // Show centralized loading skeleton during initial setup
   if (
     dashboardState.isLoading ||
     dashboardState.isAuthenticating ||
     authLoading
   ) {
-    return (
-      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-2 sm:p-3 lg:p-4 flex flex-col overflow-hidden">
-        {/* Mobile Layout Skeleton */}
-        <div className="flex flex-col xl:hidden gap-3 flex-1 min-h-0">
-          <SkeletonWalletBalance />
-          <SkeletonTokenList />
-          <SkeletonSwapSection />
-        </div>
-
-        {/* Desktop Layout Skeleton */}
-        <div className="hidden xl:flex gap-4 flex-1 min-h-0">
-          <div className="flex-1 flex flex-col gap-4 min-w-0 max-w-[68%]">
-            <SkeletonWalletBalance />
-            <SkeletonTokenList />
-          </div>
-          <div className="w-[32%] min-w-[360px] max-w-[440px] flex-shrink-0 h-full">
-            <SkeletonSwapSection />
-          </div>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   // Don't render if not authenticated
@@ -242,11 +219,13 @@ function DashboardContent() {
   );
 }
 
-// Main Dashboard Page Component with Provider
+// Main Dashboard Page Component with Providers
 export default function DashboardPage() {
   return (
     <WalletDataProvider>
-      <DashboardContent />
+      <DashboardLoadingProvider>
+        <DashboardContent />
+      </DashboardLoadingProvider>
     </WalletDataProvider>
   );
 }

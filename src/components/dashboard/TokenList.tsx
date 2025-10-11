@@ -1,4 +1,4 @@
-// Updated TokenList.tsx with improved sliding menu animation
+// src/components/dashboard/TokenList.tsx - COMPLETE with synchronized loading
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -8,6 +8,7 @@ import { useAccount, useChainId } from "wagmi";
 import { RootState } from "@/store";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import { useWalletTracking } from "@/hooks/useWalletTracking";
+import { useDashboardLoading } from "@/contexts/DashboardLoadingContext";
 import {
   RefreshCw,
   MoreVertical,
@@ -20,7 +21,6 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
-import { SkeletonTokenList } from "@/components/ui/Skeleton";
 import { chains } from "@/components/wallet/WalletProvider";
 
 // Improved CSS for sliding menu animation without overlap
@@ -127,6 +127,30 @@ interface WalletTokensResponse {
   lastUpdated: string;
 }
 
+// Token List Loading Skeleton
+const TokenListLoadingSkeleton = () => (
+  <div className="flex-1 overflow-y-auto scrollbar-hide space-y-2 pr-1 animate-pulse">
+    {Array.from({ length: 6 }).map((_, index) => (
+      <div
+        key={index}
+        className="flex items-center justify-between p-2.5 rounded-lg bg-[#0F0F0F]"
+      >
+        <div className="flex items-center flex-1 min-w-0">
+          <div className="w-10 h-10 bg-[#1A1A1A] rounded-full mr-2.5 flex-shrink-0"></div>
+          <div className="min-w-0 flex-1">
+            <div className="h-4 w-24 bg-[#1A1A1A] rounded mb-1.5"></div>
+            <div className="h-3 w-20 bg-[#1A1A1A] rounded"></div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="h-4 w-20 bg-[#1A1A1A] rounded mb-1.5"></div>
+          <div className="h-3 w-16 bg-[#1A1A1A] rounded"></div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 // Token Image Component
 const TokenImage = ({
   src,
@@ -143,25 +167,21 @@ const TokenImage = ({
 }) => {
   const [hasError, setHasError] = React.useState(false);
 
-  const getFirstWord = () => {
+  const getFirstLetter = () => {
     const text = name || symbol || "?";
-    const firstWord = text.split(/[\s\-_]+/)[0];
-    if (firstWord.length > 6) {
-      return firstWord.substring(0, 6);
-    }
-    return firstWord;
+    return text.charAt(0).toUpperCase();
   };
 
   if (!src || hasError) {
-    const firstWord = getFirstWord();
+    const firstLetter = getFirstLetter();
     return (
       <div
         className={`${className} rounded-full flex items-center justify-center`}
         style={{ backgroundColor: "#4A4A4A" }}
         title={name || symbol}
       >
-        <span className="text-white font-bold text-xs text-center px-1">
-          {firstWord}
+        <span className="text-white font-bold text-base text-center">
+          {firstLetter}
         </span>
       </div>
     );
@@ -227,16 +247,11 @@ const PercentageDisplay = ({
         </>
       )}
       <span>{!isValidChange ? "+0.00%" : formatPercentage(displayChange)}</span>
-      {/* {usdChange24h && Math.abs(usdChange24h) > 0.01 && (
-        <span className="ml-1 opacity-75">
-          (${usdChange24h >= 0 ? "+" : ""}${usdChange24h.toFixed(2)})
-        </span>
-      )} */}
     </div>
   );
 };
 
-// Three Dot Menu Component - Fixed click handling
+// Three Dot Menu Component
 const ThreeDotMenu = ({
   token,
   onAddToMain,
@@ -252,7 +267,6 @@ const ThreeDotMenu = ({
   const [isAnimating, setIsAnimating] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -272,7 +286,6 @@ const ThreeDotMenu = ({
   const handleButtonClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("Menu button clicked, isOpen:", !isOpen);
     setIsOpen(!isOpen);
   };
 
@@ -502,7 +515,7 @@ class EnhancedTokenService {
 // Create service instance
 const enhancedTokenService = new EnhancedTokenService();
 
-// MAIN COMPONENT with improved sliding animation
+// MAIN COMPONENT
 export default function TokenList() {
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
@@ -513,6 +526,9 @@ export default function TokenList() {
     trackNow,
     isConnected: trackingConnected,
   } = useWalletTracking();
+
+  // Use dashboard loading context
+  const { allComponentsLoaded, setComponentLoading } = useDashboardLoading();
 
   // Wallet integration
   const { address, isConnected } = useAccount();
@@ -543,6 +559,15 @@ export default function TokenList() {
   const [total24hrChange, setTotal24hrChange] = useState(0);
   const [chainName, setChainName] = useState("");
 
+  // Track if we've loaded data at least once
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  // Update loading state for dashboard synchronization
+  useEffect(() => {
+    const isLoading = loading && !hasLoadedOnce;
+    setComponentLoading("tokenList", isLoading);
+  }, [loading, hasLoadedOnce, setComponentLoading]);
+
   // Load preferences and tokens when wallet connects
   useEffect(() => {
     if (isConnected && address && chainId) {
@@ -565,6 +590,7 @@ export default function TokenList() {
     setPreferences(null);
     presetTokenCountRef.current = 0;
     setShowHidden(false);
+    setHasLoadedOnce(false);
   };
 
   const loadPreferencesAndTokens = async () => {
@@ -613,6 +639,7 @@ export default function TokenList() {
       setHasHiddenTokens(response.hasHiddenTokens);
       setChainName(response.chainName);
       presetTokenCountRef.current = response.presetTokenCount;
+      setHasLoadedOnce(true);
 
       console.log(
         `✅ Loaded ${tokensWithFlags.length} tokens (${response.presetTokenCount} preset, ${response.hiddenTokenCount} hidden)`
@@ -787,9 +814,16 @@ export default function TokenList() {
 
   const { mainTokens, additionalTokens } = getTokensForDisplay();
 
-  if (loading) {
-    return <SkeletonTokenList />;
-  }
+  // Determine if we should show internal skeleton - wait for all components
+  const showInternalSkeleton =
+    (loading && !hasLoadedOnce) || !allComponentsLoaded;
+
+  // Handle wallet not connected - mark as not loading
+  useEffect(() => {
+    if (!isConnected || !address) {
+      setComponentLoading("tokenList", false);
+    }
+  }, [isConnected, address, setComponentLoading]);
 
   if (!isConnected || !address) {
     return (
@@ -828,7 +862,7 @@ export default function TokenList() {
           </div>
 
           <div className="flex items-center gap-2">
-            {hasHiddenTokens && (
+            {hasHiddenTokens && !showInternalSkeleton && (
               <button
                 onClick={() => setShowHidden(!showHidden)}
                 className={`p-1.5 rounded-lg transition-colors flex items-center gap-1 ${
@@ -850,7 +884,7 @@ export default function TokenList() {
         </div>
 
         {/* Error state */}
-        {error && (
+        {error && !showInternalSkeleton && (
           <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
             <div className="flex items-start">
               <AlertCircle size={14} className="text-red-400 mr-2 mt-0.5" />
@@ -867,8 +901,10 @@ export default function TokenList() {
           </div>
         )}
 
-        {/* Token List */}
-        {allTokens.length === 0 ? (
+        {/* Token List - Show skeleton while loading OR waiting for other components */}
+        {showInternalSkeleton ? (
+          <TokenListLoadingSkeleton />
+        ) : allTokens.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8 flex-1">
             <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
               <span className="text-gray-400 text-base lg:text-lg">🪙</span>
@@ -900,7 +936,6 @@ export default function TokenList() {
                   {mainTokens.map((token, index) => (
                     <div
                       key={`${token.contractAddress}_${index}_main`}
-                      // onClick={() => handleTokenClick(token)}
                       className={`token-row ${
                         token.isUserAdded ? "has-menu" : ""
                       } flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
@@ -945,7 +980,6 @@ export default function TokenList() {
                             </div>
                           </div>
 
-                          {/* Menu button for user-added tokens only */}
                           {token.isUserAdded && (
                             <div className="menu-button-wrapper">
                               <ThreeDotMenu
@@ -978,7 +1012,6 @@ export default function TokenList() {
                   {additionalTokens.map((token, index) => (
                     <div
                       key={`${token.contractAddress}_${index}_additional`}
-                      // onClick={() => handleTokenClick(token)}
                       className={`token-row has-menu flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
                         isNavigating || addingToken === token.contractAddress
                           ? "opacity-70"
@@ -1021,7 +1054,6 @@ export default function TokenList() {
                             />
                           </div>
 
-                          {/* Menu button for all additional tokens */}
                           <div className="menu-button-wrapper">
                             <ThreeDotMenu
                               token={token}

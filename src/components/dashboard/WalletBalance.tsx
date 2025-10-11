@@ -1,8 +1,8 @@
-// src/components/dashboard/WalletBalance.tsx - Fixed with shared context to prevent $0.00 fluctuation
+// src/components/dashboard/WalletBalance.tsx - UPDATED with synchronized loading
 "use client";
 
 import { useSelector } from "react-redux";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Copy,
   RefreshCw,
@@ -12,10 +12,10 @@ import {
 } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
 import { RootState } from "@/store";
-import { SkeletonWalletBalance } from "@/components/ui/Skeleton";
 import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
 import { useWalletData } from "@/contexts/WalletDataContext";
+import { useDashboardLoading } from "@/contexts/DashboardLoadingContext";
 
 // Portfolio Change Component
 const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
@@ -63,11 +63,11 @@ const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
 
 // Balance Loading Skeleton
 const BalanceLoadingSkeleton = () => (
-  <div className="space-y-2">
+  <div className="space-y-2 animate-pulse">
     <div className="flex items-end justify-between">
       <div>
-        <div className="h-8 lg:h-9 w-32 lg:w-40 bg-gray-800 rounded animate-pulse mb-2"></div>
-        <div className="h-6 w-24 bg-gray-800 rounded animate-pulse"></div>
+        <div className="h-8 lg:h-9 w-32 lg:w-40 bg-[#1A1A1A] rounded mb-2"></div>
+        <div className="h-6 w-24 bg-[#1A1A1A] rounded"></div>
       </div>
     </div>
   </div>
@@ -81,6 +81,9 @@ export default function WalletBalance() {
   // Use shared wallet data context
   const { walletData, refresh, isRefreshing } = useWalletData();
 
+  // Use dashboard loading context
+  const { allComponentsLoaded, setComponentLoading } = useDashboardLoading();
+
   // Wallet integration
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -91,6 +94,16 @@ export default function WalletBalance() {
     isCopied: false,
     isAnimating: false,
   });
+
+  // Update loading state
+  useEffect(() => {
+    const isLoading = walletData.isInitialLoading && !walletData.hasLoadedOnce;
+    setComponentLoading("walletBalance", isLoading);
+  }, [
+    walletData.isInitialLoading,
+    walletData.hasLoadedOnce,
+    setComponentLoading,
+  ]);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -104,13 +117,13 @@ export default function WalletBalance() {
     }
   };
 
-  // Show skeleton during auth loading
-  if (!isAuthenticated && !user) {
-    return <SkeletonWalletBalance />;
-  }
-
   // Show wallet not connected state
   if (!isConnected || !address) {
+    // Not loading when wallet is not connected
+    useEffect(() => {
+      setComponentLoading("walletBalance", false);
+    }, [setComponentLoading]);
+
     return (
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
@@ -136,8 +149,10 @@ export default function WalletBalance() {
     );
   }
 
-  // Determine if we should show skeleton
-  const showSkeleton = walletData.isInitialLoading && !walletData.hasLoadedOnce;
+  // Determine if we should show internal skeleton or wait for all components
+  const showInternalSkeleton =
+    (walletData.isInitialLoading && !walletData.hasLoadedOnce) ||
+    !allComponentsLoaded;
 
   return (
     <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0">
@@ -182,7 +197,7 @@ export default function WalletBalance() {
       </div>
 
       {/* Error Display */}
-      {walletData.error && !showSkeleton && (
+      {walletData.error && !showInternalSkeleton && (
         <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
           <div className="flex items-start">
             <AlertCircle size={14} className="text-red-400 mr-2 mt-0.5" />
@@ -201,8 +216,8 @@ export default function WalletBalance() {
         </div>
       )}
 
-      {/* Balance Display */}
-      {showSkeleton ? (
+      {/* Balance Display - Show skeleton while loading OR waiting for other components */}
+      {showInternalSkeleton ? (
         <BalanceLoadingSkeleton />
       ) : (
         <div className="space-y-2">

@@ -164,33 +164,41 @@ const ChainIcon: React.FC<ChainIconProps> = ({
     setImageLoaded(true);
   };
 
-  const shouldShowBackground =
-    !chainData.image || imageError || !imageLoaded || chainData.useBackground;
-  const backgroundClass = shouldShowBackground ? chainData.color : "";
-
   return (
     <div
-      className={`${sizeClasses[size]} ${backgroundClass} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
+      {/* Dark background while loading or on error */}
+      {(!imageLoaded || imageError) && (
+        <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
+      )}
+
+      {/* Actual Image - no background when loaded successfully */}
       {chainData.image && !imageError && (
         <img
           src={chainData.image}
           alt={chainData.name}
           className={`w-full h-full object-contain transition-opacity duration-200 ${
             imageLoaded ? "opacity-100" : "opacity-0"
-          } ${!chainData.useBackground && imageLoaded ? "p-0" : "p-1"}`}
+          } p-1 relative z-10`}
           onError={handleImageError}
           onLoad={handleImageLoad}
           loading="lazy"
         />
       )}
-      {(!chainData.image || imageError || !imageLoaded) && (
-        <span
-          className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
+
+      {/* Only show fallback icon if image fails to load */}
+      {imageError && (
+        <div
+          className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
-          {chainData.fallbackIcon}
-        </span>
+          <span
+            className={`text-white ${iconSizes[size]} font-bold font-satoshi`}
+          >
+            {chainData.fallbackIcon}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -490,7 +498,7 @@ export default function SwapPage() {
                   <button
                     ref={chainButtonRef}
                     onClick={() => setShowChainSelector(true)}
-                    className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-fit justify-center px-3 py-2"
+                    className="flex items-center gap-2 hover:opacity-80 min-w-fit justify-center px-3 py-2"
                   >
                     <ChainIcon chainData={currentChainDisplay} size="md" />
                     <span className="text-white text-base font-satoshi font-medium">
@@ -872,10 +880,7 @@ export default function SwapPage() {
                       </span>
                       <span className="text-[#FFFFFF] font-satoshi">
                         {fromTokenBalance
-                          ? `${formatTokenAmount(
-                              fromTokenBalance.formatted,
-                              4
-                            )} ${fromTokenBalance.symbol}`
+                          ? `${fromTokenBalance.formatted} ${fromTokenBalance.symbol}`
                           : "0.00"}
                       </span>
                     </div>
