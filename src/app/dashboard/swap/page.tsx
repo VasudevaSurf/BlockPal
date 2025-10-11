@@ -293,6 +293,24 @@ export default function SwapPage() {
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
 
+  const truncateBalance = (value: string, decimals: number = 5): string => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num === 0) return "0.00000";
+
+    // Convert to string and find decimal point
+    const parts = value.split(".");
+    if (parts.length === 1) {
+      // No decimals
+      return `${parts[0]}.00000`;
+    }
+
+    // Truncate decimals without rounding
+    const truncatedDecimals = parts[1].substring(0, decimals);
+    const paddedDecimals = truncatedDecimals.padEnd(decimals, "0");
+
+    return `${parts[0]}.${paddedDecimals}`;
+  };
+
   // Use the swap hook with all its functionality
   const {
     fromToken,
@@ -880,8 +898,11 @@ export default function SwapPage() {
                       </span>
                       <span className="text-[#FFFFFF] font-satoshi">
                         {fromTokenBalance
-                          ? `${fromTokenBalance.formatted} ${fromTokenBalance.symbol}`
-                          : "0.00"}
+                          ? `${truncateBalance(
+                              fromTokenBalance.formatted,
+                              5
+                            )} ${fromTokenBalance.symbol}`
+                          : "0.00000"}
                       </span>
                     </div>
                     <button

@@ -474,15 +474,17 @@ export function useSwap() {
 
     const balance = parseFloat(fromTokenBalance.formatted);
 
-    // For ERC20 tokens, use full balance
+    // For ERC20 tokens, use 90% of balance (reserve 10%)
     if (fromToken.address !== "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") {
-      setFromAmount(balance.toString());
+      const maxAmount = balance * 0.9; // Use 90% of balance
+      setFromAmount(maxAmount.toFixed(5)); // Limit to 4 decimal places
       return;
     }
 
-    // For native tokens, need to get actual gas cost
+    // For native tokens (ETH), need to reserve gas + 10% buffer
     if (!toToken) {
-      setFromAmount(balance.toString());
+      const maxAmount = balance * 0.9;
+      setFromAmount(maxAmount.toFixed(5));
       return;
     }
 
@@ -528,33 +530,46 @@ export function useSwap() {
           ? gasPrices.medium
           : gasPrices.safe;
 
-      // Calculate actual gas cost correctly
+      // Calculate actual gas cost
       const gasUnits = parseInt(data.data.gas);
       const gasCostETH = (gasUnits * gasPriceGwei) / 1e9;
+
       console.log("MAX button gas calculation:", {
+        balance,
         gasUnits,
         gasPriceGwei,
         gasCostETH,
       });
 
-      // Add 20% buffer for gas price fluctuation
-      const gasWithBuffer = gasCostETH * 1.2;
+      // Add 50% buffer for gas price fluctuation + reserve 10% of balance
+      const gasWithBuffer = gasCostETH * 1.5;
+      const reserveAmount = balance * 0.1; // Reserve 10% of balance
+      const totalReserve = gasWithBuffer + reserveAmount;
 
       // Calculate max sendable amount
-      const maxAmount = Math.max(0, balance - gasWithBuffer);
+      const maxAmount = Math.max(0, balance - totalReserve);
 
       if (maxAmount <= 0) {
         setQuoteError(
-          `Insufficient balance for gas (need ~${gasWithBuffer.toFixed(6)} ETH)`
+          `Insufficient balance. Need to reserve ~${totalReserve.toFixed(
+            4
+          )} ETH for gas and buffer`
         );
         setFromAmount("0");
       } else {
-        setFromAmount(maxAmount.toFixed(8).replace(/\.?0+$/, ""));
+        // Limit to 4 decimal places
+        setFromAmount(maxAmount.toFixed(4));
       }
     } catch (error) {
       console.error("Error calculating max amount:", error);
-      setQuoteError("Unable to calculate max amount. Please enter manually.");
-      setFromAmount("");
+
+      // Fallback: Use 80% of balance if gas estimation fails
+      const fallbackAmount = balance * 0.8;
+      setFromAmount(fallbackAmount.toFixed(4));
+
+      setQuoteError(
+        "Using estimated max (80% of balance). Actual gas may vary."
+      );
     }
   }, [
     fromTokenBalance,

@@ -97,7 +97,7 @@ const ChainIcon: React.FC<ChainIconProps> = ({
 
   const sizeClasses = {
     sm: "w-5 h-5",
-    md: "w-6 h-6",
+    md: "w-7 h-7",
     lg: "w-8 h-8",
   };
 
@@ -509,7 +509,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                         </div>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-1">
                         {chains.map((chain) => {
                           const chainDisplay = chainDisplayData[chain.id] || {
                             name: chain.name,
