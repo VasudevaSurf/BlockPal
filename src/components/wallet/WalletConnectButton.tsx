@@ -1,4 +1,4 @@
-// src/components/wallet/WalletConnectButton.tsx - UPDATED with chain images
+// src/components/wallet/WalletConnectButton.tsx - Updated with chain selector trigger
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -10,9 +10,11 @@ import { chains } from "./WalletProvider";
 interface WalletConnectButtonProps {
   isMinimized?: boolean;
   height?: string;
+  onChainSelectorToggle?: () => void;
+  chainSelectorOpen?: boolean;
 }
 
-// Chain display data with image paths (same as GlobalDashboardHeader)
+// Chain display data
 const getChainDisplayData = () => {
   const chainDisplayData: {
     [key: number]: {
@@ -77,7 +79,7 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// Chain Icon Component with image support
+// Chain Icon Component
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -111,7 +113,6 @@ const ChainIcon = ({
     lg: "text-sm",
   };
 
-  // Reset image error state when chainData changes
   useEffect(() => {
     setImageError(false);
     setImageLoaded(false);
@@ -126,7 +127,6 @@ const ChainIcon = ({
     setImageLoaded(true);
   };
 
-  // Determine if we should show background
   const shouldShowBackground =
     !chainData.image || imageError || !imageLoaded || chainData.useBackground;
   const backgroundClass = shouldShowBackground ? chainData.color : "";
@@ -136,7 +136,6 @@ const ChainIcon = ({
       className={`${sizeClasses[size]} ${backgroundClass} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
-      {/* Chain Image */}
       {chainData.image && !imageError && (
         <img
           src={chainData.image}
@@ -150,7 +149,6 @@ const ChainIcon = ({
         />
       )}
 
-      {/* Fallback Icon - only show when needed */}
       {(!chainData.image || imageError || !imageLoaded) && (
         <span
           className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
@@ -165,6 +163,8 @@ const ChainIcon = ({
 export default function WalletConnectButton({
   isMinimized = false,
   height = "h-10",
+  onChainSelectorToggle,
+  chainSelectorOpen = false,
 }: WalletConnectButtonProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -173,19 +173,14 @@ export default function WalletConnectButton({
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Get chain display data
   const chainDisplayData = getChainDisplayData();
-
-  // Get current chain data
   const currentChain = chains.find((c) => c.id === chainId);
 
-  // Get display data for current chain
   const getCurrentChainDisplay = () => {
     if (mounted && isConnected && chainId && chainDisplayData[chainId]) {
       return chainDisplayData[chainId];
     }
 
-    // Fallback to Ethereum
     return (
       chainDisplayData[1] || {
         name: "Ethereum",
@@ -200,19 +195,16 @@ export default function WalletConnectButton({
 
   const currentChainDisplay = getCurrentChainDisplay();
 
-  // Ensure component is mounted before accessing wallet state
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Clear errors when successfully connected
   useEffect(() => {
     if (mounted && isConnected && address) {
       setConnectionError(null);
     }
   }, [mounted, isConnected, address]);
 
-  // Handle copy address
   const handleCopyAddress = async () => {
     if (!address) return;
 
@@ -225,13 +217,11 @@ export default function WalletConnectButton({
     }
   };
 
-  // Handle disconnect
   const handleDisconnect = () => {
     disconnect();
     setConnectionError(null);
   };
 
-  // Return a static button during SSR/hydration
   if (!mounted) {
     return (
       <button
@@ -313,7 +303,7 @@ export default function WalletConnectButton({
                     <button
                       onClick={() => {
                         setConnectionError(null);
-                        openChainModal();
+                        onChainSelectorToggle?.();
                       }}
                       type="button"
                       className={`bg-red-500 hover:bg-red-600 text-white rounded-[12px] font-satoshi text-xs flex items-center justify-center ${
@@ -328,30 +318,25 @@ export default function WalletConnectButton({
                   );
                 }
 
-                // Connected wallet - minimized view (icons only)
+                // Connected wallet - minimized view
                 if (isMinimized) {
                   return (
                     <div className="flex flex-col gap-2">
-                      {/* Connected status indicator with chain image */}
-                      <div
-                        className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] flex items-center justify-center relative group cursor-pointer hover:bg-[#D4A118] transition-colors`}
-                        title={`Connected: ${account.displayName}`}
+                      {/* Chain selector trigger */}
+                      <button
+                        onClick={onChainSelectorToggle}
+                        className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] flex items-center justify-center hover:bg-[#D4A118] transition-colors ${
+                          chainSelectorOpen ? "ring-2 ring-[#E2AF19]" : ""
+                        }`}
+                        title={`Switch Chain - Current: ${currentChainDisplay.name}`}
                       >
                         <ChainIcon chainData={currentChainDisplay} size="sm" />
-
-                        {/* Tooltip */}
-                        {/* <div className="absolute left-12 top-1/2 transform -translate-y-1/2 bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-xs text-white font-satoshi opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                          Connected: {currentChainDisplay.name}
-                          <br />
-                          {account.address?.slice(0, 6)}...
-                          {account.address?.slice(-6)}
-                        </div> */}
-                      </div>
+                      </button>
 
                       {/* Copy address button */}
                       <button
                         onClick={handleCopyAddress}
-                        className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] hover:bg-[#D4A118] transition-colors flex items-center justify-center group relative`}
+                        className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] hover:bg-[#D4A118] transition-colors flex items-center justify-center`}
                         title="Copy Address"
                       >
                         {copied ? (
@@ -359,25 +344,15 @@ export default function WalletConnectButton({
                         ) : (
                           <Copy size={14} className="text-black" />
                         )}
-
-                        {/* Tooltip */}
-                        {/* <div className="absolute left-12 top-1/2 transform -translate-y-1/2 bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-xs text-white font-satoshi opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                          {copied ? "Copied!" : "Copy Address"}
-                        </div> */}
                       </button>
 
                       {/* Disconnect button */}
                       <button
                         onClick={handleDisconnect}
-                        className={`w-10 ${height} bg-[#F9EFD1] border border-[#F9EFD1] rounded-[12px] hover:bg-[#F5E8C4] transition-colors flex items-center justify-center group relative`}
+                        className={`w-10 ${height} bg-[#F9EFD1] border border-[#F9EFD1] rounded-[12px] hover:bg-[#F5E8C4] transition-colors flex items-center justify-center`}
                         title="Disconnect"
                       >
                         <LogOut size={14} className="text-black" />
-
-                        {/* Tooltip */}
-                        {/* <div className="absolute left-12 top-1/2 transform -translate-y-1/2 bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-xs text-white font-satoshi opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                          Disconnect
-                        </div> */}
                       </button>
                     </div>
                   );
@@ -391,24 +366,23 @@ export default function WalletConnectButton({
                       {/* Connection status */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          {/* <div className="w-2 h-2 bg-green-400 rounded-full"></div> */}
                           <span className="text-[#0F0F0F] text-xs font-satoshi font-medium">
                             Connected Wallet
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          {/* Chain icon with image */}
+                        <button
+                          onClick={onChainSelectorToggle}
+                          className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                          title="Switch Chain"
+                        >
                           <ChainIcon
                             chainData={currentChainDisplay}
                             size="sm"
                           />
-                          {/* <span className="text-white text-xs font-satoshi">
-                            {currentChainDisplay.name}
-                          </span> */}
-                        </div>
+                        </button>
                       </div>
 
-                      {/* Wallet name */}
+                      {/* Wallet address */}
                       <div className="mb-2">
                         <span className="text-[#000] text-sm font-satoshi text-[16px]">
                           {account.address
@@ -419,11 +393,6 @@ export default function WalletConnectButton({
                             : account.displayName}
                         </span>
                       </div>
-
-                      {/* Wallet address */}
-                      {/* <div className="text-gray-400 text-xs font-satoshi font-mono break-all">
-                        {account.address}
-                      </div> */}
                     </div>
 
                     {/* Action buttons */}
@@ -435,15 +404,15 @@ export default function WalletConnectButton({
                       >
                         {copied ? (
                           <>
-                            <Check size={12} className="[#000]" />
-                            <span className="[#000] text-xs font-satoshi">
+                            <Check size={12} className="text-black" />
+                            <span className="text-black text-xs font-satoshi">
                               Copied
                             </span>
                           </>
                         ) : (
                           <>
-                            <Copy size={12} className="[#000]" />
-                            <span className="[#000] text-xs font-satoshi">
+                            <Copy size={12} className="text-black" />
+                            <span className="text-black text-xs font-satoshi">
                               Copy
                             </span>
                           </>
@@ -455,8 +424,8 @@ export default function WalletConnectButton({
                         onClick={handleDisconnect}
                         className="bg-[#F9EFD1] border rounded-[12px] px-3 py-2 transition-colors flex items-center justify-center gap-2"
                       >
-                        <LogOut size={12} className="[#E74C3C]" />
-                        <span className="[#E74C3C] text-xs font-satoshi">
+                        <LogOut size={12} className="text-black" />
+                        <span className="text-black text-xs font-satoshi">
                           Disconnect
                         </span>
                       </button>
