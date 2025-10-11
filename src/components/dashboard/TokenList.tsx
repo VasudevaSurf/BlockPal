@@ -978,11 +978,11 @@ export default function TokenList() {
                   {additionalTokens.map((token, index) => (
                     <div
                       key={`${token.contractAddress}_${index}_additional`}
-                      onClick={() => handleTokenClick(token)}
+                      // onClick={() => handleTokenClick(token)}
                       className={`token-row has-menu flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
                         isNavigating || addingToken === token.contractAddress
-                          ? "cursor-wait opacity-70"
-                          : "cursor-pointer hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+                          ? "opacity-70"
+                          : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
                       }`}
                       style={{ zIndex: additionalTokens.length - index }}
                     >
