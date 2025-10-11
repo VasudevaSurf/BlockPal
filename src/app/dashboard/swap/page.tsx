@@ -1,4 +1,4 @@
-// src/app/dashboard/swap/page.tsx - History UI Restored Version
+// src/app/dashboard/swap/page.tsx - Complete Updated Version with Fixed History
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -279,6 +279,31 @@ const scrollbarStyles = `
   .custom-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari, and Opera */
   }
+  
+  /* Gold scrollbar for history */
+  .custom-gold-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .custom-gold-scrollbar::-webkit-scrollbar-track {
+    background: #2C2C2C;
+    border-radius: 10px;
+  }
+  
+  .custom-gold-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #E2AF19 0%, #D4A853 100%);
+    border-radius: 10px;
+  }
+  
+  .custom-gold-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #D4A853 0%, #E2AF19 100%);
+  }
+  
+  /* Firefox */
+  .custom-gold-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #E2AF19 #2C2C2C;
+  }
 `;
 
 export default function SwapPage() {
@@ -555,7 +580,6 @@ export default function SwapPage() {
                       />
 
                       {/* Inner container with glass effect */}
-                      {/* Inner container with glass effect */}
                       <div
                         className="relative flex items-center gap-3 px-3 py-2 rounded-[24px]"
                         style={{
@@ -582,7 +606,7 @@ export default function SwapPage() {
                             onClick={() => {
                               setSlippage("5.5");
                               setCustomSlippage(false);
-                              setShowSlippageSettings(false); // Close modal when Auto is clicked
+                              setShowSlippageSettings(false);
                             }}
                             className="relative"
                           >
@@ -762,45 +786,7 @@ export default function SwapPage() {
                     )}
                   </div>
                 </div>
-                {/* Slippage Settings */}
-                {/* {showSlippageSettings && (
-                  <div className="mb-4 p-3 bg-[#191919] rounded-lg">
-                    <div className="flex gap-2 mb-2">
-                      {slippagePresets.map((preset) => (
-                        <button
-                          key={preset}
-                          onClick={() => {
-                            setSlippage(preset);
-                            setCustomSlippage(false);
-                          }}
-                          className={`px-3 py-1 rounded text-xs ${
-                            slippage === preset && !customSlippage
-                              ? "bg-[#E2AF19] text-black"
-                              : "bg-[#2C2C2C] text-white hover:bg-[#3C3C3C]"
-                          }`}
-                        >
-                          {preset}%
-                        </button>
-                      ))}
-                      <input
-                        type="number"
-                        placeholder="Custom"
-                        value={customSlippage ? slippage : ""}
-                        onChange={(e) => {
-                          setSlippage(e.target.value);
-                          setCustomSlippage(true);
-                        }}
-                        className="w-20 px-2 py-1 bg-[#2C2C2C] text-white rounded text-xs"
-                      />
-                    </div>
-                    <button
-                      onClick={() => setShowSlippageSettings(false)}
-                      className="text-xs text-gray-400 hover:text-white"
-                    >
-                      Close
-                    </button>
-                  </div>
-                )} */}
+
                 {/* From Token Box */}
                 <div
                   className="bg-[#191919] p-4"
@@ -913,6 +899,7 @@ export default function SwapPage() {
                     </button>
                   </div>
                 </div>
+
                 {/* Swap Icon */}
                 <div className="flex justify-center relative -my-[22px] z-10">
                   <button
@@ -922,6 +909,7 @@ export default function SwapPage() {
                     <SwapIcon className="text-black w-5 h-5" />
                   </button>
                 </div>
+
                 {/* To Token Box */}
                 <div
                   className="bg-[#191919] p-5 mb-2"
@@ -1154,6 +1142,7 @@ export default function SwapPage() {
                     </div>
                   </div>
                 </div>
+
                 {/* Error Display */}
                 {quoteError && (
                   <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg mb-2">
@@ -1162,6 +1151,7 @@ export default function SwapPage() {
                     </p>
                   </div>
                 )}
+
                 {/* Quote Info with proper gas display */}
                 {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
                   <div className="p-3 bg-[#191919] rounded-lg mb-2 text-sm">
@@ -1197,6 +1187,7 @@ export default function SwapPage() {
                     </div>
                   </div>
                 )}
+
                 {/* Swap Button */}
                 {!isConnected ? (
                   <WalletConnectButton />
@@ -1284,7 +1275,7 @@ export default function SwapPage() {
         </div>
       </div>
 
-      {/* History Overlay - Restored UI from original */}
+      {/* History Overlay - FIXED VERSION with Gold Scrollbar */}
       <AnimatePresence>
         {activeTab === "history" && (
           <>
@@ -1303,7 +1294,8 @@ export default function SwapPage() {
               transition={{ type: "spring", damping: 25 }}
               className="absolute top-[62%] left-1/2 transform -translate-y-1/2 z-30 ml-[150px]"
             >
-              <div className="relative p-[3px] rounded-[20px] w-[400px]">
+              <div className="relative p-[3px] rounded-[20px] w-[400px] h-[480px]">
+                {/* Gold border gradient */}
                 <div
                   className="absolute inset-0 rounded-[20px]"
                   style={{
@@ -1317,15 +1309,16 @@ export default function SwapPage() {
                   }}
                 />
 
+                {/* Inner container with fixed height */}
                 <div
-                  className="relative bg-[#0F0F0F] rounded-[20px] p-6 max-h-[75vh] overflow-hidden flex flex-col"
+                  className="relative bg-[#0F0F0F] rounded-[20px] p-6 h-full flex flex-col"
                   style={{
                     boxShadow: "0 4px 4px 0 rgba(0, 0, 0, 0.25)",
                   }}
                 >
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-7">
-                    <h3 className="text-white font-mayeka-demi-bold-demo text-xl mt-3">
+                  {/* Header - Fixed */}
+                  <div className="flex items-center justify-between mb-6 flex-shrink-0">
+                    <h3 className="text-white font-mayeka-demi-bold-demo text-xl">
                       Swap History
                     </h3>
                     {loadingHistory && (
@@ -1333,15 +1326,14 @@ export default function SwapPage() {
                     )}
                   </div>
 
-                  {/* History List */}
-                  <div className="flex-1 overflow-y-auto space-y-6">
+                  {/* Scrollable History List with Gold Scrollbar */}
+                  <div className="flex-1 overflow-y-auto pr-2 space-y-6 custom-gold-scrollbar">
                     {dbTransactions.length === 0 && !loadingHistory ? (
                       <div className="text-center text-gray-400 py-8">
                         No swap history yet
                       </div>
                     ) : (
                       dbTransactions.slice(0, 10).map((item, index) => {
-                        // Format display values
                         const fromAmount =
                           parseFloat(item.fromAmount) /
                           Math.pow(10, item.fromToken.decimals);
@@ -1356,7 +1348,6 @@ export default function SwapPage() {
                           year: "numeric",
                         });
 
-                        // Determine if it's a sell or buy (based on the from token)
                         const isSell =
                           item.fromToken.symbol !== "USDC" &&
                           item.fromToken.symbol !== "USDT" &&
@@ -1369,10 +1360,11 @@ export default function SwapPage() {
                           ? `-${fromAmount.toFixed(4)}`
                           : `+${toAmount.toFixed(4)}`;
                         const displaySymbol = displayToken.symbol;
-
-                        // Get color gradient for the token
                         const tokenGradient =
                           getTokenColorGradient(displaySymbol);
+
+                        const tokenLogoUrl =
+                          displayToken.logoUrl || displayToken.logoURI;
 
                         return (
                           <div key={item._id}>
@@ -1384,26 +1376,15 @@ export default function SwapPage() {
                                   </span>
                                 </div>
                                 <div className="flex flex-row gap-2">
-                                  {/* Token Icon with gradient */}
-                                  {displayToken.logoURI ? (
-                                    <TokenImage
-                                      src={displayToken.logoURI}
-                                      alt={displaySymbol}
-                                      symbol={displaySymbol}
-                                      name={displayToken.name}
-                                      className="w-10 h-10"
-                                    />
-                                  ) : (
-                                    <div
-                                      className={`w-10 h-10 bg-gradient-to-r ${tokenGradient} rounded-full flex items-center justify-center`}
-                                    >
-                                      <span className="text-white text-xs font-bold">
-                                        {displaySymbol[0]}
-                                      </span>
-                                    </div>
-                                  )}
+                                  {/* FIXED: Always use TokenImage component with proper props */}
+                                  <TokenImage
+                                    src={tokenLogoUrl}
+                                    alt={displaySymbol}
+                                    symbol={displaySymbol}
+                                    name={displayToken.name}
+                                    className="w-10 h-10"
+                                  />
 
-                                  {/* Transaction Details */}
                                   <div>
                                     <div className="flex items-start flex-col">
                                       <span className="text-white text-[15px] font-satoshi">
@@ -1429,6 +1410,8 @@ export default function SwapPage() {
                                 >
                                   {displayAmount} {displaySymbol}
                                 </div>
+
+                                {/* Transaction Status Badge */}
                                 {item.status === "success" &&
                                   item.txHash &&
                                   item.explorerLink && (
@@ -1436,7 +1419,7 @@ export default function SwapPage() {
                                       href={item.explorerLink}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 bg-[#E2AF19] text-[#000] text-xs p-[2px] rounded mt-1"
+                                      className="inline-flex items-center gap-1 bg-[#E2AF19] text-[#000] text-xs px-2 py-[2px] rounded mt-1 hover:bg-[#D4A853] transition-colors"
                                     >
                                       <span className="font-satoshi text-[8px] flex flex-row items-center gap-0.5">
                                         Explorer
@@ -1444,11 +1427,35 @@ export default function SwapPage() {
                                       </span>
                                     </a>
                                   )}
+
+                                {/* Failed Transaction Badge */}
+                                {(item.status === "failed" ||
+                                  item.status === "cancelled") && (
+                                  <div className="inline-flex items-center gap-1 bg-red-500/20 text-red-400 text-xs px-2 py-[2px] rounded mt-1 border border-red-500/50">
+                                    <X size={10} />
+                                    <span className="font-satoshi text-[8px]">
+                                      {item.status === "cancelled"
+                                        ? "Cancelled"
+                                        : "Failed"}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Pending Transaction Badge */}
+                                {item.status === "pending" && (
+                                  <div className="inline-flex items-center gap-1 bg-yellow-500/20 text-yellow-400 text-xs px-2 py-[2px] rounded mt-1 border border-yellow-500/50">
+                                    <Clock size={10} />
+                                    <span className="font-satoshi text-[8px]">
+                                      Pending
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            {/* Divider line - only show if not the last item */}
+
+                            {/* Divider line */}
                             {index < Math.min(dbTransactions.length - 1, 9) && (
-                              <div className="w-full h-px mt-2"></div>
+                              <div className="w-full h-px bg-[#2C2C2C] mt-4"></div>
                             )}
                           </div>
                         );
