@@ -1,4 +1,4 @@
-// src/app/dashboard/swap/page.tsx - Complete Updated Version with Black Swap Boxes
+// src/app/dashboard/swap/page.tsx - Centered Layout Version
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -169,12 +169,10 @@ const ChainIcon: React.FC<ChainIconProps> = ({
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
-      {/* Dark background while loading or on error */}
       {(!imageLoaded || imageError) && (
         <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
       )}
 
-      {/* Actual Image - no background when loaded successfully */}
       {chainData.image && !imageError && (
         <img
           src={chainData.image}
@@ -188,7 +186,6 @@ const ChainIcon: React.FC<ChainIconProps> = ({
         />
       )}
 
-      {/* Only show fallback icon if image fails to load */}
       {imageError && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
@@ -322,21 +319,17 @@ export default function SwapPage() {
     const num = parseFloat(value);
     if (isNaN(num) || num === 0) return "0.00000";
 
-    // Convert to string and find decimal point
     const parts = value.split(".");
     if (parts.length === 1) {
-      // No decimals
       return `${parts[0]}.00000`;
     }
 
-    // Truncate decimals without rounding
     const truncatedDecimals = parts[1].substring(0, decimals);
     const paddedDecimals = truncatedDecimals.padEnd(decimals, "0");
 
     return `${parts[0]}.${paddedDecimals}`;
   };
 
-  // Use the swap hook with all its functionality
   const {
     fromToken,
     setFromToken,
@@ -368,7 +361,6 @@ export default function SwapPage() {
     loadingHistory,
   } = useSwap();
 
-  // Motion values for swipe
   const x = useMotionValue(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const chainButtonRef = useRef<HTMLButtonElement>(null);
@@ -385,17 +377,14 @@ export default function SwapPage() {
       setSwipeCompleted(true);
       x.set(containerWidth - 50);
 
-      // Execute actual swap
       const success = await executeSwap();
 
       if (success) {
-        // Show success animation
         setTimeout(() => {
           setSwipeCompleted(false);
           x.set(0);
         }, 2000);
       } else {
-        // Reset on failure
         setSwipeCompleted(false);
         x.set(0);
       }
@@ -404,7 +393,6 @@ export default function SwapPage() {
     }
   };
 
-  // Handle token selection
   const handleFromTokenSelect = (token: any) => {
     console.log("From token selected:", token);
     setFromToken({
@@ -445,7 +433,6 @@ export default function SwapPage() {
     return num.toFixed(Math.min(decimals, 8));
   };
 
-  // Calculate values for display using actual gas data
   const rate =
     fromAmount && toAmount && parseFloat(fromAmount) > 0
       ? (parseFloat(toAmount) / parseFloat(fromAmount)).toFixed(6)
@@ -457,7 +444,6 @@ export default function SwapPage() {
 
   const slippagePresets = ["0.1", "0.5", "1", "3"];
 
-  // Add styles for hiding scrollbar
   useEffect(() => {
     const style = document.createElement("style");
     style.textContent = scrollbarStyles;
@@ -468,56 +454,74 @@ export default function SwapPage() {
   }, []);
 
   return (
-    <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 flex flex-col overflow-hidden relative">
-      <div className="flex justify-center mb-6 relative z-20">
-        <h1 className="text-[#E2AF19] text-[30px] font-mayeka">
-          Secure and Best Rates Everytime
-        </h1>
+    <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] flex flex-col overflow-hidden relative">
+      {/* Swap Effect Image - Top Right Corner (sticks to edge) */}
+      <div className="absolute -top-0 -right-0 z-10 pointer-events-none">
+        <img
+          src="/swapEffect.png"
+          alt=""
+          className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] 2xl:w-[32rem] 2xl:h-[32rem] opacity-50"
+          style={{
+            filter: "blur(0px)",
+            marginTop: "-1px",
+            marginRight: "-1px",
+          }}
+        />
       </div>
-      {/* Tab Navigation */}
-      <div className="flex justify-center mb-4 relative z-20">
-        <div className="relative inline-flex py-[6px] px-[6px] gap-[6px] border border-[#4B3A08] rounded-[12px]">
-          <motion.div
-            className="absolute h-[calc(100%-12px)] bg-[#E2AF19] rounded-[13px] top-[6px]"
-            initial={false}
-            animate={activeTab}
-            variants={{
-              swap: { x: 0, width: "calc(50% - 3px)" },
-              history: { x: "calc(80% + 3px)", width: "calc(52% - 3px)" },
-            }}
-            transition={{
-              type: "spring",
-              stiffness: 500,
-              damping: 30,
-            }}
-          />
 
-          <button
-            onClick={() => setActiveTab("swap")}
-            className={`relative z-10 px-6 py-2.5 font-mayeka text-md rounded-[13px] transition-colors duration-200 ${
-              activeTab === "swap"
-                ? "text-black"
-                : "text-white hover:text-gray-300"
-            }`}
-          >
-            Swap
-          </button>
-
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`relative z-10 px-6 py-2.5 font-mayeka text-md rounded-[13px] transition-colors duration-200 ${
-              activeTab === "history"
-                ? "text-black"
-                : "text-white hover:text-gray-300"
-            }`}
-          >
-            History
-          </button>
+      {/* Centered Content Container */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4 relative z-20">
+        {/* Title */}
+        <div className="mb-8 relative z-20">
+          <h1 className="text-[#E2AF19] text-[30px] font-mayeka text-center">
+            Secure and Best Rates Everytime
+          </h1>
         </div>
-      </div>
 
-      <div className="flex-1 flex items-center justify-center relative z-20">
-        <div className="w-full max-w-xl mx-auto px-4">
+        {/* Tab Navigation */}
+        <div className="mb-6 relative z-20">
+          <div className="relative inline-flex py-[6px] px-[6px] gap-[6px] border border-[#4B3A08] rounded-[12px]">
+            <motion.div
+              className="absolute h-[calc(100%-12px)] bg-[#E2AF19] rounded-[13px] top-[6px]"
+              initial={false}
+              animate={activeTab}
+              variants={{
+                swap: { x: 0, width: "calc(50% - 3px)" },
+                history: { x: "calc(80% + 3px)", width: "calc(52% - 3px)" },
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 500,
+                damping: 30,
+              }}
+            />
+
+            <button
+              onClick={() => setActiveTab("swap")}
+              className={`relative z-10 px-6 py-2.5 font-mayeka text-md rounded-[13px] transition-colors duration-200 ${
+                activeTab === "swap"
+                  ? "text-black"
+                  : "text-white hover:text-gray-300"
+              }`}
+            >
+              Swap
+            </button>
+
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`relative z-10 px-6 py-2.5 font-mayeka text-md rounded-[13px] transition-colors duration-200 ${
+                activeTab === "history"
+                  ? "text-black"
+                  : "text-white hover:text-gray-300"
+              }`}
+            >
+              History
+            </button>
+          </div>
+        </div>
+
+        {/* Main Swap Card */}
+        <div className="w-full max-w-xl relative z-20">
           {/* Container with gradient border */}
           <div className="relative p-[3px] rounded-[30px]">
             <div
@@ -910,7 +914,7 @@ export default function SwapPage() {
                   </button>
                 </div>
 
-                {/* To Token Box - CHANGED TO BLACK */}
+                {/* To Token Box */}
                 <div
                   className="bg-[#191919] p-5 mb-2"
                   style={{ borderRadius: "26.066px" }}
@@ -929,10 +933,9 @@ export default function SwapPage() {
                       />
                     </div>
 
-                    {/* FIXED: Updated token select button - only show icon when token is selected */}
+                    {/* Token select button */}
                     <div className="relative">
                       <div className="relative p-[1px] rounded-[25px] overflow-hidden">
-                        {/* Animated gradient border */}
                         <div
                           className="absolute inset-0"
                           style={{
@@ -946,7 +949,6 @@ export default function SwapPage() {
                           }}
                         />
 
-                        {/* Inner button with glass effect */}
                         <button
                           onClick={() => setShowToTokenSelector(true)}
                           className="relative flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] rounded-[24px]"
@@ -963,7 +965,6 @@ export default function SwapPage() {
             `,
                           }}
                         >
-                          {/* FIXED: Only show TokenImage when toToken is selected */}
                           {toToken && (
                             <TokenImage
                               src={toToken.logoURI}
@@ -974,7 +975,6 @@ export default function SwapPage() {
                             />
                           )}
 
-                          {/* FIXED: Show text with conditional styling */}
                           <span
                             className={`text-white text-base font-satoshi ${
                               !toToken ? "pl-1" : ""
@@ -1015,7 +1015,6 @@ export default function SwapPage() {
                       {/* Fast Button */}
                       <div className="relative">
                         <div className="relative p-[1px] rounded-[12px] overflow-hidden">
-                          {/* Animated gradient border */}
                           <div
                             className="absolute inset-0"
                             style={{
@@ -1038,7 +1037,6 @@ export default function SwapPage() {
                             }}
                           />
 
-                          {/* Inner button with glass effect */}
                           <button
                             onClick={() => setGasMode("high")}
                             className={`relative flex items-center gap-1 px-3 py-1.5 rounded-[11px] transition-all ${
@@ -1079,7 +1077,6 @@ export default function SwapPage() {
                       {/* Instant Button */}
                       <div className="relative">
                         <div className="relative p-[1px] rounded-[12px] overflow-hidden">
-                          {/* Animated gradient border */}
                           <div
                             className="absolute inset-0"
                             style={{
@@ -1102,7 +1099,6 @@ export default function SwapPage() {
                             }}
                           />
 
-                          {/* Inner button with glass effect */}
                           <button
                             onClick={() => setGasMode("instant")}
                             className={`relative flex items-center gap-1 px-3 py-1.5 rounded-[11px] transition-all ${
@@ -1152,7 +1148,7 @@ export default function SwapPage() {
                   </div>
                 )}
 
-                {/* Quote Info with proper gas display - CHANGED TO BLACK */}
+                {/* Quote Info */}
                 {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
                   <div className="p-3 bg-[#000000] rounded-lg mb-2 text-sm">
                     <div className="flex justify-between mb-1">
@@ -1275,7 +1271,7 @@ export default function SwapPage() {
         </div>
       </div>
 
-      {/* History Overlay - FIXED VERSION with Gold Scrollbar */}
+      {/* History Overlay */}
       <AnimatePresence>
         {activeTab === "history" && (
           <>
@@ -1292,10 +1288,9 @@ export default function SwapPage() {
               animate={{ opacity: 1, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.95, x: 50 }}
               transition={{ type: "spring", damping: 25 }}
-              className="absolute top-[62%] left-1/2 transform -translate-y-1/2 z-30 ml-[150px]"
+              className="absolute top-1/2 left-1/2 transform -translate-y-1/2 z-30 ml-[150px]"
             >
               <div className="relative p-[3px] rounded-[20px] w-[400px] h-[480px]">
-                {/* Gold border gradient */}
                 <div
                   className="absolute inset-0 rounded-[20px]"
                   style={{
@@ -1309,14 +1304,12 @@ export default function SwapPage() {
                   }}
                 />
 
-                {/* Inner container with fixed height */}
                 <div
                   className="relative bg-[#0F0F0F] rounded-[20px] p-6 h-full flex flex-col"
                   style={{
                     boxShadow: "0 4px 4px 0 rgba(0, 0, 0, 0.25)",
                   }}
                 >
-                  {/* Header - Fixed */}
                   <div className="flex items-center justify-between mb-6 flex-shrink-0">
                     <h3 className="text-white font-mayeka-demi-bold-demo text-xl">
                       Swap History
@@ -1326,7 +1319,6 @@ export default function SwapPage() {
                     )}
                   </div>
 
-                  {/* Scrollable History List with Gold Scrollbar */}
                   <div className="flex-1 overflow-y-auto pr-2 space-y-6 custom-gold-scrollbar">
                     {dbTransactions.length === 0 && !loadingHistory ? (
                       <div className="text-center text-gray-400 py-8">
@@ -1360,8 +1352,6 @@ export default function SwapPage() {
                           ? `-${fromAmount.toFixed(4)}`
                           : `+${toAmount.toFixed(4)}`;
                         const displaySymbol = displayToken.symbol;
-                        const tokenGradient =
-                          getTokenColorGradient(displaySymbol);
 
                         const tokenLogoUrl =
                           displayToken.logoUrl || displayToken.logoURI;
@@ -1376,7 +1366,6 @@ export default function SwapPage() {
                                   </span>
                                 </div>
                                 <div className="flex flex-row gap-2">
-                                  {/* FIXED: Always use TokenImage component with proper props */}
                                   <TokenImage
                                     src={tokenLogoUrl}
                                     alt={displaySymbol}
@@ -1398,7 +1387,6 @@ export default function SwapPage() {
                                 </div>
                               </div>
 
-                              {/* Right Side Info */}
                               <div className="text-right">
                                 <div className="text-white text-[14px] font-satoshi mb-1">
                                   {displayDate}
@@ -1411,7 +1399,6 @@ export default function SwapPage() {
                                   {displayAmount} {displaySymbol}
                                 </div>
 
-                                {/* Transaction Status Badge */}
                                 {item.status === "success" &&
                                   item.txHash &&
                                   item.explorerLink && (
@@ -1428,7 +1415,6 @@ export default function SwapPage() {
                                     </a>
                                   )}
 
-                                {/* Failed Transaction Badge */}
                                 {(item.status === "failed" ||
                                   item.status === "cancelled") && (
                                   <div className="inline-flex items-center gap-1 bg-red-500/20 text-red-400 text-xs px-2 py-[2px] rounded mt-1 border border-red-500/50">
@@ -1441,7 +1427,6 @@ export default function SwapPage() {
                                   </div>
                                 )}
 
-                                {/* Pending Transaction Badge */}
                                 {item.status === "pending" && (
                                   <div className="inline-flex items-center gap-1 bg-yellow-500/20 text-yellow-400 text-xs px-2 py-[2px] rounded mt-1 border border-yellow-500/50">
                                     <Clock size={10} />
@@ -1453,7 +1438,6 @@ export default function SwapPage() {
                               </div>
                             </div>
 
-                            {/* Divider line */}
                             {index < Math.min(dbTransactions.length - 1, 9) && (
                               <div className="w-full h-px bg-[#2C2C2C] mt-4"></div>
                             )}

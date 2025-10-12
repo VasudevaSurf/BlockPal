@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - COMPLETE VERSION with WalletIntegration and Swap Effect
+// src/app/dashboard/layout.tsx - UPDATED to hide header on swap page
 "use client";
 
 import { useSelector } from "react-redux";
@@ -24,7 +24,7 @@ export default function DashboardLayout({
 
   // Check if we're on AI chat page for special styling
   const isAIChatPage = pathname === "/dashboard/ai-chat";
-  // Check if we're on Swap page to show the effect
+  // Check if we're on Swap page to show the effect and hide header
   const isSwapPage = pathname === "/dashboard/swap";
 
   return (
@@ -93,17 +93,19 @@ export default function DashboardLayout({
 
           {/* Main Content - With padding */}
           <main className="flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4">
-            {/* Global Header - Always show */}
-            <div className="flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2">
-              <GlobalDashboardHeader
-                title={isAIChatPage ? "Chat with Lumen" : "Dashboard"}
-                subtitle={
-                  isAIChatPage
-                    ? "Powered by advanced blockchain analysis"
-                    : "Welcome back"
-                }
-              />
-            </div>
+            {/* Global Header - Hide on swap page */}
+            {!isSwapPage && (
+              <div className="flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2">
+                <GlobalDashboardHeader
+                  title={isAIChatPage ? "Chat with Lumen" : "Dashboard"}
+                  subtitle={
+                    isAIChatPage
+                      ? "Powered by advanced blockchain analysis"
+                      : "Welcome back"
+                  }
+                />
+              </div>
+            )}
 
             {/* Content Area */}
             <div
