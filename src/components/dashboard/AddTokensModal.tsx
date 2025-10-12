@@ -1,10 +1,9 @@
-// src/components/dashboard/AddTokensModal.tsx - ENHANCED WITH COINGECKO TRENDING + RECENTLY ADDED
-import { useState, useEffect } from "react";
+// src/components/dashboard/AddTokensModal.tsx - UPDATED WITH SWAP TOKEN SELECTOR UI
+import { useState, useEffect, useRef } from "react";
 import { X, Search, Loader2 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { coinlesService, TokenSearchResult } from "@/services/coinlesService";
-import { useCoinGecko, TrendingToken } from "@/hooks/useCoinGecko";
 
 interface AddTokensModalProps {
   isOpen: boolean;
@@ -12,180 +11,225 @@ interface AddTokensModalProps {
   onAddToken: (token: any) => void;
 }
 
-// Custom SVG Icons
-const ClockIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-  >
-    <path
-      d="M15.7099 15.1798L12.6099 13.3298C12.0699 13.0098 11.6299 12.2398 11.6299 11.6098V7.50977"
-      stroke="#B7B7B7"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M4 6C2.75 7.67 2 9.75 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2C10.57 2 9.2 2.3 7.97 2.85"
-      stroke="#B7B7B7"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
+// Chain data configuration
+const getChainDisplayData = () => {
+  const chainDisplayData: {
+    [key: string]: {
+      name: string;
+      color: string;
+      icon: string;
+      image?: string;
+      fallbackIcon: string;
+      useBackground: boolean;
+    };
+  } = {
+    eth: {
+      name: "Ethereum",
+      color: "bg-blue-500",
+      icon: "Ξ",
+      image: "/chains/Ethereum.png",
+      fallbackIcon: "Ξ",
+      useBackground: true,
+    },
+    base: {
+      name: "Base",
+      color: "bg-blue-600",
+      icon: "B",
+      image: "/chains/Base.png",
+      fallbackIcon: "B",
+      useBackground: false,
+    },
+    polygon: {
+      name: "Polygon",
+      color: "bg-purple-500",
+      icon: "◆",
+      image: "/chains/Polygon.png",
+      fallbackIcon: "◆",
+      useBackground: false,
+    },
+    arbitrum: {
+      name: "Arbitrum",
+      color: "bg-blue-400",
+      icon: "◉",
+      image: "/chains/Arbitrum.png",
+      fallbackIcon: "◉",
+      useBackground: false,
+    },
+    avalanche: {
+      name: "Avalanche",
+      color: "bg-red-500",
+      icon: "A",
+      image: "/chains/Avalanche.png",
+      fallbackIcon: "A",
+      useBackground: true,
+    },
+    bsc: {
+      name: "BSC",
+      color: "bg-yellow-500",
+      icon: "B",
+      image: "/chains/BSC.png",
+      fallbackIcon: "B",
+      useBackground: true,
+    },
+  };
 
-const TrendingIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-  >
-    <path
-      d="M16.19 2H7.81C4.17 2 2 4.17 2 7.81V16.18C2 19.83 4.17 22 7.81 22H16.18C19.82 22 21.99 19.83 21.99 16.19V7.81C22 4.17 19.83 2 16.19 2ZM18 16.5C18 16.88 17.62 17.14 17.28 16.99L13.17 15.18C12.45 14.86 11.54 14.86 10.82 15.18L6.71 16.99C6.37 17.14 5.99 16.88 5.99 16.5V11.5C5.99 7.97 7.46 6.5 10.99 6.5H17.99V16.5H18Z"
-      stroke="#B7B7B7"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const TopGainersIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-  >
-    <path
-      d="M16.5 9.5L12.3 13.7L10.7 11.3L7.5 14.5"
-      stroke="#B7B7B7"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M14.5 9.5H16.5V11.5"
-      stroke="#B7B7B7"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z"
-      stroke="#B7B7B7"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const TABS = [
-  { id: "trending", label: "Trending", icon: TrendingIcon },
-  { id: "eth", label: "Ethereum", icon: TopGainersIcon },
-  { id: "bsc", label: "BSC", icon: TopGainersIcon },
-  { id: "sol", label: "Solana", icon: TopGainersIcon },
-];
-
-const CHAIN_MAPPING: { [key: string]: string } = {
-  trending: "eth",
-  eth: "eth",
-  bsc: "bsc",
-  sol: "sol",
+  return chainDisplayData;
 };
+
+// Chain Icon Component
+interface ChainIconProps {
+  chainData: {
+    name: string;
+    color: string;
+    icon: string;
+    image?: string;
+    fallbackIcon: string;
+    useBackground: boolean;
+  };
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}
+
+const ChainIcon: React.FC<ChainIconProps> = ({
+  chainData,
+  size = "md",
+  className = "",
+}) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  const sizeClasses = {
+    sm: "w-5 h-5",
+    md: "w-7 h-7",
+    lg: "w-8 h-8",
+  };
+
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+  }, [chainData.image]);
+
+  const handleImageError = () => {
+    setImageError(true);
+    setImageLoaded(true);
+  };
+
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+  };
+
+  return (
+    <div
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
+      title={chainData.name}
+    >
+      {(!imageLoaded || imageError) && (
+        <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
+      )}
+
+      {chainData.image && !imageError && (
+        <img
+          src={chainData.image}
+          alt={chainData.name}
+          className={`w-full h-full object-contain transition-opacity duration-300 ${
+            imageLoaded ? "opacity-100" : "opacity-0"
+          } p-1 relative z-10`}
+          onError={handleImageError}
+          onLoad={handleImageLoad}
+          loading="lazy"
+        />
+      )}
+
+      {imageError && (
+        <div
+          className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
+        >
+          <span className="text-white text-xs font-bold font-satoshi">
+            {chainData.fallbackIcon}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Token Image Component
+const TokenImage = ({
+  src,
+  alt,
+  symbol,
+  name,
+  className = "",
+}: {
+  src?: string | null;
+  alt: string;
+  symbol: string;
+  name?: string;
+  className?: string;
+}) => {
+  const [hasError, setHasError] = useState(false);
+
+  const getFirstLetter = () => {
+    const text = symbol || name || "?";
+    return text.charAt(0).toUpperCase();
+  };
+
+  if (!src || hasError) {
+    return (
+      <div
+        className={`${className} rounded-full flex items-center justify-center`}
+        style={{ backgroundColor: "#4A4A4A" }}
+        title={name || symbol}
+      >
+        <span className="text-white font-bold text-xs">{getFirstLetter()}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`${className} rounded-full object-cover`}
+      onError={() => setHasError(true)}
+      loading="lazy"
+    />
+  );
+};
+
+const CHAINS = [
+  { id: "eth", label: "Ethereum" },
+  { id: "base", label: "Base" },
+  { id: "polygon", label: "Polygon" },
+  { id: "arbitrum", label: "Arbitrum" },
+  { id: "avalanche", label: "Avalanche" },
+  { id: "bsc", label: "BSC" },
+];
 
 export default function AddTokensModal({
   isOpen,
   onClose,
   onAddToken,
 }: AddTokensModalProps) {
-  // Get user from Redux
   const { user } = useSelector((state: RootState) => state.auth);
 
-  // Get real trending tokens from CoinGecko
-  const { data: coinGeckoData, loading: coinGeckoLoading } = useCoinGecko();
-
-  const [activeTab, setActiveTab] = useState("trending");
+  const [selectedChain, setSelectedChain] = useState("eth");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set());
   const [searchResults, setSearchResults] = useState<TokenSearchResult[]>([]);
-  const [recentlyAdded, setRecentlyAdded] = useState<TokenSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchDebounceTimer, setSearchDebounceTimer] =
     useState<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Get trending tokens from CoinGecko
-  const trendingTokens = coinGeckoData?.trendingTokens || [];
-
-  // Load recently added tokens when modal opens
-  useEffect(() => {
-    if (isOpen && user?.email) {
-      loadRecentlyAdded();
-    }
-  }, [isOpen, user?.email]);
-
-  // Load recently added tokens from user's watchlist
-  const loadRecentlyAdded = async () => {
-    if (!user?.email) return;
-
-    try {
-      const watchlist = await coinlesService.getUserWatchlist(
-        user.email,
-        false
-      );
-
-      // Get last 5 added tokens
-      const recent = watchlist
-        .sort((a, b) => {
-          const dateA = new Date(a.addedAt || 0).getTime();
-          const dateB = new Date(b.addedAt || 0).getTime();
-          return dateB - dateA;
-        })
-        .slice(0, 5)
-        .map((item) => ({
-          poolAddress: item.poolAddress,
-          contractAddress: item.contractAddress,
-          contractAddressDisplay: `${item.contractAddress.substring(
-            0,
-            6
-          )}...${item.contractAddress.substring(
-            item.contractAddress.length - 4
-          )}`,
-          name: item.tokenName,
-          symbol: item.tokenSymbol,
-          price: item.marketData?.price || 0,
-          // FIXED: Use cachedLogo for recently added tokens
-          logo: item.cachedLogo || item.metadata?.logo || "",
-          change24h: item.marketData?.change24h || 0,
-          liquidity: item.marketData?.liquidity || 0,
-          volume24h: item.marketData?.volume24h || 0,
-          buys24h: item.transactions?.buys24h || 0,
-          sells24h: item.transactions?.sells24h || 0,
-          poolCount: 1,
-          displayName: item.tokenName,
-        }));
-
-      setRecentlyAdded(recent);
-    } catch (error) {
-      console.error("Error loading recently added tokens:", error);
-      setRecentlyAdded([]);
-    }
-  };
+  const chainDisplayData = getChainDisplayData();
 
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery("");
       setSelectedTokens(new Set());
-      setActiveTab("trending");
+      setSelectedChain("eth");
       setSearchResults([]);
     }
   }, [isOpen]);
@@ -201,6 +245,23 @@ export default function AddTokensModal({
     document.addEventListener("keydown", handleEscKey);
     return () => document.removeEventListener("keydown", handleEscKey);
   }, [isOpen, onClose]);
+
+  // Focus search input when modal opens
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isOpen]);
+
+  // Clear search when chain changes
+  useEffect(() => {
+    if (isOpen) {
+      setSearchQuery("");
+      setSearchResults([]);
+    }
+  }, [selectedChain]);
 
   // Debounced search
   useEffect(() => {
@@ -222,9 +283,8 @@ export default function AddTokensModal({
         clearTimeout(searchDebounceTimer);
       }
     };
-  }, [searchQuery]);
+  }, [searchQuery, selectedChain]);
 
-  // Handle search
   const handleSearch = async (query: string) => {
     if (!query) {
       setSearchResults([]);
@@ -233,11 +293,9 @@ export default function AddTokensModal({
 
     try {
       setSearchLoading(true);
-      const chain = CHAIN_MAPPING[activeTab] || "eth";
+      console.log("Searching for:", query, "on chain:", selectedChain);
 
-      console.log("Searching for:", query, "on chain:", chain);
-
-      const results = await coinlesService.searchTokens(chain, query);
+      const results = await coinlesService.searchTokens(selectedChain, query);
 
       if (results && results.length > 0) {
         setSearchResults(results);
@@ -253,10 +311,6 @@ export default function AddTokensModal({
       setSearchLoading(false);
     }
   };
-
-  if (!isOpen) return null;
-
-  const hasSearchResults = searchQuery.trim().length > 0;
 
   const toggleTokenSelection = (tokenKey: string) => {
     const newSelected = new Set(selectedTokens);
@@ -274,62 +328,17 @@ export default function AddTokensModal({
       return;
     }
 
-    // Add tokens from trending list
-    const trendingToAdd = trendingTokens.filter((token: TrendingToken) => {
-      const tokenKey = `trending_${token.symbol}`;
-      return selectedTokens.has(tokenKey);
-    });
-
-    // Add tokens from search results
     const searchToAdd = searchResults.filter((token) =>
       selectedTokens.has(`${token.contractAddress}_${token.poolAddress}`)
     );
 
     console.log("Adding tokens:", {
-      trending: trendingToAdd.length,
       search: searchToAdd.length,
     });
 
-    // ✅ Auto-search and add trending tokens with real contract addresses
-    for (const token of trendingToAdd) {
-      try {
-        console.log(`🔍 Searching for trending token: ${token.symbol}`);
-
-        // Search for the token to get real contract address
-        const chain = CHAIN_MAPPING[activeTab] || "eth";
-        const results = await coinlesService.searchTokens(chain, token.symbol);
-
-        if (results && results.length > 0) {
-          // Use the first result (most relevant)
-          const realToken = results[0];
-
-          const tokenData = {
-            chainId: chain,
-            contractAddress: realToken.contractAddress,
-            poolAddress: realToken.poolAddress,
-            name: realToken.name,
-            symbol: realToken.symbol,
-          };
-
-          console.log(`✅ Adding trending token: ${token.symbol}`, tokenData);
-          await onAddToken(tokenData);
-        } else {
-          console.warn(
-            `⚠️ No results found for trending token: ${token.symbol}`
-          );
-        }
-      } catch (error) {
-        console.error(
-          `❌ Failed to add trending token ${token.symbol}:`,
-          error
-        );
-      }
-    }
-
-    // Add search result tokens (these have real contract addresses)
     for (const token of searchToAdd) {
       const tokenData = {
-        chainId: CHAIN_MAPPING[activeTab] || "eth",
+        chainId: selectedChain,
         contractAddress: token.contractAddress,
         poolAddress: token.poolAddress,
         name: token.name,
@@ -341,371 +350,242 @@ export default function AddTokensModal({
     onClose();
   };
 
-  const getColorForSymbol = (symbol: string) => {
-    const colors = [
-      "from-blue-500 to-blue-600",
-      "from-pink-500 to-pink-600",
-      "from-orange-500 to-orange-600",
-      "from-yellow-500 to-yellow-600",
-      "from-green-500 to-green-600",
-      "from-purple-500 to-purple-600",
-    ];
-    const index = symbol.charCodeAt(0) % colors.length;
-    return colors[index];
+  const formatCurrency = (value: number) => {
+    if (value === 0) return "$0.000";
+    if (value < 0.001) return "< $0.001";
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(2)}M`;
+    }
+    if (value >= 1000) {
+      return `$${(value / 1000).toFixed(2)}K`;
+    }
+    return `$${value.toFixed(3)}`;
   };
 
-  const handleRemoveFromRecent = (tokenKey: string) => {
-    setRecentlyAdded((prev) =>
-      prev.filter((t) => `${t.contractAddress}_${t.poolAddress}` !== tokenKey)
-    );
-  };
+  if (!isOpen) return null;
 
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-8">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        onClick={onClose}
+      >
+        {/* Modal positioned in center of screen */}
         <div
-          className="bg-[#0F0F0F] rounded-[28px] w-full max-w-6xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl scale-[1.05]"
+          className="h-[550px] mx-4 w-full max-w-4xl"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between px-8 pt-6 pb-4 flex-shrink-0">
-            <h2 className="text-white font-mayeka text-xl">Add Tokens</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors p-1.5 hover:bg-[#2C2C2C] rounded-lg"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Search Bar */}
-          <div className="px-8 pb-4 flex-shrink-0">
-            <div className="relative">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                {searchLoading ? (
-                  <Loader2 size={16} className="text-gray-400 animate-spin" />
-                ) : (
-                  <Search size={16} className="text-gray-400" />
-                )}
+          {/* Main container */}
+          <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden">
+            {/* Left Side - Chains */}
+            <div className="w-1/3 p-5">
+              {/* Main heading */}
+              <div className="mb-8">
+                <h2 className="text-white font-mayeka text-xl">Add Tokens</h2>
               </div>
-              <input
-                type="text"
-                placeholder="Search tokens or paste address"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#000] rounded-[12px] pl-10 pr-3 py-3 text-white text-xs placeholder-gray-400 focus:outline-none border border-[#2C2C2C] focus:border-[#E2AF19] font-satoshi transition-colors"
-              />
-            </div>
-          </div>
 
-          {/* Two Boxes Side by Side */}
-          <div className="flex-1 px-8 pb-4 overflow-hidden flex flex-col min-h-0">
-            <div className="flex gap-4 flex-1 min-h-0">
-              {/* Left Box - Search Results (ALWAYS VISIBLE) */}
-              <div className="flex-1 relative p-[2px] rounded-[16px] min-h-0">
-                <div
-                  className="absolute inset-0 rounded-[16px]"
-                  style={{
-                    background: `linear-gradient(135deg, #E2AF19 0%, #E2AF19 10%, #2C2C2C 25%, #2C2C2C 75%, #E2AF19 90%, #E2AF19 100%)`,
-                  }}
-                />
-                <div className="relative bg-black rounded-[14px] h-full p-3 flex flex-col overflow-hidden">
-                  <div className="mb-2 flex-shrink-0">
-                    <h3 className="text-white font-satoshi font-medium text-xs">
-                      Search Results
-                    </h3>
-                  </div>
+              <div className="flex items-center justify-between mb-4">
+                {/* Networks section with gradient border */}
+                <div className="relative p-[2px] rounded-[12px] w-full">
+                  <div
+                    className="absolute inset-0 rounded-[12px]"
+                    style={{
+                      background: `linear-gradient(135deg, 
+                        #E2AF19 0%, 
+                        #E2AF19 10%,
+                        #2C2C2C 25%, 
+                        #2C2C2C 75%, 
+                        #E2AF19 90%,
+                        #E2AF19 100%)`,
+                    }}
+                  />
+                  <div className="relative bg-[#000] rounded-[10px] p-4">
+                    <div className="mb-4">
+                      <div className="bg-[#0F0F0F] p-2 px-3 rounded-[14px] inline-block">
+                        <h3 className="text-white font-mayeka text-[16px]">
+                          Select Chain
+                        </h3>
+                      </div>
+                    </div>
 
-                  <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide pr-1">
-                    {searchLoading ? (
-                      <div className="flex flex-col items-center justify-center py-8">
-                        <Loader2 className="w-8 h-8 text-[#E2AF19] animate-spin mb-2" />
-                        <p className="text-gray-400 font-satoshi text-[10px]">
-                          Searching tokens...
-                        </p>
-                      </div>
-                    ) : searchResults.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-2">
-                          <span className="text-xl">
-                            {searchQuery ? "🔍" : "💭"}
-                          </span>
-                        </div>
-                        <p className="text-gray-400 font-satoshi text-[10px]">
-                          {searchQuery
-                            ? "No results found"
-                            : "Start typing to search"}
-                        </p>
-                      </div>
-                    ) : (
-                      searchResults.map((token) => {
-                        const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
-                        const isSelected = selectedTokens.has(tokenKey);
+                    <div className="space-y-1">
+                      {CHAINS.map((chain) => {
+                        const chainDisplay = chainDisplayData[chain.id] || {
+                          name: chain.label,
+                          color: "bg-gray-500",
+                          icon: chain.label.charAt(0),
+                          fallbackIcon: chain.label.charAt(0),
+                          useBackground: true,
+                        };
+
+                        const isSelected = selectedChain === chain.id;
 
                         return (
-                          <div
-                            key={tokenKey}
-                            className="flex items-center justify-between p-1.5 rounded-lg hover:bg-[#1A1A1A] transition-colors"
+                          <button
+                            key={chain.id}
+                            onClick={() => setSelectedChain(chain.id)}
+                            className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
+                              isSelected ? "bg-[#71570C]" : "hover:bg-[#1A1A1A]"
+                            }`}
                           >
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <div
-                                className={`w-7 h-7 rounded-full bg-gradient-to-br ${getColorForSymbol(
-                                  token.symbol
-                                )} flex items-center justify-center flex-shrink-0`}
-                              >
-                                {token.logo ? (
-                                  <img
-                                    src={token.logo}
-                                    alt={token.symbol}
-                                    className="w-7 h-7 rounded-full"
-                                  />
-                                ) : (
-                                  <span className="text-white text-[10px] font-bold">
-                                    {token.symbol.charAt(0)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="text-white font-satoshi font-medium text-[11px] truncate">
-                                  {token.name}
-                                </div>
-                                <div className="text-gray-400 font-satoshi text-[9px] truncate">
-                                  {token.symbol}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <div
-                                className={`font-satoshi text-[10px] font-medium ${
-                                  token.change24h > 0
-                                    ? "text-green-500"
-                                    : "text-red-500"
+                            <div className="flex items-center gap-3">
+                              <ChainIcon chainData={chainDisplay} size="md" />
+                              <span
+                                className={`text-sm font-satoshi font-medium ${
+                                  isSelected ? "text-white" : "text-white"
                                 }`}
                               >
-                                {token.change24h > 0 ? "▲" : "▼"}{" "}
-                                {Math.abs(token.change24h).toFixed(2)}%
-                              </div>
-
-                              <button
-                                onClick={() => toggleTokenSelection(tokenKey)}
-                                className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
-                                  isSelected
-                                    ? "bg-[#E2AF19]"
-                                    : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
-                                }`}
-                              >
-                                <div
-                                  className={`w-2 h-2 rounded-full ${
-                                    isSelected ? "bg-black" : ""
-                                  }`}
-                                />
-                              </button>
+                                {chainDisplay.name}
+                              </span>
                             </div>
-                          </div>
+                          </button>
                         );
-                      })
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Box - Trending Tokens & Recently Added */}
-              <div className="flex-1 relative p-[2px] rounded-[16px] min-h-0">
-                <div
-                  className="absolute inset-0 rounded-[16px]"
-                  style={{
-                    background: `linear-gradient(135deg, #E2AF19 0%, #E2AF19 10%, #2C2C2C 25%, #2C2C2C 75%, #E2AF19 90%, #E2AF19 100%)`,
-                  }}
-                />
-                <div className="relative bg-black rounded-[14px] h-full p-3 flex flex-col overflow-hidden">
-                  {/* Trending Tokens Section */}
-                  <div className="flex-shrink-0 mb-2">
-                    <h3 className="text-white font-satoshi font-medium text-xs mb-2">
-                      Trending Tokens
-                    </h3>
-                    <div className="space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide">
-                      {coinGeckoLoading ? (
-                        <div className="flex flex-col items-center justify-center py-4">
-                          <Loader2 className="w-6 h-6 text-[#E2AF19] animate-spin mb-2" />
-                          <p className="text-gray-400 font-satoshi text-[10px]">
-                            Loading trending...
-                          </p>
-                        </div>
-                      ) : trendingTokens.length === 0 ? (
-                        <div className="text-center py-4">
-                          <p className="text-gray-400 font-satoshi text-[10px]">
-                            No trending tokens
-                          </p>
-                        </div>
-                      ) : (
-                        trendingTokens.map((token: TrendingToken) => {
-                          const tokenKey = `trending_${token.symbol}`;
-                          const isSelected = selectedTokens.has(tokenKey);
-
-                          return (
-                            <div
-                              key={tokenKey}
-                              className="flex items-center justify-between p-1.5 rounded-lg hover:bg-[#1A1A1A] transition-colors"
-                            >
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <div
-                                  className={`w-7 h-7 rounded-full ${token.bgColor} flex items-center justify-center flex-shrink-0`}
-                                >
-                                  {token.imageUrl ? (
-                                    <img
-                                      src={token.imageUrl}
-                                      alt={token.symbol}
-                                      className="w-7 h-7 rounded-full"
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = "none";
-                                      }}
-                                    />
-                                  ) : (
-                                    <span className="text-white text-[10px] font-bold">
-                                      {token.icon}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-white font-satoshi font-medium text-[11px] truncate">
-                                    {token.name}
-                                  </div>
-                                  <div className="text-gray-400 font-satoshi text-[9px] truncate">
-                                    {token.symbol}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <div
-                                  className={`font-satoshi text-[10px] font-medium ${
-                                    token.changeType === "positive"
-                                      ? "text-green-500"
-                                      : "text-red-500"
-                                  }`}
-                                >
-                                  {token.changeType === "positive" ? "▲" : "▼"}{" "}
-                                  {token.change
-                                    .replace("+", "")
-                                    .replace("-", "")}
-                                </div>
-
-                                <button
-                                  onClick={() => toggleTokenSelection(tokenKey)}
-                                  className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
-                                    isSelected
-                                      ? "bg-[#E2AF19]"
-                                      : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
-                                  }`}
-                                >
-                                  <div
-                                    className={`w-2 h-2 rounded-full ${
-                                      isSelected ? "bg-black" : ""
-                                    }`}
-                                  />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Divider */}
-                  <div className="border-t border-[#2C2C2C] my-2 flex-shrink-0"></div>
-
-                  {/* Recently Added Section */}
-                  <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                    <h3 className="text-white font-satoshi font-medium text-xs mb-2 flex-shrink-0">
-                      Recently Added
-                    </h3>
-                    <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide pr-1">
-                      {recentlyAdded.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-6 text-center">
-                          <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-2">
-                            <span className="text-xl">📋</span>
-                          </div>
-                          <p className="text-gray-400 font-satoshi text-[10px]">
-                            No recently added tokens
-                          </p>
-                        </div>
-                      ) : (
-                        recentlyAdded.map((token) => {
-                          const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
-                          return (
-                            <div
-                              key={tokenKey}
-                              className="flex items-center justify-between p-1.5 rounded-lg hover:bg-[#1A1A1A] transition-colors"
-                            >
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <div
-                                  className={`w-7 h-7 rounded-full bg-gradient-to-br ${getColorForSymbol(
-                                    token.symbol
-                                  )} flex items-center justify-center flex-shrink-0`}
-                                >
-                                  {token.logo ? (
-                                    <img
-                                      src={token.logo}
-                                      alt={token.symbol}
-                                      className="w-7 h-7 rounded-full"
-                                    />
-                                  ) : (
-                                    <span className="text-white text-[10px] font-bold">
-                                      {token.symbol.charAt(0)}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-white font-satoshi font-medium text-[11px] truncate">
-                                    {token.name}
-                                  </div>
-                                  <div className="text-gray-400 font-satoshi text-[9px] truncate">
-                                    {token.symbol}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={() => handleRemoveFromRecent(tokenKey)}
-                                className="p-0.5 bg-transparent hover:bg-[#2C2C2C] rounded-md transition-colors flex-shrink-0"
-                              >
-                                <X
-                                  size={12}
-                                  className="text-gray-400 hover:text-white"
-                                />
-                              </button>
-                            </div>
-                          );
-                        })
-                      )}
+                      })}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Add Tokens Button and Counter */}
-            <div className="flex gap-4 mt-3 flex-shrink-0 items-center">
-              <div className="flex-1">
-                <div className="text-gray-400 font-satoshi text-[10px]">
-                  {selectedTokens.size}{" "}
-                  {selectedTokens.size === 1 ? "Token" : "Tokens"} Selected
-                </div>
-              </div>
-              <div className="flex-1">
+            {/* Right Side - Tokens */}
+            <div className="flex flex-col bg-[#000] p-5 flex-1">
+              {/* Header with close button */}
+              <div className="flex justify-between items-center mb-5">
+                <div className="flex-1" />
                 <button
-                  onClick={handleAddTokens}
-                  disabled={selectedTokens.size === 0}
-                  className="w-full py-2 bg-[#E2AF19] text-black rounded-[10px] font-satoshi font-medium text-xs hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#E2AF19]"
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg ml-auto"
                 >
-                  Add Tokens
+                  <X size={20} />
                 </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative mb-5">
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                  {searchLoading ? (
+                    <Loader2 size={16} className="text-gray-400 animate-spin" />
+                  ) : (
+                    <Search size={16} className="text-gray-400" />
+                  )}
+                </div>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search name, symbol, or paste address"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
+                />
+              </div>
+
+              {/* Dynamic Heading */}
+              <div className="mb-4">
+                <h4 className="text-[#939393] font-satoshi font-medium text-base">
+                  {searchQuery ? "Search Results" : "Search tokens to add"}
+                </h4>
+              </div>
+
+              {/* Token List */}
+              <div className="flex-1 overflow-y-auto">
+                {searchLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+                      <span className="text-gray-400 text-lg">
+                        {searchQuery ? "🔍" : "💭"}
+                      </span>
+                    </div>
+                    <p className="text-gray-400 font-satoshi">
+                      {searchQuery
+                        ? "No tokens found"
+                        : "Start typing to search"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {searchResults.map((token, index) => {
+                      const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
+                      const isSelected = selectedTokens.has(tokenKey);
+
+                      return (
+                        <button
+                          key={`${tokenKey}_${index}`}
+                          onClick={() => toggleTokenSelection(tokenKey)}
+                          className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
+                        >
+                          <div className="flex items-center min-w-0 flex-1">
+                            <TokenImage
+                              src={token.logo}
+                              alt={token.symbol}
+                              symbol={token.symbol}
+                              name={token.name}
+                              className="w-10 h-10 mr-3 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-white font-medium font-satoshi text-sm">
+                                {token.name}
+                              </div>
+                              <div className="text-gray-400 text-xs font-satoshi">
+                                {token.symbol}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div
+                              className={`font-satoshi text-[10px] font-medium ${
+                                token.change24h > 0
+                                  ? "text-green-500"
+                                  : "text-red-500"
+                              }`}
+                            >
+                              {token.change24h > 0 ? "▲" : "▼"}{" "}
+                              {Math.abs(token.change24h).toFixed(2)}%
+                            </div>
+
+                            <div
+                              className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
+                                isSelected
+                                  ? "bg-[#E2AF19]"
+                                  : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
+                              }`}
+                            >
+                              <div
+                                className={`w-2 h-2 rounded-full ${
+                                  isSelected ? "bg-black" : ""
+                                }`}
+                              />
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Add Tokens Button */}
+              <div className="mt-3 flex-shrink-0 flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="text-gray-400 font-satoshi text-[10px]">
+                    {selectedTokens.size}{" "}
+                    {selectedTokens.size === 1 ? "Token" : "Tokens"} Selected
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <button
+                    onClick={handleAddTokens}
+                    disabled={selectedTokens.size === 0}
+                    className="w-full py-2 bg-[#E2AF19] text-black rounded-[10px] font-satoshi font-medium text-xs hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#E2AF19]"
+                  >
+                    Add Tokens
+                  </button>
+                </div>
               </div>
             </div>
           </div>
