@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - Updated with animated arrow toggle
+// src/components/dashboard/Sidebar.tsx - Updated with active tab and hover extending to right edge
 "use client";
 
 import { useState } from "react";
@@ -138,45 +138,12 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
   return (
     <div
-      className={`relative flex flex-col bg-black border border-[#2C2C2C] h-full overflow-hidden transition-all duration-300 ease-in-out ${
+      className={`relative flex flex-col bg-[#0F0F0F] border-r border-[#FFFFFF40] h-full overflow-hidden transition-all duration-300 ease-in-out ${
         isMinimized ? "w-16 lg:w-20" : "w-full lg:w-64"
       }`}
-      style={{ borderRadius: "16px" }}
     >
-      {/* Top Gradient Blur */}
-      <div
-        className="absolute -top-1 lg:-top-3 -left-1 lg:-left-3 -right-1 lg:-right-3 h-24 lg:h-48 pointer-events-none z-10"
-        style={{
-          borderRadius: "300px lg:600px",
-          background:
-            "linear-gradient(180deg, rgba(226, 175, 25, 0.40) 0%, rgba(226, 175, 25, 0.25) 25%, rgba(226, 175, 25, 0.10) 50%, rgba(226, 175, 25, 0.00) 75%)",
-          filter: "blur(20px lg:blur(50px)",
-        }}
-      />
-
-      {/* Bottom Gradient Blur */}
-      <div
-        className="absolute -bottom-1 lg:-bottom-3 -left-1 lg:-left-3 -right-1 lg:-right-3 h-24 lg:h-48 pointer-events-none z-10"
-        style={{
-          borderRadius: "300px lg:600px",
-          background:
-            "linear-gradient(0deg, rgba(226, 175, 25, 0.40) 0%, rgba(226, 175, 25, 0.25) 25%, rgba(226, 175, 25, 0.10) 50%, rgba(226, 175, 25, 0.00) 75%)",
-          filter: "blur(20px lg:blur(50px)",
-        }}
-      />
-
-      {/* Additional Middle Fade Gradient */}
-      <div
-        className="absolute top-1/3 bottom-1/3 -left-1 lg:-left-3 -right-1 lg:-right-3 pointer-events-none z-15"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.9) 50%, rgba(0, 0, 0, 0.3) 100%)",
-          filter: "blur(15px lg:blur(30px)",
-        }}
-      />
-
       {/* Logo Section */}
-      <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
+      <div className="p-3 lg:p-6 flex-shrink-0 mb-4 mt-4 relative z-20">
         <div className="flex items-center justify-between">
           {isMinimized ? (
             /* Mini Logo and arrow when minimized */
@@ -231,46 +198,54 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       </div>
 
       {/* Navigation Menu */}
-      <div className="flex-1 px-2 lg:px-4 overflow-y-auto relative z-20 scrollbar-hide">
-        <nav className="space-y-1 lg:space-y-2 mb-4 lg:mb-6">
+      <div className="flex-1 overflow-y-auto relative z-20 scrollbar-hide">
+        <nav className="space-y-1 lg:space-y-2 mb-4 lg:mb-6 px-2 lg:px-4">
           {menuItems.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.comingSoon && pathname === "/dashboard/coming-soon");
 
             return (
-              <button
+              <div
                 key={item.label}
-                onClick={(e) => handleNavigation(item.href, item.comingSoon, e)}
-                disabled={isLoading}
-                className={`w-full flex items-center rounded-lg text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
-                  isMinimized
-                    ? "px-2 lg:px-3 py-2 lg:py-3 justify-center"
-                    : "px-3 lg:px-4 py-2 lg:py-3"
-                } ${
-                  isActive && !item.comingSoon
-                    ? "bg-[#E2AF19] text-black font-medium"
-                    : item.comingSoon
-                    ? "text-gray-400 hover:bg-[#1C1C1C] cursor-pointer"
-                    : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
-                } ${isLoading ? "pointer-events-none" : ""}`}
-                title={isMinimized ? item.label : undefined}
+                className={
+                  !isMinimized ? "nav-item-wrapper -mr-2 lg:-mr-4" : ""
+                }
               >
-                <item.icon
-                  size={16}
-                  className={`${isMinimized ? "" : "mr-3"} flex-shrink-0`}
-                  filled={isActive && !item.comingSoon}
-                />
-                {!isMinimized && (
-                  <span
-                    className={
-                      isActive && !item.comingSoon ? "font-medium" : ""
-                    }
-                  >
-                    {item.label}
-                  </span>
-                )}
-              </button>
+                <button
+                  onClick={(e) =>
+                    handleNavigation(item.href, item.comingSoon, e)
+                  }
+                  disabled={isLoading}
+                  className={`w-full flex items-center text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
+                    isMinimized
+                      ? "px-2 lg:px-3 py-2 lg:py-3 justify-center rounded-lg"
+                      : "px-3 lg:px-4 py-2 lg:py-3 rounded-l-[12px]"
+                  } ${
+                    isActive && !item.comingSoon
+                      ? "bg-[#E2AF19] text-black font-medium"
+                      : item.comingSoon
+                      ? "text-gray-400 hover:bg-[#1C1C1C] cursor-pointer"
+                      : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
+                  } ${isLoading ? "pointer-events-none" : ""}`}
+                  title={isMinimized ? item.label : undefined}
+                >
+                  <item.icon
+                    size={16}
+                    className={`${isMinimized ? "" : "mr-3"} flex-shrink-0`}
+                    filled={isActive && !item.comingSoon}
+                  />
+                  {!isMinimized && (
+                    <span
+                      className={
+                        isActive && !item.comingSoon ? "font-medium" : ""
+                      }
+                    >
+                      {item.label}
+                    </span>
+                  )}
+                </button>
+              </div>
             );
           })}
         </nav>

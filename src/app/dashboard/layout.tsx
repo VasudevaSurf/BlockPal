@@ -30,7 +30,7 @@ export default function DashboardLayout({
   return (
     <NavigationLoadingProvider>
       <WalletIntegration>
-        <div className="h-screen bg-[#0F0F0F] flex flex-col lg:flex-row p-2 sm:p-3 lg:p-5 overflow-hidden relative">
+        <div className="h-screen bg-[#0F0F0F] flex flex-col lg:flex-row overflow-hidden relative">
           {/* Swap Effect Image - Top Right Corner of Application (only on swap page) */}
           {isSwapPage && (
             <div className="fixed top-0 right-0 z-[60] pointer-events-none">
@@ -49,7 +49,7 @@ export default function DashboardLayout({
           <NavigationLoadingIndicator />
 
           {/* Mobile Header - Always show */}
-          <div className="lg:hidden flex items-center justify-between p-4 bg-black rounded-[16px] mb-3 border border-[#2C2C2C]">
+          <div className="lg:hidden flex items-center justify-between p-4 bg-black border-b border-[#2C2C2C]">
             <div className="flex items-center">
               <img
                 src="/blockName.png"
@@ -86,13 +86,13 @@ export default function DashboardLayout({
             </div>
           )}
 
-          {/* Desktop Sidebar */}
-          <div className="hidden lg:block">
+          {/* Desktop Sidebar - No padding/margin */}
+          <div className="hidden lg:block lg:h-full">
             <Sidebar />
           </div>
 
-          {/* Main Content */}
-          <main className="flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col">
+          {/* Main Content - With padding */}
+          <main className="flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col p-2 sm:p-3 lg:p-5">
             {/* Global Header - Always show */}
             <div className="flex-shrink-0 bg-[#0F0F0F] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2">
               <GlobalDashboardHeader
