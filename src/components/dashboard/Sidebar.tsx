@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - Updated with active tab and hover extending to right edge
+// src/components/dashboard/Sidebar.tsx - Updated with active tab and hover extending to right edge (both minimized and expanded)
 "use client";
 
 import { useState } from "react";
@@ -143,7 +143,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
       }`}
     >
       {/* Logo Section */}
-      <div className="p-3 lg:p-6 flex-shrink-0 mb-4 mt-4 relative z-20">
+      <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
         <div className="flex items-center justify-between">
           {isMinimized ? (
             /* Mini Logo and arrow when minimized */
@@ -206,21 +206,17 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
               (item.comingSoon && pathname === "/dashboard/coming-soon");
 
             return (
-              <div
-                key={item.label}
-                className={
-                  !isMinimized ? "nav-item-wrapper -mr-2 lg:-mr-4" : ""
-                }
+              <div 
+                key={item.label} 
+                className="nav-item-wrapper -mr-2 lg:-mr-4"
               >
                 <button
-                  onClick={(e) =>
-                    handleNavigation(item.href, item.comingSoon, e)
-                  }
+                  onClick={(e) => handleNavigation(item.href, item.comingSoon, e)}
                   disabled={isLoading}
                   className={`w-full flex items-center text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
                     isMinimized
-                      ? "px-2 lg:px-3 py-2 lg:py-3 justify-center rounded-lg"
-                      : "px-3 lg:px-4 py-2 lg:py-3 rounded-l-[12px]"
+                      ? "px-2 lg:px-3 py-2 lg:py-3 justify-center rounded-l-lg"
+                      : "px-3 lg:px-4 py-2 lg:py-3 rounded-l-lg"
                   } ${
                     isActive && !item.comingSoon
                       ? "bg-[#E2AF19] text-black font-medium"

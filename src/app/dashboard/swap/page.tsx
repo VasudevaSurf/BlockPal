@@ -1,4 +1,4 @@
-// src/app/dashboard/swap/page.tsx - Complete Updated Version with Fixed History
+// src/app/dashboard/swap/page.tsx - Complete Updated Version with Black Swap Boxes
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -468,7 +468,7 @@ export default function SwapPage() {
   }, []);
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-4 flex flex-col overflow-hidden relative">
+    <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 flex flex-col overflow-hidden relative">
       <div className="flex justify-center mb-6 relative z-20">
         <h1 className="text-[#E2AF19] text-[30px] font-mayeka">
           Secure and Best Rates Everytime
@@ -534,7 +534,7 @@ export default function SwapPage() {
             />
 
             {/* Inner scrollable container */}
-            <div className="relative bg-[#0F0F0F] rounded-[26px] overflow-hidden">
+            <div className="relative bg-[#000000] rounded-[26px] overflow-hidden">
               <div className="max-h-[450px] overflow-y-auto custom-scrollbar py-4 px-16">
                 {/* Chain selector and slippage */}
                 <div className="flex flex-row items-center justify-between mb-4">
@@ -893,7 +893,7 @@ export default function SwapPage() {
                     </div>
                     <button
                       onClick={calculateMaxAmount}
-                      className="text-xs bg-[#000] hover:bg-[#3C3C3C] text-white px-2 py-1 rounded-md transition-colors"
+                      className="text-xs bg-[#191919] hover:bg-[#3C3C3C] text-white px-2 py-1 rounded-md transition-colors"
                     >
                       MAX
                     </button>
@@ -910,7 +910,7 @@ export default function SwapPage() {
                   </button>
                 </div>
 
-                {/* To Token Box */}
+                {/* To Token Box - CHANGED TO BLACK */}
                 <div
                   className="bg-[#191919] p-5 mb-2"
                   style={{ borderRadius: "26.066px" }}
@@ -1152,9 +1152,9 @@ export default function SwapPage() {
                   </div>
                 )}
 
-                {/* Quote Info with proper gas display */}
+                {/* Quote Info with proper gas display - CHANGED TO BLACK */}
                 {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
-                  <div className="p-3 bg-[#191919] rounded-lg mb-2 text-sm">
+                  <div className="p-3 bg-[#000000] rounded-lg mb-2 text-sm">
                     <div className="flex justify-between mb-1">
                       <span className="text-gray-400">Rate:</span>
                       <span className="text-white">

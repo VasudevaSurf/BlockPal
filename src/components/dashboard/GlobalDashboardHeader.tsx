@@ -484,9 +484,9 @@ export default function GlobalDashboardHeader({
                 <ArrowLeft size={17} className="text-white" />
               </button>
             )}
-            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white font-mayeka">
+            {/* <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white font-mayeka">
               {displayTitle}
-            </h1>
+            </h1> */}
           </div>
         </div>
 

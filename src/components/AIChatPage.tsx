@@ -851,7 +851,7 @@ export default function AIChatPage() {
   const sidebarOpen = activeTab === "history";
 
   return (
-    <div className="h-full relative bg-[#0F0F0F] flex">
+    <div className="h-full relative bg-[#000000] flex">
       {/* Overlay Background */}
       <div
         className="fixed bottom-0 right-0 w-[1600px] h-[1600px] bg-no-repeat bg-contain bg-bottom-right pointer-events-none z-0"
@@ -861,9 +861,10 @@ export default function AIChatPage() {
         }}
       />
 
+      {/* Overlay for both mobile and desktop when sidebar is open */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden"
+          className="fixed inset-0 bg-black/20 z-30"
           onClick={() => setActiveTab("chat")}
         />
       )}
@@ -875,7 +876,7 @@ export default function AIChatPage() {
         }`}
       >
         {/* Top Navigation Tabs */}
-        <div className="flex-shrink-0 bg-[#0F0F0F] px-4 py-3">
+        <div className="flex-shrink-0 bg-[#000000] px-4 py-3">
           <div className="flex justify-center">
             <div className="flex rounded-[16px] p-1 gap-[24px]">
               <button
@@ -883,7 +884,7 @@ export default function AIChatPage() {
                 className={`text-[24px] font-mayeka font-medium transition-all ${
                   activeTab === "chat"
                     ? "text-white border-b border-b-[#E7BC3F]"
-                    : "text-white"
+                    : "text-[#6E6E6E]"
                 }`}
               >
                 Chat
@@ -893,7 +894,7 @@ export default function AIChatPage() {
                 className={`text-[24px] font-mayeka font-medium transition-all ${
                   activeTab === "history"
                     ? "text-white border-b border-b-[#E7BC3F]"
-                    : "text-white"
+                    : "text-[#6E6E6E]"
                 }`}
               >
                 History
@@ -917,15 +918,15 @@ export default function AIChatPage() {
           {showWelcomeScreen ? (
             /* Welcome Screen */
             <div className="h-full flex flex-col items-center justify-center -mt-5">
-              <div className="mb-2">
+              {/* <div className="mb-2">
                 <img
                   src="/AImiddleImage.png"
                   alt="Lumen AI"
                   className="w-45 h-45 object-contain"
                 />
-              </div>
+              </div> */}
 
-              <h1 className="text-white text-[30px] font-mayeka font-bold mb-10 text-center">
+              <h1 className="text-[35px] font-mayeka-demi-bold-demo font-bold mb-10 text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
                 Chat with Lumen
               </h1>
 
@@ -1383,7 +1384,7 @@ export default function AIChatPage() {
           </div>
 
           {/* New Chat Button - Fixed at bottom */}
-          <div className="flex-shrink-0 p-4 bg-gradient-to-t from-[#0F0F0F] via-[#0F0F0F]/95 to-transparent">
+          <div className="flex-shrink-0 p-4">
             <button
               onClick={handleNewChat}
               className="mx-auto text-[#E2AF19] px-3 py-1.5 rounded-[300px] border border-[#71570C] text-[18px] font-satoshi font-medium transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"

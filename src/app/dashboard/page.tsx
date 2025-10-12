@@ -121,7 +121,7 @@ function DashboardContent() {
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
+    <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-1 flex flex-col overflow-hidden">
       {/* Error Display */}
       {dashboardState.error && (
         <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-2">
