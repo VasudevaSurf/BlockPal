@@ -370,8 +370,7 @@ class EnhancedTokenService {
 
   constructor() {
     this.baseURL =
-      process.env.NEXT_PUBLIC_API_URL ||
-      "http://localhost:5002/api/tokens";
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api/tokens";
     this.debugMode = process.env.NODE_ENV === "development";
   }
 
@@ -1030,8 +1029,14 @@ export default function TokenList() {
                             className="w-10 h-10 mr-2.5 flex-shrink-0"
                           />
                           <div className="min-w-0 flex-1">
+                            {/* FIXED: Added percentage next to token name, matching main tokens */}
                             <div className="text-white font-medium font-satoshi text-sm flex items-center">
                               {token.name}
+                              <PercentageDisplay
+                                change24h={token.change24h}
+                                usdChange24h={token.usdChange24h}
+                                size="xs"
+                              />
                             </div>
                             <div className="text-gray-400 text-xs font-satoshi">
                               {enhancedTokenService.formatTokenAmount(
@@ -1045,14 +1050,10 @@ export default function TokenList() {
 
                         <div className="token-values-wrapper">
                           <div className="token-values">
+                            {/* FIXED: Removed duplicate percentage from here */}
                             <div className="text-white font-medium font-satoshi text-sm">
                               {enhancedTokenService.formatCurrency(token.value)}
                             </div>
-                            <PercentageDisplay
-                              change24h={token.change24h}
-                              usdChange24h={token.usdChange24h}
-                              size="xs"
-                            />
                           </div>
 
                           <div className="menu-button-wrapper">

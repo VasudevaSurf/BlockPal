@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED WITH NEWS FEED SUPPORT
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED WITH PORTFOLIO TITLE DISPLAY
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -48,7 +48,7 @@ const getPageTitle = (
   switch (pathname) {
     case "/dashboard":
       return {
-        title: "Dashboard",
+        title: "Portfolio",
         subtitle: "Welcome back to your crypto portfolio",
       };
     case "/dashboard/scheduled-payments":
@@ -328,6 +328,7 @@ export default function GlobalDashboardHeader({
   const isTokenOverviewPage = pathname.startsWith("/dashboard/tokenOverview/");
   const isCodeLensPage = pathname === "/dashboard/code-lens";
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
+  const isPortfolioPage = pathname === "/dashboard";
 
   // Get page-specific title and subtitle
   const pageInfo = getPageTitle(pathname);
@@ -523,6 +524,13 @@ export default function GlobalDashboardHeader({
               </button>
             )}
 
+            {/* Portfolio Title - Only show on Portfolio page */}
+            {isPortfolioPage && (
+              <h1 className="text-white text-lg lg:text-[25px] font-mayeka font-semibold">
+                {displayTitle}
+              </h1>
+            )}
+
             {/* CodeLens Search Bar */}
             {isCodeLensPage && (
               <div className="flex-1 relative mr-4">
@@ -617,7 +625,9 @@ export default function GlobalDashboardHeader({
               </form>
             )}
 
-            {!isCodeLensPage && !isNewsFeedPage && <div></div>}
+            {!isCodeLensPage && !isNewsFeedPage && !isPortfolioPage && (
+              <div></div>
+            )}
           </div>
         </div>
 
