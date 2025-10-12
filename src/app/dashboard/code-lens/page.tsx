@@ -274,7 +274,7 @@ export default function CodeLens() {
   }
 
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[16px] p-4 flex flex-col overflow-hidden">
+    <div className="h-full bg-[#000000] rounded-[16px] p-4 flex flex-col overflow-hidden">
       {/* Search Bar */}
       <div className="flex items-center gap-3 mb-4">
         <div className="flex-1 relative">
@@ -294,7 +294,7 @@ export default function CodeLens() {
             <Plus className="w-4 h-4 text-black" />
           </button>
         </div>
-        <button
+        {/* <button
           onClick={handleManualRefresh}
           disabled={refreshing}
           className="bg-black border border-[#2C2C2C] hover:border-[#E2AF19] p-3 rounded-xl transition-colors disabled:opacity-50"
@@ -309,11 +309,11 @@ export default function CodeLens() {
           title="Filters"
         >
           <SlidersHorizontal className="w-5 h-5 text-white" />
-        </button>
+        </button> */}
       </div>
 
       {/* Token List Table */}
-      <div className="flex-1 bg-[#0F0F0F] rounded-2xl border border-[#2C2C2C] overflow-hidden flex flex-col">
+      <div className="flex-1 bg-[#000000] rounded-2xl border border-[#2C2C2C] overflow-hidden flex flex-col">
         {/* Table Header - UPDATED WITH MARKET CAP */}
         <div className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 bg-[#191919] text-gray-400 text-sm font-satoshi font-medium">
           <div className="flex items-center">Token</div>
