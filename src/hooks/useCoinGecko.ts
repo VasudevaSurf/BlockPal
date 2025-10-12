@@ -32,7 +32,7 @@ export interface TopGainer {
   changeType: "positive" | "negative";
   icon: string;
   bgColor: string;
-  imageUrl?: string | null;
+  imageUrl?: string | null; // Main image URL for TokenImage component
   thumbUrl?: string | null;
   smallUrl?: string | null;
   largeUrl?: string | null;
@@ -57,7 +57,8 @@ interface UseCoinGeckoReturn {
 }
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL_COIN || "https://amusing-freedom-production-92a5.up.railway.app";
+  process.env.NEXT_PUBLIC_API_URL_COIN ||
+  "http://localhost:5002";
 
 export function useCoinGecko(): UseCoinGeckoReturn {
   const [data, setData] = useState<CoinGeckoData | null>(null);
