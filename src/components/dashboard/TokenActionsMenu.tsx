@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy, Minus, X } from "lucide-react";
 
 interface TokenActionsMenuProps {
@@ -17,6 +17,8 @@ export default function TokenActionsMenu({
   onRemove,
 }: TokenActionsMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [adjustedPosition, setAdjustedPosition] = useState(position);
+  const [openDirection, setOpenDirection] = useState<"up" | "down">("down");
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -42,6 +44,48 @@ export default function TokenActionsMenu({
     };
   }, [isOpen, onClose]);
 
+  // Smart positioning - adjust based on viewport
+  useEffect(() => {
+    if (isOpen && menuRef.current) {
+      const menuHeight = 140; // Approximate menu height
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+
+      let newTop = position.top;
+      let newLeft = position.left;
+
+      // Check if there's enough space below
+      const spaceBelow = viewportHeight - position.top;
+      const spaceAbove = position.top;
+
+      if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+        // Open upward
+        newTop = position.top - menuHeight;
+        setOpenDirection("up");
+      } else {
+        // Open downward (default)
+        setOpenDirection("down");
+      }
+
+      // Ensure menu doesn't go off top
+      if (newTop < 10) {
+        newTop = 10;
+      }
+
+      // Ensure menu doesn't go off left side
+      if (newLeft < 10) {
+        newLeft = 10;
+      }
+
+      // Ensure menu doesn't go off right side
+      if (newLeft + 200 > viewportWidth) {
+        newLeft = viewportWidth - 210;
+      }
+
+      setAdjustedPosition({ top: newTop, left: newLeft });
+    }
+  }, [isOpen, position]);
+
   if (!isOpen) return null;
 
   return (
@@ -49,20 +93,22 @@ export default function TokenActionsMenu({
       {/* Invisible backdrop */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
 
-      {/* Menu */}
+      {/* Menu with animation */}
       <div
         ref={menuRef}
-        className="fixed z-50 bg-black rounded-xl w-[200px] shadow-2xl border border-[#2C2C2C] overflow-hidden"
+        className={`fixed z-50 bg-black rounded-xl w-[200px] shadow-2xl border border-[#2C2C2C] overflow-hidden transition-all duration-200 ${
+          openDirection === "up" ? "animate-slideUp" : "animate-slideDown"
+        }`}
         style={{
-          top: `${position.top}px`,
-          left: `${position.left}px`,
+          top: `${adjustedPosition.top}px`,
+          left: `${adjustedPosition.left}px`,
         }}
       >
         {/* Close Button - Top Left Corner */}
         <div className="absolute top-0 left-0 z-10">
           <button
             onClick={onClose}
-            className="p-2 hover:bg-[#1A1A1A] transition-colors"
+            className="p-2 hover:bg-[#1A1A1A] transition-colors rounded-tl-xl"
           >
             <X className="w-4 h-4 text-gray-400" strokeWidth={2} />
           </button>
@@ -99,6 +145,38 @@ export default function TokenActionsMenu({
           </button>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-slideDown {
+          animation: slideDown 0.2s ease-out;
+        }
+
+        .animate-slideUp {
+          animation: slideUp 0.2s ease-out;
+        }
+      `}</style>
     </>
   );
 }

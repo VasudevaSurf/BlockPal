@@ -1,9 +1,13 @@
-// src/components/dashboard/AddTokensModal.tsx - UPDATED WITH SWAP TOKEN SELECTOR UI
+// src/components/dashboard/AddTokensModal.tsx - COMPLETE UPDATED VERSION
 import { useState, useEffect, useRef } from "react";
 import { X, Search, Loader2 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { coinlesService, TokenSearchResult } from "@/services/coinlesService";
+import {
+  getPopularTokensForChain,
+  PopularToken,
+} from "@/services/popularTokensService";
 
 interface AddTokensModalProps {
   isOpen: boolean;
@@ -217,6 +221,7 @@ export default function AddTokensModal({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set());
   const [searchResults, setSearchResults] = useState<TokenSearchResult[]>([]);
+  const [popularTokens, setPopularTokens] = useState<PopularToken[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchDebounceTimer, setSearchDebounceTimer] =
     useState<NodeJS.Timeout | null>(null);
@@ -255,6 +260,17 @@ export default function AddTokensModal({
     }
   }, [isOpen]);
 
+  // Load popular tokens when chain changes
+  useEffect(() => {
+    if (isOpen && !searchQuery) {
+      const tokens = getPopularTokensForChain(selectedChain);
+      setPopularTokens(tokens);
+      console.log(
+        `Loaded ${tokens.length} popular tokens for ${selectedChain}`
+      );
+    }
+  }, [selectedChain, isOpen, searchQuery]);
+
   // Clear search when chain changes
   useEffect(() => {
     if (isOpen) {
@@ -276,6 +292,8 @@ export default function AddTokensModal({
       setSearchDebounceTimer(timer);
     } else {
       setSearchResults([]);
+      const tokens = getPopularTokensForChain(selectedChain);
+      setPopularTokens(tokens);
     }
 
     return () => {
@@ -288,6 +306,8 @@ export default function AddTokensModal({
   const handleSearch = async (query: string) => {
     if (!query) {
       setSearchResults([]);
+      const tokens = getPopularTokensForChain(selectedChain);
+      setPopularTokens(tokens);
       return;
     }
 
@@ -299,6 +319,7 @@ export default function AddTokensModal({
 
       if (results && results.length > 0) {
         setSearchResults(results);
+        setPopularTokens([]);
         console.log("Search results:", results.length, "tokens found");
       } else {
         setSearchResults([]);
@@ -328,14 +349,22 @@ export default function AddTokensModal({
       return;
     }
 
+    // Add from search results
     const searchToAdd = searchResults.filter((token) =>
       selectedTokens.has(`${token.contractAddress}_${token.poolAddress}`)
     );
 
+    // Add from popular tokens
+    const popularToAdd = popularTokens.filter((token) =>
+      selectedTokens.has(`popular_${token.address}`)
+    );
+
     console.log("Adding tokens:", {
       search: searchToAdd.length,
+      popular: popularToAdd.length,
     });
 
+    // Add search results WITH LOGO
     for (const token of searchToAdd) {
       const tokenData = {
         chainId: selectedChain,
@@ -343,8 +372,33 @@ export default function AddTokensModal({
         poolAddress: token.poolAddress,
         name: token.name,
         symbol: token.symbol,
+        logo: token.logo, // FIXED: Include logo from search results
       };
       await onAddToken(tokenData);
+    }
+
+    // Add popular tokens (need to get pool address from CoinLes)
+    for (const token of popularToAdd) {
+      try {
+        const searchResults = await coinlesService.searchTokens(
+          selectedChain,
+          token.symbol
+        );
+        if (searchResults && searchResults.length > 0) {
+          const foundToken = searchResults[0];
+          const tokenData = {
+            chainId: selectedChain,
+            contractAddress: foundToken.contractAddress,
+            poolAddress: foundToken.poolAddress,
+            name: foundToken.name,
+            symbol: foundToken.symbol,
+            logo: foundToken.logo || token.logoURI, // FIXED: Include logo
+          };
+          await onAddToken(tokenData);
+        }
+      } catch (error) {
+        console.error(`Error adding popular token ${token.symbol}:`, error);
+      }
     }
 
     onClose();
@@ -363,6 +417,10 @@ export default function AddTokensModal({
   };
 
   if (!isOpen) return null;
+
+  // Determine what to display
+  const displayTokens = searchQuery ? searchResults : [];
+  const showPopular = !searchQuery && popularTokens.length > 0;
 
   return (
     <>
@@ -483,7 +541,11 @@ export default function AddTokensModal({
               {/* Dynamic Heading */}
               <div className="mb-4">
                 <h4 className="text-[#939393] font-satoshi font-medium text-base">
-                  {searchQuery ? "Search Results" : "Search tokens to add"}
+                  {searchQuery
+                    ? "Search Results"
+                    : `Popular ${
+                        chainDisplayData[selectedChain]?.name || ""
+                      } Tokens`}
                 </h4>
               </div>
 
@@ -493,7 +555,57 @@ export default function AddTokensModal({
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
                   </div>
-                ) : searchResults.length === 0 ? (
+                ) : showPopular ? (
+                  // Show popular tokens
+                  <div className="space-y-2">
+                    {popularTokens.map((token, index) => {
+                      const tokenKey = `popular_${token.address}`;
+                      const isSelected = selectedTokens.has(tokenKey);
+
+                      return (
+                        <button
+                          key={`${tokenKey}_${index}`}
+                          onClick={() => toggleTokenSelection(tokenKey)}
+                          className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
+                        >
+                          <div className="flex items-center min-w-0 flex-1">
+                            <TokenImage
+                              src={token.logoURI}
+                              alt={token.symbol}
+                              symbol={token.symbol}
+                              name={token.name}
+                              className="w-10 h-10 mr-3 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-white font-medium font-satoshi text-sm">
+                                {token.name}
+                              </div>
+                              <div className="text-gray-400 text-xs font-satoshi">
+                                {token.symbol}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div
+                              className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
+                                isSelected
+                                  ? "bg-[#E2AF19]"
+                                  : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
+                              }`}
+                            >
+                              <div
+                                className={`w-2 h-2 rounded-full ${
+                                  isSelected ? "bg-black" : ""
+                                }`}
+                              />
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : displayTokens.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
                       <span className="text-gray-400 text-lg">
@@ -507,8 +619,9 @@ export default function AddTokensModal({
                     </p>
                   </div>
                 ) : (
+                  // Show search results
                   <div className="space-y-2">
-                    {searchResults.map((token, index) => {
+                    {displayTokens.map((token, index) => {
                       const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
                       const isSelected = selectedTokens.has(tokenKey);
 
@@ -536,16 +649,22 @@ export default function AddTokensModal({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <div
-                              className={`font-satoshi text-[10px] font-medium ${
-                                token.change24h > 0
-                                  ? "text-green-500"
-                                  : "text-red-500"
-                              }`}
-                            >
-                              {token.change24h > 0 ? "▲" : "▼"}{" "}
-                              {Math.abs(token.change24h).toFixed(2)}%
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {/* Price and percentage */}
+                            <div className="text-right">
+                              <div className="text-white font-medium font-satoshi text-sm">
+                                {formatCurrency(token.price)}
+                              </div>
+                              <div
+                                className={`font-satoshi text-[10px] font-medium ${
+                                  token.change24h > 0
+                                    ? "text-green-500"
+                                    : "text-red-500"
+                                }`}
+                              >
+                                {token.change24h > 0 ? "▲" : "▼"}{" "}
+                                {Math.abs(token.change24h).toFixed(2)}%
+                              </div>
                             </div>
 
                             <div

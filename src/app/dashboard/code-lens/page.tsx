@@ -1,4 +1,4 @@
-// src/app/dashboard/code-lens/page.tsx - COMPLETE UPDATED VERSION
+// src/app/dashboard/code-lens/page.tsx - COMPLETE WITH MARKET CAP COLUMN
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -93,7 +93,7 @@ export default function CodeLens() {
         liquidity: item.marketData?.liquidity || 0,
         buys24h: item.transactions?.buys24h || 0,
         sells24h: item.transactions?.sells24h || 0,
-        logo: item.metadata?.logo,
+        logo: item.metadata?.logo || "",
       }));
 
       setTokens(transformedTokens);
@@ -168,7 +168,9 @@ export default function CodeLens() {
     if (token) {
       const tokenInfo = `${token.name} (${token.symbol})\nContract: ${
         token.contractAddress
-      }\nPrice: $${token.price.toLocaleString()}`;
+      }\nPrice: $${token.price.toLocaleString()}\nMarket Cap: ${formatNumber(
+        token.marketCap
+      )}`;
       navigator.clipboard.writeText(tokenInfo);
       console.log("Copied token info:", tokenInfo);
     }
@@ -204,7 +206,7 @@ export default function CodeLens() {
   const handleAddToken = async (tokenData: any) => {
     if (!user?.email) return;
 
-    console.log("Adding token:", tokenData);
+    console.log("Adding token with data:", tokenData);
 
     try {
       const watchlistToken = {
@@ -235,8 +237,10 @@ export default function CodeLens() {
           liquidity: result.token.marketData?.liquidity || 0,
           buys24h: result.token.transactions?.buys24h || 0,
           sells24h: result.token.transactions?.sells24h || 0,
-          logo: result.token.metadata?.logo,
+          logo: result.token.metadata?.logo || tokenData.logo || "",
         };
+
+        console.log("New token created with logo:", newToken.logo);
 
         const updatedTokens = [...tokens, newToken];
         setTokens(updatedTokens);
@@ -310,19 +314,20 @@ export default function CodeLens() {
 
       {/* Token List Table */}
       <div className="flex-1 bg-[#0F0F0F] rounded-2xl border border-[#2C2C2C] overflow-hidden flex flex-col">
-        {/* Table Header */}
-        <div className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.5fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 bg-[#191919] text-gray-400 text-sm font-satoshi font-medium">
+        {/* Table Header - UPDATED WITH MARKET CAP */}
+        <div className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 bg-[#191919] text-gray-400 text-sm font-satoshi font-medium">
           <div className="flex items-center">Token</div>
           <div className="flex items-center justify-center">Price</div>
           <div className="flex items-center justify-center">24h</div>
           <div className="flex items-center justify-center">24h Volume</div>
+          <div className="flex items-center justify-center">Market Cap</div>
           <div className="flex items-center justify-center">Liquidity</div>
           <div className="flex items-center justify-center">Buys</div>
           <div className="flex items-center justify-center">Sells</div>
           <div className="flex items-center justify-center">Actions</div>
         </div>
 
-        {/* Table Body */}
+        {/* Table Body - UPDATED WITH MARKET CAP */}
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           {filteredTokens.length === 0 ? (
             <div className="flex items-center justify-center h-64">
@@ -337,11 +342,11 @@ export default function CodeLens() {
               <div
                 key={token.id}
                 onClick={() => handleTokenClick(token)}
-                className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.5fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer"
+                className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer"
               >
                 {/* Token */}
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#2C2C2C]">
                     {token.logo ? (
                       <img
                         src={token.logo}
@@ -349,6 +354,13 @@ export default function CodeLens() {
                         className="w-8 h-8 rounded-full"
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            const fallback = document.createElement("span");
+                            fallback.className = "text-white text-xs font-bold";
+                            fallback.textContent = token.symbol.charAt(0);
+                            parent.appendChild(fallback);
+                          }
                         }}
                       />
                     ) : (
@@ -389,6 +401,11 @@ export default function CodeLens() {
                 {/* 24h Volume */}
                 <div className="flex items-center justify-center text-white font-satoshi text-sm">
                   {formatNumber(token.volume24h)}
+                </div>
+
+                {/* Market Cap - NEW COLUMN */}
+                <div className="flex items-center justify-center text-white font-satoshi text-sm">
+                  {formatNumber(token.marketCap)}
                 </div>
 
                 {/* Liquidity */}
