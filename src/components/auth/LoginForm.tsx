@@ -591,7 +591,7 @@ export default function LoginForm() {
           onClick={handleGoogleLogin}
           disabled={isLoading}
           variant="secondary"
-          className="w-full text-black hover:bg-gray-100 border-white font-satoshi"
+          className="w-full text-black border-white font-satoshi"
           size="md"
         >
           {googleLoading ? (
@@ -674,7 +674,7 @@ export default function LoginForm() {
                 className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
                 disabled={isLoading}
               >
-                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                {showPassword ? <Eye size={14} /> : <EyeOff size={14} />}
               </button>
             </div>
             {formErrors.password && (

@@ -10,16 +10,22 @@ import Input from "@/components/ui/Input";
 import { registerUser, clearError } from "@/store/slices/authSlice";
 import { RootState, AppDispatch } from "@/store";
 import { auth, googleProvider } from "@/lib/firebase";
+
 import {
   sendRegistrationVerificationEmail,
   RegistrationEmailData,
 } from "@/lib/emailjs"; // Updated import
-import EyeOff from "../icons/EyeOffIcon";
-import Eye from "../icons/EyeIcon";
 import UserIcon from "../icons/UserIcon";
 import MailIcon from "../icons/MailIcon";
 import LockIcon from "../icons/LockIcon";
-import { Shield, AlertCircle, CheckCircle, Mail } from "lucide-react";
+import {
+  Shield,
+  AlertCircle,
+  CheckCircle,
+  Mail,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 
 type Step = "form" | "verify" | "success";
 
@@ -383,6 +389,7 @@ export default function RegisterForm() {
             disabled={loading || googleLoading || sendingCode}
           />
 
+          {/* For Create Password field */}
           <div className="relative">
             <Input
               type={showPassword ? "text" : "password"}
@@ -401,18 +408,15 @@ export default function RegisterForm() {
             />
             <button
               type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
               onClick={() => setShowPassword(!showPassword)}
               disabled={loading || googleLoading || sendingCode}
             >
-              {showPassword ? (
-                <EyeOff size={18} color="#9CA3AF" />
-              ) : (
-                <Eye size={18} color="#9CA3AF" />
-              )}
+              {showPassword ? <Eye size={14} /> : <EyeOff size={14} />}
             </button>
           </div>
 
+          {/* For Repeat Password field */}
           <div className="relative">
             <Input
               type={showConfirmPassword ? "text" : "password"}
@@ -431,15 +435,11 @@ export default function RegisterForm() {
             />
             <button
               type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               disabled={loading || googleLoading || sendingCode}
             >
-              {showConfirmPassword ? (
-                <EyeOff size={18} color="#9CA3AF" />
-              ) : (
-                <Eye size={18} color="#9CA3AF" />
-              )}
+              {showConfirmPassword ? <Eye size={14} /> : <EyeOff size={14} />}
             </button>
           </div>
 

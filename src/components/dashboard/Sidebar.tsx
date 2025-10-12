@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - Updated with active tab and hover extending to right edge (both minimized and expanded)
+// src/components/dashboard/Sidebar.tsx - Fixed icon alignment when minimized
 "use client";
 
 import { useState } from "react";
@@ -32,30 +32,12 @@ const menuItems = [
     href: "/dashboard",
     comingSoon: false,
   },
-  // {
-  //   icon: ScheduleIcon,
-  //   label: "LoopX",
-  //   href: "/dashboard/scheduled-payments",
-  //   comingSoon: false,
-  // },
-  // {
-  //   icon: BatchIcon,
-  //   label: "Cluster",
-  //   href: "/dashboard/batch-payments",
-  //   comingSoon: false,
-  // },
   {
     icon: AIIcon,
     label: "Lumen",
     href: "/dashboard/ai-chat",
     comingSoon: false,
   },
-  // {
-  //   icon: FriendsIcon,
-  //   label: "Friends",
-  //   href: "/dashboard/friends",
-  //   comingSoon: false,
-  // },
   {
     icon: SwapIcon,
     label: "Swap",
@@ -148,15 +130,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
           {isMinimized ? (
             /* Mini Logo and arrow when minimized */
             <div className="w-full flex flex-col items-center gap-2">
-              {/* <img
-                src="/minLogo.png"
-                alt="Blockpal Mini"
-                className="brightness-110 h-6 lg:h-8"
-                style={{
-                  width: "auto",
-                }}
-              /> */}
-
               {/* Arrow button when minimized */}
               <button
                 onClick={toggleMinimized}
@@ -199,23 +172,26 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
       {/* Navigation Menu */}
       <div className="flex-1 overflow-y-auto relative z-20 scrollbar-hide">
-        <nav className="space-y-1 lg:space-y-2 mb-4 lg:mb-6 px-2 lg:px-4">
+        <nav
+          className={`space-y-1 lg:space-y-2 mb-4 lg:mb-6 ${
+            isMinimized ? "px-2" : "px-2 lg:px-4"
+          }`}
+        >
           {menuItems.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.comingSoon && pathname === "/dashboard/coming-soon");
 
             return (
-              <div 
-                key={item.label} 
-                className="nav-item-wrapper -mr-2 lg:-mr-4"
-              >
+              <div key={item.label} className="nav-item-wrapper -mr-2 lg:-mr-4">
                 <button
-                  onClick={(e) => handleNavigation(item.href, item.comingSoon, e)}
+                  onClick={(e) =>
+                    handleNavigation(item.href, item.comingSoon, e)
+                  }
                   disabled={isLoading}
                   className={`w-full flex items-center text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
                     isMinimized
-                      ? "px-2 lg:px-3 py-2 lg:py-3 justify-center rounded-l-lg"
+                      ? "pl-[18px] lg:pl-[22px] pr-4 lg:pr-6 py-2 lg:py-3 rounded-l-lg"
                       : "px-3 lg:px-4 py-2 lg:py-3 rounded-l-lg"
                   } ${
                     isActive && !item.comingSoon
@@ -228,7 +204,9 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
                 >
                   <item.icon
                     size={16}
-                    className={`${isMinimized ? "" : "mr-3"} flex-shrink-0`}
+                    className={`${
+                      isMinimized ? "" : "mr-3"
+                    } flex-shrink-0 lg:w-5 lg:h-5`}
                     filled={isActive && !item.comingSoon}
                   />
                   {!isMinimized && (

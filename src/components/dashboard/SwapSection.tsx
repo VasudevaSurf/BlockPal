@@ -1,4 +1,4 @@
-// src/components/dashboard/SwapSection.tsx - FIXED to keep skeleton until all content ready
+// src/components/dashboard/SwapSection.tsx - FIXED refresh flashing
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -154,12 +154,31 @@ export default function SwapSection() {
   // Track initial load
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
+  // Cache the last successful data to prevent flashing
+  const [cachedTrendingTokens, setCachedTrendingTokens] = useState<
+    TrendingToken[]
+  >([]);
+  const [cachedTopGainers, setCachedTopGainers] = useState<TopGainer[]>([]);
+
   // Use mock data instead of Redux
   const tokens = mockTokens;
 
   // Get real trending tokens and top gainers from CoinGecko
   const trendingTokens = coinGeckoData?.trendingTokens || [];
   const topGainersData = coinGeckoData?.topGainers || [];
+
+  // Update cache when new data arrives
+  useEffect(() => {
+    if (trendingTokens.length > 0) {
+      setCachedTrendingTokens(trendingTokens);
+    }
+  }, [trendingTokens]);
+
+  useEffect(() => {
+    if (topGainersData.length > 0) {
+      setCachedTopGainers(topGainersData);
+    }
+  }, [topGainersData]);
 
   // State
   const [sellToken, setSellToken] = useState<Token | null>(null);
@@ -204,9 +223,17 @@ export default function SwapSection() {
     setComponentLoading,
   ]);
 
-  // Determine if we should show content or skeleton
-  const shouldShowContent =
-    allComponentsLoaded && hasInitiallyLoaded && !coinGeckoLoading;
+  // Show skeleton only on initial load, use cached data during refreshes
+  const shouldShowSkeleton = !hasInitiallyLoaded && coinGeckoLoading;
+  const shouldShowContent = !shouldShowSkeleton;
+
+  // Use cached data if refreshing, otherwise use current data
+  const displayTrendingTokens =
+    coinGeckoLoading && hasInitiallyLoaded
+      ? cachedTrendingTokens
+      : trendingTokens;
+  const displayTopGainers =
+    coinGeckoLoading && hasInitiallyLoaded ? cachedTopGainers : topGainersData;
 
   // Close settings dropdown when clicking outside
   useEffect(() => {
@@ -409,8 +436,8 @@ export default function SwapSection() {
             </div>
           )}
 
-          {/* Loading State - show skeleton until shouldShowContent is true */}
-          {!shouldShowContent && (
+          {/* Loading State - show skeleton only on initial load */}
+          {shouldShowSkeleton && (
             <div className="flex-1 overflow-y-auto space-y-2 animate-pulse">
               {Array.from({ length: 7 }).map((_, index) => (
                 <div
@@ -432,11 +459,11 @@ export default function SwapSection() {
             </div>
           )}
 
-          {/* Token List - only show when shouldShowContent is true */}
+          {/* Token List - show cached data during refresh, new data when available */}
           {shouldShowContent && !coinGeckoError && (
             <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
-              {trendingTokens.length > 0 ? (
-                trendingTokens.map((token: TrendingToken) => (
+              {displayTrendingTokens.length > 0 ? (
+                displayTrendingTokens.map((token: TrendingToken) => (
                   <div
                     key={token.index}
                     className="flex items-center justify-between py-1.5"
@@ -560,8 +587,8 @@ export default function SwapSection() {
             </div>
           </div>
 
-          {/* Loading State - show skeleton until shouldShowContent is true */}
-          {!shouldShowContent && (
+          {/* Loading State - show skeleton only on initial load */}
+          {shouldShowSkeleton && (
             <div className="flex-1 overflow-y-auto space-y-1 animate-pulse">
               {Array.from({ length: 6 }).map((_, index) => (
                 <div
@@ -583,11 +610,11 @@ export default function SwapSection() {
             </div>
           )}
 
-          {/* Token List - only show when shouldShowContent is true */}
+          {/* Token List - show cached data during refresh, new data when available */}
           {shouldShowContent && (
             <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide">
-              {topGainersData.length > 0 ? (
-                topGainersData.map((token: TopGainer) => (
+              {displayTopGainers.length > 0 ? (
+                displayTopGainers.map((token: TopGainer) => (
                   <div
                     key={token.index}
                     className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
