@@ -6,7 +6,7 @@ import React from "react";
 // Centralized Dashboard Skeleton - matches exact UI structure
 export function DashboardSkeleton() {
   return (
-    <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
+    <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-1 sm:p-2 lg:p-3 flex flex-col overflow-hidden">
       {/* Mobile Layout Skeleton */}
       <div className="flex xl:hidden flex-col gap-3 lg:gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
         <SkeletonWalletBalance />
