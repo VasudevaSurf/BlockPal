@@ -1,4 +1,4 @@
-// src/app/dashboard/news-feed/page.tsx
+// src/app/dashboard/news-feed/page.tsx - UPDATED VERSION
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import TokenSidebar from "@/components/dashboard/TokenSidebar";
 import NewsChatPage from "@/components/NewsChatPage";
 import { useNews } from "@/hooks/useNews";
+import { useNewsFeedContext } from "@/app/dashboard/layout";
 
 interface NewsCardProps {
   title: string;
@@ -45,23 +46,10 @@ const NewsCard = ({
     }
   };
 
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment?.toLowerCase()) {
-      case "positive":
-        return "#2ECC71";
-      case "negative":
-        return "#E74C3C";
-      default:
-        return "#6b7280";
-    }
-  };
-
-  // Get sentiment icon based on sentiment
   const getSentimentIcon = (sentiment: string) => {
     const sentimentLower = sentiment?.toLowerCase();
 
     if (sentimentLower === "positive") {
-      // Bullish/Green icon
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -85,7 +73,6 @@ const NewsCard = ({
         </svg>
       );
     } else if (sentimentLower === "negative") {
-      // Bearish/Red icon
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -112,7 +99,6 @@ const NewsCard = ({
         </svg>
       );
     } else {
-      // Neutral - small gray circle
       return (
         <div
           className="w-2 h-2 rounded-full"
@@ -156,9 +142,6 @@ const NewsCard = ({
 
           <div className="flex items-center justify-between mt-3">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-[#F7B410] flex items-center justify-center text-[10px] font-semibold text-black">
-                {author.charAt(0)}
-              </div>
               <span className="text-[#fff] text-[12px] font-medium">
                 By {author}
               </span>
@@ -170,7 +153,7 @@ const NewsCard = ({
             <div className="flex items-center gap-2">
               {tickers.length > 0 && (
                 <span className="text-[#999999] text-[11px]">
-                  🏷️ {tickers.slice(0, 3).join(", ")}
+                  {tickers.slice(0, 3).join(", ")}
                 </span>
               )}
               {getSentimentIcon(sentiment)}
@@ -183,7 +166,6 @@ const NewsCard = ({
 };
 
 export default function NewsFeed() {
-  const [searchInput, setSearchInput] = useState("");
   const [showAIChat, setShowAIChat] = useState(false);
   const {
     news,
@@ -196,6 +178,9 @@ export default function NewsFeed() {
     clearSearch,
     searchQuery,
   } = useNews();
+
+  // Use context from layout
+  const newsFeedContext = useNewsFeedContext();
 
   const observerRef = useRef<IntersectionObserver>();
   const lastNewsElementRef = useCallback(
@@ -214,17 +199,16 @@ export default function NewsFeed() {
     [loading, hasMore, fetchMore]
   );
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchInput.trim()) {
-      search(searchInput.trim());
-    }
-  };
+  // Connect context handlers
+  useEffect(() => {
+    newsFeedContext.setSearchQuery(searchQuery);
+  }, [searchQuery]);
 
-  const handleClearSearch = () => {
-    setSearchInput("");
-    clearSearch();
-  };
+  useEffect(() => {
+    newsFeedContext.setOnSearch(() => search);
+    newsFeedContext.setOnClearSearch(() => clearSearch);
+    newsFeedContext.setOnAIClick(() => () => setShowAIChat(true));
+  }, [search, clearSearch]);
 
   const formatDate = (dateString: string) => {
     const now = new Date();
@@ -298,118 +282,20 @@ export default function NewsFeed() {
         }
       `}</style>
 
-      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden relative">
+      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden relative">
         {/* Desktop Layout */}
         <div className="hidden xl:flex gap-3 flex-1 min-h-0 relative">
           <div className="flex-[0_0_60%] flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             {/* Left side - News Feed */}
             <div className="w-full flex-1 h-full flex flex-col relative">
               <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] overflow-hidden flex flex-col">
-                {/* Search Bar with AI Button */}
-                <div className="sticky top-0 z-10 bg-black p-4 pb-0">
-                  <form onSubmit={handleSearch} className="flex gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        placeholder="Search crypto news..."
-                        value={searchInput}
-                        onChange={(e) => setSearchInput(e.target.value)}
-                        className="w-full border border-[#2C2C2C] rounded-[10px] px-4 py-3 pl-10 text-white text-[14px] placeholder:text-[#666666] focus:outline-none focus:border-[#F7B410] transition-colors"
-                      />
-                      <svg
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#666666]"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                        />
-                      </svg>
-                    </div>
-
-                    {/* AI Button replacing Search button */}
-                    <button
-                      type="button"
-                      onClick={() => setShowAIChat(true)}
-                      className="px-6 py-3 border border-[#2C2C2C] rounded-[10px] text-white text-[14px] font-medium bg-[#F7B410] hover:from-[#D4A853] hover:to-[#E2AF19] transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 29 29"
-                        fill="none"
-                      >
-                        <path
-                          d="M8.04157 4.81315C7.3544 4.81295 6.67954 4.99549 6.08616 5.34206C5.49279 5.68862 5.00224 6.18674 4.66481 6.78536C4.32738 7.38398 4.15521 8.06156 4.16594 8.74865C4.17667 9.43573 4.36991 10.1076 4.72587 10.6954C3.84177 10.8662 3.04473 11.3395 2.47159 12.034C1.89844 12.7285 1.58496 13.6009 1.58496 14.5013C1.58496 15.4017 1.89844 16.2741 2.47159 16.9686C3.04473 17.6631 3.84177 18.1364 4.72587 18.3072M8.04157 4.81315C8.04157 3.95672 8.38179 3.13537 8.98737 2.52979C9.59296 1.9242 10.4143 1.58398 11.2707 1.58398C12.1272 1.58398 12.9485 1.9242 13.5541 2.52979C14.1597 3.13537 14.4999 3.95672 14.4999 4.81315M8.04157 4.81315C8.04157 5.86973 8.5492 6.80748 9.33324 7.39648M4.72587 18.3072C4.37024 18.895 4.17726 19.5667 4.16671 20.2536C4.15615 20.9405 4.32838 21.6178 4.66577 22.2163C5.00316 22.8147 5.49358 23.3126 6.08677 23.6591C6.67996 24.0056 7.3546 24.1882 8.04157 24.1882C8.04157 25.0446 8.38179 25.8659 8.98737 26.4715C9.59296 27.0771 10.4143 27.4173 11.2707 27.4173C12.1272 27.4173 12.9485 27.0771 13.5541 26.4715C14.1597 25.8659 14.4999 25.0446 14.4999 24.1882M4.72587 18.3072C5.18942 17.5398 5.90473 16.9569 6.74991 16.6577M14.4999 4.81315V24.1882M14.4999 4.81315C14.4999 3.95672 14.8401 3.13537 15.4457 2.52979C16.0513 1.9242 16.8726 1.58398 17.7291 1.58398C18.5855 1.58398 19.4069 1.9242 20.0124 2.52979C20.618 3.13537 20.9582 3.95672 20.9582 4.81315C21.6452 4.81309 22.3199 4.99567 22.913 5.34216C23.5062 5.68866 23.9966 6.18663 24.334 6.78505C24.6714 7.38346 24.8437 8.06082 24.8331 8.74771C24.8226 9.43461 24.6296 10.1063 24.2739 10.6941M14.4999 24.1882C14.4999 25.0446 14.8401 25.8659 15.4457 26.4715C16.0513 27.0771 16.8726 27.4173 17.7291 27.4173C18.5855 27.4173 19.4069 27.0771 20.0124 26.4715C20.618 25.8659 20.9582 25.0446 20.9582 24.1882M20.9582 24.1882C21.6454 24.1883 22.3203 24.0058 22.9136 23.6592C23.507 23.3127 23.9976 22.8146 24.335 22.2159C24.6724 21.6173 24.8446 20.9397 24.8339 20.2527C24.8231 19.5656 24.6299 18.8937 24.2739 18.3059C25.158 18.1351 25.9551 17.6618 26.5282 16.9673C27.1014 16.2728 27.4149 15.4005 27.4149 14.5C27.4149 13.5996 27.1014 12.7272 26.5282 12.0327C25.9551 11.3382 25.158 10.8649 24.2739 10.6941M20.9582 24.1882C20.9582 23.1316 20.4506 22.1938 19.6666 21.6048M24.2739 10.6941C23.8104 11.4615 23.0951 12.0445 22.2499 12.3436"
-                          stroke="black"
-                          strokeWidth="1.9375"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      <span className="font-mayeka text-black">News AI</span>
-                    </button>
-
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={handleClearSearch}
-                        className="px-4 py-3 border border-[#2C2C2C] rounded-[10px] text-[#999999] text-[14px] font-medium hover:border-[#F7B410] hover:text-[#F7B410] transition-colors"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </form>
-
-                  {searchQuery && (
-                    <p className="text-[#6b7280] text-[14px] mt-2">
+                {/* Search query display */}
+                {searchQuery && (
+                  <div className="px-4 pt-4">
+                    <p className="text-[#6b7280] text-[14px]">
                       Searching for:{" "}
                       <strong className="text-white">{searchQuery}</strong>
                     </p>
-                  )}
-                </div>
-
-                {/* Trending Section */}
-                {!searchQuery && trending.length > 0 && (
-                  <div className="px-4 py-3 border-b border-[#2C2C2C]">
-                    <h2 className="text-white text-[16px] font-semibold mb-3">
-                      Trending Now
-                    </h2>
-                    <div className="flex gap-3 overflow-x-auto scrollbar-hide">
-                      {trending.map((headline, index) => (
-                        <div
-                          key={headline.headline_id || index}
-                          className="min-w-[300px] p-3 bg-[#1A1A1A] rounded-[12px] border border-[#2C2C2C] hover:border-[#F7B410] transition-colors cursor-pointer"
-                        >
-                          <h3 className="text-white text-[13px] font-medium leading-tight mb-2">
-                            {headline.headline}
-                          </h3>
-                          <div className="flex items-center gap-2 text-[11px]">
-                            <span className="text-[#666666]">
-                              {formatDate(headline.date)}
-                            </span>
-                            <span
-                              className="font-medium"
-                              style={{
-                                color: getSentimentColor(headline.sentiment),
-                              }}
-                            >
-                              • {headline.sentiment}
-                            </span>
-                            {headline.tickers.length > 0 && (
-                              <span className="text-[#999999]">
-                                🏷️ {headline.tickers.slice(0, 2).join(", ")}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 )}
 
@@ -481,7 +367,110 @@ export default function NewsFeed() {
           {/* AI Chat Overlay - Slides from left */}
           {showAIChat && (
             <div className="absolute inset-0 z-50 slide-in">
-              <div className="h-full bg-[#0F0F0F] rounded-[14px] border border-[#2C2C2C] overflow-hidden flex flex-col">
+              <div className="h-full bg-[#000000] rounded-[14px] border border-[#2C2C2C] overflow-hidden flex flex-col">
+                {/* Header with Back Button */}
+                <div className="flex-shrink-0 bg-black border-b border-[#2C2C2C] p-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowAIChat(false)}
+                      className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                    >
+                      <ArrowLeft size={20} className="text-[#E2AF19]" />
+                    </button>
+                    <div>
+                      <h2 className="text-white text-xl font-mayeka font-bold">
+                        News Chat
+                      </h2>
+                      <p className="text-[#999999] text-sm font-satoshi">
+                        Ask about crypto news and insights
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* News Chat Component */}
+                <div className="flex-1 overflow-hidden">
+                  <NewsChatPage />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Layout */}
+        <div className="xl:hidden flex flex-col h-full">
+          {/* News Feed - Mobile */}
+          <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] overflow-hidden flex flex-col">
+            {/* Search query display */}
+            {searchQuery && (
+              <div className="px-4 pt-4">
+                <p className="text-[#6b7280] text-[14px]">
+                  Searching for:{" "}
+                  <strong className="text-white">{searchQuery}</strong>
+                </p>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+              <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-[10px]">
+                <p className="text-red-400 text-[14px]">{error}</p>
+              </div>
+            )}
+
+            {/* News Feed */}
+            <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-3">
+              {news.length === 0 && !loading && (
+                <div className="text-center py-10">
+                  <p className="text-[#666666] text-[14px]">
+                    {searchQuery
+                      ? "No news found for your search"
+                      : "No news available"}
+                  </p>
+                </div>
+              )}
+
+              {news.map((article, index) => (
+                <div
+                  key={article.news_url}
+                  ref={index === news.length - 1 ? lastNewsElementRef : null}
+                >
+                  <NewsCard
+                    title={article.title}
+                    description={article.text}
+                    author={article.source_name}
+                    date={article.date}
+                    image={article.image_url}
+                    sentiment={article.sentiment}
+                    tickers={article.tickers}
+                    url={article.news_url}
+                  />
+                </div>
+              ))}
+
+              {loading && (
+                <div className="text-center py-5">
+                  <div className="inline-block w-6 h-6 border-2 border-[#F7B410] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[#666666] text-[14px] mt-2">
+                    Loading more news...
+                  </p>
+                </div>
+              )}
+
+              {!hasMore && news.length > 0 && (
+                <div className="text-center py-5">
+                  <p className="text-[#666666] text-[14px]">
+                    No more news to load
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* AI Chat Overlay - Mobile */}
+          {showAIChat && (
+            <div className="absolute inset-0 z-50 slide-in">
+              <div className="h-full bg-[#000000] rounded-[14px] border border-[#2C2C2C] overflow-hidden flex flex-col">
                 {/* Header with Back Button */}
                 <div className="flex-shrink-0 bg-black border-b border-[#2C2C2C] p-4">
                   <div className="flex items-center gap-3">

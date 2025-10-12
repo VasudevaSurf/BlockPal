@@ -226,7 +226,7 @@ export default function NewsChatPage() {
   const showWelcomeScreen = messages.length === 0;
 
   return (
-    <div className="h-full relative bg-[#0F0F0F] flex">
+    <div className="h-full relative bg-[#000000] flex">
       {/* Overlay Background */}
       <div
         className="fixed bottom-0 right-0 w-[1600px] h-[1600px] bg-no-repeat bg-contain bg-bottom-right pointer-events-none z-0"

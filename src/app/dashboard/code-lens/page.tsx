@@ -1,20 +1,15 @@
-// src/app/dashboard/code-lens/page.tsx - COMPLETE WITH MARKET CAP COLUMN
+// src/app/dashboard/code-lens/page.tsx - COMPLETE UPDATED VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import {
-  Search,
-  Plus,
-  SlidersHorizontal,
-  MoreVertical,
-  RefreshCw,
-} from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import TokenActionsMenu from "@/components/dashboard/TokenActionsMenu";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
-import { coinlesService, WatchlistToken } from "@/services/coinlesService";
+import { coinlesService } from "@/services/coinlesService";
+import { useCodeLensContext } from "../layout";
 
 interface Token {
   id: string;
@@ -36,8 +31,9 @@ interface Token {
 export default function CodeLens() {
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { searchQuery, setSearchQuery, setOnAddTokenClick } =
+    useCodeLensContext();
 
-  const [searchQuery, setSearchQuery] = useState("");
   const [tokens, setTokens] = useState<Token[]>([]);
   const [filteredTokens, setFilteredTokens] = useState<Token[]>([]);
   const [activeMenuTokenId, setActiveMenuTokenId] = useState<string | null>(
@@ -48,6 +44,11 @@ export default function CodeLens() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+
+  // Set the add token handler for the layout
+  useEffect(() => {
+    setOnAddTokenClick(() => () => setAddTokensModalOpen(true));
+  }, [setOnAddTokenClick]);
 
   // Load user's watchlist on mount
   useEffect(() => {
@@ -123,7 +124,6 @@ export default function CodeLens() {
   };
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query);
     if (query.trim() === "") {
       setFilteredTokens(tokens);
     } else {
@@ -136,6 +136,11 @@ export default function CodeLens() {
       setFilteredTokens(filtered);
     }
   };
+
+  // Sync search query changes from context
+  useEffect(() => {
+    handleSearch(searchQuery);
+  }, [searchQuery, tokens]);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000000) {
@@ -275,46 +280,9 @@ export default function CodeLens() {
 
   return (
     <div className="h-full bg-[#000000] rounded-[16px] p-4 flex flex-col overflow-hidden">
-      {/* Search Bar */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Search tokens or paste address"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-full bg-black border border-[#2C2C2C] rounded-xl pl-12 pr-14 py-3 text-gray-300 text-sm font-satoshi placeholder-gray-600 focus:outline-none focus:border-[#E2AF19] transition-colors"
-          />
-          <button
-            onClick={() => setAddTokensModalOpen(true)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] p-2 rounded-lg transition-colors"
-            title="Add Tokens"
-          >
-            <Plus className="w-4 h-4 text-black" />
-          </button>
-        </div>
-        {/* <button
-          onClick={handleManualRefresh}
-          disabled={refreshing}
-          className="bg-black border border-[#2C2C2C] hover:border-[#E2AF19] p-3 rounded-xl transition-colors disabled:opacity-50"
-          title="Refresh tokens"
-        >
-          <RefreshCw
-            className={`w-5 h-5 text-white ${refreshing ? "animate-spin" : ""}`}
-          />
-        </button>
-        <button
-          className="bg-black border border-[#2C2C2C] hover:border-[#E2AF19] p-3 rounded-xl transition-colors"
-          title="Filters"
-        >
-          <SlidersHorizontal className="w-5 h-5 text-white" />
-        </button> */}
-      </div>
-
       {/* Token List Table */}
       <div className="flex-1 bg-[#000000] rounded-2xl border border-[#2C2C2C] overflow-hidden flex flex-col">
-        {/* Table Header - UPDATED WITH MARKET CAP */}
+        {/* Table Header */}
         <div className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 bg-[#191919] text-gray-400 text-sm font-satoshi font-medium">
           <div className="flex items-center">Token</div>
           <div className="flex items-center justify-center">Price</div>
@@ -327,7 +295,7 @@ export default function CodeLens() {
           <div className="flex items-center justify-center">Actions</div>
         </div>
 
-        {/* Table Body - UPDATED WITH MARKET CAP */}
+        {/* Table Body */}
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           {filteredTokens.length === 0 ? (
             <div className="flex items-center justify-center h-64">
@@ -403,7 +371,7 @@ export default function CodeLens() {
                   {formatNumber(token.volume24h)}
                 </div>
 
-                {/* Market Cap - NEW COLUMN */}
+                {/* Market Cap */}
                 <div className="flex items-center justify-center text-white font-satoshi text-sm">
                   {formatNumber(token.marketCap)}
                 </div>
