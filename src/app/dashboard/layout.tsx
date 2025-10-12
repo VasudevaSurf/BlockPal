@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED to hide header on swap page
+// src/app/dashboard/layout.tsx - FIXED padding issue for swap page
 "use client";
 
 import { useSelector } from "react-redux";
@@ -31,20 +31,6 @@ export default function DashboardLayout({
     <NavigationLoadingProvider>
       <WalletIntegration>
         <div className="h-screen bg-[#000000] flex flex-col lg:flex-row overflow-hidden relative">
-          {/* Swap Effect Image - Top Right Corner of Application (only on swap page) */}
-          {isSwapPage && (
-            <div className="fixed top-0 right-0 z-[60] pointer-events-none">
-              <img
-                src="/swapEffect.png"
-                alt=""
-                className="w-80 h-80 md:w-96 md:h-96 lg:w-[32rem] lg:h-[32rem] xl:w-[40rem] xl:h-[40rem] 2xl:w-[48rem] 2xl:h-[48rem] opacity-50"
-                style={{
-                  filter: "blur(0px)",
-                }}
-              />
-            </div>
-          )}
-
           {/* Navigation Loading Indicator */}
           <NavigationLoadingIndicator />
 
@@ -91,8 +77,12 @@ export default function DashboardLayout({
             <Sidebar />
           </div>
 
-          {/* Main Content - With padding */}
-          <main className="flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4">
+          {/* Main Content - Conditional padding based on page */}
+          <main
+            className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col ${
+              isSwapPage ? "p-0" : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
+            }`}
+          >
             {/* Global Header - Hide on swap page */}
             {!isSwapPage && (
               <div className="flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2">

@@ -473,7 +473,7 @@ export default function SwapPage() {
       <div className="flex-1 flex flex-col items-center justify-center p-4 relative z-20">
         {/* Title */}
         <div className="mb-8 relative z-20">
-          <h1 className="text-[#E2AF19] text-[30px] font-mayeka text-center">
+          <h1 className="text-[30px] font-mayeka-demi-bold-demo font-bold text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
             Secure and Best Rates Everytime
           </h1>
         </div>
@@ -539,7 +539,7 @@ export default function SwapPage() {
 
             {/* Inner scrollable container */}
             <div className="relative bg-[#000000] rounded-[26px] overflow-hidden">
-              <div className="max-h-[450px] overflow-y-auto custom-scrollbar py-4 px-16">
+              <div className=" py-4 px-16">
                 {/* Chain selector and slippage */}
                 <div className="flex flex-row items-center justify-between mb-4">
                   <button
@@ -1150,7 +1150,7 @@ export default function SwapPage() {
 
                 {/* Quote Info */}
                 {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
-                  <div className="p-3 bg-[#000000] rounded-lg mb-2 text-sm">
+                  <div className="px-1 py-1 bg-[#000000] rounded-lg text-sm">
                     <div className="flex justify-between mb-1">
                       <span className="text-gray-400">Rate:</span>
                       <span className="text-white">
@@ -1161,20 +1161,20 @@ export default function SwapPage() {
                       <span className="text-gray-400">Slippage:</span>
                       <span className="text-white">{slippage}%</span>
                     </div>
-                    <div className="flex justify-between mb-1">
+                    {/* <div className="flex justify-between mb-1">
                       <span className="text-gray-400">
                         Estimated Gas ({gasMode}):
                       </span>
                       <span className="text-white">
                         {gasPrice.gasCostEth} ETH (${gasPrice.gasCostUSD})
                       </span>
-                    </div>
-                    <div className="flex justify-between mb-1">
+                    </div> */}
+                    {/* <div className="flex justify-between mb-1">
                       <span className="text-gray-400">Gas Price:</span>
                       <span className="text-white">
                         {gasPrice.gasPriceGwei} Gwei
                       </span>
-                    </div>
+                    </div> */}
                     <div className="flex justify-between">
                       <span className="text-gray-400">Min Received:</span>
                       <span className="text-white">
@@ -1288,7 +1288,12 @@ export default function SwapPage() {
               animate={{ opacity: 1, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.95, x: 50 }}
               transition={{ type: "spring", damping: 25 }}
-              className="absolute top-1/2 left-1/2 transform -translate-y-1/2 z-30 ml-[150px]"
+              className="fixed z-30"
+              style={{
+                top: "calc(50vh - 160px)",
+                left: "calc(50% + 310px)",
+                transform: "translate(-50%, -50%)",
+              }}
             >
               <div className="relative p-[3px] rounded-[20px] w-[400px] h-[480px]">
                 <div
