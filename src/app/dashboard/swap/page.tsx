@@ -1,4 +1,4 @@
-// src/app/dashboard/swap/page.tsx - Centered Layout Version
+// src/app/dashboard/swap/page.tsx - Complete Updated Version with Select Token Button
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -231,8 +231,12 @@ const TokenImage: React.FC<TokenImageProps> = ({
       <div
         className={`${className} rounded-full flex items-center justify-center bg-[#4A4A4A]`}
         title={name || symbol}
+        style={{ userSelect: "none", pointerEvents: "none" }}
       >
-        <span className="text-white font-bold text-xs text-center px-1">
+        <span
+          className="text-white font-bold text-xs text-center px-1"
+          style={{ userSelect: "none", pointerEvents: "none" }}
+        >
           {firstWord.charAt(0)}
         </span>
       </div>
@@ -246,6 +250,9 @@ const TokenImage: React.FC<TokenImageProps> = ({
       className={`${className} rounded-full object-cover`}
       onError={() => setHasError(true)}
       loading="lazy"
+      draggable={false}
+      style={{ userSelect: "none", pointerEvents: "none" }}
+      onDragStart={(e) => e.preventDefault()}
     />
   );
 };
@@ -267,26 +274,39 @@ const getTokenColorGradient = (symbol: string): string => {
   return colorMap[symbol] || "from-blue-500 to-purple-600";
 };
 
-// Add this CSS to your global styles or as a style tag
+// Scrollbar styles
 const scrollbarStyles = `
   .custom-scrollbar {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
   .custom-scrollbar::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, and Opera */
+    display: none;
   }
   
-  /* Hidden scrollbar for history - scrollable but no indicator */
   .custom-gold-scrollbar {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
   
   .custom-gold-scrollbar::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, and Opera */
+    display: none;
   }
 `;
+
+// NEW: Reusable Button Component that looks like WalletConnectButton
+const SelectTokenButton = ({ onClick }: { onClick: () => void }) => {
+  return (
+    <button
+      onClick={onClick}
+      className="relative w-full h-[50px] rounded-[100px] bg-[#E2AF19] hover:bg-[#D4A853] transition-colors flex items-center justify-center overflow-hidden"
+    >
+      <span className="text-black font-mayeka-bold-demo text-base">
+        Select Tokens
+      </span>
+    </button>
+  );
+};
 
 export default function SwapPage() {
   const [activeTab, setActiveTab] = useState("swap");
@@ -352,6 +372,9 @@ export default function SwapPage() {
 
   const chainDisplayData = getChainDisplayData();
   const currentChainDisplay = chainDisplayData[chainId] || chainDisplayData[1];
+
+  // NEW: Check if both tokens are selected
+  const bothTokensSelected = fromToken && toToken;
 
   const handleSwipeEnd = async (_event: any, info: PanInfo) => {
     const containerWidth = containerRef.current?.offsetWidth || 300;
@@ -437,6 +460,11 @@ export default function SwapPage() {
       document.head.removeChild(style);
     };
   }, []);
+
+  // NEW: Handler to open token selector when button is clicked
+  const handleSelectTokensClick = () => {
+    setShowFromTokenSelector(true);
+  };
 
   return (
     <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] flex flex-col overflow-hidden relative">
@@ -718,11 +746,12 @@ export default function SwapPage() {
                                   key={preset}
                                   onClick={() => {
                                     setSlippage(preset);
-                                    setCustomSlippage(false);
-                                    setShowSlippageSettings(false);
+                                    // Keep customSlippage as true to stay on Custom tab
+                                    setCustomSlippage(true);
+                                    // Don't close the settings modal
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-satoshi transition-all ${
-                                    slippage === preset && !customSlippage
+                                    slippage === preset && customSlippage
                                       ? "bg-[#E2AF19] text-black"
                                       : "bg-[#191919] text-white hover:bg-[#2C2C2C] border border-[#2C2C2C]"
                                   }`}
@@ -761,6 +790,7 @@ export default function SwapPage() {
                                   min="0"
                                   max="49"
                                   step="0.1"
+                                  autoFocus
                                 />
                                 <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">
                                   %
@@ -773,6 +803,14 @@ export default function SwapPage() {
                                 Maximum slippage is 49%
                               </p>
                             )}
+
+                            {/* Close button */}
+                            <button
+                              onClick={() => setShowSlippageSettings(false)}
+                              className="w-full mt-3 px-4 py-2 bg-[#E2AF19] text-black rounded-lg text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                            >
+                              Apply
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -996,7 +1034,7 @@ export default function SwapPage() {
                         Estimated Fee:
                       </span>
                       <span className="text-[#FFFFFF] font-satoshi">
-                        {gasPrice ? `(~$${gasPrice.gasCostUSD})` : "(~$0.00)"}
+                        {gasPrice ? `(~${gasPrice.gasCostUSD})` : "(~$0.00)"}
                       </span>
                     </div>
                     {/* Gas Mode Selection Buttons */}
@@ -1128,15 +1166,6 @@ export default function SwapPage() {
                   </div>
                 </div>
 
-                {/* Error Display */}
-                {/* {quoteError && (
-                  <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg mb-2">
-                    <p className="text-red-400 text-sm font-satoshi">
-                      {quoteError}
-                    </p>
-                  </div>
-                )} */}
-
                 {/* Quote Info */}
                 {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
                   <div className="px-1 py-1 bg-[#000000] rounded-lg text-sm">
@@ -1150,20 +1179,6 @@ export default function SwapPage() {
                       <span className="text-gray-400">Slippage:</span>
                       <span className="text-white">{slippage}%</span>
                     </div>
-                    {/* <div className="flex justify-between mb-1">
-                      <span className="text-gray-400">
-                        Estimated Gas ({gasMode}):
-                      </span>
-                      <span className="text-white">
-                        {gasPrice.gasCostEth} ETH (${gasPrice.gasCostUSD})
-                      </span>
-                    </div> */}
-                    {/* <div className="flex justify-between mb-1">
-                      <span className="text-gray-400">Gas Price:</span>
-                      <span className="text-white">
-                        {gasPrice.gasPriceGwei} Gwei
-                      </span>
-                    </div> */}
                     <div className="flex justify-between">
                       <span className="text-gray-400">Min Received:</span>
                       <span className="text-white">
@@ -1173,12 +1188,17 @@ export default function SwapPage() {
                   </div>
                 )}
 
-                {/* Swap Button */}
+                {/* MODIFIED BUTTON LOGIC */}
                 {!isConnected ? (
+                  // Show wallet connect button when not connected
                   <WalletConnectButton />
+                ) : !bothTokensSelected ? (
+                  // Show "Select Tokens" button when wallet is connected but tokens not selected
+                  <SelectTokenButton onClick={handleSelectTokensClick} />
                 ) : (
+                  // Show sliding swap button when everything is ready
                   <div
-                    className="relative w-full h-[50px] overflow-hidden"
+                    className="relative w-full h-[50px] overflow-hidden animate-pulse-subtle"
                     style={{
                       borderRadius: "100px",
                       background:
@@ -1186,6 +1206,11 @@ export default function SwapPage() {
                     }}
                     ref={containerRef}
                   >
+                    {/* Sliding shimmer animation */}
+                    <div className="absolute inset-0 overflow-hidden">
+                      <div className="shimmer-effect"></div>
+                    </div>
+
                     <motion.div
                       className="absolute left-1 top-1/2 transform -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing"
                       style={{ x }}
@@ -1202,18 +1227,30 @@ export default function SwapPage() {
                       dragConstraints={{ left: 0, right: 350 }}
                       dragElastic={0.1}
                       onDragEnd={handleSwipeEnd}
+                      animate={{
+                        x: [0, 10, 0],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        repeatType: "loop",
+                        ease: "easeInOut",
+                      }}
                     >
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center border-4 border-[#797878]">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center pointer-events-none select-none relative">
+                        {/* Glow effect around draggable icon */}
+                        <div className="absolute inset-0 rounded-full bg-[#E2AF19] opacity-30 blur-md animate-pulse"></div>
+
                         {fromToken ? (
                           <TokenImage
                             src={fromToken.logoURI}
                             alt={fromToken.symbol}
                             symbol={fromToken.symbol}
                             name={fromToken.name}
-                            className="w-6 h-6"
+                            className="w-10 h-10 pointer-events-none select-none relative z-10"
                           />
                         ) : (
-                          <span className="text-white text-xs font-bold">
+                          <span className="text-white text-xs font-bold pointer-events-none select-none relative z-10">
                             E
                           </span>
                         )}
@@ -1221,14 +1258,14 @@ export default function SwapPage() {
                     </motion.div>
 
                     <div className="absolute right-1 top-1/2 transform -translate-y-1/2 z-10">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center border-4 border-white/10">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center">
                         {toToken ? (
                           <TokenImage
                             src={toToken.logoURI}
                             alt={toToken.symbol}
                             symbol={toToken.symbol}
                             name={toToken.name}
-                            className="w-6 h-6"
+                            className="w-10 h-10"
                           />
                         ) : (
                           <span className="text-white text-xs font-bold">
@@ -1238,7 +1275,7 @@ export default function SwapPage() {
                       </div>
                     </div>
 
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <span className="text-white font-mayeka-bold-demo text-base">
                         {swapping ? (
                           <div className="flex items-center gap-2">
@@ -1474,6 +1511,47 @@ export default function SwapPage() {
         }}
         triggerRef={chainButtonRef}
       />
+
+      {/* Custom Styles */}
+      <style jsx>{`
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+
+        .shimmer-effect {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(
+            90deg,
+            rgba(226, 175, 25, 0) 0%,
+            rgba(226, 175, 25, 0.3) 50%,
+            rgba(226, 175, 25, 0) 100%
+          );
+          animation: shimmer 2s infinite;
+        }
+
+        @keyframes pulse-subtle {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.95;
+          }
+        }
+
+        .animate-pulse-subtle {
+          animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+      `}</style>
     </div>
   );
 }

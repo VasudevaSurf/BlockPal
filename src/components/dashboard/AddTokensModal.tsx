@@ -425,10 +425,9 @@ export default function AddTokensModal({
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center"
-        onClick={onClose}
-      >
+      <div className="absolute inset-0 bg-white/10 z-40" onClick={onClose} />
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-">
         {/* Modal positioned in center of screen */}
         <div
           className="h-[550px] mx-4 w-full max-w-4xl"

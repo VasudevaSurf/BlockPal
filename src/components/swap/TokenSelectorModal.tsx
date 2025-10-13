@@ -736,14 +736,20 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                 )}
               </div> */}
 
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto relative min-h-[400px]">
                 {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
+                  // FIXED: Centered loading spinner with absolute positioning
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19]"></div>
+                      <p className="text-gray-400 text-sm font-satoshi">
+                        Loading tokens...
+                      </p>
+                    </div>
                   </div>
                 ) : mainListTokens.length === 0 &&
                   additionalTokens.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="flex flex-col items-center justify-center py-8 text-center absolute inset-0">
                     <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
                       <span className="text-gray-400 text-lg">🪙</span>
                     </div>
@@ -765,7 +771,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                       renderTokenButton(token, index)
                     )}
 
-                    {/* Divider with Expand Button - Only show when there are additional tokens and no search */}
+                    {/* Divider with Expand Button */}
                     {additionalTokens.length > 0 && !searchQuery && (
                       <div className="py-2">
                         <button
