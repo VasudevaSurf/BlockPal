@@ -1,4 +1,4 @@
-// src/components/dashboard/AddTokensModal.tsx - CENTERED WITHIN PAGE
+// src/components/dashboard/AddTokensModal.tsx - FIXED VERSION
 import { useState, useEffect, useRef } from "react";
 import { X, Search, Loader2 } from "lucide-react";
 import { useSelector } from "react-redux";
@@ -236,6 +236,7 @@ export default function AddTokensModal({
       setSelectedTokens(new Set());
       setSelectedChain("eth");
       setSearchResults([]);
+      setSearchLoading(false);
     }
   }, [isOpen]);
 
@@ -271,62 +272,101 @@ export default function AddTokensModal({
     }
   }, [selectedChain, isOpen, searchQuery]);
 
-  // Clear search when chain changes
+  // FIXED: Clear search when chain changes
   useEffect(() => {
     if (isOpen) {
-      setSearchQuery("");
-      setSearchResults([]);
-    }
-  }, [selectedChain]);
+      console.log(`🔄 Chain changed to: ${selectedChain}`);
 
-  // Debounced search
+      // Clear search query
+      setSearchQuery("");
+
+      // Clear search results
+      setSearchResults([]);
+
+      // Stop any loading state
+      setSearchLoading(false);
+
+      // Clear any pending debounce timer
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+        setSearchDebounceTimer(null);
+      }
+
+      // Load popular tokens for new chain
+      const tokens = getPopularTokensForChain(selectedChain);
+      setPopularTokens(tokens);
+
+      console.log(
+        `✅ Chain switch complete - showing ${tokens.length} popular tokens`
+      );
+    }
+  }, [selectedChain, isOpen]);
+
+  // FIXED: Debounced search with better error handling
   useEffect(() => {
+    // Clear existing timer
     if (searchDebounceTimer) {
       clearTimeout(searchDebounceTimer);
     }
 
-    if (searchQuery.trim().length > 0) {
-      const timer = setTimeout(() => {
-        handleSearch(searchQuery.trim());
-      }, 500);
-      setSearchDebounceTimer(timer);
-    } else {
+    // If search query is empty, show popular tokens
+    if (searchQuery.trim().length === 0) {
       setSearchResults([]);
-      const tokens = getPopularTokensForChain(selectedChain);
-      setPopularTokens(tokens);
-    }
-
-    return () => {
-      if (searchDebounceTimer) {
-        clearTimeout(searchDebounceTimer);
-      }
-    };
-  }, [searchQuery, selectedChain]);
-
-  const handleSearch = async (query: string) => {
-    if (!query) {
-      setSearchResults([]);
+      setSearchLoading(false);
       const tokens = getPopularTokensForChain(selectedChain);
       setPopularTokens(tokens);
       return;
     }
 
+    // Set new timer for search
+    const timer = setTimeout(() => {
+      handleSearch(searchQuery.trim());
+    }, 500);
+
+    setSearchDebounceTimer(timer);
+
+    // Cleanup
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [searchQuery, selectedChain]);
+
+  const handleSearch = async (query: string) => {
+    if (!query || query.trim().length === 0) {
+      setSearchResults([]);
+      const tokens = getPopularTokensForChain(selectedChain);
+      setPopularTokens(tokens);
+      setSearchLoading(false);
+      return;
+    }
+
     try {
       setSearchLoading(true);
-      console.log("Searching for:", query, "on chain:", selectedChain);
+      setPopularTokens([]); // Clear popular tokens when searching
+
+      console.log(`🔍 Searching for: "${query}" on chain: ${selectedChain}`);
 
       const results = await coinlesService.searchTokens(selectedChain, query);
 
+      console.log(`📊 Search results for ${selectedChain}:`, {
+        query,
+        resultCount: results?.length || 0,
+        hasResults: results && results.length > 0,
+      });
+
       if (results && results.length > 0) {
         setSearchResults(results);
-        setPopularTokens([]);
-        console.log("Search results:", results.length, "tokens found");
+        console.log(
+          `✅ ${results.length} tokens found for "${query}" on ${selectedChain}`
+        );
       } else {
         setSearchResults([]);
-        console.log("No search results found");
+        console.log(`⚠️ No results found for "${query}" on ${selectedChain}`);
       }
     } catch (error) {
-      console.error("Error searching tokens:", error);
+      console.error(`❌ Error searching tokens on ${selectedChain}:`, error);
       setSearchResults([]);
     } finally {
       setSearchLoading(false);
