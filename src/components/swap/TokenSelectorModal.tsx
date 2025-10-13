@@ -462,6 +462,8 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   return (
     <>
       {/* Backdrop */}
+      <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
+
       <div
         className="fixed inset-0 z-50 flex items-center justify-center"
         onClick={onClose}

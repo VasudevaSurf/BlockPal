@@ -277,29 +277,14 @@ const scrollbarStyles = `
     display: none; /* Chrome, Safari, and Opera */
   }
   
-  /* Gold scrollbar for history */
-  .custom-gold-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  .custom-gold-scrollbar::-webkit-scrollbar-track {
-    background: #2C2C2C;
-    border-radius: 10px;
-  }
-  
-  .custom-gold-scrollbar::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #E2AF19 0%, #D4A853 100%);
-    border-radius: 10px;
-  }
-  
-  .custom-gold-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, #D4A853 0%, #E2AF19 100%);
-  }
-  
-  /* Firefox */
+  /* Hidden scrollbar for history - scrollable but no indicator */
   .custom-gold-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: #E2AF19 #2C2C2C;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  .custom-gold-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, and Opera */
   }
 `;
 
@@ -1367,7 +1352,7 @@ export default function SwapPage() {
                               <div className="flex flex-col items-start gap-2">
                                 <div className="flex items-start">
                                   <span className="text-white text-[14px] font-satoshi">
-                                    {transactionType} Token
+                                    Buy Token
                                   </span>
                                 </div>
                                 <div className="flex flex-row gap-2">

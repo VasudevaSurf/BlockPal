@@ -66,7 +66,6 @@ export default function AIChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // const menuRef = useRef<HTMLDivElement>(null);
 
   const [loadingConversationId, setLoadingConversationId] = useState<
     string | null
@@ -76,20 +75,42 @@ export default function AIChatPage() {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
 
-  // Suggestion chips data
+  // Suggestion chips data with display text and actual query
   const suggestionChips = [
-    "Analyze BTC",
-    "Check ETH security",
-    "Compare Bitcoin vs Ethereum",
-    "Analyze my wallet",
-    "What's trending in DeFi?",
-    "Chart analysis for LINK",
-    "Token security for SHIB",
-    "Portfolio insights",
-    "Market sentiment today",
-    "Best altcoins 2025",
-    "Crypto news summary",
-    "Gas fees prediction",
+    { display: "Tell me about UNI", query: "Tell me about UNI" },
+    { display: "Is BONK safe to invert", query: "Is BONK safe to invert" },
+    {
+      display: "Do Reploy as honey pot alert",
+      query: "Do Reploy as honey pot alert",
+    },
+    {
+      display: "Get market data of 0x51...86CA",
+      query: "Get market data of 0x514910771AF9Ca656af840dff83E8264EcF986CA",
+    },
+    {
+      display: "Perform chat analysis for PEPE",
+      query: "Perform chat analysis for PEPE",
+    },
+    {
+      display: "What are closest support levels of WBTC",
+      query: "What are closest support levels of WBTC",
+    },
+    {
+      display: "Is it right time to buy LINK",
+      query: "Is it right time to buy LINK",
+    },
+    { display: "Compare PEPE and BONK", query: "Compare PEPE and BONK" },
+    {
+      display: "Analyze this wallet 0xEDe....236F",
+      query: "Analyze this wallet 0xEDe9937Bc032d0D403d15E844a67fd4F726B236F",
+    },
+    {
+      display: "List the top trades on 0xEDe....236F",
+      query:
+        "List the top trades on 0xEDe9937Bc032d0D403d15E844a67fd4F726B236F",
+    },
+    { display: "Tell me about yourself", query: "Tell me about yourself" },
+    { display: "Gas fees prediction", query: "Gas fees prediction" },
   ];
 
   // Get authenticated user from Redux
@@ -137,15 +158,15 @@ export default function AIChatPage() {
           setIsListening(false);
 
           if (event.error === "not-allowed") {
-            setError(
+            console.log(
               "Microphone access denied. Please allow microphone access."
             );
           } else if (event.error === "no-speech") {
-            setError("No speech detected. Please try again.");
+            console.log("No speech detected. Please try again.");
           } else {
-            setError("Voice recognition error. Please try again.");
+            console.log("Voice recognition error. Please try again.");
           }
-          setTimeout(() => setError(null), 3000);
+          setTimeout(() => console.log(null), 3000);
         };
 
         recognitionInstance.onend = () => {
@@ -837,8 +858,8 @@ export default function AIChatPage() {
     return formatted;
   };
 
-  const handleChipClick = (chipText: string) => {
-    setInputMessage(chipText);
+  const handleChipClick = (chip: { display: string; query: string }) => {
+    setInputMessage(chip.query);
     // Focus the input after setting the message
     if (inputRef.current) {
       inputRef.current.focus();
@@ -918,14 +939,6 @@ export default function AIChatPage() {
           {showWelcomeScreen ? (
             /* Welcome Screen */
             <div className="h-full flex flex-col items-center justify-center -mt-5">
-              {/* <div className="mb-2">
-                <img
-                  src="/AImiddleImage.png"
-                  alt="Lumen AI"
-                  className="w-45 h-45 object-contain"
-                />
-              </div> */}
-
               <h1 className="text-[35px] font-mayeka-demi-bold-demo font-bold mb-10 text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
                 Chat with Lumen
               </h1>
@@ -939,7 +952,7 @@ export default function AIChatPage() {
                       className="px-3 py-1.5 text-white text-xs font-satoshi rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
                       disabled={isTyping || !isInitialized}
                     >
-                      {chip}
+                      {chip.display}
                     </button>
                   ))}
                 </div>
@@ -952,18 +965,27 @@ export default function AIChatPage() {
                 <div key={message.id} className="flex flex-col space-y-2">
                   {message.type === "assistant" ? (
                     <div className="flex flex-col items-start space-y-2">
-                      <div className="max-w-4xl bg-black/40 backdrop-blur-md p-4 rounded-xl border border-[#F9EFD1]/30">
-                        {message.processing && !message.content ? (
+                      {message.processing && !message.content ? (
+                        <div className="max-w-4xl bg-black/40 backdrop-blur-md p-4 rounded-xl">
                           <div className="flex items-center space-x-2">
-                            {/* <RefreshCw
-                              size={16}
-                              className="text-[#E2AF19] animate-spin"
-                            /> */}
-                            <span className="text-[#F9EFD1] text-sm font-satoshi">
-                              Lumen AI is thinking...
-                            </span>
+                            <div className="flex space-x-1">
+                              <div
+                                className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
+                                style={{ animationDelay: "0ms" }}
+                              ></div>
+                              <div
+                                className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
+                                style={{ animationDelay: "150ms" }}
+                              ></div>
+                              <div
+                                className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
+                                style={{ animationDelay: "300ms" }}
+                              ></div>
+                            </div>
                           </div>
-                        ) : (
+                        </div>
+                      ) : (
+                        <div className="max-w-4xl bg-black/40 backdrop-blur-md p-4 rounded-xl border border-[#F9EFD1]/30">
                           <div className="text-[#F9EFD1] text-sm leading-relaxed font-satoshi">
                             <div
                               className="message-content"
@@ -974,24 +996,9 @@ export default function AIChatPage() {
                             {message.typing && (
                               <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
                             )}
-
-                            {/* {message.functionCalls &&
-                              message.functionCalls.length > 0 &&
-                              !message.typing && (
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                  {message.functionCalls.map((func, idx) => (
-                                    <span
-                                      key={idx}
-                                      className="text-xs bg-[#E2AF19]/20 text-[#E2AF19] px-2 py-1 rounded"
-                                    >
-                                      {func.replace("_", " ")}
-                                    </span>
-                                  ))}
-                                </div>
-                              )} */}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex justify-end">
@@ -1024,7 +1031,7 @@ export default function AIChatPage() {
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
               {/* Attachment Icon */}
-              <button
+              {/* <button
                 className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
                 disabled={isTyping || !isInitialized}
               >
@@ -1040,7 +1047,7 @@ export default function AIChatPage() {
                     fill="#939393"
                   />
                 </svg>
-              </button>
+              </button> */}
 
               {/* Microphone Icon */}
               <button
@@ -1212,6 +1219,16 @@ export default function AIChatPage() {
               {/* Saved Conversations - filter out current conversation */}
               {conversations
                 .filter((conv) => conv.id !== conversationId)
+                .sort((a, b) => {
+                  // Starred conversations come first
+                  if (a.isStarred && !b.isStarred) return -1;
+                  if (!a.isStarred && b.isStarred) return 1;
+                  // If both starred or both not starred, sort by timestamp (most recent first)
+                  return (
+                    new Date(b.timestamp).getTime() -
+                    new Date(a.timestamp).getTime()
+                  );
+                })
                 .map((conversation) => (
                   <div
                     key={conversation.id}
@@ -1268,10 +1285,6 @@ export default function AIChatPage() {
                           <div className="flex items-center gap-2">
                             {loadingConversationId === conversation.id ? (
                               <>
-                                {/* <RefreshCw
-                                  size={12}
-                                  className="text-[#E2AF19] animate-spin flex-shrink-0"
-                                /> */}
                                 <span className="text-gray-300 text-sm font-medium line-clamp-1">
                                   Loading...
                                 </span>
