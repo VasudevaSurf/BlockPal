@@ -1,4 +1,4 @@
-// src/components/swap/TokenSelectorModal.tsx - Fixed Version
+// src/components/swap/TokenSelectorModal.tsx - FIXED POSITIONING
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -122,12 +122,10 @@ const ChainIcon: React.FC<ChainIconProps> = ({
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
-      {/* Dark background while loading or on error */}
       {(!imageLoaded || imageError) && (
         <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
       )}
 
-      {/* Actual Image - no background when loaded successfully */}
       {chainData.image && !imageError && (
         <img
           src={chainData.image}
@@ -141,7 +139,6 @@ const ChainIcon: React.FC<ChainIconProps> = ({
         />
       )}
 
-      {/* Only show fallback icon if image fails to load */}
       {imageError && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
@@ -171,7 +168,6 @@ const TokenImage = ({
 }) => {
   const [hasError, setHasError] = React.useState(false);
 
-  // Get only the first letter of the symbol or name
   const getFirstLetter = () => {
     const text = symbol || name || "?";
     return text.charAt(0).toUpperCase();
@@ -200,24 +196,6 @@ const TokenImage = ({
   );
 };
 
-interface TokenBalance {
-  id: string;
-  symbol: string;
-  name: string;
-  contractAddress: string;
-  decimals: number;
-  balance: number;
-  balanceWei: string;
-  value: number;
-  change24h: number;
-  price: number;
-  isNative: boolean;
-  logoUrl?: string | null;
-  isPopular?: boolean;
-  possibleSpam?: boolean;
-  verifiedContract?: boolean;
-}
-
 interface TokenSelectorProps {
   isOpen: boolean;
   onClose: () => void;
@@ -243,24 +221,18 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const chainDisplayData = getChainDisplayData();
-  const currentChain = chains.find((c) => c.id === selectedChain);
-  const currentChainDisplay =
-    chainDisplayData[selectedChain] || chainDisplayData[1];
 
-  // IMPORTANT FIX: Sync selectedChain with actual chainId changes
   useEffect(() => {
     setSelectedChain(chainId);
   }, [chainId]);
 
-  // Clear search and tokens when chain changes
   useEffect(() => {
     if (isOpen) {
-      setSearchQuery(""); // Clear search when chain changes
-      setTokens([]); // Clear tokens to force reload
+      setSearchQuery("");
+      setTokens([]);
     }
   }, [selectedChain]);
 
-  // Load tokens when modal opens or dependencies change
   useEffect(() => {
     if (isOpen) {
       if (searchTimeoutRef.current) {
@@ -282,15 +254,12 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     }
   }, [isOpen, selectedChain, searchQuery, isConnected, address]);
 
-  // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
-      // Reset search when modal closes
       setSearchQuery("");
     }
   }, [isOpen]);
 
-  // Focus search input when modal opens
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       setTimeout(() => {
@@ -305,7 +274,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
       let fetchedTokens = [];
 
       if (searchQuery.trim()) {
-        // When there's a search query, search ALL tokens via 1inch API
         console.log(
           `🔍 Searching all tokens for: ${searchQuery} on chain ${selectedChain}`
         );
@@ -328,7 +296,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
             token.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         }));
 
-        // If user is connected, also get their balances for these tokens
         if (isConnected && address && fetchedTokens.length > 0) {
           try {
             const walletResponse = await tokenService.getWalletTokens(
@@ -337,7 +304,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
               true
             );
 
-            // Merge balance data with search results
             const walletTokensMap = new Map(
               walletResponse.tokens.map((t: any) => [
                 t.contractAddress.toLowerCase(),
@@ -359,7 +325,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
               return token;
             });
 
-            // Sort to show tokens with balance first
             fetchedTokens.sort((a: any, b: any) => {
               if (a.balance > 0 && b.balance === 0) return -1;
               if (a.balance === 0 && b.balance > 0) return 1;
@@ -370,7 +335,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
           }
         }
       } else {
-        // No search query - show user's wallet tokens if connected, otherwise show popular tokens
         if (isConnected && address) {
           console.log(`📦 Loading wallet tokens for chain ${selectedChain}`);
           const response = await tokenService.getWalletTokens(
@@ -380,7 +344,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
           );
           fetchedTokens = response.tokens || [];
         } else {
-          // Show popular tokens from 1inch when not connected
           console.log(`📦 Loading popular tokens for chain ${selectedChain}`);
           const popularTokens = await swapService.searchTokens(selectedChain);
           fetchedTokens = popularTokens.slice(0, 20).map((token: any) => ({
@@ -410,9 +373,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     }
   };
 
-  // FIXED: Handle token selection with proper address formatting
   const handleTokenSelect = (token: any) => {
-    // Convert to expected format for swap
     const formattedToken = {
       address:
         token.contractAddress === "native"
@@ -461,26 +422,25 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
+      {/* Backdrop - CHANGED: Now uses absolute positioning */}
+      <div className="absolute inset-0 bg-white/10 z-40" onClick={onClose} />
 
+      {/* Modal Container - CHANGED: Now uses absolute positioning and centers within parent */}
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center"
+        className="absolute inset-0 z-50 flex items-center justify-center p-4"
         onClick={onClose}
       >
-        {/* Modal positioned in center of screen */}
+        {/* Modal Content */}
         <div
-          className={`h-[550px] mx-4 ${
+          className={`h-[550px] ${
             showChainSelector ? "w-full max-w-4xl" : "w-full max-w-2xl"
           }`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Main container */}
           <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden">
             {/* Left Side - Chains */}
             {showChainSelector && (
               <div className="w-1/3 p-5">
-                {/* Main heading for the entire left section */}
                 <div className="mb-8">
                   <h2 className="text-white font-mayeka text-xl">
                     Select a Token
@@ -488,8 +448,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between mb-4">
-                  {/* Networks section with gradient border */}
-                  <div className="relative p-[2px] rounded-[12px] w-full ">
+                  <div className="relative p-[2px] rounded-[12px] w-full">
                     <div
                       className="absolute inset-0 rounded-[12px]"
                       style={{
@@ -530,7 +489,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                               className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
                                 isSelected
                                   ? "bg-[#71570C]"
-                                  : " hover:bg-[#1A1A1A]"
+                                  : "hover:bg-[#1A1A1A]"
                               }`}
                             >
                               <div className="flex items-center gap-3">
@@ -559,15 +518,12 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                 showChainSelector ? "flex-1" : "w-full"
               }`}
             >
-              {/* Header with title and close button */}
               <div className="flex justify-between items-center mb-5">
-                {/* Show title only when chain selector is hidden */}
                 {!showChainSelector && (
                   <h2 className="text-white font-mayeka text-xl">
                     Select a Token
                   </h2>
                 )}
-                {/* Close Button */}
                 <button
                   onClick={onClose}
                   className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg ml-auto"
@@ -575,7 +531,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                   <X size={20} />
                 </button>
               </div>
-              {/* Search Bar */}
+
               <div className="relative mb-5">
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
                   <Search size={16} className="text-gray-400" />
@@ -589,7 +545,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                   className="w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
                 />
               </div>
-              {/* Dynamic Heading */}
+
               <div className="mb-4">
                 <h4 className="text-[#939393] font-satoshi font-medium text-base">
                   {searchQuery
@@ -599,7 +555,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                     : "Popular Tokens"}
                 </h4>
               </div>
-              {/* Token List */}
+
               <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
@@ -674,7 +630,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                   </div>
                 )}
               </div>
-              9
             </div>
           </div>
         </div>

@@ -229,7 +229,7 @@ const TokenImage: React.FC<TokenImageProps> = ({
     const firstWord = getFirstWord();
     return (
       <div
-        className={`${className} rounded-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600`}
+        className={`${className} rounded-full flex items-center justify-center bg-[#4A4A4A]`}
         title={name || symbol}
       >
         <span className="text-white font-bold text-xs text-center px-1">
