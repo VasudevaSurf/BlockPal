@@ -1,4 +1,4 @@
-// src/components/NewsChatPage.tsx - FIXED VERSION with proper URL rendering
+// src/components/NewsChatPage.tsx - WITH SUGGESTION CHIPS AND MICROPHONE
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -20,9 +20,121 @@ export default function NewsChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState<any>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Suggestion chips for news-related queries
+  const suggestionChips = [
+    {
+      display: "Latest Bitcoin news",
+      query: "What's the latest Bitcoin news?",
+    },
+    {
+      display: "Ethereum price trends",
+      query: "What are the Ethereum price trends?",
+    },
+    {
+      display: "Top crypto gainers today",
+      query: "What are the top crypto gainers today?",
+    },
+    { display: "DeFi market updates", query: "Give me DeFi market updates" },
+    {
+      display: "NFT market analysis",
+      query: "What's happening in the NFT market?",
+    },
+    { display: "Altcoin news", query: "Tell me about recent altcoin news" },
+    {
+      display: "Crypto regulations",
+      query: "What are the latest crypto regulations?",
+    },
+    {
+      display: "Market sentiment today",
+      query: "What's the market sentiment today?",
+    },
+    {
+      display: "Top trending tokens",
+      query: "What are the top trending tokens?",
+    },
+    {
+      display: "Blockchain innovations",
+      query: "Tell me about recent blockchain innovations",
+    },
+    {
+      display: "Crypto security news",
+      query: "What's new in crypto security?",
+    },
+    {
+      display: "Stablecoin updates",
+      query: "Give me stablecoin market updates",
+    },
+  ];
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition ||
+        (window as any).webkitSpeechRecognition;
+
+      if (SpeechRecognition) {
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.continuous = false;
+        recognitionInstance.interimResults = true;
+        recognitionInstance.lang = "en-US";
+
+        recognitionInstance.onstart = () => {
+          setIsListening(true);
+          console.log("🎤 Voice recognition started");
+        };
+
+        recognitionInstance.onresult = (event: any) => {
+          let finalTranscript = "";
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + " ";
+            }
+          }
+
+          if (finalTranscript) {
+            setInputMessage((prev) => prev + finalTranscript);
+          }
+        };
+
+        recognitionInstance.onerror = (event: any) => {
+          console.error("❌ Speech recognition error:", event.error);
+          setIsListening(false);
+
+          if (event.error === "not-allowed") {
+            setError(
+              "Microphone access denied. Please allow microphone access."
+            );
+          } else if (event.error === "no-speech") {
+            setError("No speech detected. Please try again.");
+          } else {
+            setError("Voice recognition error. Please try again.");
+          }
+          setTimeout(() => setError(null), 3000);
+        };
+
+        recognitionInstance.onend = () => {
+          setIsListening(false);
+          console.log("🎤 Voice recognition ended");
+          if (inputRef.current) {
+            inputRef.current.focus();
+          }
+        };
+
+        setRecognition(recognitionInstance);
+      } else {
+        console.warn("⚠️ Speech recognition not supported in this browser");
+      }
+    }
+  }, []);
 
   // Auto scroll
   useEffect(() => {
@@ -30,6 +142,27 @@ export default function NewsChatPage() {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  const toggleMicrophone = () => {
+    if (!recognition) {
+      setError("Voice recognition is not supported in your browser");
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    if (isListening) {
+      recognition.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error("Error starting recognition:", error);
+        setError("Failed to start voice recognition");
+        setTimeout(() => setError(null), 3000);
+      }
+    }
+  };
 
   const typeMessage = (fullText: string, messageId: string) => {
     return new Promise<void>((resolve) => {
@@ -94,6 +227,9 @@ export default function NewsChatPage() {
       setMessages([]);
       setConversationId("");
       setIsTyping(false);
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
       return;
     }
 
@@ -132,7 +268,6 @@ export default function NewsChatPage() {
       const data = await response.json();
       console.log("📦 News AI Response received:", data);
 
-      // Set conversation ID if this is a new conversation
       if (data.conversationId && !conversationId) {
         console.log("📝 Setting conversation ID:", data.conversationId);
         setConversationId(data.conversationId);
@@ -193,6 +328,11 @@ export default function NewsChatPage() {
       setError(error.message);
     } finally {
       setIsTyping(false);
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
     }
   };
 
@@ -203,21 +343,24 @@ export default function NewsChatPage() {
     }
   };
 
-  // IMPROVED: Format message content with proper markdown link rendering
+  const handleChipClick = (chip: { display: string; query: string }) => {
+    setInputMessage(chip.query);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   const formatMessageContent = (content: string) => {
-    // First convert markdown bold and italic
     let formatted = content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
       .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>');
 
-    // Convert markdown links [text](url) to clickable HTML links
     formatted = formatted.replace(
       /\[([^\]]+)\]\(([^)]+)\)/g,
       '<a href="$2" target="_blank" rel="noopener noreferrer" class="news-link">$1</a>'
     );
 
-    // Convert newlines to <br>
     formatted = formatted.replace(/\n/g, "<br>");
 
     return formatted;
@@ -241,15 +384,25 @@ export default function NewsChatPage() {
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 min-h-0">
           {showWelcomeScreen ? (
-            /* Welcome Screen */
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <h1 className="text-[35px] font-mayeka-demi-bold-demo font-bold text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
-                  News AI Chat
-                </h1>
-                <p className="text-[#999999] text-[14px] font-satoshi">
-                  Ask questions about crypto news and market insights
-                </p>
+            /* Welcome Screen with Suggestion Chips */
+            <div className="h-full flex flex-col items-center justify-center -mt-5">
+              <h1 className="text-[35px] font-mayeka-demi-bold-demo font-bold mb-10 text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
+                News AI Chat
+              </h1>
+
+              <div className="w-full max-w-2xl mx-auto mb-16">
+                <div className="flex flex-wrap justify-center gap-2 px-4">
+                  {suggestionChips.map((chip, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleChipClick(chip)}
+                      className="px-3 py-1.5 text-white text-xs font-satoshi rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
+                      disabled={isTyping}
+                    >
+                      {chip.display}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
@@ -262,13 +415,20 @@ export default function NewsChatPage() {
                       <div className="max-w-4xl bg-black/40 backdrop-blur-md p-4 rounded-xl border border-[#F9EFD1]/30">
                         {message.processing && !message.content ? (
                           <div className="flex items-center space-x-2">
-                            <RefreshCw
-                              size={16}
-                              className="text-[#E2AF19] animate-spin"
-                            />
-                            <span className="text-[#F9EFD1] text-sm font-satoshi">
-                              Analyzing news...
-                            </span>
+                            <div className="flex space-x-1">
+                              <div
+                                className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
+                                style={{ animationDelay: "0ms" }}
+                              ></div>
+                              <div
+                                className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
+                                style={{ animationDelay: "150ms" }}
+                              ></div>
+                              <div
+                                className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
+                                style={{ animationDelay: "300ms" }}
+                              ></div>
+                            </div>
                           </div>
                         ) : (
                           <div className="text-[#F9EFD1] text-sm leading-relaxed font-satoshi">
@@ -328,58 +488,80 @@ export default function NewsChatPage() {
               disabled={isTyping}
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-              {/* Attachment Icon */}
-              <button
-                className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
-                disabled={isTyping}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="20"
-                  viewBox="0 0 22 24"
-                  fill="none"
-                >
-                  <path
-                    d="M1.6013e-06 12.0617C-0.000352729 12.2597 0.0581042 12.4534 0.167961 12.6182C0.277818 12.783 0.434128 12.9114 0.617075 12.9873C0.800022 13.0631 1.00137 13.0829 1.19558 13.0442C1.3898 13.0054 1.56814 12.9099 1.708 12.7697L10.898 3.57569C11.8358 2.63788 13.1077 2.11103 14.434 2.11103C15.0907 2.11103 15.741 2.24037 16.3477 2.49168C16.9544 2.74299 17.5056 3.11133 17.97 3.57569C18.4344 4.04004 18.8027 4.59131 19.054 5.19802C19.3053 5.80472 19.4347 6.45499 19.4347 7.11169C19.4347 7.76838 19.3053 8.41865 19.054 9.02535C18.8027 9.63206 18.4344 10.1833 17.97 10.6477L7.364 21.2537C6.9868 21.618 6.48159 21.8196 5.9572 21.815C5.43281 21.8105 4.93118 21.6001 4.56036 21.2293C4.18955 20.8585 3.97921 20.3569 3.97465 19.8325C3.9701 19.3081 4.17169 18.8029 4.536 18.4257L15.142 7.81969C15.235 7.72671 15.3087 7.61633 15.359 7.49485C15.4094 7.37337 15.4353 7.24317 15.4353 7.11169C15.4353 6.9802 15.4094 6.85 15.359 6.72852C15.3087 6.60704 15.235 6.49666 15.142 6.40369C15.049 6.31071 14.9386 6.23696 14.8172 6.18664C14.6957 6.13632 14.5655 6.11042 14.434 6.11042C14.3025 6.11042 14.1723 6.13632 14.0508 6.18664C13.9294 6.23696 13.819 6.31071 13.726 6.40369L3.12 17.0117C2.73796 17.3807 2.43323 17.8221 2.2236 18.3101C2.01396 18.7981 1.90362 19.323 1.899 19.8541C1.89438 20.3852 1.99559 20.9119 2.19672 21.4035C2.39784 21.8951 2.69485 22.3417 3.07042 22.7173C3.44599 23.0928 3.8926 23.3898 4.38419 23.591C4.87577 23.7921 5.40249 23.8933 5.93361 23.8887C6.46472 23.8841 6.9896 23.7737 7.47762 23.5641C7.96564 23.3545 8.40701 23.0497 8.776 22.6677L19.382 12.0617C20.6948 10.7489 21.4324 8.9683 21.4324 7.11169C21.4324 5.25507 20.6948 3.47451 19.382 2.16169C18.0692 0.848864 16.2886 0.111328 14.432 0.111328C12.5754 0.111328 10.7948 0.848864 9.482 2.16169L0.294002 11.3537C0.201198 11.4467 0.127642 11.5571 0.0775382 11.6786C0.0274348 11.8001 -0.000233093 11.9303 1.6013e-06 12.0617Z"
-                    fill="#939393"
-                  />
-                </svg>
-              </button>
-
               {/* Microphone Icon */}
               <button
-                className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
+                onClick={toggleMicrophone}
+                className={`p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 ${
+                  isListening ? "bg-red-500/20" : ""
+                }`}
                 disabled={isTyping}
+                title={isListening ? "Stop recording" : "Start voice input"}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="25"
-                  height="25"
-                  viewBox="0 0 31 30"
-                  fill="none"
-                >
-                  <path
-                    d="M15.4324 20.3125C12.1574 20.3125 9.49487 17.65 9.49487 14.375V7.5C9.49487 4.225 12.1574 1.5625 15.4324 1.5625C18.7074 1.5625 21.3699 4.225 21.3699 7.5V14.375C21.3699 17.65 18.7074 20.3125 15.4324 20.3125ZM15.4324 3.4375C13.1949 3.4375 11.3699 5.2625 11.3699 7.5V14.375C11.3699 16.6125 13.1949 18.4375 15.4324 18.4375C17.6699 18.4375 19.4949 16.6125 19.4949 14.375V7.5C19.4949 5.2625 17.6699 3.4375 15.4324 3.4375Z"
-                    fill="#939393"
-                  />
-                  <path
-                    d="M15.4324 24.6875C9.64487 24.6875 4.93237 19.975 4.93237 14.1875V12.0625C4.93237 11.55 5.35737 11.125 5.86987 11.125C6.38237 11.125 6.80737 11.55 6.80737 12.0625V14.1875C6.80737 18.9375 10.6824 22.8125 15.4324 22.8125C20.1824 22.8125 24.0574 18.9375 24.0574 14.1875V12.0625C24.0574 11.55 24.4824 11.125 24.9949 11.125C25.5074 11.125 25.9324 11.55 25.9324 12.0625V14.1875C25.9324 19.975 21.2199 24.6875 15.4324 24.6875Z"
-                    fill="#939393"
-                  />
-                  <path
-                    d="M17.1698 8.97539C17.0698 8.97539 16.9573 8.96289 16.8448 8.92539C15.9323 8.58789 14.9323 8.58789 14.0198 8.92539C13.5323 9.10039 12.9948 8.85039 12.8198 8.36289C12.6448 7.87539 12.8948 7.33789 13.3823 7.16289C14.7073 6.68789 16.1698 6.68789 17.4948 7.16289C17.9823 7.33789 18.2323 7.87539 18.0573 8.36289C17.9073 8.73789 17.5448 8.97539 17.1698 8.97539Z"
-                    fill="#939393"
-                  />
-                  <path
-                    d="M16.4323 11.6254C16.3448 11.6254 16.2698 11.6129 16.1823 11.5879C15.6823 11.4504 15.1698 11.4504 14.6698 11.5879C14.1698 11.7254 13.6573 11.4254 13.5198 10.9254C13.3823 10.4379 13.6823 9.92539 14.1823 9.78789C14.9948 9.56289 15.8698 9.56289 16.6823 9.78789C17.1823 9.92539 17.4823 10.4379 17.3448 10.9379C17.2323 11.3504 16.8448 11.6254 16.4323 11.6254Z"
-                    fill="#939393"
-                  />
-                  <path
-                    d="M15.4324 28.4375C14.9199 28.4375 14.4949 28.0125 14.4949 27.5V23.75C14.4949 23.2375 14.9199 22.8125 15.4324 22.8125C15.9449 22.8125 16.3699 23.2375 16.3699 23.75V27.5C16.3699 28.0125 15.9449 28.4375 15.4324 28.4375Z"
-                    fill="#939393"
-                  />
-                </svg>
+                {isListening ? (
+                  <div className="relative">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="25"
+                      height="25"
+                      viewBox="0 0 31 30"
+                      fill="none"
+                    >
+                      <path
+                        d="M15.4324 20.3125C12.1574 20.3125 9.49487 17.65 9.49487 14.375V7.5C9.49487 4.225 12.1574 1.5625 15.4324 1.5625C18.7074 1.5625 21.3699 4.225 21.3699 7.5V14.375C21.3699 17.65 18.7074 20.3125 15.4324 20.3125ZM15.4324 3.4375C13.1949 3.4375 11.3699 5.2625 11.3699 7.5V14.375C11.3699 16.6125 13.1949 18.4375 15.4324 18.4375C17.6699 18.4375 19.4949 16.6125 19.4949 14.375V7.5C19.4949 5.2625 17.6699 3.4375 15.4324 3.4375Z"
+                        fill="#EF4444"
+                      />
+                      <path
+                        d="M15.4324 24.6875C9.64487 24.6875 4.93237 19.975 4.93237 14.1875V12.0625C4.93237 11.55 5.35737 11.125 5.86987 11.125C6.38237 11.125 6.80737 11.55 6.80737 12.0625V14.1875C6.80737 18.9375 10.6824 22.8125 15.4324 22.8125C20.1824 22.8125 24.0574 18.9375 24.0574 14.1875V12.0625C24.0574 11.55 24.4824 11.125 24.9949 11.125C25.5074 11.125 25.9324 11.55 25.9324 12.0625V14.1875C25.9324 19.975 21.2199 24.6875 15.4324 24.6875Z"
+                        fill="#EF4444"
+                      />
+                      <path
+                        d="M17.1698 8.97539C17.0698 8.97539 16.9573 8.96289 16.8448 8.92539C15.9323 8.58789 14.9323 8.58789 14.0198 8.92539C13.5323 9.10039 12.9948 8.85039 12.8198 8.36289C12.6448 7.87539 12.8948 7.33789 13.3823 7.16289C14.7073 6.68789 16.1698 6.68789 17.4948 7.16289C17.9823 7.33789 18.2323 7.87539 18.0573 8.36289C17.9073 8.73789 17.5448 8.97539 17.1698 8.97539Z"
+                        fill="#EF4444"
+                      />
+                      <path
+                        d="M16.4323 11.6254C16.3448 11.6254 16.2698 11.6129 16.1823 11.5879C15.6823 11.4504 15.1698 11.4504 14.6698 11.5879C14.1698 11.7254 13.6573 11.4254 13.5198 10.9254C13.3823 10.4379 13.6823 9.92539 14.1823 9.78789C14.9948 9.56289 15.8698 9.56289 16.6823 9.78789C17.1823 9.92539 17.4823 10.4379 17.3448 10.9379C17.2323 11.3504 16.8448 11.6254 16.4323 11.6254Z"
+                        fill="#EF4444"
+                      />
+                      <path
+                        d="M15.4324 28.4375C14.9199 28.4375 14.4949 28.0125 14.4949 27.5V23.75C14.4949 23.2375 14.9199 22.8125 15.4324 22.8125C15.9449 22.8125 16.3699 23.2375 16.3699 23.75V27.5C16.3699 28.0125 15.9449 28.4375 15.4324 28.4375Z"
+                        fill="#EF4444"
+                      />
+                    </svg>
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                  </div>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="25"
+                    height="25"
+                    viewBox="0 0 31 30"
+                    fill="none"
+                  >
+                    <path
+                      d="M15.4324 20.3125C12.1574 20.3125 9.49487 17.65 9.49487 14.375V7.5C9.49487 4.225 12.1574 1.5625 15.4324 1.5625C18.7074 1.5625 21.3699 4.225 21.3699 7.5V14.375C21.3699 17.65 18.7074 20.3125 15.4324 20.3125ZM15.4324 3.4375C13.1949 3.4375 11.3699 5.2625 11.3699 7.5V14.375C11.3699 16.6125 13.1949 18.4375 15.4324 18.4375C17.6699 18.4375 19.4949 16.6125 19.4949 14.375V7.5C19.4949 5.2625 17.6699 3.4375 15.4324 3.4375Z"
+                      fill="#939393"
+                    />
+                    <path
+                      d="M15.4324 24.6875C9.64487 24.6875 4.93237 19.975 4.93237 14.1875V12.0625C4.93237 11.55 5.35737 11.125 5.86987 11.125C6.38237 11.125 6.80737 11.55 6.80737 12.0625V14.1875C6.80737 18.9375 10.6824 22.8125 15.4324 22.8125C20.1824 22.8125 24.0574 18.9375 24.0574 14.1875V12.0625C24.0574 11.55 24.4824 11.125 24.9949 11.125C25.5074 11.125 25.9324 11.55 25.9324 12.0625V14.1875C25.9324 19.975 21.2199 24.6875 15.4324 24.6875Z"
+                      fill="#939393"
+                    />
+                    <path
+                      d="M17.1698 8.97539C17.0698 8.97539 16.9573 8.96289 16.8448 8.92539C15.9323 8.58789 14.9323 8.58789 14.0198 8.92539C13.5323 9.10039 12.9948 8.85039 12.8198 8.36289C12.6448 7.87539 12.8948 7.33789 13.3823 7.16289C14.7073 6.68789 16.1698 6.68789 17.4948 7.16289C17.9823 7.33789 18.2323 7.87539 18.0573 8.36289C17.9073 8.73789 17.5448 8.97539 17.1698 8.97539Z"
+                      fill="#939393"
+                    />
+                    <path
+                      d="M16.4323 11.6254C16.3448 11.6254 16.2698 11.6129 16.1823 11.5879C15.6823 11.4504 15.1698 11.4504 14.6698 11.5879C14.1698 11.7254 13.6573 11.4254 13.5198 10.9254C13.3823 10.4379 13.6823 9.92539 14.1823 9.78789C14.9948 9.56289 15.8698 9.56289 16.6823 9.78789C17.1823 9.92539 17.4823 10.4379 17.3448 10.9379C17.2323 11.3504 16.8448 11.6254 16.4323 11.6254Z"
+                      fill="#939393"
+                    />
+                    <path
+                      d="M15.4324 28.4375C14.9199 28.4375 14.4949 28.0125 14.4949 27.5V23.75C14.4949 23.2375 14.9199 22.8125 15.4324 22.8125C15.9449 22.8125 16.3699 23.2375 16.3699 23.75V27.5C16.3699 28.0125 15.9449 28.4375 15.4324 28.4375Z"
+                      fill="#939393"
+                    />
+                  </svg>
+                )}
               </button>
 
               {/* Send Button */}
@@ -434,7 +616,6 @@ export default function NewsChatPage() {
           font-family: monospace;
           font-size: 0.9em;
         }
-        /* Style for clickable news links */
         .message-content .news-link {
           color: #e2af19;
           text-decoration: underline;
