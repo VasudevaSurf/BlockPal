@@ -1,4 +1,4 @@
-// src/app/dashboard/news-feed/page.tsx - UPDATED with header hiding
+// src/app/dashboard/news-feed/page.tsx - FIXED with no padding for AI chat overlay
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -356,12 +356,12 @@ export default function NewsFeed() {
             <TokenSidebar />
           </div>
 
-          {/* AI Chat Overlay - Slides from left and hides header */}
+          {/* AI Chat Overlay - Covers content area only, not sidebar */}
           {showAIChat && (
             <div className="absolute inset-0 z-50 slide-in">
-              <div className="h-full bg-[#000000] overflow-hidden flex flex-col">
+              <div className="h-full w-full bg-[#000000] overflow-hidden flex flex-col">
                 {/* Header with Back Button */}
-                <div className="flex-shrink-0 bg-black p-4">
+                <div className="flex-shrink-0 bg-black p-4 border-b border-[#2C2C2C]">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setShowAIChat(false)}
@@ -373,9 +373,6 @@ export default function NewsFeed() {
                       <h2 className="text-white text-xl font-mayeka font-bold">
                         News Chat
                       </h2>
-                      {/* <p className="text-[#999999] text-sm font-satoshi">
-                        Ask about crypto news and insights
-                      </p> */}
                     </div>
                   </div>
                 </div>
@@ -459,12 +456,22 @@ export default function NewsFeed() {
             </div>
           </div>
 
-          {/* AI Chat Overlay - Mobile */}
+          {/* AI Chat Overlay - Mobile - FIXED */}
           {showAIChat && (
-            <div className="absolute inset-0 z-50 slide-in">
-              <div className="h-full bg-[#000000] overflow-hidden flex flex-col">
+            <div
+              className="fixed inset-0 z-50 slide-in"
+              style={{
+                left: "0",
+                right: "0",
+                top: "0",
+                bottom: "0",
+                margin: "0",
+                padding: "0",
+              }}
+            >
+              <div className="h-full w-full bg-[#000000] overflow-hidden flex flex-col">
                 {/* Header with Back Button */}
-                <div className="flex-shrink-0 bg-black p-4">
+                <div className="flex-shrink-0 bg-black p-4 border-b border-[#2C2C2C]">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setShowAIChat(false)}
@@ -476,9 +483,6 @@ export default function NewsFeed() {
                       <h2 className="text-white text-xl font-mayeka font-bold">
                         News Chat
                       </h2>
-                      {/* <p className="text-[#999999] text-sm font-satoshi">
-                        Ask about crypto news and insights
-                      </p> */}
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-// src/components/NewsChatPage.tsx - WITH SUGGESTION CHIPS AND MICROPHONE
+// src/components/NewsChatPage.tsx - FIXED background with absolute positioning
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -29,46 +29,28 @@ export default function NewsChatPage() {
   // Suggestion chips for news-related queries
   const suggestionChips = [
     {
-      display: "Latest Bitcoin news",
-      query: "What's the latest Bitcoin news?",
+      display: "Get the latest news on BTC",
+      query: "Get the latest news on BTC?",
     },
     {
-      display: "Ethereum price trends",
-      query: "What are the Ethereum price trends?",
+      display: "List today's trending news",
+      query: "List today's trending news?",
     },
     {
-      display: "Top crypto gainers today",
-      query: "What are the top crypto gainers today?",
-    },
-    { display: "DeFi market updates", query: "Give me DeFi market updates" },
-    {
-      display: "NFT market analysis",
-      query: "What's happening in the NFT market?",
-    },
-    { display: "Altcoin news", query: "Tell me about recent altcoin news" },
-    {
-      display: "Crypto regulations",
-      query: "What are the latest crypto regulations?",
+      display: "Any bearish news about SOL",
+      query: "Any bearish news about SOL?",
     },
     {
-      display: "Market sentiment today",
-      query: "What's the market sentiment today?",
+      display: "Summarize the news report",
+      query: "Summarize the news report",
     },
     {
-      display: "Top trending tokens",
-      query: "What are the top trending tokens?",
+      display: "What the market mood today",
+      query: "What the market mood today?",
     },
     {
-      display: "Blockchain innovations",
-      query: "Tell me about recent blockchain innovations",
-    },
-    {
-      display: "Crypto security news",
-      query: "What's new in crypto security?",
-    },
-    {
-      display: "Stablecoin updates",
-      query: "Give me stablecoin market updates",
+      display: "Which news effecting the ETH price drop",
+      query: "Which news effecting the ETH price drop",
     },
   ];
 
@@ -369,18 +351,20 @@ export default function NewsChatPage() {
   const showWelcomeScreen = messages.length === 0;
 
   return (
-    <div className="h-full relative bg-[#000000] flex">
-      {/* Overlay Background */}
+    <div className="h-full relative bg-[#000000] flex overflow-hidden">
+      {/* FIXED: Background positioned to actual viewport edge using fixed positioning */}
       <div
-        className="fixed bottom-0 right-0 w-[1600px] h-[1600px] bg-no-repeat bg-contain bg-bottom-right pointer-events-none z-0"
+        className="fixed bottom-0 right-0 w-[1600px] h-[1600px] pointer-events-none z-0"
         style={{
           backgroundImage: "url(/aiChatGrade.png)",
-          backgroundPosition: "bottom right",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "contain",
+          backgroundPosition: "100% 100%",
         }}
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 min-h-0">
           {showWelcomeScreen ? (

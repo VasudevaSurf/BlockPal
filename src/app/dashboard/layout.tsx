@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED WITH NEWS CHAT HEADER HIDING
+// src/app/dashboard/layout.tsx - UPDATED to remove padding when news chat is active
 "use client";
 
 import { useSelector } from "react-redux";
@@ -207,10 +207,10 @@ export default function DashboardLayout({
                 <Sidebar />
               </div>
 
-              {/* Main Content - Conditional padding based on page */}
+              {/* Main Content - FIXED: Remove padding when news chat is active */}
               <main
                 className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col ${
-                  isSwapPage ? "p-0" : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
+                  isSwapPage || isNewsChatActive ? "p-0" : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
                 }`}
               >
                 {/* Global Header - Hide on swap page AND when news chat is active */}
