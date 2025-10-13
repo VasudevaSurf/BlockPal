@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED WITH PORTFOLIO TITLE DISPLAY
+// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED wallet disconnect visibility
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -266,7 +266,7 @@ export default function GlobalDashboardHeader({
   } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Wallet integration
+  // Wallet integration - CRITICAL FIX: Use these for display logic
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const {
@@ -307,12 +307,6 @@ export default function GlobalDashboardHeader({
         setSwitchError(null);
       },
     },
-  });
-
-  const [selectedWallet] = useState({
-    name: "Ethereum",
-    address: "0xAD7a4hw64...R8J6153",
-    balance: 2500.0,
   });
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -358,6 +352,8 @@ export default function GlobalDashboardHeader({
     if (!isConnected) {
       setSwitchError(null);
       setSwitchingChain(null);
+      // CRITICAL: Close chain selector when wallet disconnects
+      setChainSelectorOpen(false);
     }
   }, [isConnected]);
 
@@ -505,7 +501,8 @@ export default function GlobalDashboardHeader({
     return null;
   }
 
-  const showWalletInfo = mounted && isConnected;
+  // CRITICAL FIX: Only show wallet info when actually connected
+  const showWalletInfo = mounted && isConnected && address;
 
   return (
     <>
@@ -556,7 +553,7 @@ export default function GlobalDashboardHeader({
             {isNewsFeedPage && (
               <form
                 onSubmit={handleNewsSearchSubmit}
-                className="flex-1 flex gap-2 mr-4 max-w-[720px]"
+                className="flex-1 flex gap-2 mr-4 max-w-[810px]"
               >
                 <div className="relative flex-1">
                   <input
@@ -580,7 +577,6 @@ export default function GlobalDashboardHeader({
                     />
                   </svg>
 
-                  {/* Clear button - shows when there's a search query */}
                   {newsSearchQuery && (
                     <button
                       type="button"
@@ -632,181 +628,174 @@ export default function GlobalDashboardHeader({
         </div>
 
         <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4">
-          {/* Wallet Display with Chain Selector */}
-          <div className="relative" ref={chainSelectorRef}>
-            <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] gap-1.5">
-              <div className="flex items-center flex-1 min-w-0 bg-[#0F0F0F] rounded-[100px] p-[4px] mr-2">
-                <ChainIcon
-                  chainData={currentChainDisplay}
-                  size="md"
-                  className="mr-2 lg:mr-2.5"
-                />
+          {/* CRITICAL FIX: Only show wallet display when connected */}
+          {showWalletInfo && (
+            <div className="relative" ref={chainSelectorRef}>
+              <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] gap-1.5">
+                <div className="flex items-center flex-1 min-w-0 bg-[#0F0F0F] rounded-[100px] p-[4px] mr-2">
+                  <ChainIcon
+                    chainData={currentChainDisplay}
+                    size="md"
+                    className="mr-2 lg:mr-2.5"
+                  />
 
-                <div className="flex-1 min-w-0">
-                  <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate block">
-                    {showWalletInfo
-                      ? currentChainDisplay.name
-                      : selectedWallet.name}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-white text-xs sm:text-xs font-satoshi mr-1.5 min-w-0 truncate block">
+                      {currentChainDisplay.name}
+                    </span>
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => setChainSelectorOpen(!chainSelectorOpen)}
+                  className="flex items-center hover:opacity-80 transition-opacity"
+                  disabled={!mounted}
+                >
+                  <span className="text-[#EDEDED] text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
+                    {address
+                      ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                      : ""}
+                  </span>
+
+                  <ChevronDown
+                    size={12}
+                    className={`text-gray-400 lg:w-3 lg:h-3 transition-transform ${
+                      chainSelectorOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
               </div>
 
-              <button
-                onClick={() => setChainSelectorOpen(!chainSelectorOpen)}
-                className="flex items-center hover:opacity-80 transition-opacity"
-                disabled={!mounted}
-              >
-                <span className="text-[#EDEDED] text-xs font-satoshi italic mr-1.5 lg:mr-2 hidden sm:block truncate">
-                  {showWalletInfo && address
-                    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-                    : selectedWallet.address}
-                </span>
+              {/* Chain Selector Dropdown - Only show when connected */}
+              {chainSelectorOpen && mounted && isConnected && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30 bg-black/20"
+                    onClick={() => setChainSelectorOpen(false)}
+                  />
 
-                <ChevronDown
-                  size={12}
-                  className={`text-gray-400 lg:w-3 lg:h-3 transition-transform ${
-                    chainSelectorOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-            </div>
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-black border border-[#2C2C2C] rounded-[28px] shadow-2xl z-40 overflow-hidden">
+                    <div className="flex items-center justify-between p-3">
+                      <button
+                        onClick={() => setChainSelectorOpen(false)}
+                        className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded"
+                      >
+                        <ArrowLeft size={16} />
+                      </button>
+                      <h3 className="text-white font-semibold text-sm font-satoshi absolute left-1/2 transform -translate-x-1/2">
+                        Select Chain
+                      </h3>
+                    </div>
 
-            {/* Chain Selector Dropdown */}
-            {chainSelectorOpen && mounted && (
-              <>
-                <div
-                  className="fixed inset-0 z-30 bg-black/20"
-                  onClick={() => setChainSelectorOpen(false)}
-                />
+                    <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
+                      <div className="p-2 space-y-1">
+                        {chains.map((chain) => {
+                          const chainDisplay = chainDisplayData[chain.id] || {
+                            name: chain.name,
+                            color: "bg-gray-500",
+                            icon: chain.name.charAt(0),
+                            fallbackIcon: chain.name.charAt(0),
+                            useBackground: true,
+                          };
 
-                <div className="absolute top-full right-0 mt-2 w-64 bg-black border border-[#2C2C2C] rounded-[28px] shadow-2xl z-40 overflow-hidden">
-                  <div className="flex items-center justify-between p-3">
-                    <button
-                      onClick={() => setChainSelectorOpen(false)}
-                      className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-[#2C2C2C] rounded"
-                    >
-                      <ArrowLeft size={16} />
-                    </button>
-                    <h3 className="text-white font-semibold text-sm font-satoshi absolute left-1/2 transform -translate-x-1/2">
-                      Select Chain
-                    </h3>
-                  </div>
+                          const isCurrentChain = chainId === chain.id;
+                          const isSwitching = switchingChain === chain.id;
 
-                  <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
-                    <div className="p-2 space-y-1">
-                      {chains.map((chain) => {
-                        const chainDisplay = chainDisplayData[chain.id] || {
-                          name: chain.name,
-                          color: "bg-gray-500",
-                          icon: chain.name.charAt(0),
-                          fallbackIcon: chain.name.charAt(0),
-                          useBackground: true,
-                        };
-
-                        const isCurrentChain =
-                          showWalletInfo && chainId === chain.id;
-                        const isSwitching = switchingChain === chain.id;
-
-                        return (
-                          <button
-                            key={chain.id}
-                            onClick={() => handleChainSwitch(chain.id)}
-                            disabled={
-                              isSwitching || !isConnected || isSwitchingChain
-                            }
-                            className={`w-full flex items-center justify-between p-2.5 rounded-[8px] transition-all hover:bg-[#1A1A1A] ${
-                              !isConnected
-                                ? "opacity-50 cursor-not-allowed"
-                                : ""
-                            } ${isSwitching ? "opacity-70" : ""}`}
-                          >
-                            <div className="flex items-center">
-                              <ChainIcon
-                                chainData={chainDisplay}
-                                size="lg"
-                                className="mr-2.5"
-                              />
-
-                              <span
-                                className={`text-sm font-satoshi ${
-                                  isCurrentChain
-                                    ? "text-[#E2AF19]"
-                                    : "text-white"
-                                }`}
-                              >
-                                {chainDisplay.name}
-                                {isSwitching && (
-                                  <span className="ml-2 text-xs">
-                                    (Switching...)
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-
-                            <div
-                              className={`w-10 h-5 rounded-full transition-colors relative ${
-                                isCurrentChain ? "bg-[#E2AF19]" : "bg-[#2C2C2C]"
-                              }`}
+                          return (
+                            <button
+                              key={chain.id}
+                              onClick={() => handleChainSwitch(chain.id)}
+                              disabled={
+                                isSwitching || !isConnected || isSwitchingChain
+                              }
+                              className={`w-full flex items-center justify-between p-2.5 rounded-[8px] transition-all hover:bg-[#1A1A1A] ${
+                                !isConnected
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : ""
+                              } ${isSwitching ? "opacity-70" : ""}`}
                             >
+                              <div className="flex items-center">
+                                <ChainIcon
+                                  chainData={chainDisplay}
+                                  size="lg"
+                                  className="mr-2.5"
+                                />
+
+                                <span
+                                  className={`text-sm font-satoshi ${
+                                    isCurrentChain
+                                      ? "text-[#E2AF19]"
+                                      : "text-white"
+                                  }`}
+                                >
+                                  {chainDisplay.name}
+                                  {isSwitching && (
+                                    <span className="ml-2 text-xs">
+                                      (Switching...)
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+
                               <div
-                                className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${
+                                className={`w-10 h-5 rounded-full transition-colors relative ${
                                   isCurrentChain
-                                    ? "translate-x-5"
-                                    : "translate-x-0.5"
+                                    ? "bg-[#E2AF19]"
+                                    : "bg-[#2C2C2C]"
                                 }`}
                               >
-                                {isSwitching && (
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-2.5 h-2.5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
-                                  </div>
-                                )}
+                                <div
+                                  className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${
+                                    isCurrentChain
+                                      ? "translate-x-5"
+                                      : "translate-x-0.5"
+                                  }`}
+                                >
+                                  {isSwitching && (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <div className="w-2.5 h-2.5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {!isConnected && (
-                    <div className="p-3 bg-[#0F0F0F]">
-                      <p className="text-gray-400 text-xs font-satoshi text-center">
-                        Connect your wallet to switch chains
-                      </p>
-                    </div>
-                  )}
-
-                  {switchError && (
-                    <div className="p-3 bg-red-900/20 border-t border-red-500/50">
-                      <div className="flex items-start">
-                        <div className="w-4 h-4 bg-red-500 rounded-full mr-2 mt-0.5 flex-shrink-0">
-                          <span className="text-white text-xs flex items-center justify-center w-full h-full">
-                            !
-                          </span>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-red-400 text-xs font-satoshi font-medium mb-1">
-                            Chain Switch Failed
-                          </p>
-                          <p className="text-red-300 text-xs font-satoshi">
-                            {switchError}
-                          </p>
-                          <button
-                            onClick={() => setSwitchError(null)}
-                            className="text-red-400 hover:text-red-300 text-xs font-satoshi underline mt-1"
-                          >
-                            Dismiss
-                          </button>
-                        </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
 
-          {/* Action Icons Container */}
+                    {switchError && (
+                      <div className="p-3 bg-red-900/20 border-t border-red-500/50">
+                        <div className="flex items-start">
+                          <div className="w-4 h-4 bg-red-500 rounded-full mr-2 mt-0.5 flex-shrink-0">
+                            <span className="text-white text-xs flex items-center justify-center w-full h-full">
+                              !
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-red-400 text-xs font-satoshi font-medium mb-1">
+                              Chain Switch Failed
+                            </p>
+                            <p className="text-red-300 text-xs font-satoshi">
+                              {switchError}
+                            </p>
+                            <button
+                              onClick={() => setSwitchError(null)}
+                              className="text-red-400 hover:text-red-300 text-xs font-satoshi underline mt-1"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Action Icons Container - Always show */}
           <div className="flex items-center space-x-2 relative">
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-1.5 lg:px-2 py-1.5 lg:py-2">
               <button

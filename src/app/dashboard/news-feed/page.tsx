@@ -142,10 +142,10 @@ const NewsCard = ({
 
           <div className="flex items-center justify-between mt-3">
             <div className="flex items-center gap-2">
-              <span className="text-[#fff] text-[12px] font-medium">
+              <span className="text-[#fff] text-[10px] font-medium">
                 By {author}
               </span>
-              <span className="text-[#fff] text-[12px]">
+              <span className="text-[#F9EFD1] text-[10px]">
                 {formatDate(date)}
               </span>
             </div>
@@ -285,10 +285,10 @@ export default function NewsFeed() {
       <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden relative">
         {/* Desktop Layout */}
         <div className="hidden xl:flex gap-3 flex-1 min-h-0 relative">
-          <div className="flex-[0_0_60%] flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
+          <div className="flex-[0_0_68%] flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             {/* Left side - News Feed */}
             <div className="w-full flex-1 h-full flex flex-col relative">
-              <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] overflow-hidden flex flex-col">
+              <div className="flex-1 bg-black rounded-[14px] overflow-hidden flex flex-col">
                 {/* Search query display */}
                 {searchQuery && (
                   <div className="px-4 pt-4">
@@ -307,7 +307,7 @@ export default function NewsFeed() {
                 )}
 
                 {/* News Feed */}
-                <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-3">
+                <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-3">
                   {news.length === 0 && !loading && (
                     <div className="text-center py-10">
                       <p className="text-[#666666] text-[14px]">
