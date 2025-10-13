@@ -93,12 +93,10 @@ export default function TokenActionsMenu({
       {/* Invisible backdrop */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
 
-      {/* Menu with animation */}
+      {/* Menu - No animations, just direct positioning */}
       <div
         ref={menuRef}
-        className={`fixed z-50 bg-black rounded-xl w-[200px] shadow-2xl border border-[#2C2C2C] overflow-hidden transition-all duration-200 ${
-          openDirection === "up" ? "animate-slideUp" : "animate-slideDown"
-        }`}
+        className="fixed z-50 bg-black rounded-xl w-[200px] shadow-2xl border border-[#2C2C2C] overflow-hidden"
         style={{
           top: `${adjustedPosition.top}px`,
           left: `${adjustedPosition.left}px`,
@@ -145,38 +143,6 @@ export default function TokenActionsMenu({
           </button>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-slideDown {
-          animation: slideDown 0.2s ease-out;
-        }
-
-        .animate-slideUp {
-          animation: slideUp 0.2s ease-out;
-        }
-      `}</style>
     </>
   );
 }
