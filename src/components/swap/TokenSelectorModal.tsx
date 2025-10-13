@@ -1,8 +1,8 @@
-// src/components/swap/TokenSelectorModal.tsx - FIXED POSITIONING
+// src/components/swap/TokenSelectorModal.tsx - WITH CONTRACT ADDRESS DISPLAY
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { X, Search } from "lucide-react";
+import { X, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
 import { chains } from "@/components/wallet/WalletProvider";
 import { tokenService } from "@/services/tokenService";
@@ -214,11 +214,19 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const [selectedChain, setSelectedChain] = useState(chainId);
-  const [tokens, setTokens] = useState<any[]>([]);
+  const [mainListTokens, setMainListTokens] = useState<any[]>([]);
+  const [additionalTokens, setAdditionalTokens] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // State for showing additional tokens
+  const [showAdditionalTokens, setShowAdditionalTokens] = useState(false);
+
+  // Track preset token count for filtering
+  const [presetTokenCount, setPresetTokenCount] = useState(0);
+  const [userAddedTokens, setUserAddedTokens] = useState<string[]>([]);
 
   const chainDisplayData = getChainDisplayData();
 
@@ -229,7 +237,9 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   useEffect(() => {
     if (isOpen) {
       setSearchQuery("");
-      setTokens([]);
+      setMainListTokens([]);
+      setAdditionalTokens([]);
+      setShowAdditionalTokens(false);
     }
   }, [selectedChain]);
 
@@ -268,6 +278,87 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     }
   }, [isOpen]);
 
+  // NEW: Format contract address (0x123...abc)
+  const formatContractAddress = (address: string): string => {
+    if (!address || address === "native") return "Native";
+    if (address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+      return "Native";
+
+    // Format as 0xabc...xyz
+    if (address.length > 10) {
+      return `${address.slice(0, 5)}...${address.slice(-3)}`;
+    }
+    return address;
+  };
+
+  // Load user preferences to get user-added tokens
+  const loadUserPreferences = async () => {
+    if (!address || !isConnected) return { userAddedTokens: [] };
+
+    try {
+      const response = await fetch(
+        `/api/wallet/preferences?wallet=${address}&chain=${selectedChain}`
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return { userAddedTokens: [] };
+        }
+        throw new Error("Failed to load preferences");
+      }
+
+      const data = await response.json();
+      return {
+        userAddedTokens: data.data?.userAddedTokens || [],
+      };
+    } catch (error) {
+      console.warn("Could not load user preferences:", error);
+      return { userAddedTokens: [] };
+    }
+  };
+
+  // Split tokens into main list and additional
+  const splitTokens = (
+    allTokens: any[],
+    presetCount: number,
+    userAdded: string[]
+  ) => {
+    console.log("🔍 Splitting tokens:", {
+      totalTokens: allTokens.length,
+      presetCount,
+      userAddedCount: userAdded.length,
+    });
+
+    // Get preset tokens (first N tokens)
+    const presetTokens = allTokens.slice(0, presetCount);
+
+    // Get user-added tokens from the remaining tokens
+    const remainingTokens = allTokens.slice(presetCount);
+    const userAddedFromRemaining = remainingTokens.filter((token) =>
+      userAdded.some(
+        (addr) => addr.toLowerCase() === token.contractAddress.toLowerCase()
+      )
+    );
+
+    // Main list = preset + user-added
+    const mainList = [...presetTokens, ...userAddedFromRemaining];
+
+    // Additional = everything else (not in main list)
+    const additional = remainingTokens.filter(
+      (token) =>
+        !userAdded.some(
+          (addr) => addr.toLowerCase() === token.contractAddress.toLowerCase()
+        )
+    );
+
+    console.log("✅ Split tokens:", {
+      mainList: mainList.length,
+      additional: additional.length,
+    });
+
+    return { mainList, additional };
+  };
+
   const loadTokens = async () => {
     setLoading(true);
     try {
@@ -296,13 +387,18 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
             token.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         }));
 
-        if (isConnected && address && fetchedTokens.length > 0) {
+        // When searching, show all results (no split)
+        if (isConnected && address) {
           try {
             const walletResponse = await tokenService.getWalletTokens(
               address,
               selectedChain,
               true
             );
+
+            const preferences = await loadUserPreferences();
+            setUserAddedTokens(preferences.userAddedTokens);
+            setPresetTokenCount(walletResponse.presetTokenCount);
 
             const walletTokensMap = new Map(
               walletResponse.tokens.map((t: any) => [
@@ -334,15 +430,40 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
             console.warn("Could not fetch wallet balances for search results");
           }
         }
+
+        // During search, show all in main list
+        setMainListTokens(fetchedTokens);
+        setAdditionalTokens([]);
       } else {
+        // No search query - load and split tokens
         if (isConnected && address) {
-          console.log(`📦 Loading wallet tokens for chain ${selectedChain}`);
+          console.log(
+            `📦 Loading wallet tokens for chain ${selectedChain} (with split)`
+          );
+
           const response = await tokenService.getWalletTokens(
             address,
             selectedChain,
             true
           );
-          fetchedTokens = response.tokens || [];
+
+          const preferences = await loadUserPreferences();
+          setUserAddedTokens(preferences.userAddedTokens);
+          setPresetTokenCount(response.presetTokenCount);
+
+          const allTokens = response.tokens || [];
+          const { mainList, additional } = splitTokens(
+            allTokens,
+            response.presetTokenCount,
+            preferences.userAddedTokens
+          );
+
+          setMainListTokens(mainList);
+          setAdditionalTokens(additional);
+
+          console.log(
+            `✅ Loaded ${mainList.length} main list tokens and ${additional.length} additional tokens`
+          );
         } else {
           console.log(`📦 Loading popular tokens for chain ${selectedChain}`);
           const popularTokens = await swapService.searchTokens(selectedChain);
@@ -358,16 +479,17 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
             isNative:
               token.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           }));
+
+          setMainListTokens(fetchedTokens);
+          setAdditionalTokens([]);
         }
       }
 
-      setTokens(fetchedTokens);
-      console.log(
-        `✅ Loaded ${fetchedTokens.length} tokens for chain ${selectedChain}`
-      );
+      console.log(`✅ Displaying tokens for chain ${selectedChain}`);
     } catch (error) {
       console.error("Error loading tokens:", error);
-      setTokens([]);
+      setMainListTokens([]);
+      setAdditionalTokens([]);
     } finally {
       setLoading(false);
     }
@@ -418,14 +540,66 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     return amount.toFixed(Math.min(decimals, 8));
   };
 
+  const renderTokenButton = (token: any, index: number) => (
+    <button
+      key={`${token.contractAddress || token.address}_${index}`}
+      onClick={() => handleTokenSelect(token)}
+      className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
+    >
+      <div className="flex items-center min-w-0 flex-1">
+        <TokenImage
+          src={token.logoUrl || token.logoURI}
+          alt={token.symbol}
+          symbol={token.symbol}
+          name={token.name}
+          className="w-10 h-10 mr-3 flex-shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="text-white font-medium font-satoshi text-sm">
+            {token.name}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-xs font-satoshi">
+              {token.symbol}
+            </span>
+            <span className="text-gray-500 text-[10px] font-satoshi font-mono">
+              {formatContractAddress(token.contractAddress || token.address)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-right flex-shrink-0">
+        {token.balance > 0 ? (
+          <>
+            <div className="text-white font-medium font-satoshi text-sm">
+              {formatTokenAmount(token.balance, 4)}
+            </div>
+            <div className="text-gray-400 text-xs font-satoshi">
+              {formatCurrency(token.value)}
+            </div>
+          </>
+        ) : (
+          <div className="text-gray-400 text-xs font-satoshi">
+            {searchQuery && isConnected
+              ? "No balance"
+              : token.isNative
+              ? "Native"
+              : "ERC-20"}
+          </div>
+        )}
+      </div>
+    </button>
+  );
+
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Backdrop - CHANGED: Now uses absolute positioning */}
+      {/* Backdrop */}
       <div className="absolute inset-0 bg-white/10 z-40" onClick={onClose} />
 
-      {/* Modal Container - CHANGED: Now uses absolute positioning and centers within parent */}
+      {/* Modal Container */}
       <div
         className="absolute inset-0 z-50 flex items-center justify-center p-4"
         onClick={onClose}
@@ -546,22 +720,29 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                 />
               </div>
 
-              <div className="mb-4">
+              {/* <div className="mb-4">
                 <h4 className="text-[#939393] font-satoshi font-medium text-base">
                   {searchQuery
                     ? "Search Results"
                     : isConnected
-                    ? "Your Tokens"
+                    ? "Your Main List Tokens"
                     : "Popular Tokens"}
                 </h4>
-              </div>
+                {isConnected && !searchQuery && (
+                  <p className="text-gray-500 text-xs font-satoshi mt-1">
+                    Showing {mainListTokens.length} tokens ({presetTokenCount}{" "}
+                    preset + {userAddedTokens.length} user-added)
+                  </p>
+                )}
+              </div> */}
 
               <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
                   </div>
-                ) : tokens.length === 0 ? (
+                ) : mainListTokens.length === 0 &&
+                  additionalTokens.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
                       <span className="text-gray-400 text-lg">🪙</span>
@@ -579,54 +760,48 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {tokens.map((token, index) => (
-                      <button
-                        key={`${
-                          token.contractAddress || token.address
-                        }_${index}`}
-                        onClick={() => handleTokenSelect(token)}
-                        className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
-                      >
-                        <div className="flex items-center min-w-0 flex-1">
-                          <TokenImage
-                            src={token.logoUrl || token.logoURI}
-                            alt={token.symbol}
-                            symbol={token.symbol}
-                            name={token.name}
-                            className="w-10 h-10 mr-3 flex-shrink-0"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="text-white font-medium font-satoshi text-sm">
-                              {token.name}
-                            </div>
-                            <div className="text-gray-400 text-xs font-satoshi">
-                              {token.symbol}
-                            </div>
-                          </div>
-                        </div>
+                    {/* Main List Tokens */}
+                    {mainListTokens.map((token, index) =>
+                      renderTokenButton(token, index)
+                    )}
 
-                        <div className="text-right flex-shrink-0">
-                          {token.balance > 0 ? (
-                            <>
-                              <div className="text-white font-medium font-satoshi text-sm">
-                                {formatTokenAmount(token.balance, 4)}
-                              </div>
-                              <div className="text-gray-400 text-xs font-satoshi">
-                                {formatCurrency(token.value)}
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-gray-400 text-xs font-satoshi">
-                              {searchQuery && isConnected
-                                ? "No balance"
-                                : token.isNative
-                                ? "Native"
-                                : "ERC-20"}
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    ))}
+                    {/* Divider with Expand Button - Only show when there are additional tokens and no search */}
+                    {additionalTokens.length > 0 && !searchQuery && (
+                      <div className="py-2">
+                        <button
+                          onClick={() =>
+                            setShowAdditionalTokens(!showAdditionalTokens)
+                          }
+                          className="w-full flex items-center justify-center gap-2 py-3 rounded-lg hover:bg-[#1A1A1A] transition-colors"
+                        >
+                          <div className="flex-1 h-px bg-[#2C2C2C]"></div>
+                          <div className="flex items-center gap-2 px-3">
+                            <span className="text-gray-400 text-xs font-satoshi">
+                              {showAdditionalTokens ? "Hide" : "Show"}{" "}
+                              Additional Tokens ({additionalTokens.length})
+                            </span>
+                            {showAdditionalTokens ? (
+                              <ChevronUp size={16} className="text-gray-400" />
+                            ) : (
+                              <ChevronDown
+                                size={16}
+                                className="text-gray-400"
+                              />
+                            )}
+                          </div>
+                          <div className="flex-1 h-px bg-[#2C2C2C]"></div>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Additional Tokens - Expandable */}
+                    {showAdditionalTokens && additionalTokens.length > 0 && (
+                      <div className="space-y-2 pt-2">
+                        {additionalTokens.map((token, index) =>
+                          renderTokenButton(token, index)
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

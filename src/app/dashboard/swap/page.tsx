@@ -740,20 +740,24 @@ export default function SwapPage() {
                                 <input
                                   type="number"
                                   placeholder="0.0"
-                                  value={customSlippage ? slippage : ""}
+                                  value={slippage}
                                   onChange={(e) => {
-                                    const value = parseFloat(e.target.value);
-                                    if (!isNaN(value) && value < 49) {
-                                      setSlippage(e.target.value);
+                                    const value = e.target.value;
+                                    const numValue = parseFloat(value);
+                                    if (
+                                      value === "" ||
+                                      (!isNaN(numValue) && numValue < 49)
+                                    ) {
+                                      setSlippage(value);
                                       setCustomSlippage(true);
                                     }
                                   }}
                                   onKeyPress={(e) => {
-                                    if (e.key === "Enter" && customSlippage) {
+                                    if (e.key === "Enter") {
                                       setShowSlippageSettings(false);
                                     }
                                   }}
-                                  className="w-full px-3 py-1.5 bg-[#191919] text-white rounded-lg text-xs border border-[#2C2C2C] focus:border-[#E2AF19] focus:outline-none"
+                                  className="w-full px-3 py-1.5 bg-[#191919] text-white rounded-lg text-xs border border-[#2C2C2C] focus:border-[#E2AF19] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   min="0"
                                   max="49"
                                   step="0.1"
@@ -1125,13 +1129,13 @@ export default function SwapPage() {
                 </div>
 
                 {/* Error Display */}
-                {quoteError && (
+                {/* {quoteError && (
                   <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg mb-2">
                     <p className="text-red-400 text-sm font-satoshi">
                       {quoteError}
                     </p>
                   </div>
-                )}
+                )} */}
 
                 {/* Quote Info */}
                 {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
