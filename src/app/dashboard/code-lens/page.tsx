@@ -1,4 +1,4 @@
-// src/app/dashboard/code-lens/page.tsx - COMPLETE UPDATED VERSION
+// src/app/dashboard/code-lens/page.tsx - WITH RELATIVE POSITIONING
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -279,7 +279,7 @@ export default function CodeLens() {
   }
 
   return (
-    <div className="h-full bg-[#000000] rounded-[16px] p-4 flex flex-col overflow-hidden">
+    <div className="h-full bg-[#000000] rounded-[16px] p-4 flex flex-col overflow-hidden relative">
       {/* Token List Table */}
       <div className="flex-1 bg-[#000000] rounded-2xl border border-[#2C2C2C] overflow-hidden flex flex-col">
         {/* Table Header */}
@@ -419,7 +419,7 @@ export default function CodeLens() {
         onRemove={handleRemove}
       />
 
-      {/* Add Tokens Modal */}
+      {/* Add Tokens Modal - Now positioned relative to this container */}
       <AddTokensModal
         isOpen={addTokensModalOpen}
         onClose={() => setAddTokensModalOpen(false)}

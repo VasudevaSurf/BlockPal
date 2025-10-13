@@ -1,4 +1,4 @@
-// src/components/dashboard/AddTokensModal.tsx - COMPLETE UPDATED VERSION
+// src/components/dashboard/AddTokensModal.tsx - CENTERED WITHIN PAGE
 import { useState, useEffect, useRef } from "react";
 import { X, Search, Loader2 } from "lucide-react";
 import { useSelector } from "react-redux";
@@ -372,7 +372,7 @@ export default function AddTokensModal({
         poolAddress: token.poolAddress,
         name: token.name,
         symbol: token.symbol,
-        logo: token.logo, // FIXED: Include logo from search results
+        logo: token.logo,
       };
       await onAddToken(tokenData);
     }
@@ -392,7 +392,7 @@ export default function AddTokensModal({
             poolAddress: foundToken.poolAddress,
             name: foundToken.name,
             symbol: foundToken.symbol,
-            logo: foundToken.logo || token.logoURI, // FIXED: Include logo
+            logo: foundToken.logo || token.logoURI,
           };
           await onAddToken(tokenData);
         }
@@ -424,17 +424,17 @@ export default function AddTokensModal({
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-white/10 z-40" onClick={onClose} />
+      {/* Backdrop - covers entire website */}
+      <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
 
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-">
-        {/* Modal positioned in center of screen */}
+      {/* Modal Container - centered in CodeLens page */}
+      <div className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="h-[550px] mx-4 w-full max-w-4xl"
+          className="h-[550px] w-full max-w-4xl pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Main container */}
-          <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden">
+          <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden border border-[#2C2C2C] shadow-2xl">
             {/* Left Side - Chains */}
             <div className="w-1/3 p-5">
               {/* Main heading */}
