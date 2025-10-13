@@ -1,4 +1,4 @@
-// src/app/dashboard/news-feed/page.tsx - UPDATED VERSION
+// src/app/dashboard/news-feed/page.tsx - UPDATED with header hiding
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -210,33 +210,20 @@ export default function NewsFeed() {
     newsFeedContext.setOnAIClick(() => () => setShowAIChat(true));
   }, [search, clearSearch]);
 
-  const formatDate = (dateString: string) => {
-    const now = new Date();
-    const articleDate = new Date(dateString);
-    const diff = now.getTime() - articleDate.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-
-    if (hours < 1) {
-      const minutes = Math.floor(diff / (1000 * 60));
-      return `${minutes}m ago`;
-    } else if (hours < 24) {
-      return `${hours}h ago`;
+  // CRITICAL: Notify layout about AI chat state to hide header
+  useEffect(() => {
+    // Add a data attribute to the body to signal AI chat is active
+    if (showAIChat) {
+      document.body.setAttribute("data-news-chat-active", "true");
     } else {
-      const days = Math.floor(hours / 24);
-      return `${days}d ago`;
+      document.body.removeAttribute("data-news-chat-active");
     }
-  };
 
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment?.toLowerCase()) {
-      case "positive":
-        return "#2ECC71";
-      case "negative":
-        return "#E74C3C";
-      default:
-        return "#6b7280";
-    }
-  };
+    // Cleanup on unmount
+    return () => {
+      document.body.removeAttribute("data-news-chat-active");
+    };
+  }, [showAIChat]);
 
   return (
     <>
@@ -279,6 +266,11 @@ export default function NewsFeed() {
 
         .slide-out {
           animation: slideOutToLeft 0.3s ease-out forwards;
+        }
+
+        /* Hide header when news chat is active */
+        .news-chat-active .global-dashboard-header {
+          display: none !important;
         }
       `}</style>
 
@@ -364,12 +356,12 @@ export default function NewsFeed() {
             <TokenSidebar />
           </div>
 
-          {/* AI Chat Overlay - Slides from left */}
+          {/* AI Chat Overlay - Slides from left and hides header */}
           {showAIChat && (
             <div className="absolute inset-0 z-50 slide-in">
-              <div className="h-full bg-[#000000] rounded-[14px] border border-[#2C2C2C] overflow-hidden flex flex-col">
+              <div className="h-full bg-[#000000] overflow-hidden flex flex-col">
                 {/* Header with Back Button */}
-                <div className="flex-shrink-0 bg-black border-b border-[#2C2C2C] p-4">
+                <div className="flex-shrink-0 bg-black p-4">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setShowAIChat(false)}
@@ -381,9 +373,9 @@ export default function NewsFeed() {
                       <h2 className="text-white text-xl font-mayeka font-bold">
                         News Chat
                       </h2>
-                      <p className="text-[#999999] text-sm font-satoshi">
+                      {/* <p className="text-[#999999] text-sm font-satoshi">
                         Ask about crypto news and insights
-                      </p>
+                      </p> */}
                     </div>
                   </div>
                 </div>
@@ -470,9 +462,9 @@ export default function NewsFeed() {
           {/* AI Chat Overlay - Mobile */}
           {showAIChat && (
             <div className="absolute inset-0 z-50 slide-in">
-              <div className="h-full bg-[#000000] rounded-[14px] border border-[#2C2C2C] overflow-hidden flex flex-col">
+              <div className="h-full bg-[#000000] overflow-hidden flex flex-col">
                 {/* Header with Back Button */}
-                <div className="flex-shrink-0 bg-black border-b border-[#2C2C2C] p-4">
+                <div className="flex-shrink-0 bg-black p-4">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setShowAIChat(false)}
@@ -484,9 +476,9 @@ export default function NewsFeed() {
                       <h2 className="text-white text-xl font-mayeka font-bold">
                         News Chat
                       </h2>
-                      <p className="text-[#999999] text-sm font-satoshi">
+                      {/* <p className="text-[#999999] text-sm font-satoshi">
                         Ask about crypto news and insights
-                      </p>
+                      </p> */}
                     </div>
                   </div>
                 </div>

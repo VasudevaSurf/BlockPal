@@ -244,14 +244,7 @@ export default function NewsChatPage() {
             /* Welcome Screen */
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
-                <div className="mb-4">
-                  <img
-                    src="/AImiddleImage.png"
-                    alt="News AI"
-                    className="w-32 h-32 object-contain mx-auto"
-                  />
-                </div>
-                <h1 className="text-white text-[24px] font-mayeka font-bold mb-2">
+                <h1 className="text-[35px] font-mayeka-demi-bold-demo font-bold text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
                   News AI Chat
                 </h1>
                 <p className="text-[#999999] text-[14px] font-satoshi">

@@ -1,8 +1,8 @@
-// src/app/dashboard/layout.tsx - UPDATED WITH NEWS FEED SUPPORT
+// src/app/dashboard/layout.tsx - UPDATED WITH NEWS CHAT HEADER HIDING
 "use client";
 
 import { useSelector } from "react-redux";
-import { useState, createContext, useContext } from "react";
+import { useState, createContext, useContext, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { RootState } from "@/store";
 import Sidebar from "@/components/dashboard/Sidebar";
@@ -64,6 +64,9 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
+  // State to track if news chat is active (to hide header)
+  const [isNewsChatActive, setIsNewsChatActive] = useState(false);
+
   // CodeLens search state
   const [codeLensSearchQuery, setCodeLensSearchQuery] = useState("");
   const [codeLensAddTokenHandler, setCodeLensAddTokenHandler] = useState<
@@ -90,6 +93,27 @@ export default function DashboardLayout({
   const isCodeLensPage = pathname === "/dashboard/code-lens";
   // Check if we're on News Feed page
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
+
+  // Listen for news chat active state from body attribute
+  useEffect(() => {
+    const checkNewsChatState = () => {
+      const isActive =
+        document.body.getAttribute("data-news-chat-active") === "true";
+      setIsNewsChatActive(isActive);
+    };
+
+    // Check immediately
+    checkNewsChatState();
+
+    // Set up a MutationObserver to watch for changes
+    const observer = new MutationObserver(checkNewsChatState);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-news-chat-active"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const handleCodeLensSearchChange = (query: string) => {
     setCodeLensSearchQuery(query);
@@ -138,30 +162,32 @@ export default function DashboardLayout({
               {/* Navigation Loading Indicator */}
               <NavigationLoadingIndicator />
 
-              {/* Mobile Header - Always show */}
-              <div className="lg:hidden flex items-center justify-between p-4 bg-black border-b border-[#2C2C2C]">
-                <div className="flex items-center">
-                  <img
-                    src="/blockName.png"
-                    alt="Blockpal"
-                    className="h-6 brightness-110"
-                  />
-                  {isAIChatPage && (
-                    <div className="ml-3 flex items-center space-x-2">
-                      <div className="w-1 h-4 bg-[#E2AF19] rounded-full"></div>
-                      <span className="text-[#E2AF19] text-sm font-satoshi font-medium">
-                        AI Chat
-                      </span>
-                    </div>
-                  )}
+              {/* Mobile Header - Always show unless news chat is active */}
+              {!isNewsChatActive && (
+                <div className="lg:hidden flex items-center justify-between p-4 bg-black border-b border-[#2C2C2C]">
+                  <div className="flex items-center">
+                    <img
+                      src="/blockName.png"
+                      alt="Blockpal"
+                      className="h-6 brightness-110"
+                    />
+                    {isAIChatPage && (
+                      <div className="ml-3 flex items-center space-x-2">
+                        <div className="w-1 h-4 bg-[#E2AF19] rounded-full"></div>
+                        <span className="text-[#E2AF19] text-sm font-satoshi font-medium">
+                          AI Chat
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    className="p-2 text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                  >
+                    {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                  </button>
                 </div>
-                <button
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="p-2 text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
-                >
-                  {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                </button>
-              </div>
+              )}
 
               {/* Mobile Sidebar Overlay */}
               {mobileMenuOpen && (
@@ -187,8 +213,8 @@ export default function DashboardLayout({
                   isSwapPage ? "p-0" : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
                 }`}
               >
-                {/* Global Header - Hide on swap page */}
-                {!isSwapPage && (
+                {/* Global Header - Hide on swap page AND when news chat is active */}
+                {!isSwapPage && !isNewsChatActive && (
                   <div className="flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2">
                     <GlobalDashboardHeader
                       title={isAIChatPage ? "Chat with Lumen" : "Dashboard"}
