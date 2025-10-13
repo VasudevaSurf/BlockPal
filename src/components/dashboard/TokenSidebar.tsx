@@ -165,9 +165,11 @@ export default function TokenSidebar() {
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-[#F7931A] flex items-center justify-center">
-              <span className="text-white text-sm font-bold">₿</span>
-            </div>
+            <img
+              src="/Bitcoin.png"
+              alt="Ethereum"
+              className="w-8 h-8 rounded-full object-cover"
+            />
             <div>
               <h3 className="text-white text-[13px] font-semibold leading-tight">
                 Bitcoin
