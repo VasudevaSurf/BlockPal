@@ -138,6 +138,7 @@ const ChainIcon: React.FC<ChainIconProps> = ({
 }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   const sizeClasses = {
     sm: "w-5 h-5",
@@ -154,10 +155,22 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   useEffect(() => {
     setImageError(false);
     setImageLoaded(false);
+
+    // Preload image to check if it's cached
+    if (chainData.image) {
+      const img = new Image();
+      img.src = chainData.image;
+
+      // Check if image is already cached
+      if (img.complete) {
+        setImageLoaded(true);
+      }
+    }
   }, [chainData.image]);
 
   const handleImageError = () => {
     setImageError(true);
+    setImageLoaded(true); // Set to true to hide background
   };
 
   const handleImageLoad = () => {
@@ -169,12 +182,14 @@ const ChainIcon: React.FC<ChainIconProps> = ({
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
-      {(!imageLoaded || imageError) && (
+      {/* Only show background while loading and not errored */}
+      {!imageLoaded && !imageError && chainData.image && (
         <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
       )}
 
       {chainData.image && !imageError && (
         <img
+          ref={imgRef}
           src={chainData.image}
           alt={chainData.name}
           className={`w-full h-full object-contain transition-opacity duration-200 ${
@@ -182,10 +197,10 @@ const ChainIcon: React.FC<ChainIconProps> = ({
           } p-1 relative z-10`}
           onError={handleImageError}
           onLoad={handleImageLoad}
-          loading="lazy"
         />
       )}
 
+      {/* Only show fallback icon on error */}
       {imageError && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
