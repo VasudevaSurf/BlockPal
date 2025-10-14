@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - Fixed icon alignment when minimized
+// src/components/dashboard/Sidebar.tsx - Responsive with mobile bottom nav
 "use client";
 
 import { useState } from "react";
@@ -63,6 +63,11 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ onItemClick }: SidebarProps) {
+  // Add padding bottom for mobile content to avoid bottom nav overlap
+  if (typeof window !== "undefined") {
+    const root = document.documentElement;
+    root.style.setProperty("--mobile-bottom-nav-height", "80px");
+  }
   const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
@@ -70,7 +75,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
   const { wallets } = useSelector((state: RootState) => state.wallet);
   const { isLoading, startLoading } = useNavigationLoading();
 
-  // State for sidebar minimization
+  // State for sidebar minimization (desktop only)
   const [isMinimized, setIsMinimized] = useState(false);
 
   // Check if user has wallets
@@ -119,115 +124,166 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
   };
 
   return (
-    <div
-      className={`relative flex flex-col bg-[#0F0F0F] border-r border-[#FFFFFF40] h-full overflow-hidden transition-all duration-300 ease-in-out ${
-        isMinimized ? "w-16 lg:w-20" : "w-full lg:w-64"
-      }`}
-    >
-      {/* Logo Section */}
-      <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
-        <div className="flex items-center justify-between">
-          {isMinimized ? (
-            /* Mini Logo and arrow when minimized */
-            <div className="w-full flex flex-col items-center gap-2">
-              {/* Arrow button when minimized */}
-              <button
-                onClick={toggleMinimized}
-                className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-all duration-300 text-gray-400 hover:text-white group"
-                title="Expand sidebar"
-              >
-                <ChevronRight
-                  size={18}
-                  className="lg:w-5 lg:h-5 transition-all duration-300 group-hover:translate-x-0.5"
+    <>
+      {/* Desktop Sidebar - Hidden on mobile */}
+      <div
+        className={`hidden lg:flex relative flex-col bg-[#0F0F0F] border-r border-[#FFFFFF40] h-full overflow-hidden transition-all duration-300 ease-in-out ${
+          isMinimized ? "w-16 lg:w-20" : "w-full lg:w-64"
+        }`}
+      >
+        {/* Logo Section */}
+        <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
+          <div className="flex items-center justify-between">
+            {isMinimized ? (
+              /* Mini Logo and arrow when minimized */
+              <div className="w-full flex flex-col items-center gap-2">
+                {/* Arrow button when minimized */}
+                <button
+                  onClick={toggleMinimized}
+                  className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-all duration-300 text-gray-400 hover:text-white group"
+                  title="Expand sidebar"
+                >
+                  <ChevronRight
+                    size={18}
+                    className="lg:w-5 lg:h-5 transition-all duration-300 group-hover:translate-x-0.5"
+                  />
+                </button>
+              </div>
+            ) : (
+              /* Full logo and arrow when expanded */
+              <>
+                <img
+                  src="/blockName.png"
+                  alt="Blockpal"
+                  className="brightness-110 h-5 lg:h-6"
+                  style={{
+                    width: "auto",
+                  }}
                 />
-              </button>
-            </div>
-          ) : (
-            /* Full logo and arrow when expanded */
-            <>
-              <img
-                src="/blockName.png"
-                alt="Blockpal"
-                className="brightness-110 h-5 lg:h-6"
-                style={{
-                  width: "auto",
-                }}
-              />
 
-              {/* Arrow Toggle Button */}
-              <button
-                onClick={toggleMinimized}
-                className="p-1.5 lg:p-2 hover:bg-[#2C2C2C] rounded-lg transition-all duration-300 text-gray-400 hover:text-white group"
-                title="Minimize sidebar"
-              >
-                <ChevronLeft
-                  size={18}
-                  className="lg:w-5 lg:h-5 transition-all duration-300 group-hover:-translate-x-0.5"
-                />
-              </button>
-            </>
-          )}
+                {/* Arrow Toggle Button */}
+                <button
+                  onClick={toggleMinimized}
+                  className="p-1.5 lg:p-2 hover:bg-[#2C2C2C] rounded-lg transition-all duration-300 text-gray-400 hover:text-white group"
+                  title="Minimize sidebar"
+                >
+                  <ChevronLeft
+                    size={18}
+                    className="lg:w-5 lg:h-5 transition-all duration-300 group-hover:-translate-x-0.5"
+                  />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <div className="flex-1 overflow-y-auto relative z-20 scrollbar-hide">
+          <nav
+            className={`space-y-1 lg:space-y-2 mb-4 lg:mb-6 ${
+              isMinimized ? "px-2" : "px-2 lg:px-4"
+            }`}
+          >
+            {menuItems.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                (item.comingSoon && pathname === "/dashboard/coming-soon");
+
+              return (
+                <div
+                  key={item.label}
+                  className="nav-item-wrapper -mr-2 lg:-mr-4"
+                >
+                  <button
+                    onClick={(e) =>
+                      handleNavigation(item.href, item.comingSoon, e)
+                    }
+                    disabled={isLoading}
+                    className={`w-full flex items-center text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
+                      isMinimized
+                        ? "pl-[18px] lg:pl-[22px] pr-4 lg:pr-6 py-2 lg:py-3 rounded-l-lg"
+                        : "px-3 lg:px-4 py-2 lg:py-3 rounded-l-lg"
+                    } ${
+                      isActive && !item.comingSoon
+                        ? "bg-[#E2AF19] text-black font-medium"
+                        : item.comingSoon
+                        ? "text-gray-400 hover:bg-[#1C1C1C] cursor-pointer"
+                        : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
+                    } ${isLoading ? "pointer-events-none" : ""}`}
+                    title={isMinimized ? item.label : undefined}
+                  >
+                    <item.icon
+                      size={16}
+                      className={`${
+                        isMinimized ? "" : "mr-3"
+                      } flex-shrink-0 lg:w-5 lg:h-5`}
+                      filled={isActive && !item.comingSoon}
+                    />
+                    {!isMinimized && (
+                      <span
+                        className={
+                          isActive && !item.comingSoon ? "font-medium" : ""
+                        }
+                      >
+                        {item.label}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Bottom Section - RainbowKit Connect Wallet Button */}
+        <div className="p-2 lg:p-4 flex-shrink-0 relative z-20">
+          <WalletConnectButton isMinimized={isMinimized} />
         </div>
       </div>
 
-      {/* Navigation Menu */}
-      <div className="flex-1 overflow-y-auto relative z-20 scrollbar-hide">
-        <nav
-          className={`space-y-1 lg:space-y-2 mb-4 lg:mb-6 ${
-            isMinimized ? "px-2" : "px-2 lg:px-4"
-          }`}
-        >
+      {/* Mobile Bottom Navigation */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0F0F0F] border-t border-[#FFFFFF40] safe-area-bottom">
+        <nav className="flex items-center justify-around px-2 py-3">
           {menuItems.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.comingSoon && pathname === "/dashboard/coming-soon");
 
             return (
-              <div key={item.label} className="nav-item-wrapper -mr-2 lg:-mr-4">
-                <button
-                  onClick={(e) =>
-                    handleNavigation(item.href, item.comingSoon, e)
-                  }
-                  disabled={isLoading}
-                  className={`w-full flex items-center text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
-                    isMinimized
-                      ? "pl-[18px] lg:pl-[22px] pr-4 lg:pr-6 py-2 lg:py-3 rounded-l-lg"
-                      : "px-3 lg:px-4 py-2 lg:py-3 rounded-l-lg"
-                  } ${
+              <button
+                key={item.label}
+                onClick={(e) => handleNavigation(item.href, item.comingSoon, e)}
+                disabled={isLoading}
+                className={`flex flex-col items-center justify-center min-w-[60px] py-2 px-3 rounded-lg transition-all duration-200 ${
+                  isLoading ? "pointer-events-none opacity-50" : ""
+                }`}
+              >
+                <item.icon
+                  size={20}
+                  className={`mb-1 ${
                     isActive && !item.comingSoon
-                      ? "bg-[#E2AF19] text-black font-medium"
+                      ? "text-[#E2AF19]"
                       : item.comingSoon
-                      ? "text-gray-400 hover:bg-[#1C1C1C] cursor-pointer"
-                      : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
-                  } ${isLoading ? "pointer-events-none" : ""}`}
-                  title={isMinimized ? item.label : undefined}
+                      ? "text-gray-400"
+                      : "text-[#EDEDED]"
+                  }`}
+                  filled={isActive && !item.comingSoon}
+                />
+                <span
+                  className={`text-[10px] font-satoshi ${
+                    isActive && !item.comingSoon
+                      ? "text-[#E2AF19] font-medium"
+                      : item.comingSoon
+                      ? "text-gray-400"
+                      : "text-[#EDEDED]"
+                  }`}
                 >
-                  <item.icon
-                    size={16}
-                    className={`${
-                      isMinimized ? "" : "mr-3"
-                    } flex-shrink-0 lg:w-5 lg:h-5`}
-                    filled={isActive && !item.comingSoon}
-                  />
-                  {!isMinimized && (
-                    <span
-                      className={
-                        isActive && !item.comingSoon ? "font-medium" : ""
-                      }
-                    >
-                      {item.label}
-                    </span>
-                  )}
-                </button>
-              </div>
+                  {item.label}
+                </span>
+              </button>
             );
           })}
         </nav>
-      </div>
-
-      {/* Bottom Section - RainbowKit Connect Wallet Button */}
-      <div className="p-2 lg:p-4 flex-shrink-0 relative z-20">
-        <WalletConnectButton isMinimized={isMinimized} />
       </div>
 
       <style jsx>{`
@@ -237,6 +293,11 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         }
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
+        }
+
+        /* Safe area for notched devices */
+        .safe-area-bottom {
+          padding-bottom: env(safe-area-inset-bottom);
         }
 
         /* Optional: Add a subtle pulse animation to the arrow when minimized */
@@ -254,6 +315,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
           animation: pulse-arrow 2s ease-in-out infinite;
         }
       `}</style>
-    </div>
+    </>
   );
 }

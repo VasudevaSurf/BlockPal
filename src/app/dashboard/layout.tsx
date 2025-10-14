@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED to remove padding when news chat is active
+// src/app/dashboard/layout.tsx - UPDATED with mobile bottom nav support
 "use client";
 
 import { useSelector } from "react-redux";
@@ -180,37 +180,22 @@ export default function DashboardLayout({
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className="p-2 text-white hover:bg-[#2C2C2C] rounded-lg transition-colors"
-                  >
-                    {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                  </button>
+                  {/* Menu button removed as we have bottom nav now */}
                 </div>
               )}
 
-              {/* Mobile Sidebar Overlay */}
-              {mobileMenuOpen && (
-                <div className="lg:hidden fixed inset-0 z-40 bg-black bg-opacity-50">
-                  <div className="absolute left-0 top-0 h-full w-80 max-w-[85vw]">
-                    <Sidebar onItemClick={() => setMobileMenuOpen(false)} />
-                  </div>
-                  <div
-                    className="absolute right-0 top-0 h-full flex-1"
-                    onClick={() => setMobileMenuOpen(false)}
-                  />
-                </div>
-              )}
+              {/* Sidebar - Contains both desktop sidebar and mobile bottom nav */}
+              <Sidebar />
 
-              {/* Desktop Sidebar - No padding/margin */}
-              <div className="hidden lg:block lg:h-full">
-                <Sidebar />
-              </div>
-
-              {/* Main Content - FIXED: Remove padding when news chat is active */}
+              {/* Main Content - FIXED: Added mobile bottom padding */}
               <main
                 className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col ${
-                  isSwapPage || isNewsChatActive ? "p-0" : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
+                  isSwapPage || isNewsChatActive
+                    ? "p-0"
+                    : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
+                } ${
+                  // Add padding bottom on mobile for bottom nav
+                  "pb-20 lg:pb-2"
                 }`}
               >
                 {/* Global Header - Hide on swap page AND when news chat is active */}
