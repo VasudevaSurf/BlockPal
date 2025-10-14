@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED with mobile bottom nav support
+// src/app/dashboard/layout.tsx - UPDATED to hide header on mobile for AI chat
 "use client";
 
 import { useSelector } from "react-redux";
@@ -162,28 +162,6 @@ export default function DashboardLayout({
               {/* Navigation Loading Indicator */}
               <NavigationLoadingIndicator />
 
-              {/* Mobile Header - Always show unless news chat is active */}
-              {!isNewsChatActive && (
-                <div className="lg:hidden flex items-center justify-between p-4 bg-black border-b border-[#2C2C2C]">
-                  <div className="flex items-center">
-                    <img
-                      src="/blockName.png"
-                      alt="Blockpal"
-                      className="h-6 brightness-110"
-                    />
-                    {isAIChatPage && (
-                      <div className="ml-3 flex items-center space-x-2">
-                        <div className="w-1 h-4 bg-[#E2AF19] rounded-full"></div>
-                        <span className="text-[#E2AF19] text-sm font-satoshi font-medium">
-                          AI Chat
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {/* Menu button removed as we have bottom nav now */}
-                </div>
-              )}
-
               {/* Sidebar - Contains both desktop sidebar and mobile bottom nav */}
               <Sidebar />
 
@@ -192,15 +170,21 @@ export default function DashboardLayout({
                 className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col ${
                   isSwapPage || isNewsChatActive
                     ? "p-0"
+                    : isAIChatPage
+                    ? "p-0 lg:p-2 lg:px-4"
                     : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
                 } ${
                   // Add padding bottom on mobile for bottom nav
                   "pb-20 lg:pb-2"
                 }`}
               >
-                {/* Global Header - Hide on swap page AND when news chat is active */}
+                {/* Global Header - Hide on swap page, news chat active, AND on mobile for AI chat */}
                 {!isSwapPage && !isNewsChatActive && (
-                  <div className="flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2">
+                  <div
+                    className={`flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2 ${
+                      isAIChatPage ? "hidden lg:block" : ""
+                    }`}
+                  >
                     <GlobalDashboardHeader
                       title={isAIChatPage ? "Chat with Lumen" : "Dashboard"}
                       subtitle={

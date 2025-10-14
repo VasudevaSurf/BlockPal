@@ -75,6 +75,9 @@ export default function AIChatPage() {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
 
+  // Mobile history sidebar state
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
+
   // Suggestion chips data with display text and actual query
   const suggestionChips = [
     { display: "Tell me about UNI", query: "Tell me about UNI" },
@@ -557,6 +560,7 @@ export default function AIChatPage() {
   const handleSessionSelect = async (selectedSessionId: string) => {
     if (selectedSessionId === conversationId) {
       setActiveTab("chat");
+      setMobileHistoryOpen(false);
       return;
     }
 
@@ -584,6 +588,7 @@ export default function AIChatPage() {
           setMessages(formattedMessages);
           setCurrentConversationLoaded(true);
           setActiveTab("chat");
+          setMobileHistoryOpen(false);
         }
       } else {
         throw new Error("Failed to load conversation");
@@ -602,6 +607,7 @@ export default function AIChatPage() {
     setConversationId("");
     setCurrentConversationLoaded(false);
     setActiveTab("chat");
+    setMobileHistoryOpen(false);
     console.log(
       "🆕 Starting new chat - conversation will be created on first message"
     );
@@ -882,10 +888,18 @@ export default function AIChatPage() {
         }}
       />
 
-      {/* Overlay for both mobile and desktop when sidebar is open */}
+      {/* Overlay for mobile when history sidebar is open */}
+      {mobileHistoryOpen && (
+        <div
+          className="fixed inset-0 bg-black/20 z-30 lg:hidden"
+          onClick={() => setMobileHistoryOpen(false)}
+        />
+      )}
+
+      {/* Desktop overlay when sidebar is open */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/20 z-30"
+          className="hidden lg:block fixed inset-0 bg-black/20 z-30"
           onClick={() => setActiveTab("chat")}
         />
       )}
@@ -896,8 +910,77 @@ export default function AIChatPage() {
           sidebarOpen ? "lg:mr-80" : ""
         }`}
       >
-        {/* Top Navigation Tabs */}
-        <div className="flex-shrink-0 bg-[#000000] px-4 py-3">
+        {/* Mobile Header - Only visible on mobile */}
+        <div className="lg:hidden flex-shrink-0 bg-[#000000] px-4 py-3">
+          <div className="flex items-center justify-center relative mt-2">
+            {/* <h1 className="text-white text-lg font-mayeka font-semibold">
+              Chat with Lumen
+            </h1> */}
+            <button
+              onClick={() => setMobileHistoryOpen(!mobileHistoryOpen)}
+              className="absolute right-0 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+              aria-label="Open chat history"
+            >
+              <div className="flex flex-col gap-[3px]">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="29"
+                  height="4"
+                  viewBox="0 0 29 4"
+                  fill="none"
+                >
+                  <path
+                    d="M2 2H27.3521"
+                    stroke="white"
+                    strokeWidth="2.11268"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="21"
+                  height="3"
+                  viewBox="0 0 21 3"
+                  fill="none"
+                >
+                  <path
+                    d="M2 1.63379H19"
+                    stroke="white"
+                    strokeWidth="2.11268"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="15"
+                  height="3"
+                  viewBox="0 0 15 3"
+                  fill="none"
+                >
+                  <path
+                    d="M2 1.26758H13"
+                    stroke="white"
+                    strokeWidth="2.11268"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+            </button>
+          </div>
+
+          {/* Error Display - Mobile */}
+          {error && (
+            <div className="mt-2 bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-2 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <AlertTriangle size={16} className="text-yellow-400" />
+                <p className="text-yellow-400 text-xs font-satoshi">{error}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Top Navigation Tabs */}
+        <div className="hidden lg:block flex-shrink-0 bg-[#000000] px-4 py-3">
           <div className="flex justify-center">
             <div className="flex rounded-[16px] p-1 gap-[24px]">
               <button
@@ -923,7 +1006,7 @@ export default function AIChatPage() {
             </div>
           </div>
 
-          {/* Error Display */}
+          {/* Error Display - Desktop */}
           {error && (
             <div className="mt-2 bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-2 text-center">
               <div className="flex items-center justify-center gap-2">
@@ -935,21 +1018,22 @@ export default function AIChatPage() {
         </div>
 
         {/* Messages or Welcome Screen */}
-        <div className="flex-1 overflow-y-auto px-4 min-h-0">
+        <div className="flex-1 overflow-y-auto px-4 min-h-0 pb-4 lg:pb-4">
           {showWelcomeScreen ? (
             /* Welcome Screen */
             <div className="h-full flex flex-col items-center justify-center -mt-5">
-              <h1 className="text-[35px] font-mayeka-demi-bold-demo font-bold mb-10 text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
+              <h1 className="text-[24px] lg:text-[35px] font-mayeka-demi-bold-demo font-bold mb-6 lg:mb-10 text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent px-4">
                 Chat with Lumen
               </h1>
 
-              <div className="w-full max-w-2xl mx-auto mb-16">
-                <div className="flex flex-wrap justify-center gap-2 px-4">
+              {/* Desktop suggestion chips - only visible on desktop */}
+              <div className="hidden lg:block w-full max-w-2xl mx-auto mb-10 lg:mb-16">
+                <div className="flex flex-wrap justify-center gap-1.5 lg:gap-2 px-2 lg:px-4">
                   {suggestionChips.map((chip, index) => (
                     <button
                       key={index}
                       onClick={() => handleChipClick(chip)}
-                      className="px-3 py-1.5 text-white text-xs font-satoshi rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
+                      className="px-2 lg:px-3 py-1 lg:py-1.5 text-white text-[10px] lg:text-xs font-satoshi rounded-[10px] lg:rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
                       disabled={isTyping || !isInitialized}
                     >
                       {chip.display}
@@ -966,7 +1050,7 @@ export default function AIChatPage() {
                   {message.type === "assistant" ? (
                     <div className="flex flex-col items-start space-y-2">
                       {message.processing && !message.content ? (
-                        <div className="max-w-4xl bg-black/40 backdrop-blur-md p-4 rounded-xl">
+                        <div className="max-w-4xl bg-black/40 backdrop-blur-md p-3 lg:p-4 rounded-xl">
                           <div className="flex items-center space-x-2">
                             <div className="flex space-x-1">
                               <div
@@ -985,8 +1069,8 @@ export default function AIChatPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="max-w-4xl bg-black/40 backdrop-blur-md p-4 rounded-xl border border-[#F9EFD1]/30">
-                          <div className="text-[#F9EFD1] text-sm leading-relaxed font-satoshi">
+                        <div className="max-w-4xl bg-black/40 backdrop-blur-md p-3 lg:p-4 rounded-xl border border-[#F9EFD1]/30">
+                          <div className="text-[#F9EFD1] text-xs lg:text-sm leading-relaxed font-satoshi">
                             <div
                               className="message-content"
                               dangerouslySetInnerHTML={{
@@ -1002,8 +1086,8 @@ export default function AIChatPage() {
                     </div>
                   ) : (
                     <div className="flex justify-end">
-                      <div className="bg-[#F9EFD1] text-black p-4 max-w-2xl rounded-xl rounded-tr-none">
-                        <p className="text-sm">{message.content}</p>
+                      <div className="bg-[#F9EFD1] text-black p-3 lg:p-4 max-w-2xl rounded-xl rounded-tr-none">
+                        <p className="text-xs lg:text-sm">{message.content}</p>
                       </div>
                     </div>
                   )}
@@ -1014,8 +1098,26 @@ export default function AIChatPage() {
           )}
         </div>
 
+        {/* Mobile Suggestion Chips - Above input, only visible on mobile when welcome screen */}
+        {showWelcomeScreen && (
+          <div className="lg:hidden flex-shrink-0 px-3 pb-2">
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {suggestionChips.map((chip, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleChipClick(chip)}
+                  className="px-2 py-1 text-white text-[10px] font-satoshi rounded-[10px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
+                  disabled={isTyping || !isInitialized}
+                >
+                  {chip.display}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Input */}
-        <div className="flex-shrink-0 p-4">
+        <div className="flex-shrink-0 p-3 lg:p-4">
           <div className="relative max-w-4xl mx-auto">
             <textarea
               ref={inputRef}
@@ -1025,34 +1127,15 @@ export default function AIChatPage() {
               placeholder={
                 isInitialized ? "Type your message" : "Initializing AI..."
               }
-              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-36 pl-4 py-3 min-h-[48px] max-h-32 text-sm border border-[#71570C] focus:border-[#E2AF19] transition-colors rounded-[100px] disabled:opacity-50"
+              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-24 lg:pr-36 pl-3 lg:pl-4 py-2.5 lg:py-3 min-h-[44px] lg:min-h-[48px] max-h-32 text-xs lg:text-sm border border-[#71570C] focus:border-[#E2AF19] transition-colors rounded-[100px] disabled:opacity-50"
               rows={1}
               disabled={isTyping || !isInitialized}
             />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-              {/* Attachment Icon */}
-              {/* <button
-                className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50"
-                disabled={isTyping || !isInitialized}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="20"
-                  viewBox="0 0 22 24"
-                  fill="none"
-                >
-                  <path
-                    d="M1.6013e-06 12.0617C-0.000352729 12.2597 0.0581042 12.4534 0.167961 12.6182C0.277818 12.783 0.434128 12.9114 0.617075 12.9873C0.800022 13.0631 1.00137 13.0829 1.19558 13.0442C1.3898 13.0054 1.56814 12.9099 1.708 12.7697L10.898 3.57569C11.8358 2.63788 13.1077 2.11103 14.434 2.11103C15.0907 2.11103 15.741 2.24037 16.3477 2.49168C16.9544 2.74299 17.5056 3.11133 17.97 3.57569C18.4344 4.04004 18.8027 4.59131 19.054 5.19802C19.3053 5.80472 19.4347 6.45499 19.4347 7.11169C19.4347 7.76838 19.3053 8.41865 19.054 9.02535C18.8027 9.63206 18.4344 10.1833 17.97 10.6477L7.364 21.2537C6.9868 21.618 6.48159 21.8196 5.9572 21.815C5.43281 21.8105 4.93118 21.6001 4.56036 21.2293C4.18955 20.8585 3.97921 20.3569 3.97465 19.8325C3.9701 19.3081 4.17169 18.8029 4.536 18.4257L15.142 7.81969C15.235 7.72671 15.3087 7.61633 15.359 7.49485C15.4094 7.37337 15.4353 7.24317 15.4353 7.11169C15.4353 6.9802 15.4094 6.85 15.359 6.72852C15.3087 6.60704 15.235 6.49666 15.142 6.40369C15.049 6.31071 14.9386 6.23696 14.8172 6.18664C14.6957 6.13632 14.5655 6.11042 14.434 6.11042C14.3025 6.11042 14.1723 6.13632 14.0508 6.18664C13.9294 6.23696 13.819 6.31071 13.726 6.40369L3.12 17.0117C2.73796 17.3807 2.43323 17.8221 2.2236 18.3101C2.01396 18.7981 1.90362 19.323 1.899 19.8541C1.89438 20.3852 1.99559 20.9119 2.19672 21.4035C2.39784 21.8951 2.69485 22.3417 3.07042 22.7173C3.44599 23.0928 3.8926 23.3898 4.38419 23.591C4.87577 23.7921 5.40249 23.8933 5.93361 23.8887C6.46472 23.8841 6.9896 23.7737 7.47762 23.5641C7.96564 23.3545 8.40701 23.0497 8.776 22.6677L19.382 12.0617C20.6948 10.7489 21.4324 8.9683 21.4324 7.11169C21.4324 5.25507 20.6948 3.47451 19.382 2.16169C18.0692 0.848864 16.2886 0.111328 14.432 0.111328C12.5754 0.111328 10.7948 0.848864 9.482 2.16169L0.294002 11.3537C0.201198 11.4467 0.127642 11.5571 0.0775382 11.6786C0.0274348 11.8001 -0.000233093 11.9303 1.6013e-06 12.0617Z"
-                    fill="#939393"
-                  />
-                </svg>
-              </button> */}
-
+            <div className="absolute right-2 lg:right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1 lg:gap-2">
               {/* Microphone Icon */}
               <button
                 onClick={toggleMicrophone}
-                className={`p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 ${
+                className={`p-1 lg:p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 ${
                   isListening ? "bg-red-500/20" : ""
                 }`}
                 disabled={isTyping || !isInitialized}
@@ -1062,8 +1145,9 @@ export default function AIChatPage() {
                   <div className="relative">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      width="25"
-                      height="25"
+                      width="18"
+                      height="18"
+                      className="lg:w-[25px] lg:h-[25px]"
                       viewBox="0 0 31 30"
                       fill="none"
                     >
@@ -1089,16 +1173,17 @@ export default function AIChatPage() {
                       />
                     </svg>
                     {/* Pulsing animation indicator */}
-                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="absolute -top-1 -right-1 flex h-2 w-2 lg:h-3 lg:w-3">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 lg:h-3 lg:w-3 bg-red-500"></span>
                     </span>
                   </div>
                 ) : (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    width="25"
-                    height="25"
+                    width="18"
+                    height="18"
+                    className="lg:w-[25px] lg:h-[25px]"
                     viewBox="0 0 31 30"
                     fill="none"
                   >
@@ -1130,12 +1215,13 @@ export default function AIChatPage() {
               <button
                 onClick={() => handleSendMessage()}
                 disabled={!inputMessage.trim() || isTyping || !isInitialized}
-                className="bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 text-black rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                className="bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 text-black rounded-full w-7 h-7 lg:w-8 lg:h-8 flex items-center justify-center transition-colors"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  width="40"
-                  height="40"
+                  width="32"
+                  height="32"
+                  className="lg:w-[40px] lg:h-[40px]"
                   viewBox="0 0 49 48"
                   fill="none"
                 >
@@ -1154,9 +1240,265 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Right Sidebar - History */}
+      {/* Mobile History Sidebar */}
       <div
-        className={`fixed lg:absolute right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out ${
+        className={`lg:hidden fixed right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out ${
+          mobileHistoryOpen
+            ? "translate-x-0 w-80 opacity-100"
+            : "translate-x-full w-80 opacity-0"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="h-full flex flex-col bg-black/95 backdrop-blur-md border-l border-[#2C2C2C]">
+          {/* Close button for mobile */}
+          <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C] flex-shrink-0">
+            <h2 className="text-white text-lg font-satoshi font-medium">
+              Chat History
+            </h2>
+            <button
+              onClick={() => setMobileHistoryOpen(false)}
+              className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+            >
+              <X size={20} className="text-gray-400" />
+            </button>
+          </div>
+
+          {/* Scrollable Chat History - with proper bottom padding */}
+          <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-4 min-h-0">
+            <div className="mb-4">
+              <span className="text-gray-300 text-sm font-satoshi font-medium">
+                Recent
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {/* Current Session */}
+              {messages.length > 0 &&
+                conversationId &&
+                currentConversationLoaded && (
+                  <div className="p-3 rounded-xl bg-[#E2AF19]/10 border border-[#E2AF19]/20 cursor-pointer hover:bg-[#E2AF19]/15 transition-all">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        {(() => {
+                          const currentConv = conversations.find(
+                            (conv) => conv.id === conversationId
+                          );
+                          return (
+                            <>
+                              {currentConv?.isStarred && (
+                                <Star
+                                  size={12}
+                                  className="text-[#E2AF19] fill-current flex-shrink-0"
+                                />
+                              )}
+                              <span className="text-white text-sm font-medium line-clamp-1">
+                                {currentConv?.title || "Current Chat"}
+                              </span>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              {/* Saved Conversations */}
+              {conversations
+                .filter((conv) => conv.id !== conversationId)
+                .sort((a, b) => {
+                  if (a.isStarred && !b.isStarred) return -1;
+                  if (!a.isStarred && b.isStarred) return 1;
+                  return (
+                    new Date(b.timestamp).getTime() -
+                    new Date(a.timestamp).getTime()
+                  );
+                })
+                .map((conversation) => (
+                  <div
+                    key={conversation.id}
+                    className="relative p-2 rounded-xl cursor-pointer group transition-all hover:bg-[#2C2C2C]/30"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div
+                        className="flex-1 min-w-0 pr-2"
+                        onClick={() =>
+                          !loadingConversationId &&
+                          handleSessionSelect(conversation.id)
+                        }
+                      >
+                        {editingId === conversation.id ? (
+                          <div className="flex items-center gap-2 w-full">
+                            {renamingId === conversation.id ? (
+                              <div className="flex items-center gap-2 w-full">
+                                <RefreshCw
+                                  size={12}
+                                  className="text-[#E2AF19] animate-spin flex-shrink-0"
+                                />
+                                <span className="text-gray-300 text-sm font-medium">
+                                  Saving...
+                                </span>
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                value={editingTitle}
+                                onChange={(e) =>
+                                  setEditingTitle(e.target.value)
+                                }
+                                onBlur={() => {
+                                  if (!renamingId) {
+                                    handleRename(conversation.id);
+                                  }
+                                }}
+                                onKeyPress={(e) => {
+                                  if (e.key === "Enter" && !renamingId) {
+                                    handleRename(conversation.id);
+                                  }
+                                  if (e.key === "Escape" && !renamingId) {
+                                    setEditingId(null);
+                                    setEditingTitle("");
+                                  }
+                                }}
+                                disabled={!!renamingId}
+                                autoFocus
+                                className="w-full bg-[#2C2C2C] text-white text-sm rounded px-2 py-1 outline-none border border-[#E2AF19] disabled:opacity-50"
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {loadingConversationId === conversation.id ? (
+                              <>
+                                <span className="text-gray-300 text-sm font-medium line-clamp-1">
+                                  Loading...
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {conversation.isStarred && (
+                                  <Star
+                                    size={12}
+                                    className="text-[#E2AF19] fill-current flex-shrink-0"
+                                  />
+                                )}
+                                <span className="text-gray-300 text-sm font-medium line-clamp-1">
+                                  {conversation.title}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Three-dot menu */}
+                      <div className="relative conversation-menu">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!loadingConversationId) {
+                              setOpenMenuId(
+                                openMenuId === conversation.id
+                                  ? null
+                                  : conversation.id
+                              );
+                            }
+                          }}
+                          disabled={!!loadingConversationId}
+                          className="p-1 hover:bg-[#2C2C2C] rounded transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-30"
+                        >
+                          <MoreHorizontal size={16} className="text-gray-400" />
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {openMenuId === conversation.id &&
+                          !loadingConversationId && (
+                            <div
+                              className="absolute right-0 top-8 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg shadow-lg min-w-[160px] z-50"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleStar(conversation.id);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                              >
+                                <Star
+                                  size={14}
+                                  className={
+                                    conversation.isStarred
+                                      ? "text-[#E2AF19] fill-current"
+                                      : "text-gray-400"
+                                  }
+                                />
+                                {conversation.isStarred ? "Unstar" : "Star"}
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startRename(
+                                    conversation.id,
+                                    conversation.title
+                                  );
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                              >
+                                <Edit3 size={14} className="text-gray-400" />
+                                Rename
+                              </button>
+
+                              <div className="border-t border-[#2C2C2C] my-1" />
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteConversation(conversation.id);
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-[#2C2C2C] transition-colors flex items-center gap-2"
+                              >
+                                <Trash2 size={14} className="text-red-400" />
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+              {/* Empty State */}
+              {conversations.length === 0 && messages.length === 0 && (
+                <div className="text-center py-8">
+                  <Brain className="text-gray-500 mx-auto mb-3" size={32} />
+                  <p className="text-gray-500 text-sm">No conversations yet</p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    Start chatting to see history
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* New Chat Button - Fixed at bottom above bottom nav */}
+          <div className="flex-shrink-0 p-4 border-t border-[#2C2C2C] bg-black/95 pb-24">
+            <button
+              onClick={handleNewChat}
+              className="w-full text-[#E2AF19] px-3 py-1.5 rounded-[300px] border border-[#71570C] text-[18px] font-satoshi font-medium transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"
+              disabled={isTyping}
+            >
+              <div className="p-1 bg-[#E2AF19] rounded-[100px]">
+                <Plus color="#000" size={12} />
+              </div>
+              <span>New Chat</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Right Sidebar - History */}
+      <div
+        className={`hidden lg:block fixed lg:absolute right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out ${
           sidebarOpen
             ? "translate-x-0 w-80 opacity-100"
             : "translate-x-full lg:translate-x-full w-80 opacity-0"
@@ -1164,8 +1506,8 @@ export default function AIChatPage() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="h-full flex flex-col bg-black/20 backdrop-blur-md lg:rounded-[30px] border border-[#2C2C2C] lg:m-2 lg:h-[calc(100%-16px)]">
-          {/* Close button for mobile */}
-          <div className="lg:hidden flex items-center justify-between p-4 border-b border-[#2C2C2C]">
+          {/* Close button for desktop */}
+          <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C]">
             <h2 className="text-white text-lg font-satoshi font-medium">
               Chat History
             </h2>
