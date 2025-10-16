@@ -1,6 +1,6 @@
-// src/components/dashboard/AddTokensModal.tsx - WEBSOCKET VERSION WITH ORIGINAL UI
+// src/components/dashboard/AddTokensModal.tsx - WITH DUPLICATE DETECTION
 import { useState, useEffect, useRef } from "react";
-import { X, Search, Loader2 } from "lucide-react";
+import { X, Search, Loader2, CheckCircle2 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { coinlesSocketClient } from "@/services/coinlesSocketClient";
@@ -13,6 +13,11 @@ interface AddTokensModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddToken: (token: any) => void;
+  existingTokens?: Array<{
+    // NEW: Accept existing tokens
+    chainId: string;
+    contractAddress: string;
+  }>;
 }
 
 interface SearchResult {
@@ -231,6 +236,7 @@ export default function AddTokensModal({
   isOpen,
   onClose,
   onAddToken,
+  existingTokens = [], // NEW: Default empty array
 }: AddTokensModalProps) {
   const { user } = useSelector((state: RootState) => state.auth);
 
@@ -240,11 +246,24 @@ export default function AddTokensModal({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [popularTokens, setPopularTokens] = useState<PopularToken[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [addingTokens, setAddingTokens] = useState(false);
   const [searchDebounceTimer, setSearchDebounceTimer] =
     useState<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const chainDisplayData = getChainDisplayData();
+
+  // NEW: Helper function to check if token already exists
+  const isTokenAlreadyAdded = (
+    contractAddress: string,
+    chainId: string
+  ): boolean => {
+    return existingTokens.some(
+      (token) =>
+        token.contractAddress.toLowerCase() === contractAddress.toLowerCase() &&
+        token.chainId.toLowerCase() === chainId.toLowerCase()
+    );
+  };
 
   // Set up WebSocket listener for search results
   useEffect(() => {
@@ -269,20 +288,21 @@ export default function AddTokensModal({
       setSelectedChain("eth");
       setSearchResults([]);
       setSearchLoading(false);
+      setAddingTokens(false);
     }
   }, [isOpen]);
 
   // Handle ESC key
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isOpen) {
+      if (event.key === "Escape" && isOpen && !addingTokens) {
         onClose();
       }
     };
 
     document.addEventListener("keydown", handleEscKey);
     return () => document.removeEventListener("keydown", handleEscKey);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, addingTokens]);
 
   // Focus search input when modal opens
   useEffect(() => {
@@ -371,10 +391,7 @@ export default function AddTokensModal({
         `🔍 Searching via WebSocket: "${query}" on chain: ${selectedChain}`
       );
 
-      // Use WebSocket search instead of REST API
       coinlesSocketClient.searchTokens(selectedChain, query, user.email);
-
-      // Results will come via the "search-results" event listener
     } catch (error) {
       console.error(`❌ Error searching tokens on ${selectedChain}:`, error);
       setSearchResults([]);
@@ -382,7 +399,13 @@ export default function AddTokensModal({
     }
   };
 
-  const toggleTokenSelection = (tokenKey: string) => {
+  const toggleTokenSelection = (tokenKey: string, contractAddress: string) => {
+    // NEW: Prevent selection if already added
+    if (isTokenAlreadyAdded(contractAddress, selectedChain)) {
+      console.log("Token already in watchlist, cannot select");
+      return;
+    }
+
     const newSelected = new Set(selectedTokens);
     if (newSelected.has(tokenKey)) {
       newSelected.delete(tokenKey);
@@ -393,8 +416,8 @@ export default function AddTokensModal({
   };
 
   const handleAddTokens = async () => {
-    if (!user?.email) {
-      console.error("No user email found");
+    if (!user?.email || addingTokens) {
+      console.error("No user email found or already adding");
       return;
     }
 
@@ -411,58 +434,62 @@ export default function AddTokensModal({
       popular: popularToAdd.length,
     });
 
-    for (const token of searchToAdd) {
-      const tokenData = {
-        chainId: selectedChain,
-        contractAddress: token.contractAddress,
-        poolAddress: token.poolAddress,
-        name: token.name,
-        symbol: token.symbol,
-        logo: token.logo,
-      };
-      await onAddToken(tokenData);
-    }
+    try {
+      setAddingTokens(true);
 
-    // For popular tokens, we need to search them via WebSocket to get full data
-    for (const token of popularToAdd) {
-      try {
-        // Create a promise that will resolve when we get search results
-        const searchPromise = new Promise<SearchResult[]>((resolve) => {
-          const handleResults = (results: SearchResult[]) => {
-            coinlesSocketClient.off("search-results", handleResults);
-            resolve(results);
-          };
-          coinlesSocketClient.on("search-results", handleResults);
-        });
-
-        // Trigger the search
-        coinlesSocketClient.searchTokens(
-          selectedChain,
-          token.symbol,
-          user.email
-        );
-
-        // Wait for results
-        const results = await searchPromise;
-
-        if (results && results.length > 0) {
-          const foundToken = results[0];
-          const tokenData = {
-            chainId: selectedChain,
-            contractAddress: foundToken.contractAddress,
-            poolAddress: foundToken.poolAddress,
-            name: foundToken.name,
-            symbol: foundToken.symbol,
-            logo: foundToken.logo || token.logoURI,
-          };
-          await onAddToken(tokenData);
-        }
-      } catch (error) {
-        console.error(`Error adding popular token ${token.symbol}:`, error);
+      for (const token of searchToAdd) {
+        const tokenData = {
+          chainId: selectedChain,
+          contractAddress: token.contractAddress,
+          poolAddress: token.poolAddress,
+          name: token.name,
+          symbol: token.symbol,
+          logo: token.logo,
+        };
+        await onAddToken(tokenData);
       }
-    }
 
-    onClose();
+      for (const token of popularToAdd) {
+        try {
+          const searchPromise = new Promise<SearchResult[]>((resolve) => {
+            const handleResults = (results: SearchResult[]) => {
+              coinlesSocketClient.off("search-results", handleResults);
+              resolve(results);
+            };
+            coinlesSocketClient.on("search-results", handleResults);
+          });
+
+          coinlesSocketClient.searchTokens(
+            selectedChain,
+            token.symbol,
+            user.email
+          );
+
+          const results = await searchPromise;
+
+          if (results && results.length > 0) {
+            const foundToken = results[0];
+            const tokenData = {
+              chainId: selectedChain,
+              contractAddress: foundToken.contractAddress,
+              poolAddress: foundToken.poolAddress,
+              name: foundToken.name,
+              symbol: foundToken.symbol,
+              logo: foundToken.logo || token.logoURI,
+            };
+            await onAddToken(tokenData);
+          }
+        } catch (error) {
+          console.error(`Error adding popular token ${token.symbol}:`, error);
+        }
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Error adding tokens:", error);
+    } finally {
+      setAddingTokens(false);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -540,8 +567,13 @@ export default function AddTokensModal({
                           <button
                             key={chain.id}
                             onClick={() => setSelectedChain(chain.id)}
+                            disabled={addingTokens}
                             className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
                               isSelected ? "bg-[#71570C]" : "hover:bg-[#1A1A1A]"
+                            } ${
+                              addingTokens
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
                             }`}
                           >
                             <div className="flex items-center gap-3">
@@ -570,7 +602,10 @@ export default function AddTokensModal({
                 <div className="flex-1" />
                 <button
                   onClick={onClose}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg ml-auto"
+                  disabled={addingTokens}
+                  className={`text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg ml-auto ${
+                    addingTokens ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                 >
                   <X size={20} />
                 </button>
@@ -591,7 +626,10 @@ export default function AddTokensModal({
                   placeholder="Search name, symbol, or paste address"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
+                  disabled={addingTokens}
+                  className={`w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka ${
+                    addingTokens ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                 />
               </div>
 
@@ -617,12 +655,25 @@ export default function AddTokensModal({
                     {popularTokens.map((token, index) => {
                       const tokenKey = `popular_${token.address}`;
                       const isSelected = selectedTokens.has(tokenKey);
+                      const alreadyAdded = isTokenAlreadyAdded(
+                        token.address,
+                        selectedChain
+                      ); // NEW
 
                       return (
                         <button
                           key={`${tokenKey}_${index}`}
-                          onClick={() => toggleTokenSelection(tokenKey)}
-                          className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
+                          onClick={() =>
+                            toggleTokenSelection(tokenKey, token.address)
+                          }
+                          disabled={addingTokens || alreadyAdded} // NEW: Disable if already added
+                          className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left ${
+                            alreadyAdded
+                              ? "bg-[#1A1A1A] opacity-60 cursor-not-allowed" // NEW: Different style for already added
+                              : addingTokens
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:bg-[#1A1A1A]"
+                          }`}
                         >
                           <div className="flex items-center min-w-0 flex-1">
                             <TokenImage
@@ -633,7 +684,7 @@ export default function AddTokensModal({
                               className="w-10 h-10 mr-3 flex-shrink-0"
                             />
                             <div className="min-w-0 flex-1">
-                              <div className="text-white font-medium font-satoshi text-sm">
+                              <div className="text-white font-medium font-satoshi text-sm flex items-center gap-2">
                                 {token.name}
                               </div>
                               <div className="text-gray-400 text-xs font-satoshi">
@@ -643,19 +694,26 @@ export default function AddTokensModal({
                           </div>
 
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <div
-                              className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
-                                isSelected
-                                  ? "bg-[#E2AF19]"
-                                  : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
-                              }`}
-                            >
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  isSelected ? "bg-black" : ""
-                                }`}
+                            {alreadyAdded ? ( // NEW: Show checkmark if already added
+                              <CheckCircle2
+                                size={16}
+                                className="text-green-400"
                               />
-                            </div>
+                            ) : (
+                              <div
+                                className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
+                                  isSelected
+                                    ? "bg-[#E2AF19]"
+                                    : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
+                                }`}
+                              >
+                                <div
+                                  className={`w-2 h-2 rounded-full ${
+                                    isSelected ? "bg-black" : ""
+                                  }`}
+                                />
+                              </div>
+                            )}
                           </div>
                         </button>
                       );
@@ -679,12 +737,28 @@ export default function AddTokensModal({
                     {displayTokens.map((token, index) => {
                       const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
                       const isSelected = selectedTokens.has(tokenKey);
+                      const alreadyAdded = isTokenAlreadyAdded(
+                        token.contractAddress,
+                        selectedChain
+                      ); // NEW
 
                       return (
                         <button
                           key={`${tokenKey}_${index}`}
-                          onClick={() => toggleTokenSelection(tokenKey)}
-                          className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
+                          onClick={() =>
+                            toggleTokenSelection(
+                              tokenKey,
+                              token.contractAddress
+                            )
+                          }
+                          disabled={addingTokens || alreadyAdded} // NEW: Disable if already added
+                          className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left ${
+                            alreadyAdded
+                              ? "bg-[#1A1A1A] opacity-60 cursor-not-allowed" // NEW: Different style for already added
+                              : addingTokens
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:bg-[#1A1A1A]"
+                          }`}
                         >
                           <div className="flex items-center min-w-0 flex-1">
                             <TokenImage
@@ -695,8 +769,13 @@ export default function AddTokensModal({
                               className="w-10 h-10 mr-3 flex-shrink-0"
                             />
                             <div className="min-w-0 flex-1">
-                              <div className="text-white font-medium font-satoshi text-sm">
+                              <div className="text-white font-medium font-satoshi text-sm flex items-center gap-2">
                                 {token.name}
+                                {alreadyAdded && ( // NEW: Show "Already Added" badge
+                                  <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-satoshi">
+                                    Already Added
+                                  </span>
+                                )}
                               </div>
                               <div className="text-gray-400 text-xs font-satoshi">
                                 {token.symbol}
@@ -705,35 +784,44 @@ export default function AddTokensModal({
                           </div>
 
                           <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right">
-                              <div className="text-white font-medium font-satoshi text-sm">
-                                {formatCurrency(token.price)}
+                            {!alreadyAdded && ( // NEW: Only show price if not already added
+                              <div className="text-right">
+                                <div className="text-white font-medium font-satoshi text-sm">
+                                  {formatCurrency(token.price)}
+                                </div>
+                                <div
+                                  className={`font-satoshi text-[10px] font-medium ${
+                                    token.change24h > 0
+                                      ? "text-green-500"
+                                      : "text-red-500"
+                                  }`}
+                                >
+                                  {token.change24h > 0 ? "▲" : "▼"}{" "}
+                                  {Math.abs(token.change24h).toFixed(2)}%
+                                </div>
                               </div>
+                            )}
+
+                            {alreadyAdded ? ( // NEW: Show checkmark if already added
+                              <CheckCircle2
+                                size={16}
+                                className="text-green-400"
+                              />
+                            ) : (
                               <div
-                                className={`font-satoshi text-[10px] font-medium ${
-                                  token.change24h > 0
-                                    ? "text-green-500"
-                                    : "text-red-500"
+                                className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
+                                  isSelected
+                                    ? "bg-[#E2AF19]"
+                                    : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
                                 }`}
                               >
-                                {token.change24h > 0 ? "▲" : "▼"}{" "}
-                                {Math.abs(token.change24h).toFixed(2)}%
+                                <div
+                                  className={`w-2 h-2 rounded-full ${
+                                    isSelected ? "bg-black" : ""
+                                  }`}
+                                />
                               </div>
-                            </div>
-
-                            <div
-                              className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
-                                isSelected
-                                  ? "bg-[#E2AF19]"
-                                  : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
-                              }`}
-                            >
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  isSelected ? "bg-black" : ""
-                                }`}
-                              />
-                            </div>
+                            )}
                           </div>
                         </button>
                       );
@@ -753,10 +841,21 @@ export default function AddTokensModal({
                 <div className="flex-1">
                   <button
                     onClick={handleAddTokens}
-                    disabled={selectedTokens.size === 0}
-                    className="w-full py-2 bg-[#E2AF19] text-black rounded-[10px] font-satoshi font-medium text-xs hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#E2AF19]"
+                    disabled={selectedTokens.size === 0 || addingTokens}
+                    className={`w-full py-2 rounded-[10px] font-satoshi font-medium text-xs transition-all flex items-center justify-center gap-2 ${
+                      selectedTokens.size === 0 || addingTokens
+                        ? "bg-[#E2AF19] opacity-50 cursor-not-allowed"
+                        : "bg-[#E2AF19] hover:bg-[#D4A853]"
+                    } text-black`}
                   >
-                    Add Tokens
+                    {addingTokens ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Adding...</span>
+                      </>
+                    ) : (
+                      <span>Add Tokens</span>
+                    )}
                   </button>
                 </div>
               </div>

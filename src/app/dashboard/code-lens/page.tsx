@@ -1,4 +1,4 @@
-// src/app/dashboard/code-lens/page.tsx - COMPLETE WEBSOCKET VERSION
+// src/app/dashboard/code-lens/page.tsx - TREAT 0 AS NA
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -45,24 +45,27 @@ export default function CodeLens() {
   const [connected, setConnected] = useState(false);
   const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
-  // Set the add token handler for the layout
+  const watchlistReceivedRef = useRef(false);
+
   useEffect(() => {
     setOnAddTokenClick(() => () => setAddTokensModalOpen(true));
   }, [setOnAddTokenClick]);
 
-  // Connect to WebSocket and load user's watchlist
   useEffect(() => {
     if (!user?.email) {
       setLoading(false);
       return;
     }
 
-    console.log("🔌 Connecting to CoinLes WebSocket...");
+    console.log("🔌 Setting up WebSocket connection...");
 
-    // Connect to WebSocket
+    const isAlreadyConnected = coinlesSocketClient.isConnected();
+    console.log(
+      `Connection status: ${isAlreadyConnected ? "Connected" : "Not connected"}`
+    );
+
     coinlesSocketClient.connect(user.email);
 
-    // Set up event listeners
     const handleWatchlist = (data: any[]) => {
       console.log("📋 Received watchlist:", data.length, "tokens");
       const transformedTokens = transformWatchlistData(data);
@@ -70,6 +73,7 @@ export default function CodeLens() {
       setFilteredTokens(transformedTokens);
       setLoading(false);
       setConnected(true);
+      watchlistReceivedRef.current = true;
     };
 
     const handleTokenUpdate = (update: any) => {
@@ -98,7 +102,6 @@ export default function CodeLens() {
         setTokens((prev) => [...prev, newToken]);
         setFilteredTokens((prev) => [...prev, newToken]);
       }
-      setAddTokensModalOpen(false);
     };
 
     const handleTokenRemoved = (response: any) => {
@@ -107,6 +110,7 @@ export default function CodeLens() {
 
     const handleError = (error: any) => {
       console.error("❌ WebSocket error:", error);
+      setLoading(false);
     };
 
     const handleConnect = () => {
@@ -119,7 +123,6 @@ export default function CodeLens() {
       setConnected(false);
     };
 
-    // Register event listeners
     coinlesSocketClient.on("watchlist", handleWatchlist);
     coinlesSocketClient.on("token-update", handleTokenUpdate);
     coinlesSocketClient.on("token-added", handleTokenAdded);
@@ -128,7 +131,17 @@ export default function CodeLens() {
     coinlesSocketClient.on("connect", handleConnect);
     coinlesSocketClient.on("disconnect", handleDisconnect);
 
-    // Cleanup on unmount
+    if (isAlreadyConnected && !watchlistReceivedRef.current) {
+      console.log("🔄 Already connected, requesting watchlist...");
+      setTimeout(() => {
+        coinlesSocketClient.emit("register", { email: user.email });
+      }, 100);
+    } else if (watchlistReceivedRef.current) {
+      console.log("✅ Using cached watchlist data");
+      setLoading(false);
+      setConnected(true);
+    }
+
     return () => {
       coinlesSocketClient.off("watchlist", handleWatchlist);
       coinlesSocketClient.off("token-update", handleTokenUpdate);
@@ -140,12 +153,10 @@ export default function CodeLens() {
     };
   }, [user?.email]);
 
-  // Handle search query changes
   useEffect(() => {
     handleSearch(searchQuery);
   }, [searchQuery, tokens]);
 
-  // Transform watchlist data from WebSocket to frontend format
   const transformWatchlistData = (data: any[]): Token[] => {
     return data.map((item) => ({
       id: `${item.chainId}_${item.contractAddress}`,
@@ -165,7 +176,6 @@ export default function CodeLens() {
     }));
   };
 
-  // Transform single token
   const transformSingleToken = (data: any): Token => {
     return {
       id: `${data.chainId}_${data.contractAddress}`,
@@ -199,7 +209,18 @@ export default function CodeLens() {
     }
   };
 
-  const formatNumber = (num: number) => {
+  // NEW: Check if value is valid (not 0, null, undefined, or NaN)
+  const isValidValue = (value: any): boolean => {
+    return (
+      value !== null && value !== undefined && !isNaN(value) && value !== 0
+    );
+  };
+
+  // NEW: Format number - show N/A if 0 or invalid
+  const formatNumber = (num: number): string => {
+    if (!isValidValue(num)) {
+      return "N/A";
+    }
     if (num >= 1000000000) {
       return `$${(num / 1000000000).toFixed(1)}B`;
     }
@@ -210,6 +231,46 @@ export default function CodeLens() {
       return `$${(num / 1000).toFixed(1)}K`;
     }
     return `$${num.toFixed(2)}`;
+  };
+
+  // NEW: Format price - show N/A if 0 or invalid
+  const formatPrice = (price: number): string => {
+    if (!isValidValue(price)) {
+      return "N/A";
+    }
+    return `$${price.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    })}`;
+  };
+
+  // NEW: Format change - show N/A if 0 or invalid (but allow negative values)
+  const formatChange = (
+    change: number
+  ): { display: string; isPositive: boolean | null } => {
+    // For change24h, we need to check if it's exactly 0, not just falsy
+    // Allow negative values to show
+    if (change === null || change === undefined || isNaN(change)) {
+      return { display: "N/A", isPositive: null };
+    }
+    // If change is 0, it could mean no change or no data
+    // Typically APIs send 0 when there's no data, so treat it as N/A
+    if (change === 0) {
+      return { display: "N/A", isPositive: null };
+    }
+    const isPositive = change >= 0;
+    return {
+      display: `${isPositive ? "▲" : "▼"} ${Math.abs(change).toFixed(2)}%`,
+      isPositive,
+    };
+  };
+
+  // NEW: Format count - show N/A if 0 or invalid
+  const formatCount = (count: number): string => {
+    if (!isValidValue(count)) {
+      return "N/A";
+    }
+    return count.toString();
   };
 
   const handleMoreClick = (tokenId: string, event: React.MouseEvent) => {
@@ -230,7 +291,7 @@ export default function CodeLens() {
     if (token) {
       const tokenInfo = `${token.name} (${token.symbol})\nContract: ${
         token.contractAddress
-      }\nPrice: $${token.price.toLocaleString()}\nMarket Cap: ${formatNumber(
+      }\nPrice: ${formatPrice(token.price)}\nMarket Cap: ${formatNumber(
         token.marketCap
       )}`;
       navigator.clipboard.writeText(tokenInfo);
@@ -242,14 +303,12 @@ export default function CodeLens() {
     const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
     if (token && user?.email) {
       try {
-        // Emit remove token event via WebSocket
         coinlesSocketClient.removeToken(
           user.email,
           token.chainId,
           token.contractAddress
         );
 
-        // Optimistically update UI
         const newTokens = tokens.filter((t) => t.id !== activeMenuTokenId);
         setTokens(newTokens);
 
@@ -272,7 +331,6 @@ export default function CodeLens() {
     console.log("Adding token with data:", tokenData);
 
     try {
-      // Emit add token event via WebSocket
       coinlesSocketClient.addToken(user.email, {
         chainId: tokenData.chainId,
         contractAddress: tokenData.contractAddress,
@@ -280,8 +338,6 @@ export default function CodeLens() {
         tokenName: tokenData.name,
         tokenSymbol: tokenData.symbol,
       });
-
-      // UI will be updated via 'token-added' event
     } catch (error) {
       console.error("Error adding token:", error);
     }
@@ -342,106 +398,122 @@ export default function CodeLens() {
               </p>
             </div>
           ) : (
-            filteredTokens.map((token) => (
-              <div
-                key={token.id}
-                onClick={() => handleTokenClick(token)}
-                className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer"
-              >
-                {/* Token */}
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#2C2C2C]">
-                    {token.logo ? (
-                      <img
-                        src={token.logo}
-                        alt={token.symbol}
-                        className="w-8 h-8 rounded-full"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                          const parent = e.currentTarget.parentElement;
-                          if (parent) {
-                            const fallback = document.createElement("span");
-                            fallback.className = "text-white text-xs font-bold";
-                            fallback.textContent = token.symbol.charAt(0);
-                            parent.appendChild(fallback);
-                          }
-                        }}
-                      />
-                    ) : (
-                      <span className="text-white text-xs font-bold">
-                        {token.symbol.charAt(0)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-row items-baseline gap-1.5">
-                    <div className="text-white font-satoshi font-medium text-sm">
-                      {token.name}
-                    </div>
-                    <div className="text-gray-500 font-satoshi text-xs">
-                      {token.symbol}
-                    </div>
-                  </div>
-                </div>
+            filteredTokens.map((token) => {
+              const changeData = formatChange(token.change24h);
 
-                {/* Price */}
-                <div className="flex items-center justify-center text-white font-satoshi font-medium text-sm">
-                  $
-                  {token.price.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 6,
-                  })}
-                </div>
-
-                {/* 24h Change */}
+              return (
                 <div
-                  className={`flex items-center justify-center font-satoshi font-medium text-sm ${
-                    token.change24h > 0 ? "text-green-500" : "text-red-500"
-                  }`}
+                  key={token.id}
+                  onClick={() => handleTokenClick(token)}
+                  className="grid grid-cols-[2fr_1fr_1fr_1.2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer"
                 >
-                  {token.change24h > 0 ? "▲" : "▼"}{" "}
-                  {Math.abs(token.change24h).toFixed(2)}%
-                </div>
+                  {/* Token */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#2C2C2C]">
+                      {token.logo ? (
+                        <img
+                          src={token.logo}
+                          alt={token.symbol}
+                          className="w-8 h-8 rounded-full"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                            const parent = e.currentTarget.parentElement;
+                            if (parent) {
+                              const fallback = document.createElement("span");
+                              fallback.className =
+                                "text-white text-xs font-bold";
+                              fallback.textContent = token.symbol.charAt(0);
+                              parent.appendChild(fallback);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <span className="text-white text-xs font-bold">
+                          {token.symbol.charAt(0)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-row items-baseline gap-1.5">
+                      <div className="text-white font-satoshi font-medium text-sm">
+                        {token.name}
+                      </div>
+                      <div className="text-gray-500 font-satoshi text-xs">
+                        {token.symbol}
+                      </div>
+                    </div>
+                  </div>
 
-                {/* 24h Volume */}
-                <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                  {formatNumber(token.volume24h)}
-                </div>
+                  {/* Price - Shows N/A if 0 */}
+                  <div className="flex items-center justify-center text-white font-satoshi font-medium text-sm">
+                    {formatPrice(token.price)}
+                  </div>
 
-                {/* Market Cap */}
-                <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                  {formatNumber(token.marketCap)}
-                </div>
-
-                {/* Liquidity */}
-                <div className="flex items-center justify-center text-white font-satoshi text-sm">
-                  {formatNumber(token.liquidity)}
-                </div>
-
-                {/* Buys */}
-                <div className="flex items-center justify-center text-green-500 font-satoshi text-sm">
-                  {token.buys24h}
-                </div>
-
-                {/* Sells */}
-                <div className="flex items-center justify-center text-red-500 font-satoshi text-sm">
-                  {token.sells24h}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-center">
-                  <button
-                    ref={(el) => {
-                      buttonRefs.current[token.id] = el;
-                    }}
-                    onClick={(e) => handleMoreClick(token.id, e)}
-                    className="p-1 hover:bg-[#2C2C2C] rounded transition-colors"
-                    title="More actions"
+                  {/* 24h Change - Shows N/A if 0 */}
+                  <div
+                    className={`flex items-center justify-center font-satoshi font-medium text-sm ${
+                      changeData.isPositive === null
+                        ? "text-gray-400"
+                        : changeData.isPositive
+                        ? "text-green-500"
+                        : "text-red-500"
+                    }`}
                   >
-                    <MoreVertical className="w-4 h-4 text-gray-400" />
-                  </button>
+                    {changeData.display}
+                  </div>
+
+                  {/* 24h Volume - Shows N/A if 0 */}
+                  <div className="flex items-center justify-center text-white font-satoshi text-sm">
+                    {formatNumber(token.volume24h)}
+                  </div>
+
+                  {/* Market Cap - Shows N/A if 0 */}
+                  <div className="flex items-center justify-center text-white font-satoshi text-sm">
+                    {formatNumber(token.marketCap)}
+                  </div>
+
+                  {/* Liquidity - Shows N/A if 0 */}
+                  <div className="flex items-center justify-center text-white font-satoshi text-sm">
+                    {formatNumber(token.liquidity)}
+                  </div>
+
+                  {/* Buys - Shows N/A if 0 */}
+                  <div
+                    className={`flex items-center justify-center font-satoshi text-sm ${
+                      isValidValue(token.buys24h)
+                        ? "text-green-500"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    {formatCount(token.buys24h)}
+                  </div>
+
+                  {/* Sells - Shows N/A if 0 */}
+                  <div
+                    className={`flex items-center justify-center font-satoshi text-sm ${
+                      isValidValue(token.sells24h)
+                        ? "text-red-500"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    {formatCount(token.sells24h)}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-center">
+                    <button
+                      ref={(el) => {
+                        buttonRefs.current[token.id] = el;
+                      }}
+                      onClick={(e) => handleMoreClick(token.id, e)}
+                      className="p-1 hover:bg-[#2C2C2C] rounded transition-colors"
+                      title="More actions"
+                    >
+                      <MoreVertical className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -460,6 +532,10 @@ export default function CodeLens() {
         isOpen={addTokensModalOpen}
         onClose={() => setAddTokensModalOpen(false)}
         onAddToken={handleAddToken}
+        existingTokens={tokens.map((token) => ({
+          chainId: token.chainId,
+          contractAddress: token.contractAddress,
+        }))}
       />
 
       <style jsx global>{`

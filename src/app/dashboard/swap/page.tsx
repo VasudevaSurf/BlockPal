@@ -845,8 +845,25 @@ export default function SwapPage() {
                       </h2>
                       <input
                         type="text"
+                        inputMode="decimal"
                         value={fromAmount}
-                        onChange={(e) => setFromAmount(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Allow empty string, numbers, and single decimal point
+                          if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                            setFromAmount(value);
+                          }
+                        }}
+                        onKeyPress={(e) => {
+                          // Prevent non-numeric characters except decimal point
+                          if (!/[\d.]/.test(e.key)) {
+                            e.preventDefault();
+                          }
+                          // Prevent multiple decimal points
+                          if (e.key === "." && fromAmount.includes(".")) {
+                            e.preventDefault();
+                          }
+                        }}
                         className="bg-transparent text-white text-3xl font-satoshi outline-none w-full"
                         placeholder="0"
                         disabled={swapping}
