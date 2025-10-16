@@ -1,4 +1,4 @@
-// src/components/swap/SwapChainSelector.tsx - FIXED ICON BACKGROUNDS
+// src/components/swap/SwapChainSelector.tsx - RESPONSIVE VERSION
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -71,7 +71,7 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// FIXED Chain Icon Component - No background when image loads successfully
+// Chain Icon Component
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -94,9 +94,9 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   const [imageError, setImageError] = useState(false);
 
   const sizeClasses = {
-    sm: "w-5 h-5",
-    md: "w-6 h-6 lg:w-7 lg:h-7",
-    lg: "w-8 h-8",
+    sm: "w-4 h-4 lg:w-5 lg:h-5",
+    md: "w-5 h-5 lg:w-6 lg:h-6",
+    lg: "w-6 h-6 lg:w-8 lg:h-8",
   };
 
   useEffect(() => {
@@ -118,12 +118,10 @@ const ChainIcon: React.FC<ChainIconProps> = ({
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
-      {/* Dark background while loading or on error */}
       {(!imageLoaded || imageError) && (
         <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
       )}
 
-      {/* Actual Image - no background when loaded successfully */}
       {chainData.image && !imageError && (
         <img
           src={chainData.image}
@@ -137,12 +135,11 @@ const ChainIcon: React.FC<ChainIconProps> = ({
         />
       )}
 
-      {/* Only show fallback icon if image fails to load */}
       {imageError && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
-          <span className="text-white text-xs font-bold font-satoshi">
+          <span className="text-white text-[10px] lg:text-xs font-bold font-satoshi">
             {chainData.fallbackIcon}
           </span>
         </div>
@@ -198,10 +195,12 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
   useEffect(() => {
     if (isOpen && triggerRef?.current) {
       const triggerRect = triggerRef.current.getBoundingClientRect();
+      const isMobile = window.innerWidth < 1024;
+      
       setDropdownPosition({
         top: triggerRect.bottom + 8,
-        left: triggerRect.left,
-        width: Math.max(triggerRect.width * 1.7, 320),
+        left: isMobile ? triggerRect.left : triggerRect.left,
+        width: isMobile ? Math.min(triggerRect.width * 2.2, 280) : Math.max(triggerRect.width * 1.7, 320),
       });
     }
   }, [isOpen, triggerRef]);
@@ -245,10 +244,12 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
 
   return (
     <>
+      {/* Backdrop */}
       <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
 
+      {/* Desktop Dropdown */}
       <div
-        className="fixed z-50 bg-[#0F0F0F] rounded-[28px] border border-[#2C2C2C] shadow-2xl"
+        className="hidden lg:block fixed z-50 bg-[#0F0F0F] rounded-[28px] border border-[#2C2C2C] shadow-2xl"
         style={{
           top: `${dropdownPosition.top}px`,
           left: `${dropdownPosition.left}px`,
@@ -331,6 +332,116 @@ const SwapChainSelector: React.FC<SwapChainSelectorProps> = ({
             {isSwitchingChain || switchingChain ? (
               <div className="flex items-center justify-center gap-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
+                Switching...
+              </div>
+            ) : selectedChain === chainId ? (
+              "Current Chain"
+            ) : (
+              "Switch to " + (chainDisplayData[selectedChain]?.name || "Chain")
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Dropdown - Centered */}
+      <div 
+        className="lg:hidden fixed z-50 bg-[#0F0F0F] rounded-[20px] border border-[#2C2C2C] shadow-2xl flex flex-col"
+        style={{
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: "280px",
+          maxHeight: "400px",
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-2.5 border-b border-[#2C2C2C] flex-shrink-0">
+          <h3 className="text-white font-mayeka text-sm">Select Chain</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition-colors p-0.5"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Chain List */}
+        <div className="p-2 space-y-1.5 overflow-y-auto flex-1">
+          {chains.map((chain) => {
+            const chainDisplay = chainDisplayData[chain.id] || {
+              name: chain.name,
+              color: "bg-gray-500",
+              icon: chain.name.charAt(0),
+              fallbackIcon: chain.name.charAt(0),
+              useBackground: true,
+            };
+
+            const isSelected = selectedChain === chain.id;
+            const isSwitching = switchingChain === chain.id;
+
+            return (
+              <button
+                key={chain.id}
+                onClick={() => handleChainSelect(chain.id)}
+                disabled={isSwitching || isSwitchingChain}
+                className={`w-full p-2 rounded-[8px] transition-all duration-200 text-left ${
+                  isSelected
+                    ? "bg-[#71570C] border border-[#E2AF19]"
+                    : "border border-[#2C2C2C] hover:border-[#4C4C4C]"
+                } ${isSwitching ? "opacity-70" : ""}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ChainIcon chainData={chainDisplay} size="sm" />
+                    <span
+                      className={`text-xs font-satoshi font-medium ${
+                        isSelected ? "text-[#E2AF19]" : "text-white"
+                      }`}
+                    >
+                      {chainDisplay.name}
+                      {isSwitching && (
+                        <span className="ml-1.5 text-[10px] text-gray-400">
+                          (Switching...)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {isSelected && (
+                    <div className="w-3.5 h-3.5 bg-[#E2AF19] rounded-full flex items-center justify-center">
+                      <svg
+                        className="w-2 h-2 text-black"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Confirm Button */}
+        <div className="p-2 pt-0 pb-2 flex-shrink-0">
+          <button
+            onClick={handleConfirm}
+            disabled={isSwitchingChain || switchingChain}
+            className={`w-full py-2 font-mayeka-demi-bold-demo font-medium text-xs rounded-[8px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              selectedChain === chainId
+                ? "bg-[#2C2C2C] text-gray-400 cursor-not-allowed"
+                : "bg-[#E2AF19] text-black hover:bg-[#D4A853]"
+            }`}
+          >
+            {isSwitchingChain || switchingChain ? (
+              <div className="flex items-center justify-center gap-1.5">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-black"></div>
                 Switching...
               </div>
             ) : selectedChain === chainId ? (

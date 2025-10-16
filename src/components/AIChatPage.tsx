@@ -913,9 +913,6 @@ export default function AIChatPage() {
         {/* Mobile Header - Only visible on mobile */}
         <div className="lg:hidden flex-shrink-0 bg-[#000000] px-4 py-3">
           <div className="flex items-center justify-center relative mt-2">
-            {/* <h1 className="text-white text-lg font-mayeka font-semibold">
-              Chat with Lumen
-            </h1> */}
             <button
               onClick={() => setMobileHistoryOpen(!mobileHistoryOpen)}
               className="absolute right-0 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
@@ -1021,10 +1018,26 @@ export default function AIChatPage() {
         <div className="flex-1 overflow-y-auto px-4 min-h-0 pb-4 lg:pb-4">
           {showWelcomeScreen ? (
             /* Welcome Screen */
-            <div className="h-full flex flex-col items-center justify-center -mt-5">
-              <h1 className="text-[24px] lg:text-[35px] font-mayeka-demi-bold-demo font-bold mb-6 lg:mb-10 text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent px-4">
+            <div className="h-full flex flex-col items-center justify-center">
+              <h1 className="text-[24px] lg:text-[35px] font-mayeka-demi-bold-demo font-bold mb-3 lg:mb-10 text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent px-4">
                 Chat with Lumen
               </h1>
+
+              {/* Mobile suggestion chips - right below title */}
+              <div className="lg:hidden w-full px-3 mt-8">
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {suggestionChips.map((chip, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleChipClick(chip)}
+                      className="px-2 py-1 text-white text-[10px] font-satoshi rounded-[10px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
+                      disabled={isTyping || !isInitialized}
+                    >
+                      {chip.display}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Desktop suggestion chips - only visible on desktop */}
               <div className="hidden lg:block w-full max-w-2xl mx-auto mb-10 lg:mb-16">
@@ -1097,24 +1110,6 @@ export default function AIChatPage() {
             </div>
           )}
         </div>
-
-        {/* Mobile Suggestion Chips - Above input, only visible on mobile when welcome screen */}
-        {showWelcomeScreen && (
-          <div className="lg:hidden flex-shrink-0 px-3 pb-2">
-            <div className="flex flex-wrap justify-center gap-1.5">
-              {suggestionChips.map((chip, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleChipClick(chip)}
-                  className="px-2 py-1 text-white text-[10px] font-satoshi rounded-[10px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
-                  disabled={isTyping || !isInitialized}
-                >
-                  {chip.display}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Input */}
         <div className="flex-shrink-0 p-3 lg:p-4">

@@ -201,7 +201,7 @@ class CoinlesSocketClient {
     return this.currentEmail || (typeof window !== 'undefined' ? localStorage.getItem('coinlesUserEmail') : null);
   }
 
-  // ========== CODELENS SPECIFIC METHODS ==========
+  // ========== COINLENS SPECIFIC METHODS ==========
 
   searchTokens(chain: string, query: string, email: string) {
     console.log('🔍 Searching tokens:', { chain, query });

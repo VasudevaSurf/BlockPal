@@ -370,7 +370,7 @@ export default function TokenOverviewPage() {
 
   if (loading) {
     return (
-      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[14px] p-3 flex items-center justify-center">
+      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[14px] p-3 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19]"></div>
       </div>
     );
@@ -378,7 +378,7 @@ export default function TokenOverviewPage() {
 
   if (!tokenInfo) {
     return (
-      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[14px] p-3 flex items-center justify-center">
+      <div className="h-full bg-[#0000000] rounded-[12px] lg:rounded-[14px] p-3 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-lg font-bold text-white mb-1.5">
             Token not found
@@ -423,7 +423,7 @@ export default function TokenOverviewPage() {
         }
       `}</style>
 
-      <div className="h-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden">
+      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden">
         {/* Mobile Layout */}
         <div className="flex flex-col xl:hidden gap-2.5 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
           {/* Token Header */}

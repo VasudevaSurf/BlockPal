@@ -23,7 +23,7 @@ interface GlobalDashboardHeaderProps {
   title: string;
   subtitle?: string;
   children?: React.ReactNode;
-  // CodeLens specific props
+  // CoinLens specific props
   onSearchChange?: (query: string) => void;
   onAddTokenClick?: () => void;
   searchQuery?: string;
@@ -81,9 +81,9 @@ const getPageTitle = (
         title: "Swap",
         subtitle: "Make Swap Payments",
       };
-    case "/dashboard/code-lens":
+    case "/dashboard/coin-lens":
       return {
-        title: "CodeLens",
+        title: "CoinLens",
         subtitle: "Analyze Tokens",
       };
     case "/dashboard/news-feed":
@@ -320,7 +320,7 @@ export default function GlobalDashboardHeader({
   const chainSelectorRef = useRef<HTMLDivElement>(null);
 
   const isTokenOverviewPage = pathname.startsWith("/dashboard/tokenOverview/");
-  const isCodeLensPage = pathname === "/dashboard/code-lens";
+  const isCoinLensPage = pathname === "/dashboard/coin-lens";
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
   const isPortfolioPage = pathname === "/dashboard";
 
@@ -528,8 +528,8 @@ export default function GlobalDashboardHeader({
               </h1>
             )}
 
-            {/* CodeLens Search Bar */}
-            {isCodeLensPage && (
+            {/* CoinLens Search Bar */}
+            {isCoinLensPage && (
               <div className="flex-1 relative mr-4">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
                 <input
@@ -621,7 +621,7 @@ export default function GlobalDashboardHeader({
               </form>
             )}
 
-            {!isCodeLensPage && !isNewsFeedPage && !isPortfolioPage && (
+            {!isCoinLensPage && !isNewsFeedPage && !isPortfolioPage && (
               <div></div>
             )}
           </div>

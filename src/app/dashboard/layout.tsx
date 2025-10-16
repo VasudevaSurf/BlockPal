@@ -90,7 +90,7 @@ export default function DashboardLayout({
   // Check if we're on Swap page to show the effect and hide header
   const isSwapPage = pathname === "/dashboard/swap";
   // Check if we're on CodeLens page
-  const isCodeLensPage = pathname === "/dashboard/code-lens";
+  const isCodeLensPage = pathname === "/dashboard/coin-lens";
   // Check if we're on News Feed page
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
 

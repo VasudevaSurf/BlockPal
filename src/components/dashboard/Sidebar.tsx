@@ -46,8 +46,8 @@ const menuItems = [
   },
   {
     icon: SwapIcon,
-    label: "CodeLens",
-    href: "/dashboard/code-lens",
+    label: "CoinLens",
+    href: "/dashboard/coin-lens",
     comingSoon: false,
   },
   {

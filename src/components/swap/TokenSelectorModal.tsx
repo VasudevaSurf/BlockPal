@@ -1,4 +1,4 @@
-// src/components/swap/TokenSelectorModal.tsx - WITH CONTRACT ADDRESS DISPLAY
+// src/components/swap/TokenSelectorModal.tsx - RESPONSIVE VERSION
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -96,9 +96,9 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   const [imageError, setImageError] = useState(false);
 
   const sizeClasses = {
-    sm: "w-5 h-5",
-    md: "w-7 h-7",
-    lg: "w-8 h-8",
+    sm: "w-4 h-4 lg:w-5 lg:h-5",
+    md: "w-6 h-6 lg:w-7 lg:h-7",
+    lg: "w-7 h-7 lg:w-8 lg:h-8",
   };
 
   useEffect(() => {
@@ -107,13 +107,11 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   }, [chainData.image]);
 
   const handleImageError = () => {
-    console.log(`Failed to load image: ${chainData.image}`);
     setImageError(true);
     setImageLoaded(true);
   };
 
   const handleImageLoad = () => {
-    console.log(`Successfully loaded image: ${chainData.image}`);
     setImageLoaded(true);
   };
 
@@ -143,7 +141,7 @@ const ChainIcon: React.FC<ChainIconProps> = ({
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
-          <span className="text-white text-xs font-bold font-satoshi">
+          <span className="text-white text-[10px] lg:text-xs font-bold font-satoshi">
             {chainData.fallbackIcon}
           </span>
         </div>
@@ -180,7 +178,9 @@ const TokenImage = ({
         style={{ backgroundColor: "#4A4A4A" }}
         title={name || symbol}
       >
-        <span className="text-white font-bold text-xs">{getFirstLetter()}</span>
+        <span className="text-white font-bold text-[10px] lg:text-xs">
+          {getFirstLetter()}
+        </span>
       </div>
     );
   }
@@ -278,13 +278,12 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     }
   }, [isOpen]);
 
-  // NEW: Format contract address (0x123...abc)
+  // Format contract address (0x123...abc)
   const formatContractAddress = (address: string): string => {
     if (!address || address === "native") return "Native";
     if (address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
       return "Native";
 
-    // Format as 0xabc...xyz
     if (address.length > 10) {
       return `${address.slice(0, 5)}...${address.slice(-3)}`;
     }
@@ -323,16 +322,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     presetCount: number,
     userAdded: string[]
   ) => {
-    console.log("🔍 Splitting tokens:", {
-      totalTokens: allTokens.length,
-      presetCount,
-      userAddedCount: userAdded.length,
-    });
-
-    // Get preset tokens (first N tokens)
     const presetTokens = allTokens.slice(0, presetCount);
-
-    // Get user-added tokens from the remaining tokens
     const remainingTokens = allTokens.slice(presetCount);
     const userAddedFromRemaining = remainingTokens.filter((token) =>
       userAdded.some(
@@ -340,21 +330,13 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
       )
     );
 
-    // Main list = preset + user-added
     const mainList = [...presetTokens, ...userAddedFromRemaining];
-
-    // Additional = everything else (not in main list)
     const additional = remainingTokens.filter(
       (token) =>
         !userAdded.some(
           (addr) => addr.toLowerCase() === token.contractAddress.toLowerCase()
         )
     );
-
-    console.log("✅ Split tokens:", {
-      mainList: mainList.length,
-      additional: additional.length,
-    });
 
     return { mainList, additional };
   };
@@ -365,10 +347,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
       let fetchedTokens = [];
 
       if (searchQuery.trim()) {
-        console.log(
-          `🔍 Searching all tokens for: ${searchQuery} on chain ${selectedChain}`
-        );
-
         const searchResults = await swapService.searchTokens(
           selectedChain,
           searchQuery
@@ -387,7 +365,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
             token.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         }));
 
-        // When searching, show all results (no split)
         if (isConnected && address) {
           try {
             const walletResponse = await tokenService.getWalletTokens(
@@ -431,16 +408,10 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
           }
         }
 
-        // During search, show all in main list
         setMainListTokens(fetchedTokens);
         setAdditionalTokens([]);
       } else {
-        // No search query - load and split tokens
         if (isConnected && address) {
-          console.log(
-            `📦 Loading wallet tokens for chain ${selectedChain} (with split)`
-          );
-
           const response = await tokenService.getWalletTokens(
             address,
             selectedChain,
@@ -460,12 +431,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
 
           setMainListTokens(mainList);
           setAdditionalTokens(additional);
-
-          console.log(
-            `✅ Loaded ${mainList.length} main list tokens and ${additional.length} additional tokens`
-          );
         } else {
-          console.log(`📦 Loading popular tokens for chain ${selectedChain}`);
           const popularTokens = await swapService.searchTokens(selectedChain);
           fetchedTokens = popularTokens.slice(0, 20).map((token: any) => ({
             id: token.address,
@@ -484,8 +450,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
           setAdditionalTokens([]);
         }
       }
-
-      console.log(`✅ Displaying tokens for chain ${selectedChain}`);
     } catch (error) {
       console.error("Error loading tokens:", error);
       setMainListTokens([]);
@@ -509,7 +473,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
       value: token.value,
     };
 
-    console.log("Token selected in TokenSelector:", formattedToken);
     onTokenSelect(formattedToken);
     onClose();
   };
@@ -544,7 +507,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     <button
       key={`${token.contractAddress || token.address}_${index}`}
       onClick={() => handleTokenSelect(token)}
-      className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
+      className="w-full flex items-center justify-between p-2 lg:p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
     >
       <div className="flex items-center min-w-0 flex-1">
         <TokenImage
@@ -552,17 +515,17 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
           alt={token.symbol}
           symbol={token.symbol}
           name={token.name}
-          className="w-10 h-10 mr-3 flex-shrink-0"
+          className="w-8 h-8 lg:w-10 lg:h-10 mr-2 lg:mr-3 flex-shrink-0"
         />
         <div className="min-w-0 flex-1">
-          <div className="text-white font-medium font-satoshi text-sm">
+          <div className="text-white font-medium font-satoshi text-xs lg:text-sm">
             {token.name}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-gray-400 text-xs font-satoshi">
+            <span className="text-gray-400 text-[10px] lg:text-xs font-satoshi">
               {token.symbol}
             </span>
-            <span className="text-gray-500 text-[10px] font-satoshi font-mono">
+            <span className="text-gray-500 text-[9px] lg:text-[10px] font-satoshi font-mono">
               {formatContractAddress(token.contractAddress || token.address)}
             </span>
           </div>
@@ -572,15 +535,15 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
       <div className="text-right flex-shrink-0">
         {token.balance > 0 ? (
           <>
-            <div className="text-white font-medium font-satoshi text-sm">
+            <div className="text-white font-medium font-satoshi text-xs lg:text-sm">
               {formatTokenAmount(token.balance, 4)}
             </div>
-            <div className="text-gray-400 text-xs font-satoshi">
+            <div className="text-gray-400 text-[10px] lg:text-xs font-satoshi">
               {formatCurrency(token.value)}
             </div>
           </>
         ) : (
-          <div className="text-gray-400 text-xs font-satoshi">
+          <div className="text-gray-400 text-[10px] lg:text-xs font-satoshi">
             {searchQuery && isConnected
               ? "No balance"
               : token.isNative
@@ -601,20 +564,22 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
 
       {/* Modal Container */}
       <div
-        className="absolute inset-0 z-50 flex items-center justify-center p-4"
+        className="absolute inset-0 z-50 flex items-center justify-center p-2 lg:p-4"
         onClick={onClose}
       >
         {/* Modal Content */}
         <div
-          className={`h-[550px] ${
-            showChainSelector ? "w-full max-w-4xl" : "w-full max-w-2xl"
+          className={`h-[70vh] lg:h-[550px] ${
+            showChainSelector
+              ? "w-full max-w-[95vw] lg:max-w-4xl"
+              : "w-full max-w-[95vw] lg:max-w-2xl"
           }`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden">
-            {/* Left Side - Chains */}
+          <div className="bg-[#000] rounded-[16px] lg:rounded-[20px] h-full flex flex-col lg:flex-row overflow-hidden border border-[#2C2C2C]">
+            {/* Desktop Left Side - Chains */}
             {showChainSelector && (
-              <div className="w-1/3 p-5">
+              <div className="hidden lg:block lg:w-1/3 p-5">
                 <div className="mb-8">
                   <h2 className="text-white font-mayeka text-xl">
                     Select a Token
@@ -668,11 +633,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                             >
                               <div className="flex items-center gap-3">
                                 <ChainIcon chainData={chainDisplay} size="md" />
-                                <span
-                                  className={`text-sm font-satoshi font-medium ${
-                                    isSelected ? "text-white" : "text-white"
-                                  }`}
-                                >
+                                <span className="text-sm font-satoshi font-medium text-white">
                                   {chainDisplay.name}
                                 </span>
                               </div>
@@ -686,13 +647,27 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
               </div>
             )}
 
-            {/* Right Side - Tokens */}
+            {/* Mobile & Desktop Right Side - Tokens */}
             <div
-              className={`flex flex-col bg-[#000] p-5 ${
+              className={`flex flex-col bg-[#000] ${
                 showChainSelector ? "flex-1" : "w-full"
-              }`}
+              } min-h-0`}
             >
-              <div className="flex justify-between items-center mb-5">
+              {/* Mobile Header */}
+              <div className="lg:hidden flex items-center justify-between p-3 border-b border-[#2C2C2C] flex-shrink-0">
+                <h2 className="text-white font-mayeka text-lg">
+                  Select a Token
+                </h2>
+                <button
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-white transition-colors p-1.5"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Desktop Header */}
+              <div className="hidden lg:flex justify-between items-center p-5 pb-0 flex-shrink-0">
                 {!showChainSelector && (
                   <h2 className="text-white font-mayeka text-xl">
                     Select a Token
@@ -706,110 +681,153 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                 </button>
               </div>
 
-              <div className="relative mb-5">
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                  <Search size={16} className="text-gray-400" />
+              {/* Content */}
+              <div className="flex-1 flex flex-col p-3 lg:p-5 lg:pt-0 min-h-0">
+                {/* Mobile Chain Selector */}
+                {showChainSelector && (
+                  <div className="lg:hidden mb-7 flex-shrink-0">
+                    <div className="relative p-[2px] rounded-[12px]">
+                      <div
+                        className="absolute inset-0 rounded-[12px]"
+                        style={{
+                          background: `linear-gradient(135deg, 
+                            #E2AF19 0%, 
+                            #E2AF19 10%,
+                            #2C2C2C 25%, 
+                            #2C2C2C 75%, 
+                            #E2AF19 90%,
+                            #E2AF19 100%)`,
+                        }}
+                      />
+                      <div className="relative bg-[#000] rounded-[10px] p-3">
+                        <div className="mb-3">
+                          <h3 className="text-white font-mayeka text-sm">
+                            Supported Chains
+                          </h3>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {chains.map((chain) => {
+                            const chainDisplay = chainDisplayData[chain.id];
+                            const isSelected = selectedChain === chain.id;
+
+                            return (
+                              <button
+                                key={chain.id}
+                                onClick={() => setSelectedChain(chain.id)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-[10px] transition-all ${
+                                  isSelected
+                                    ? "bg-[#71570C]"
+                                    : "bg-[#0F0F0F] hover:bg-[#1A1A1A]"
+                                }`}
+                              >
+                                <ChainIcon chainData={chainDisplay} size="sm" />
+                                <span className="text-xs font-satoshi font-medium text-white">
+                                  {chainDisplay.name}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Search Bar */}
+                <div className="relative mb-3 lg:mb-5 flex-shrink-0">
+                  <div className="absolute left-2.5 lg:left-3 top-1/2 transform -translate-y-1/2">
+                    <Search size={14} className="lg:w-4 lg:h-4 text-gray-400" />
+                  </div>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search name, symbol, or paste address"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[15px] pl-8 lg:pl-10 pr-3 lg:pr-4 py-2 lg:py-3 text-sm lg:text-base text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
+                  />
                 </div>
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search name, symbol, or paste address"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
-                />
-              </div>
 
-              {/* <div className="mb-4">
-                <h4 className="text-[#939393] font-satoshi font-medium text-base">
-                  {searchQuery
-                    ? "Search Results"
-                    : isConnected
-                    ? "Your Main List Tokens"
-                    : "Popular Tokens"}
-                </h4>
-                {isConnected && !searchQuery && (
-                  <p className="text-gray-500 text-xs font-satoshi mt-1">
-                    Showing {mainListTokens.length} tokens ({presetTokenCount}{" "}
-                    preset + {userAddedTokens.length} user-added)
-                  </p>
-                )}
-              </div> */}
-
-              <div className="flex-1 overflow-y-auto relative min-h-[400px]">
-                {loading ? (
-                  // FIXED: Centered loading spinner with absolute positioning
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19]"></div>
-                      <p className="text-gray-400 text-sm font-satoshi">
-                        Loading tokens...
-                      </p>
-                    </div>
-                  </div>
-                ) : mainListTokens.length === 0 &&
-                  additionalTokens.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center absolute inset-0">
-                    <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
-                      <span className="text-gray-400 text-lg">🪙</span>
-                    </div>
-                    <p className="text-gray-400 font-satoshi">
-                      {searchQuery
-                        ? "No tokens found. Try a different search."
-                        : "No tokens available"}
-                    </p>
-                    {!isConnected && !searchQuery && (
-                      <p className="text-gray-500 text-sm mt-2">
-                        Connect wallet to see your tokens
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {/* Main List Tokens */}
-                    {mainListTokens.map((token, index) =>
-                      renderTokenButton(token, index)
-                    )}
-
-                    {/* Divider with Expand Button */}
-                    {additionalTokens.length > 0 && !searchQuery && (
-                      <div className="py-2">
-                        <button
-                          onClick={() =>
-                            setShowAdditionalTokens(!showAdditionalTokens)
-                          }
-                          className="w-full flex items-center justify-center gap-2 py-3 rounded-lg hover:bg-[#1A1A1A] transition-colors"
-                        >
-                          <div className="flex-1 h-px bg-[#2C2C2C]"></div>
-                          <div className="flex items-center gap-2 px-3">
-                            <span className="text-gray-400 text-xs font-satoshi">
-                              {showAdditionalTokens ? "Hide" : "Show"}{" "}
-                              Additional Tokens ({additionalTokens.length})
-                            </span>
-                            {showAdditionalTokens ? (
-                              <ChevronUp size={16} className="text-gray-400" />
-                            ) : (
-                              <ChevronDown
-                                size={16}
-                                className="text-gray-400"
-                              />
-                            )}
-                          </div>
-                          <div className="flex-1 h-px bg-[#2C2C2C]"></div>
-                        </button>
+                {/* Token List */}
+                <div className="flex-1 overflow-y-auto relative min-h-0">
+                  {loading ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="animate-spin rounded-full h-6 w-6 lg:h-8 lg:w-8 border-b-2 border-[#E2AF19]"></div>
+                        <p className="text-gray-400 text-xs lg:text-sm font-satoshi">
+                          Loading tokens...
+                        </p>
                       </div>
-                    )}
-
-                    {/* Additional Tokens - Expandable */}
-                    {showAdditionalTokens && additionalTokens.length > 0 && (
-                      <div className="space-y-2 pt-2">
-                        {additionalTokens.map((token, index) =>
-                          renderTokenButton(token, index)
-                        )}
+                    </div>
+                  ) : mainListTokens.length === 0 &&
+                    additionalTokens.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center absolute inset-0">
+                      <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+                        <span className="text-gray-400 text-base lg:text-lg">
+                          🪙
+                        </span>
                       </div>
-                    )}
-                  </div>
-                )}
+                      <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+                        {searchQuery
+                          ? "No tokens found. Try a different search."
+                          : "No tokens available"}
+                      </p>
+                      {!isConnected && !searchQuery && (
+                        <p className="text-gray-500 text-xs lg:text-sm mt-2">
+                          Connect wallet to see your tokens
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 lg:space-y-2">
+                      {/* Main List Tokens */}
+                      {mainListTokens.map((token, index) =>
+                        renderTokenButton(token, index)
+                      )}
+
+                      {/* Divider with Expand Button */}
+                      {additionalTokens.length > 0 && !searchQuery && (
+                        <div className="py-2">
+                          <button
+                            onClick={() =>
+                              setShowAdditionalTokens(!showAdditionalTokens)
+                            }
+                            className="w-full flex items-center justify-center gap-2 py-2 lg:py-3 rounded-lg hover:bg-[#1A1A1A] transition-colors"
+                          >
+                            <div className="flex-1 h-px bg-[#2C2C2C]"></div>
+                            <div className="flex items-center gap-2 px-2 lg:px-3">
+                              <span className="text-gray-400 text-[10px] lg:text-xs font-satoshi">
+                                {showAdditionalTokens ? "Hide" : "Show"}{" "}
+                                Additional Tokens ({additionalTokens.length})
+                              </span>
+                              {showAdditionalTokens ? (
+                                <ChevronUp
+                                  size={14}
+                                  className="lg:w-4 lg:h-4 text-gray-400"
+                                />
+                              ) : (
+                                <ChevronDown
+                                  size={14}
+                                  className="lg:w-4 lg:h-4 text-gray-400"
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 h-px bg-[#2C2C2C]"></div>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Additional Tokens - Expandable */}
+                      {showAdditionalTokens && additionalTokens.length > 0 && (
+                        <div className="space-y-1.5 lg:space-y-2 pt-2">
+                          {additionalTokens.map((token, index) =>
+                            renderTokenButton(token, index)
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
