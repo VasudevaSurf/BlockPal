@@ -1,4 +1,4 @@
-// src/services/popularTokensService.ts - Popular tokens per chain
+// src/services/popularTokensService.ts - VERIFIED Popular tokens per chain
 export interface PopularToken {
   address: string;
   symbol: string;
@@ -17,15 +17,6 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
       decimals: 18,
       logoURI:
         "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
-      isPopular: true,
-    },
-    {
-      address: "0xdac17f958d2ee523a2206206994597c13d831ec7",
-      symbol: "USDT",
-      name: "Tether USD",
-      decimals: 6,
-      logoURI:
-        "https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png",
       isPopular: true,
     },
     {
@@ -202,7 +193,7 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
       isPopular: true,
     },
     {
-      address: "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+      address: "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
       symbol: "USDC",
       name: "USD Coin",
       decimals: 6,
@@ -220,7 +211,7 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
       isPopular: true,
     },
     {
-      address: "0x8f3cf7ad23cd3cadbD9735aff958023239c6a063",
+      address: "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063",
       symbol: "DAI",
       name: "Dai Stablecoin",
       decimals: 18,
