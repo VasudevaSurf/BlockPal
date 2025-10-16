@@ -1,4 +1,4 @@
-// src/app/dashboard/swap/page.tsx - Complete Updated Version with Select Token Button
+// src/app/dashboard/swap/page.tsx - Complete Updated Version with Fixed History Display
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -156,12 +156,10 @@ const ChainIcon: React.FC<ChainIconProps> = ({
     setImageError(false);
     setImageLoaded(false);
 
-    // Preload image to check if it's cached
     if (chainData.image) {
       const img = new Image();
       img.src = chainData.image;
 
-      // Check if image is already cached
       if (img.complete) {
         setImageLoaded(true);
       }
@@ -170,7 +168,7 @@ const ChainIcon: React.FC<ChainIconProps> = ({
 
   const handleImageError = () => {
     setImageError(true);
-    setImageLoaded(true); // Set to true to hide background
+    setImageLoaded(true);
   };
 
   const handleImageLoad = () => {
@@ -182,7 +180,6 @@ const ChainIcon: React.FC<ChainIconProps> = ({
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
     >
-      {/* Only show background while loading and not errored */}
       {!imageLoaded && !imageError && chainData.image && (
         <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
       )}
@@ -200,7 +197,6 @@ const ChainIcon: React.FC<ChainIconProps> = ({
         />
       )}
 
-      {/* Only show fallback icon on error */}
       {imageError && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
@@ -309,7 +305,7 @@ const scrollbarStyles = `
   }
 `;
 
-// NEW: Reusable Button Component that looks like WalletConnectButton
+// Reusable Button Component
 const SelectTokenButton = ({ onClick }: { onClick: () => void }) => {
   return (
     <button
@@ -388,7 +384,6 @@ export default function SwapPage() {
   const chainDisplayData = getChainDisplayData();
   const currentChainDisplay = chainDisplayData[chainId] || chainDisplayData[1];
 
-  // NEW: Check if both tokens are selected
   const bothTokensSelected = fromToken && toToken;
 
   const handleSwipeEnd = async (_event: any, info: PanInfo) => {
@@ -476,14 +471,13 @@ export default function SwapPage() {
     };
   }, []);
 
-  // NEW: Handler to open token selector when button is clicked
   const handleSelectTokensClick = () => {
     setShowFromTokenSelector(true);
   };
 
   return (
     <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] flex flex-col overflow-hidden relative">
-      {/* Swap Effect Image - Top Right Corner (sticks to edge) */}
+      {/* Swap Effect Image - Top Right Corner */}
       <div className="absolute -top-0 -right-0 z-10 pointer-events-none">
         <img
           src="/swapEffect.png"
@@ -550,7 +544,6 @@ export default function SwapPage() {
 
         {/* Main Swap Card */}
         <div className="w-full max-w-xl relative z-20">
-          {/* Container with gradient border */}
           <div className="relative p-[3px] rounded-[30px]">
             <div
               className="absolute inset-0 rounded-[30px]"
@@ -565,7 +558,6 @@ export default function SwapPage() {
               }}
             />
 
-            {/* Inner scrollable container */}
             <div className="relative bg-[#000000] rounded-[26px] overflow-hidden">
               <div className=" py-4 px-16">
                 {/* Chain selector and slippage */}
@@ -595,9 +587,7 @@ export default function SwapPage() {
                   </button>
 
                   <div className="relative">
-                    {/* Glacier effect container */}
                     <div className="relative p-[1px] rounded-[25px] overflow-hidden">
-                      {/* Animated gradient border */}
                       <div
                         className="absolute inset-0"
                         style={{
@@ -611,7 +601,6 @@ export default function SwapPage() {
                         }}
                       />
 
-                      {/* Inner container with glass effect */}
                       <div
                         className="relative flex items-center gap-3 px-3 py-2 rounded-[24px]"
                         style={{
@@ -631,9 +620,7 @@ export default function SwapPage() {
                           Slippage%
                         </span>
 
-                        {/* Toggle container */}
                         <div className="relative flex items-center gap-1">
-                          {/* Auto button with conditional border */}
                           <button
                             onClick={() => {
                               setSlippage("5.5");
@@ -670,7 +657,6 @@ export default function SwapPage() {
                             </span>
                           </button>
 
-                          {/* Custom button with conditional border */}
                           <button
                             onClick={() => {
                               setShowSlippageSettings(!showSlippageSettings);
@@ -713,7 +699,6 @@ export default function SwapPage() {
                     {showSlippageSettings && (
                       <div className="absolute top-full mt-2 right-0 z-50">
                         <div className="relative p-[1px] rounded-[20px] overflow-hidden">
-                          {/* Animated gradient border - glacier effect */}
                           <div
                             className="absolute inset-0"
                             style={{
@@ -727,7 +712,6 @@ export default function SwapPage() {
                             }}
                           />
 
-                          {/* Inner container with glass effect */}
                           <div
                             className="relative rounded-[19px] p-4 min-w-[250px]"
                             style={{
@@ -761,9 +745,7 @@ export default function SwapPage() {
                                   key={preset}
                                   onClick={() => {
                                     setSlippage(preset);
-                                    // Keep customSlippage as true to stay on Custom tab
                                     setCustomSlippage(true);
-                                    // Don't close the settings modal
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-satoshi transition-all ${
                                     slippage === preset && customSlippage
@@ -819,7 +801,6 @@ export default function SwapPage() {
                               </p>
                             )}
 
-                            {/* Close button */}
                             <button
                               onClick={() => setShowSlippageSettings(false)}
                               className="w-full mt-3 px-4 py-2 bg-[#E2AF19] text-black rounded-lg text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
@@ -849,17 +830,14 @@ export default function SwapPage() {
                         value={fromAmount}
                         onChange={(e) => {
                           const value = e.target.value;
-                          // Allow empty string, numbers, and single decimal point
                           if (value === "" || /^\d*\.?\d*$/.test(value)) {
                             setFromAmount(value);
                           }
                         }}
                         onKeyPress={(e) => {
-                          // Prevent non-numeric characters except decimal point
                           if (!/[\d.]/.test(e.key)) {
                             e.preventDefault();
                           }
-                          // Prevent multiple decimal points
                           if (e.key === "." && fromAmount.includes(".")) {
                             e.preventDefault();
                           }
@@ -870,10 +848,8 @@ export default function SwapPage() {
                       />
                     </div>
 
-                    {/* Updated token select button with glacier effect */}
                     <div className="relative">
                       <div className="relative p-[1px] rounded-[25px] overflow-hidden">
-                        {/* Animated gradient border */}
                         <div
                           className="absolute inset-0"
                           style={{
@@ -887,7 +863,6 @@ export default function SwapPage() {
                           }}
                         />
 
-                        {/* Inner button with glass effect */}
                         <button
                           onClick={() => setShowFromTokenSelector(true)}
                           className="relative flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[6px] rounded-[24px]"
@@ -992,7 +967,6 @@ export default function SwapPage() {
                       />
                     </div>
 
-                    {/* Token select button */}
                     <div className="relative">
                       <div className="relative p-[1px] rounded-[25px] overflow-hidden">
                         <div
@@ -1069,9 +1043,7 @@ export default function SwapPage() {
                         {gasPrice ? `(~${gasPrice.gasCostUSD})` : "(~$0.00)"}
                       </span>
                     </div>
-                    {/* Gas Mode Selection Buttons */}
                     <div className="flex gap-2">
-                      {/* Fast Button */}
                       <div className="relative">
                         <div className="relative p-[1px] rounded-[12px] overflow-hidden">
                           <div
@@ -1133,7 +1105,6 @@ export default function SwapPage() {
                         </div>
                       </div>
 
-                      {/* Instant Button */}
                       <div className="relative">
                         <div className="relative p-[1px] rounded-[12px] overflow-hidden">
                           <div
@@ -1220,15 +1191,11 @@ export default function SwapPage() {
                   </div>
                 )}
 
-                {/* MODIFIED BUTTON LOGIC */}
                 {!isConnected ? (
-                  // Show wallet connect button when not connected
                   <WalletConnectButton />
                 ) : !bothTokensSelected ? (
-                  // Show "Select Tokens" button when wallet is connected but tokens not selected
                   <SelectTokenButton onClick={handleSelectTokensClick} />
                 ) : (
-                  // Show sliding swap button when everything is ready
                   <div
                     className="relative w-full h-[50px] overflow-hidden animate-pulse-subtle"
                     style={{
@@ -1238,7 +1205,6 @@ export default function SwapPage() {
                     }}
                     ref={containerRef}
                   >
-                    {/* Sliding shimmer animation */}
                     <div className="absolute inset-0 overflow-hidden">
                       <div className="shimmer-effect"></div>
                     </div>
@@ -1270,7 +1236,6 @@ export default function SwapPage() {
                       }}
                     >
                       <div className="w-10 h-10 rounded-full flex items-center justify-center pointer-events-none select-none relative">
-                        {/* Glow effect around draggable icon */}
                         <div className="absolute inset-0 rounded-full bg-[#E2AF19] opacity-30 blur-md animate-pulse"></div>
 
                         {fromToken ? (
@@ -1329,7 +1294,7 @@ export default function SwapPage() {
         </div>
       </div>
 
-      {/* History Overlay */}
+      {/* History Overlay - FIXED SECTION */}
       <AnimatePresence>
         {activeTab === "history" && (
           <>
@@ -1403,17 +1368,9 @@ export default function SwapPage() {
                           year: "numeric",
                         });
 
-                        const isSell =
-                          item.fromToken.symbol !== "USDC" &&
-                          item.fromToken.symbol !== "USDT" &&
-                          item.fromToken.symbol !== "DAI";
-                        const transactionType = isSell ? "Sell" : "Buy";
-                        const displayToken = isSell
-                          ? item.fromToken
-                          : item.toToken;
-                        const displayAmount = isSell
-                          ? `-${fromAmount.toFixed(4)}`
-                          : `+${toAmount.toFixed(4)}`;
+                        // FIXED: Always display the "to" token (what you're buying/receiving)
+                        const displayToken = item.toToken;
+                        const displayAmount = `+${toAmount.toFixed(4)}`;
                         const displaySymbol = displayToken.symbol;
 
                         const tokenLogoUrl =
@@ -1454,11 +1411,7 @@ export default function SwapPage() {
                                 <div className="text-white text-[14px] font-satoshi mb-1">
                                   {displayDate}
                                 </div>
-                                <div
-                                  className={`font-satoshi ${
-                                    isSell ? "text-white" : "text-green-400"
-                                  }`}
-                                >
+                                <div className="font-satoshi text-green-400">
                                   {displayAmount} {displaySymbol}
                                 </div>
 

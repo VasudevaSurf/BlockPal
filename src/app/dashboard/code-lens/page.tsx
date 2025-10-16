@@ -289,13 +289,9 @@ export default function CodeLens() {
   const handleCopy = () => {
     const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
     if (token) {
-      const tokenInfo = `${token.name} (${token.symbol})\nContract: ${
-        token.contractAddress
-      }\nPrice: ${formatPrice(token.price)}\nMarket Cap: ${formatNumber(
-        token.marketCap
-      )}`;
-      navigator.clipboard.writeText(tokenInfo);
-      console.log("Copied token info:", tokenInfo);
+      // Copy only the contract address
+      navigator.clipboard.writeText(token.contractAddress);
+      console.log("Copied contract address:", token.contractAddress);
     }
   };
 
