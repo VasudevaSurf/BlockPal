@@ -1,213 +1,42 @@
-// src/components/dashboard/AddTokensModal.tsx - FIXED VERSION
+// src/components/dashboard/AddTokensModal.tsx - WEBSOCKET VERSION
+"use client";
+
 import { useState, useEffect, useRef } from "react";
-import { X, Search, Loader2 } from "lucide-react";
+import { X, Search } from "lucide-react";
+import { coinlesSocketClient } from "@/services/coinlesSocketClient";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { coinlesService, TokenSearchResult } from "@/services/coinlesService";
-import {
-  getPopularTokensForChain,
-  PopularToken,
-} from "@/services/popularTokensService";
 
 interface AddTokensModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddToken: (token: any) => void;
+  onAddToken: (tokenData: any) => void;
 }
 
-// Chain data configuration
-const getChainDisplayData = () => {
-  const chainDisplayData: {
-    [key: string]: {
-      name: string;
-      color: string;
-      icon: string;
-      image?: string;
-      fallbackIcon: string;
-      useBackground: boolean;
-    };
-  } = {
-    eth: {
-      name: "Ethereum",
-      color: "bg-blue-500",
-      icon: "Ξ",
-      image: "/chains/Ethereum.png",
-      fallbackIcon: "Ξ",
-      useBackground: true,
-    },
-    base: {
-      name: "Base",
-      color: "bg-blue-600",
-      icon: "B",
-      image: "/chains/Base.png",
-      fallbackIcon: "B",
-      useBackground: false,
-    },
-    polygon: {
-      name: "Polygon",
-      color: "bg-purple-500",
-      icon: "◆",
-      image: "/chains/Polygon.png",
-      fallbackIcon: "◆",
-      useBackground: false,
-    },
-    arbitrum: {
-      name: "Arbitrum",
-      color: "bg-blue-400",
-      icon: "◉",
-      image: "/chains/Arbitrum.png",
-      fallbackIcon: "◉",
-      useBackground: false,
-    },
-    avalanche: {
-      name: "Avalanche",
-      color: "bg-red-500",
-      icon: "A",
-      image: "/chains/Avalanche.png",
-      fallbackIcon: "A",
-      useBackground: true,
-    },
-    bsc: {
-      name: "BSC",
-      color: "bg-yellow-500",
-      icon: "B",
-      image: "/chains/BSC.png",
-      fallbackIcon: "B",
-      useBackground: true,
-    },
-  };
-
-  return chainDisplayData;
-};
-
-// Chain Icon Component
-interface ChainIconProps {
-  chainData: {
-    name: string;
-    color: string;
-    icon: string;
-    image?: string;
-    fallbackIcon: string;
-    useBackground: boolean;
-  };
-  size?: "sm" | "md" | "lg";
-  className?: string;
-}
-
-const ChainIcon: React.FC<ChainIconProps> = ({
-  chainData,
-  size = "md",
-  className = "",
-}) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-
-  const sizeClasses = {
-    sm: "w-5 h-5",
-    md: "w-7 h-7",
-    lg: "w-8 h-8",
-  };
-
-  useEffect(() => {
-    setImageLoaded(false);
-    setImageError(false);
-  }, [chainData.image]);
-
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoaded(true);
-  };
-
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-  };
-
-  return (
-    <div
-      className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
-      title={chainData.name}
-    >
-      {(!imageLoaded || imageError) && (
-        <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
-      )}
-
-      {chainData.image && !imageError && (
-        <img
-          src={chainData.image}
-          alt={chainData.name}
-          className={`w-full h-full object-contain transition-opacity duration-300 ${
-            imageLoaded ? "opacity-100" : "opacity-0"
-          } p-1 relative z-10`}
-          onError={handleImageError}
-          onLoad={handleImageLoad}
-          loading="lazy"
-        />
-      )}
-
-      {imageError && (
-        <div
-          className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
-        >
-          <span className="text-white text-xs font-bold font-satoshi">
-            {chainData.fallbackIcon}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Token Image Component
-const TokenImage = ({
-  src,
-  alt,
-  symbol,
-  name,
-  className = "",
-}: {
-  src?: string | null;
-  alt: string;
+interface SearchResult {
+  poolAddress: string;
+  contractAddress: string;
+  contractAddressDisplay: string;
+  name: string;
   symbol: string;
-  name?: string;
-  className?: string;
-}) => {
-  const [hasError, setHasError] = useState(false);
-
-  const getFirstLetter = () => {
-    const text = symbol || name || "?";
-    return text.charAt(0).toUpperCase();
-  };
-
-  if (!src || hasError) {
-    return (
-      <div
-        className={`${className} rounded-full flex items-center justify-center`}
-        style={{ backgroundColor: "#4A4A4A" }}
-        title={name || symbol}
-      >
-        <span className="text-white font-bold text-xs">{getFirstLetter()}</span>
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className={`${className} rounded-full object-cover`}
-      onError={() => setHasError(true)}
-      loading="lazy"
-    />
-  );
-};
+  price: number;
+  logo: string;
+  change24h: number;
+  liquidity: number;
+  volume24h: number;
+  buys24h: number;
+  sells24h: number;
+  poolCount: number;
+  displayName: string;
+}
 
 const CHAINS = [
-  { id: "eth", label: "Ethereum" },
-  { id: "base", label: "Base" },
-  { id: "polygon", label: "Polygon" },
-  { id: "arbitrum", label: "Arbitrum" },
-  { id: "avalanche", label: "Avalanche" },
-  { id: "bsc", label: "BSC" },
+  { id: "eth", name: "Ethereum", color: "#627EEA" },
+  { id: "base", name: "Base", color: "#0052FF" },
+  { id: "polygon", name: "Polygon", color: "#8247E5" },
+  { id: "arbitrum", name: "Arbitrum", color: "#28A0F0" },
+  { id: "avalanche", name: "Avalanche", color: "#E84142" },
+  { id: "bsc", name: "BSC", color: "#F3BA2F" },
 ];
 
 export default function AddTokensModal({
@@ -216,549 +45,283 @@ export default function AddTokensModal({
   onAddToken,
 }: AddTokensModalProps) {
   const { user } = useSelector((state: RootState) => state.auth);
-
   const [selectedChain, setSelectedChain] = useState("eth");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set());
-  const [searchResults, setSearchResults] = useState<TokenSearchResult[]>([]);
-  const [popularTokens, setPopularTokens] = useState<PopularToken[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchDebounceTimer, setSearchDebounceTimer] =
-    useState<NodeJS.Timeout | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  const chainDisplayData = getChainDisplayData();
-
-  // Reset state when modal closes
+  // Set up search results listener
   useEffect(() => {
-    if (!isOpen) {
-      setSearchQuery("");
-      setSelectedTokens(new Set());
-      setSelectedChain("eth");
-      setSearchResults([]);
-      setSearchLoading(false);
-    }
-  }, [isOpen]);
-
-  // Handle ESC key
-  useEffect(() => {
-    const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isOpen) {
-        onClose();
-      }
+    const handleSearchResults = (results: SearchResult[]) => {
+      console.log("🔍 Search results received:", results.length);
+      setSearchResults(results);
+      setLoading(false);
+      setHasSearched(true);
     };
 
-    document.addEventListener("keydown", handleEscKey);
-    return () => document.removeEventListener("keydown", handleEscKey);
-  }, [isOpen, onClose]);
+    coinlesSocketClient.on("search-results", handleSearchResults);
 
-  // Focus search input when modal opens
+    return () => {
+      coinlesSocketClient.off("search-results", handleSearchResults);
+    };
+  }, []);
+
+  // Auto-search with debounce
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 100);
+    if (!isOpen) return;
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
-  }, [isOpen]);
 
-  // Load popular tokens when chain changes
-  useEffect(() => {
-    if (isOpen && !searchQuery) {
-      const tokens = getPopularTokensForChain(selectedChain);
-      setPopularTokens(tokens);
-      console.log(
-        `Loaded ${tokens.length} popular tokens for ${selectedChain}`
-      );
-    }
-  }, [selectedChain, isOpen, searchQuery]);
-
-  // FIXED: Clear search when chain changes
-  useEffect(() => {
-    if (isOpen) {
-      console.log(`🔄 Chain changed to: ${selectedChain}`);
-
-      // Clear search query
-      setSearchQuery("");
-
-      // Clear search results
+    // Reset if query is empty
+    if (searchQuery.trim() === "") {
       setSearchResults([]);
-
-      // Stop any loading state
-      setSearchLoading(false);
-
-      // Clear any pending debounce timer
-      if (searchDebounceTimer) {
-        clearTimeout(searchDebounceTimer);
-        setSearchDebounceTimer(null);
-      }
-
-      // Load popular tokens for new chain
-      const tokens = getPopularTokensForChain(selectedChain);
-      setPopularTokens(tokens);
-
-      console.log(
-        `✅ Chain switch complete - showing ${tokens.length} popular tokens`
-      );
-    }
-  }, [selectedChain, isOpen]);
-
-  // FIXED: Debounced search with better error handling
-  useEffect(() => {
-    // Clear existing timer
-    if (searchDebounceTimer) {
-      clearTimeout(searchDebounceTimer);
-    }
-
-    // If search query is empty, show popular tokens
-    if (searchQuery.trim().length === 0) {
-      setSearchResults([]);
-      setSearchLoading(false);
-      const tokens = getPopularTokensForChain(selectedChain);
-      setPopularTokens(tokens);
+      setHasSearched(false);
+      setLoading(false);
       return;
     }
 
-    // Set new timer for search
-    const timer = setTimeout(() => {
-      handleSearch(searchQuery.trim());
+    // Debounce search
+    setLoading(true);
+    searchTimeoutRef.current = setTimeout(() => {
+      handleSearch();
     }, 500);
 
-    setSearchDebounceTimer(timer);
-
-    // Cleanup
     return () => {
-      if (timer) {
-        clearTimeout(timer);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchQuery, selectedChain]);
+  }, [searchQuery, selectedChain, isOpen]);
 
-  const handleSearch = async (query: string) => {
-    if (!query || query.trim().length === 0) {
-      setSearchResults([]);
-      const tokens = getPopularTokensForChain(selectedChain);
-      setPopularTokens(tokens);
-      setSearchLoading(false);
+  const handleSearch = () => {
+    if (!searchQuery.trim() || !user?.email) {
+      setLoading(false);
       return;
     }
 
-    try {
-      setSearchLoading(true);
-      setPopularTokens([]); // Clear popular tokens when searching
+    console.log("🔍 Searching:", { chain: selectedChain, query: searchQuery });
+    coinlesSocketClient.searchTokens(selectedChain, searchQuery, user.email);
+  };
 
-      console.log(`🔍 Searching for: "${query}" on chain: ${selectedChain}`);
+  const handleAddToken = (result: SearchResult) => {
+    const tokenData = {
+      chainId: selectedChain,
+      contractAddress: result.contractAddress,
+      poolAddress: result.poolAddress,
+      name: result.name,
+      symbol: result.symbol,
+      logo: result.logo,
+    };
 
-      const results = await coinlesService.searchTokens(selectedChain, query);
+    console.log("➕ Adding token:", tokenData);
+    onAddToken(tokenData);
 
-      console.log(`📊 Search results for ${selectedChain}:`, {
-        query,
-        resultCount: results?.length || 0,
-        hasResults: results && results.length > 0,
-      });
-
-      if (results && results.length > 0) {
-        setSearchResults(results);
-        console.log(
-          `✅ ${results.length} tokens found for "${query}" on ${selectedChain}`
-        );
-      } else {
-        setSearchResults([]);
-        console.log(`⚠️ No results found for "${query}" on ${selectedChain}`);
-      }
-    } catch (error) {
-      console.error(`❌ Error searching tokens on ${selectedChain}:`, error);
+    // Clear search and close after short delay
+    setTimeout(() => {
+      setSearchQuery("");
       setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-    }
+      setHasSearched(false);
+      onClose();
+    }, 500);
   };
 
-  const toggleTokenSelection = (tokenKey: string) => {
-    const newSelected = new Set(selectedTokens);
-    if (newSelected.has(tokenKey)) {
-      newSelected.delete(tokenKey);
-    } else {
-      newSelected.add(tokenKey);
+  const formatNumber = (num: number) => {
+    if (num >= 1000000000) {
+      return `$${(num / 1000000000).toFixed(1)}B`;
     }
-    setSelectedTokens(newSelected);
+    if (num >= 1000000) {
+      return `$${(num / 1000000).toFixed(1)}M`;
+    }
+    if (num >= 1000) {
+      return `$${(num / 1000).toFixed(1)}K`;
+    }
+    return `$${num.toFixed(2)}`;
   };
 
-  const handleAddTokens = async () => {
-    if (!user?.email) {
-      console.error("No user email found");
-      return;
-    }
-
-    // Add from search results
-    const searchToAdd = searchResults.filter((token) =>
-      selectedTokens.has(`${token.contractAddress}_${token.poolAddress}`)
-    );
-
-    // Add from popular tokens
-    const popularToAdd = popularTokens.filter((token) =>
-      selectedTokens.has(`popular_${token.address}`)
-    );
-
-    console.log("Adding tokens:", {
-      search: searchToAdd.length,
-      popular: popularToAdd.length,
-    });
-
-    // Add search results WITH LOGO
-    for (const token of searchToAdd) {
-      const tokenData = {
-        chainId: selectedChain,
-        contractAddress: token.contractAddress,
-        poolAddress: token.poolAddress,
-        name: token.name,
-        symbol: token.symbol,
-        logo: token.logo,
-      };
-      await onAddToken(tokenData);
-    }
-
-    // Add popular tokens (need to get pool address from CoinLes)
-    for (const token of popularToAdd) {
-      try {
-        const searchResults = await coinlesService.searchTokens(
-          selectedChain,
-          token.symbol
-        );
-        if (searchResults && searchResults.length > 0) {
-          const foundToken = searchResults[0];
-          const tokenData = {
-            chainId: selectedChain,
-            contractAddress: foundToken.contractAddress,
-            poolAddress: foundToken.poolAddress,
-            name: foundToken.name,
-            symbol: foundToken.symbol,
-            logo: foundToken.logo || token.logoURI,
-          };
-          await onAddToken(tokenData);
-        }
-      } catch (error) {
-        console.error(`Error adding popular token ${token.symbol}:`, error);
-      }
-    }
-
-    onClose();
-  };
-
-  const formatCurrency = (value: number) => {
-    if (value === 0) return "$0.000";
-    if (value < 0.001) return "< $0.001";
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(2)}M`;
-    }
-    if (value >= 1000) {
-      return `$${(value / 1000).toFixed(2)}K`;
-    }
-    return `$${value.toFixed(3)}`;
+  const formatPrice = (price: number) => {
+    if (price === 0) return "$0.00";
+    if (price < 0.01) return `$${price.toFixed(6)}`;
+    if (price < 1) return `$${price.toFixed(4)}`;
+    return `$${price.toFixed(2)}`;
   };
 
   if (!isOpen) return null;
 
-  // Determine what to display
-  const displayTokens = searchQuery ? searchResults : [];
-  const showPopular = !searchQuery && popularTokens.length > 0;
-
   return (
-    <>
-      {/* Backdrop - covers entire website */}
-      <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-[#0F0F0F] rounded-2xl border border-[#2C2C2C] w-full max-w-2xl max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-[#2C2C2C]">
+          <h2 className="text-xl font-bold text-white font-mayeka">
+            Add Token to Watchlist
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
 
-      {/* Modal Container - centered in CodeLens page */}
-      <div className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div
-          className="h-[550px] w-full max-w-4xl pointer-events-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Main container */}
-          <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden border border-[#2C2C2C] shadow-2xl">
-            {/* Left Side - Chains */}
-            <div className="w-1/3 p-5">
-              {/* Main heading */}
-              <div className="mb-8">
-                <h2 className="text-white font-mayeka text-xl">Add Tokens</h2>
-              </div>
-
-              <div className="flex items-center justify-between mb-4">
-                {/* Networks section with gradient border */}
-                <div className="relative p-[2px] rounded-[12px] w-full">
+        {/* Chain Selector */}
+        <div className="p-6 border-b border-[#2C2C2C]">
+          <label className="block text-sm font-medium text-gray-400 mb-3 font-satoshi">
+            Select Chain
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            {CHAINS.map((chain) => (
+              <button
+                key={chain.id}
+                onClick={() => setSelectedChain(chain.id)}
+                className={`p-3 rounded-xl border-2 transition-all font-satoshi ${
+                  selectedChain === chain.id
+                    ? "border-[#E2AF19] bg-[#E2AF19]/10"
+                    : "border-[#2C2C2C] hover:border-[#E2AF19]/50"
+                }`}
+              >
+                <div className="flex items-center gap-2">
                   <div
-                    className="absolute inset-0 rounded-[12px]"
-                    style={{
-                      background: `linear-gradient(135deg, 
-                        #E2AF19 0%, 
-                        #E2AF19 10%,
-                        #2C2C2C 25%, 
-                        #2C2C2C 75%, 
-                        #E2AF19 90%,
-                        #E2AF19 100%)`,
-                    }}
-                  />
-                  <div className="relative bg-[#000] rounded-[10px] p-4">
-                    <div className="mb-4">
-                      <div className="bg-[#0F0F0F] p-2 px-3 rounded-[14px] inline-block">
-                        <h3 className="text-white font-mayeka text-[16px]">
-                          Select Chain
-                        </h3>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      {CHAINS.map((chain) => {
-                        const chainDisplay = chainDisplayData[chain.id] || {
-                          name: chain.label,
-                          color: "bg-gray-500",
-                          icon: chain.label.charAt(0),
-                          fallbackIcon: chain.label.charAt(0),
-                          useBackground: true,
-                        };
-
-                        const isSelected = selectedChain === chain.id;
-
-                        return (
-                          <button
-                            key={chain.id}
-                            onClick={() => setSelectedChain(chain.id)}
-                            className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
-                              isSelected ? "bg-[#71570C]" : "hover:bg-[#1A1A1A]"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <ChainIcon chainData={chainDisplay} size="md" />
-                              <span
-                                className={`text-sm font-satoshi font-medium ${
-                                  isSelected ? "text-white" : "text-white"
-                                }`}
-                              >
-                                {chainDisplay.name}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Side - Tokens */}
-            <div className="flex flex-col bg-[#000] p-5 flex-1">
-              {/* Header with close button */}
-              <div className="flex justify-between items-center mb-5">
-                <div className="flex-1" />
-                <button
-                  onClick={onClose}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg ml-auto"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Search Bar */}
-              <div className="relative mb-5">
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                  {searchLoading ? (
-                    <Loader2 size={16} className="text-gray-400 animate-spin" />
-                  ) : (
-                    <Search size={16} className="text-gray-400" />
-                  )}
-                </div>
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search name, symbol, or paste address"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
-                />
-              </div>
-
-              {/* Dynamic Heading */}
-              <div className="mb-4">
-                <h4 className="text-[#939393] font-satoshi font-medium text-base">
-                  {searchQuery
-                    ? "Search Results"
-                    : `Popular ${
-                        chainDisplayData[selectedChain]?.name || ""
-                      } Tokens`}
-                </h4>
-              </div>
-
-              {/* Token List */}
-              <div className="flex-1 overflow-y-auto">
-                {searchLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
-                  </div>
-                ) : showPopular ? (
-                  // Show popular tokens
-                  <div className="space-y-2">
-                    {popularTokens.map((token, index) => {
-                      const tokenKey = `popular_${token.address}`;
-                      const isSelected = selectedTokens.has(tokenKey);
-
-                      return (
-                        <button
-                          key={`${tokenKey}_${index}`}
-                          onClick={() => toggleTokenSelection(tokenKey)}
-                          className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
-                        >
-                          <div className="flex items-center min-w-0 flex-1">
-                            <TokenImage
-                              src={token.logoURI}
-                              alt={token.symbol}
-                              symbol={token.symbol}
-                              name={token.name}
-                              className="w-10 h-10 mr-3 flex-shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-white font-medium font-satoshi text-sm">
-                                {token.name}
-                              </div>
-                              <div className="text-gray-400 text-xs font-satoshi">
-                                {token.symbol}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <div
-                              className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
-                                isSelected
-                                  ? "bg-[#E2AF19]"
-                                  : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
-                              }`}
-                            >
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  isSelected ? "bg-black" : ""
-                                }`}
-                              />
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : displayTokens.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
-                      <span className="text-gray-400 text-lg">
-                        {searchQuery ? "🔍" : "💭"}
-                      </span>
-                    </div>
-                    <p className="text-gray-400 font-satoshi">
-                      {searchQuery
-                        ? "No tokens found"
-                        : "Start typing to search"}
-                    </p>
-                  </div>
-                ) : (
-                  // Show search results
-                  <div className="space-y-2">
-                    {displayTokens.map((token, index) => {
-                      const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
-                      const isSelected = selectedTokens.has(tokenKey);
-
-                      return (
-                        <button
-                          key={`${tokenKey}_${index}`}
-                          onClick={() => toggleTokenSelection(tokenKey)}
-                          className="w-full flex items-center justify-between p-3 rounded-lg transition-colors hover:bg-[#1A1A1A] text-left"
-                        >
-                          <div className="flex items-center min-w-0 flex-1">
-                            <TokenImage
-                              src={token.logo}
-                              alt={token.symbol}
-                              symbol={token.symbol}
-                              name={token.name}
-                              className="w-10 h-10 mr-3 flex-shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-white font-medium font-satoshi text-sm">
-                                {token.name}
-                              </div>
-                              <div className="text-gray-400 text-xs font-satoshi">
-                                {token.symbol}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            {/* Price and percentage */}
-                            <div className="text-right">
-                              <div className="text-white font-medium font-satoshi text-sm">
-                                {formatCurrency(token.price)}
-                              </div>
-                              <div
-                                className={`font-satoshi text-[10px] font-medium ${
-                                  token.change24h > 0
-                                    ? "text-green-500"
-                                    : "text-red-500"
-                                }`}
-                              >
-                                {token.change24h > 0 ? "▲" : "▼"}{" "}
-                                {Math.abs(token.change24h).toFixed(2)}%
-                              </div>
-                            </div>
-
-                            <div
-                              className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
-                                isSelected
-                                  ? "bg-[#E2AF19]"
-                                  : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
-                              }`}
-                            >
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  isSelected ? "bg-black" : ""
-                                }`}
-                              />
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Add Tokens Button */}
-              <div className="mt-3 flex-shrink-0 flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="text-gray-400 font-satoshi text-[10px]">
-                    {selectedTokens.size}{" "}
-                    {selectedTokens.size === 1 ? "Token" : "Tokens"} Selected
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <button
-                    onClick={handleAddTokens}
-                    disabled={selectedTokens.size === 0}
-                    className="w-full py-2 bg-[#E2AF19] text-black rounded-[10px] font-satoshi font-medium text-xs hover:bg-[#D4A853] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#E2AF19]"
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: chain.color }}
+                  ></div>
+                  <span
+                    className={
+                      selectedChain === chain.id
+                        ? "text-white font-medium"
+                        : "text-gray-400"
+                    }
                   >
-                    Add Tokens
-                  </button>
+                    {chain.name}
+                  </span>
                 </div>
-              </div>
-            </div>
+              </button>
+            ))}
           </div>
         </div>
-      </div>
 
-      <style jsx global>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
-    </>
+        {/* Search Input */}
+        <div className="p-6 border-b border-[#2C2C2C]">
+          <label className="block text-sm font-medium text-gray-400 mb-3 font-satoshi">
+            Search Token
+          </label>
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search by name, symbol, or contract address..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#191919] border border-[#2C2C2C] rounded-xl pl-12 pr-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#E2AF19] transition-colors font-satoshi"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        {/* Results */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19]"></div>
+            </div>
+          )}
+
+          {!loading && !hasSearched && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="w-12 h-12 text-gray-600 mb-4" />
+              <p className="text-gray-500 font-satoshi">
+                Start typing to search for tokens
+              </p>
+            </div>
+          )}
+
+          {!loading && hasSearched && searchResults.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <p className="text-gray-500 font-satoshi">
+                No tokens found for "{searchQuery}"
+              </p>
+              <p className="text-gray-600 text-sm mt-2 font-satoshi">
+                Try searching with a different keyword
+              </p>
+            </div>
+          )}
+
+          {!loading && searchResults.length > 0 && (
+            <div className="space-y-2">
+              {searchResults.map((result, index) => (
+                <div
+                  key={`${result.contractAddress}_${index}`}
+                  className="bg-[#191919] border border-[#2C2C2C] rounded-xl p-4 hover:border-[#E2AF19]/50 transition-all cursor-pointer"
+                  onClick={() => handleAddToken(result)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#2C2C2C] flex items-center justify-center">
+                        {result.logo ? (
+                          <img
+                            src={result.logo}
+                            alt={result.symbol}
+                            className="w-10 h-10 rounded-full"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const fallback = document.createElement("span");
+                                fallback.className =
+                                  "text-white text-sm font-bold";
+                                fallback.textContent = result.symbol
+                                  .substring(0, 3)
+                                  .toUpperCase();
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span className="text-white text-sm font-bold">
+                            {result.symbol.substring(0, 3).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-white font-medium font-satoshi">
+                          {result.displayName || result.name}
+                        </div>
+                        <div className="text-gray-500 text-sm font-satoshi">
+                          {result.symbol} • {result.contractAddressDisplay}
+                          {result.poolCount > 1 && (
+                            <span className="text-[#E2AF19] ml-2">
+                              • {formatNumber(result.liquidity)} liquidity
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-white font-medium font-satoshi">
+                        {formatPrice(result.price)}
+                      </div>
+                      <div
+                        className={`text-sm font-satoshi ${
+                          result.change24h >= 0
+                            ? "text-green-500"
+                            : "text-red-500"
+                        }`}
+                      >
+                        {result.change24h >= 0 ? "+" : ""}
+                        {result.change24h.toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-// src/app/dashboard/code-lens/page.tsx - WITH RELATIVE POSITIONING
+// src/app/dashboard/code-lens/page.tsx - COMPLETE WEBSOCKET VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -8,7 +8,7 @@ import { RootState } from "@/store";
 import { MoreVertical } from "lucide-react";
 import TokenActionsMenu from "@/components/dashboard/TokenActionsMenu";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
-import { coinlesService } from "@/services/coinlesService";
+import { coinlesSocketClient } from "@/services/coinlesSocketClient";
 import { useCodeLensContext } from "../layout";
 
 interface Token {
@@ -42,7 +42,7 @@ export default function CodeLens() {
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [connected, setConnected] = useState(false);
   const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
   // Set the add token handler for the layout
@@ -50,77 +50,139 @@ export default function CodeLens() {
     setOnAddTokenClick(() => () => setAddTokensModalOpen(true));
   }, [setOnAddTokenClick]);
 
-  // Load user's watchlist on mount
+  // Connect to WebSocket and load user's watchlist
   useEffect(() => {
-    if (user?.email) {
-      loadUserWatchlist(false);
+    if (!user?.email) {
+      setLoading(false);
+      return;
     }
-  }, [user]);
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    if (!user?.email || tokens.length === 0) return;
+    console.log("🔌 Connecting to CoinLes WebSocket...");
 
-    const interval = setInterval(() => {
-      console.log("Auto-refreshing token data...");
-      loadUserWatchlist(true);
-    }, 30000);
+    // Connect to WebSocket
+    coinlesSocketClient.connect(user.email);
 
-    return () => clearInterval(interval);
-  }, [user?.email, tokens.length]);
-
-  const loadUserWatchlist = async (isRefresh: boolean = false) => {
-    if (!user?.email) return;
-
-    try {
-      if (!isRefresh) setLoading(true);
-
-      const watchlist = await coinlesService.getUserWatchlist(
-        user.email,
-        isRefresh
-      );
-
-      const transformedTokens: Token[] = watchlist.map((item) => ({
-        id: `${item.chainId}_${item.contractAddress}`,
-        chainId: item.chainId,
-        contractAddress: item.contractAddress,
-        poolAddress: item.poolAddress,
-        name: item.tokenName,
-        symbol: item.tokenSymbol,
-        price: item.marketData?.price || 0,
-        change24h: item.marketData?.change24h || 0,
-        volume24h: item.marketData?.volume24h || 0,
-        marketCap: item.marketData?.marketCap || 0,
-        liquidity: item.marketData?.liquidity || 0,
-        buys24h: item.transactions?.buys24h || 0,
-        sells24h: item.transactions?.sells24h || 0,
-        logo: item.metadata?.logo || "",
-      }));
-
+    // Set up event listeners
+    const handleWatchlist = (data: any[]) => {
+      console.log("📋 Received watchlist:", data.length, "tokens");
+      const transformedTokens = transformWatchlistData(data);
       setTokens(transformedTokens);
       setFilteredTokens(transformedTokens);
-
-      console.log(`Loaded ${transformedTokens.length} tokens`);
-    } catch (error) {
-      console.error("Error loading watchlist:", error);
-    } finally {
       setLoading(false);
-    }
+      setConnected(true);
+    };
+
+    const handleTokenUpdate = (update: any) => {
+      console.log(
+        "🔄 Received token update:",
+        update.chainId,
+        update.contractAddress
+      );
+      setTokens((prev) =>
+        prev.map((token) => {
+          if (
+            token.chainId === update.chainId &&
+            token.contractAddress === update.contractAddress
+          ) {
+            return transformSingleToken(update.data);
+          }
+          return token;
+        })
+      );
+    };
+
+    const handleTokenAdded = (response: any) => {
+      console.log("✅ Token added:", response);
+      if (response.success && response.tokenData) {
+        const newToken = transformSingleToken(response.tokenData);
+        setTokens((prev) => [...prev, newToken]);
+        setFilteredTokens((prev) => [...prev, newToken]);
+      }
+      setAddTokensModalOpen(false);
+    };
+
+    const handleTokenRemoved = (response: any) => {
+      console.log("🗑️ Token removed:", response);
+    };
+
+    const handleError = (error: any) => {
+      console.error("❌ WebSocket error:", error);
+    };
+
+    const handleConnect = () => {
+      console.log("✅ WebSocket connected");
+      setConnected(true);
+    };
+
+    const handleDisconnect = () => {
+      console.log("❌ WebSocket disconnected");
+      setConnected(false);
+    };
+
+    // Register event listeners
+    coinlesSocketClient.on("watchlist", handleWatchlist);
+    coinlesSocketClient.on("token-update", handleTokenUpdate);
+    coinlesSocketClient.on("token-added", handleTokenAdded);
+    coinlesSocketClient.on("token-removed", handleTokenRemoved);
+    coinlesSocketClient.on("error", handleError);
+    coinlesSocketClient.on("connect", handleConnect);
+    coinlesSocketClient.on("disconnect", handleDisconnect);
+
+    // Cleanup on unmount
+    return () => {
+      coinlesSocketClient.off("watchlist", handleWatchlist);
+      coinlesSocketClient.off("token-update", handleTokenUpdate);
+      coinlesSocketClient.off("token-added", handleTokenAdded);
+      coinlesSocketClient.off("token-removed", handleTokenRemoved);
+      coinlesSocketClient.off("error", handleError);
+      coinlesSocketClient.off("connect", handleConnect);
+      coinlesSocketClient.off("disconnect", handleDisconnect);
+    };
+  }, [user?.email]);
+
+  // Handle search query changes
+  useEffect(() => {
+    handleSearch(searchQuery);
+  }, [searchQuery, tokens]);
+
+  // Transform watchlist data from WebSocket to frontend format
+  const transformWatchlistData = (data: any[]): Token[] => {
+    return data.map((item) => ({
+      id: `${item.chainId}_${item.contractAddress}`,
+      chainId: item.chainId,
+      contractAddress: item.contractAddress,
+      poolAddress: item.poolAddress,
+      name: item.metadata?.name || item.tokenName || "Unknown",
+      symbol: item.metadata?.symbol || item.tokenSymbol || "???",
+      price: item.marketData?.price || 0,
+      change24h: item.marketData?.change24h || 0,
+      volume24h: item.marketData?.volume24h || 0,
+      marketCap: item.marketData?.marketCap || 0,
+      liquidity: item.marketData?.liquidity || 0,
+      buys24h: item.transactions?.buys24h || 0,
+      sells24h: item.transactions?.sells24h || 0,
+      logo: item.metadata?.logo || "",
+    }));
   };
 
-  const handleManualRefresh = async () => {
-    if (!user?.email || refreshing) return;
-
-    try {
-      setRefreshing(true);
-      console.log("Manual refresh triggered");
-      await coinlesService.refreshWatchlist(user.email);
-      await loadUserWatchlist(true);
-    } catch (error) {
-      console.error("Error refreshing:", error);
-    } finally {
-      setRefreshing(false);
-    }
+  // Transform single token
+  const transformSingleToken = (data: any): Token => {
+    return {
+      id: `${data.chainId}_${data.contractAddress}`,
+      chainId: data.chainId,
+      contractAddress: data.contractAddress,
+      poolAddress: data.poolAddress,
+      name: data.metadata?.name || "Unknown",
+      symbol: data.metadata?.symbol || "???",
+      price: data.marketData?.price || 0,
+      change24h: data.marketData?.change24h || 0,
+      volume24h: data.marketData?.volume24h || 0,
+      marketCap: data.marketData?.marketCap || 0,
+      liquidity: data.marketData?.liquidity || 0,
+      buys24h: data.transactions?.buys24h || 0,
+      sells24h: data.transactions?.sells24h || 0,
+      logo: data.metadata?.logo || "",
+    };
   };
 
   const handleSearch = (query: string) => {
@@ -136,11 +198,6 @@ export default function CodeLens() {
       setFilteredTokens(filtered);
     }
   };
-
-  // Sync search query changes from context
-  useEffect(() => {
-    handleSearch(searchQuery);
-  }, [searchQuery, tokens]);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000000) {
@@ -185,23 +242,24 @@ export default function CodeLens() {
     const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
     if (token && user?.email) {
       try {
-        const success = await coinlesService.removeTokenFromWatchlist(
+        // Emit remove token event via WebSocket
+        coinlesSocketClient.removeToken(
           user.email,
           token.chainId,
           token.contractAddress
         );
 
-        if (success) {
-          const newTokens = tokens.filter((t) => t.id !== activeMenuTokenId);
-          setTokens(newTokens);
+        // Optimistically update UI
+        const newTokens = tokens.filter((t) => t.id !== activeMenuTokenId);
+        setTokens(newTokens);
 
-          const newFilteredTokens = filteredTokens.filter(
-            (t) => t.id !== activeMenuTokenId
-          );
-          setFilteredTokens(newFilteredTokens);
+        const newFilteredTokens = filteredTokens.filter(
+          (t) => t.id !== activeMenuTokenId
+        );
+        setFilteredTokens(newFilteredTokens);
 
-          console.log("Removed token:", token.name);
-        }
+        console.log("Removed token:", token.name);
+        setActiveMenuTokenId(null);
       } catch (error) {
         console.error("Error removing token:", error);
       }
@@ -214,45 +272,16 @@ export default function CodeLens() {
     console.log("Adding token with data:", tokenData);
 
     try {
-      const watchlistToken = {
+      // Emit add token event via WebSocket
+      coinlesSocketClient.addToken(user.email, {
         chainId: tokenData.chainId,
         contractAddress: tokenData.contractAddress,
         poolAddress: tokenData.poolAddress,
         tokenName: tokenData.name,
         tokenSymbol: tokenData.symbol,
-      };
+      });
 
-      const result = await coinlesService.addTokenToWatchlist(
-        user.email,
-        watchlistToken
-      );
-
-      if (result.success && result.token) {
-        const newToken: Token = {
-          id: `${result.token.chainId}_${result.token.contractAddress}`,
-          chainId: result.token.chainId,
-          contractAddress: result.token.contractAddress,
-          poolAddress: result.token.poolAddress,
-          name: result.token.tokenName,
-          symbol: result.token.tokenSymbol,
-          price: result.token.marketData?.price || 0,
-          change24h: result.token.marketData?.change24h || 0,
-          volume24h: result.token.marketData?.volume24h || 0,
-          marketCap: result.token.marketData?.marketCap || 0,
-          liquidity: result.token.marketData?.liquidity || 0,
-          buys24h: result.token.transactions?.buys24h || 0,
-          sells24h: result.token.transactions?.sells24h || 0,
-          logo: result.token.metadata?.logo || tokenData.logo || "",
-        };
-
-        console.log("New token created with logo:", newToken.logo);
-
-        const updatedTokens = [...tokens, newToken];
-        setTokens(updatedTokens);
-        setFilteredTokens(updatedTokens);
-
-        console.log("Token added successfully:", newToken.name);
-      }
+      // UI will be updated via 'token-added' event
     } catch (error) {
       console.error("Error adding token:", error);
     }
@@ -280,6 +309,13 @@ export default function CodeLens() {
 
   return (
     <div className="h-full bg-[#000000] rounded-[16px] p-4 flex flex-col overflow-hidden relative">
+      {/* Connection Status Indicator */}
+      {!connected && (
+        <div className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-xs z-50">
+          Disconnected
+        </div>
+      )}
+
       {/* Token List Table */}
       <div className="flex-1 bg-[#000000] rounded-2xl border border-[#2C2C2C] overflow-hidden flex flex-col">
         {/* Table Header */}
@@ -419,7 +455,7 @@ export default function CodeLens() {
         onRemove={handleRemove}
       />
 
-      {/* Add Tokens Modal - Now positioned relative to this container */}
+      {/* Add Tokens Modal */}
       <AddTokensModal
         isOpen={addTokensModalOpen}
         onClose={() => setAddTokensModalOpen(false)}
