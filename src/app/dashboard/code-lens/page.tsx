@@ -361,13 +361,6 @@ export default function CodeLens() {
 
   return (
     <div className="h-full bg-[#000000] rounded-[16px] p-4 flex flex-col overflow-hidden relative">
-      {/* Connection Status Indicator */}
-      {!connected && (
-        <div className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-xs z-50">
-          Disconnected
-        </div>
-      )}
-
       {/* Token List Table */}
       <div className="flex-1 bg-[#000000] rounded-2xl border border-[#2C2C2C] overflow-hidden flex flex-col">
         {/* Table Header */}
