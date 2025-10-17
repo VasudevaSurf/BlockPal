@@ -616,7 +616,7 @@ export default function GlobalDashboardHeader({
                       strokeLinejoin="round"
                     />
                   </svg>
-                  <span className="font-mayeka text-black">News AI</span>
+                  <span className="font-mayeka text-black">AI</span>
                 </button>
               </form>
             )}
