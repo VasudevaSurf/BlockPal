@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - UPDATED with address below price on mobile
+// src/components/dashboard/WalletBalance.tsx - FIXED (No Double Skeleton)
 "use client";
 
 import { useSelector } from "react-redux";
@@ -60,18 +60,6 @@ const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
     </div>
   );
 };
-
-// Balance Loading Skeleton
-const BalanceLoadingSkeleton = () => (
-  <div className="space-y-2 animate-pulse">
-    <div className="flex items-end justify-between">
-      <div>
-        <div className="h-8 lg:h-9 w-32 lg:w-40 bg-[#1A1A1A] rounded mb-2"></div>
-        <div className="h-6 w-24 bg-[#1A1A1A] rounded"></div>
-      </div>
-    </div>
-  </div>
-);
 
 export default function WalletBalance() {
   const { user, isAuthenticated } = useSelector(
@@ -149,10 +137,14 @@ export default function WalletBalance() {
     );
   }
 
-  // Determine if we should show internal skeleton or wait for all components
+  // FIXED: Only show skeleton on initial load, let dashboard skeleton handle synchronization
   const showInternalSkeleton =
-    (walletData.isInitialLoading && !walletData.hasLoadedOnce) ||
-    !allComponentsLoaded;
+    walletData.isInitialLoading && !walletData.hasLoadedOnce;
+
+  // Return null during initial load - dashboard skeleton will show instead
+  if (showInternalSkeleton) {
+    return null;
+  }
 
   return (
     <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0">
@@ -213,7 +205,7 @@ export default function WalletBalance() {
       </div>
 
       {/* Error Display */}
-      {walletData.error && !showInternalSkeleton && (
+      {walletData.error && (
         <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
           <div className="flex items-start">
             <AlertCircle size={14} className="text-red-400 mr-2 mt-0.5" />
@@ -232,48 +224,42 @@ export default function WalletBalance() {
         </div>
       )}
 
-      {/* Balance Display - Show skeleton while loading OR waiting for other components */}
-      {showInternalSkeleton ? (
-        <BalanceLoadingSkeleton />
-      ) : (
-        <div className="space-y-2">
-          <div className="flex items-end justify-between">
-            <div className="w-full">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
-                {tokenService.formatCurrency(walletData.mainListValue)}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap mb-3 lg:mb-0">
-                {walletData.total24hrChange !== 0 && (
-                  <PortfolioChange
-                    totalChange24h={walletData.total24hrChange}
-                  />
-                )}
-              </div>
+      {/* Balance Display */}
+      <div className="space-y-2">
+        <div className="flex items-end justify-between">
+          <div className="w-full">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
+              {tokenService.formatCurrency(walletData.mainListValue)}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap mb-3 lg:mb-0">
+              {walletData.total24hrChange !== 0 && (
+                <PortfolioChange totalChange24h={walletData.total24hrChange} />
+              )}
+            </div>
 
-              {/* Address and Copy Button - Mobile only, below price */}
-              <div className="lg:hidden flex items-center space-x-2 mt-2">
-                <span className="text-gray-400 text-xs font-satoshi italic font-medium truncate max-w-[150px] tracking-wide">
-                  {address
-                    ? `${address.slice(0, 8)}...${address.slice(-6)}`
-                    : "No wallet connected"}
-                </span>
+            {/* Address and Copy Button - Mobile only, below price */}
+            <div className="lg:hidden flex items-center space-x-2 mt-2">
+              <span className="text-gray-400 text-xs font-satoshi italic font-medium truncate max-w-[150px] tracking-wide">
+                {address
+                  ? `${address.slice(0, 8)}...${address.slice(-6)}`
+                  : "No wallet connected"}
+              </span>
 
-                <button
-                  onClick={() => copyToClipboard(address!)}
-                  disabled={!address}
-                  className={`transition-all duration-300 ease-in-out px-2 py-0.5 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0 ${
-                    copyState.isCopied
-                      ? "bg-[#E2AF19] text-black scale-105"
-                      : "text-black hover:bg-[#D4A853] bg-[#E2AF19] bg-opacity-100 disabled:opacity-50"
-                  }`}
-                >
-                  <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
-                </button>
-              </div>
+              <button
+                onClick={() => copyToClipboard(address!)}
+                disabled={!address}
+                className={`transition-all duration-300 ease-in-out px-2 py-0.5 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0 ${
+                  copyState.isCopied
+                    ? "bg-[#E2AF19] text-black scale-105"
+                    : "text-black hover:bg-[#D4A853] bg-[#E2AF19] bg-opacity-100 disabled:opacity-50"
+                }`}
+              >
+                <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
+              </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED mobile header alignment
+// src/app/dashboard/page.tsx - UPDATED with Universal Skeleton
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,7 +11,7 @@ import WalletStats from "@/components/dashboard/WalletStats";
 import MobileWalletMenu from "@/components/dashboard/MobileWalletMenu";
 import { WalletDataProvider } from "@/contexts/WalletDataContext";
 import { DashboardLoadingProvider } from "@/contexts/DashboardLoadingContext";
-import { DashboardSkeleton } from "@/components/ui/Skeleton1";
+import { DashboardSkeleton } from "@/components/ui/UniversalSkeleton";
 
 // Mock authentication state
 const mockAuth = {
@@ -111,7 +111,7 @@ function DashboardContent() {
     }, 1000);
   };
 
-  // Show centralized loading skeleton during initial setup
+  // Show centralized universal skeleton during initial setup
   if (
     dashboardState.isLoading ||
     dashboardState.isAuthenticating ||

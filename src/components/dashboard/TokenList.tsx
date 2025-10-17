@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - COMPLETE with mobile tabs and trending/gainers
+// src/components/dashboard/TokenList.tsx - COMPLETE with Universal Skeleton
 "use client";
 
 // NOTE: This component now includes tabs for Holdings/Trending/Top Gainers on mobile
@@ -12,6 +12,7 @@ import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import { useWalletTracking } from "@/hooks/useWalletTracking";
 import { useDashboardLoading } from "@/contexts/DashboardLoadingContext";
 import { useCoinGecko, TrendingToken, TopGainer } from "@/hooks/useCoinGecko";
+import { TokenListSkeleton } from "@/components/ui/UniversalSkeleton";
 import {
   RefreshCw,
   MoreVertical,
@@ -129,30 +130,6 @@ interface WalletTokensResponse {
   hasHiddenTokens: boolean;
   lastUpdated: string;
 }
-
-// Token List Loading Skeleton
-const TokenListLoadingSkeleton = () => (
-  <div className="flex-1 overflow-y-auto scrollbar-hide space-y-2 pr-1 animate-pulse">
-    {Array.from({ length: 6 }).map((_, index) => (
-      <div
-        key={index}
-        className="flex items-center justify-between p-2.5 rounded-lg bg-[#0F0F0F]"
-      >
-        <div className="flex items-center flex-1 min-w-0">
-          <div className="w-10 h-10 bg-[#1A1A1A] rounded-full mr-2.5 flex-shrink-0"></div>
-          <div className="min-w-0 flex-1">
-            <div className="h-4 w-24 bg-[#1A1A1A] rounded mb-1.5"></div>
-            <div className="h-3 w-20 bg-[#1A1A1A] rounded"></div>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="h-4 w-20 bg-[#1A1A1A] rounded mb-1.5"></div>
-          <div className="h-3 w-16 bg-[#1A1A1A] rounded"></div>
-        </div>
-      </div>
-    ))}
-  </div>
-);
 
 // Token Image Component
 const TokenImage = ({
@@ -1022,6 +999,7 @@ export default function TokenList() {
             </div>
           )}
         </div>
+
         {/* Error state */}
         {error && !showInternalSkeleton && (
           <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
@@ -1039,9 +1017,10 @@ export default function TokenList() {
             </div>
           </div>
         )}
-        {/* Tab Content */}
+
+        {/* Tab Content - USING UNIVERSAL SKELETON */}
         {showInternalSkeleton ? (
-          <TokenListLoadingSkeleton />
+          <TokenListSkeleton />
         ) : (
           <div className="flex-1 overflow-y-auto scrollbar-hide">
             {/* Holdings Tab */}
@@ -1233,7 +1212,7 @@ export default function TokenList() {
             {activeTab === "trending" && (
               <div className="space-y-2 pr-1">
                 {coinGeckoLoading ? (
-                  <TokenListLoadingSkeleton />
+                  <TokenListSkeleton />
                 ) : coinGeckoError ? (
                   <div className="flex items-center justify-center p-4">
                     <div className="text-center">
@@ -1299,7 +1278,7 @@ export default function TokenList() {
             {activeTab === "gainers" && (
               <div className="space-y-2 pr-1">
                 {coinGeckoLoading ? (
-                  <TokenListLoadingSkeleton />
+                  <TokenListSkeleton />
                 ) : coinGeckoError ? (
                   <div className="flex items-center justify-center p-4">
                     <div className="text-center">
