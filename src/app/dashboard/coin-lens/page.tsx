@@ -1,12 +1,11 @@
-// src/app/dashboard/coin-lens/page.tsx - COMPLETE MOBILE OPTIMIZED VERSION
+// src/app/dashboard/coin-lens/page.tsx - WITH INLINE MENU FIX
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { MoreVertical } from "lucide-react";
-import TokenActionsMenu from "@/components/dashboard/TokenActionsMenu";
+import { MoreVertical, Copy, Minus, X } from "lucide-react";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
 import { coinlesSocketClient } from "@/services/coinlesSocketClient";
 import { useCodeLensContext } from "../layout";
@@ -39,13 +38,43 @@ export default function CoinLens() {
   const [activeMenuTokenId, setActiveMenuTokenId] = useState<string | null>(
     null
   );
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [connected, setConnected] = useState(false);
-  const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
   const watchlistReceivedRef = useRef(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Handle clicking outside menu - modified to check properly
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Check if click is on the menu or any of its children
+      const target = event.target as HTMLElement;
+
+      // Don't close if clicking inside the menu
+      if (menuRef.current && menuRef.current.contains(target)) {
+        return;
+      }
+
+      // Don't close if clicking on the three dots button
+      if (target.closest('button[title="More actions"]')) {
+        return;
+      }
+
+      setActiveMenuTokenId(null);
+    };
+
+    if (activeMenuTokenId) {
+      // Use timeout to avoid conflicts with click events
+      setTimeout(() => {
+        document.addEventListener("click", handleClickOutside);
+      }, 0);
+    }
+
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [activeMenuTokenId]);
 
   useEffect(() => {
     setOnAddTokenClick(() => () => setAddTokensModalOpen(true));
@@ -267,27 +296,21 @@ export default function CoinLens() {
 
   const handleMoreClick = (tokenId: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    const button = buttonRefs.current[tokenId];
-    if (button) {
-      const rect = button.getBoundingClientRect();
-      setMenuPosition({
-        top: rect.top,
-        left: rect.left - 200 - 8,
-      });
-      setActiveMenuTokenId(tokenId);
-    }
+    setActiveMenuTokenId(activeMenuTokenId === tokenId ? null : tokenId);
   };
 
-  const handleCopy = () => {
-    const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
+  const handleCopy = (tokenId: string) => {
+    const token = filteredTokens.find((t) => t.id === tokenId);
     if (token) {
       navigator.clipboard.writeText(token.contractAddress);
       console.log("Copied contract address:", token.contractAddress);
+      // Only close menu after action completes
+      setTimeout(() => setActiveMenuTokenId(null), 100);
     }
   };
 
-  const handleRemove = async () => {
-    const token = filteredTokens.find((t) => t.id === activeMenuTokenId);
+  const handleRemove = async (tokenId: string) => {
+    const token = filteredTokens.find((t) => t.id === tokenId);
     if (token && user?.email) {
       try {
         coinlesSocketClient.removeToken(
@@ -296,16 +319,16 @@ export default function CoinLens() {
           token.contractAddress
         );
 
-        const newTokens = tokens.filter((t) => t.id !== activeMenuTokenId);
+        const newTokens = tokens.filter((t) => t.id !== tokenId);
         setTokens(newTokens);
 
         const newFilteredTokens = filteredTokens.filter(
-          (t) => t.id !== activeMenuTokenId
+          (t) => t.id !== tokenId
         );
         setFilteredTokens(newFilteredTokens);
 
         console.log("Removed token:", token.name);
-        setActiveMenuTokenId(null);
+        // Menu closes automatically as token is removed from list
       } catch (error) {
         console.error("Error removing token:", error);
       }
@@ -331,6 +354,11 @@ export default function CoinLens() {
   };
 
   const handleTokenClick = (token: Token) => {
+    if (activeMenuTokenId) {
+      setActiveMenuTokenId(null);
+      return;
+    }
+
     console.log("Navigating to token:", {
       chainId: token.chainId,
       contractAddress: token.contractAddress,
@@ -377,7 +405,9 @@ export default function CoinLens() {
           {filteredTokens.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-gray-500 font-satoshi text-xs sm:text-sm">
-                {searchQuery ? "No tokens found" : "Loading..."}
+                {searchQuery
+                  ? "No tokens found"
+                  : "No tokens in watchlist. Click + to add tokens."}
               </p>
             </div>
           ) : (
@@ -387,7 +417,7 @@ export default function CoinLens() {
               return (
                 <div key={token.id} onClick={() => handleTokenClick(token)}>
                   {/* Desktop View */}
-                  <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1.2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer">
+                  <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1.2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.5fr] gap-4 px-6 py-4 hover:bg-[#1A1A1A] transition-colors cursor-pointer relative">
                     {/* Token */}
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#2C2C2C]">
@@ -480,22 +510,88 @@ export default function CoinLens() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center relative">
                       <button
-                        ref={(el) => {
-                          buttonRefs.current[token.id] = el;
-                        }}
                         onClick={(e) => handleMoreClick(token.id, e)}
                         className="p-1 hover:bg-[#2C2C2C] rounded transition-colors"
                         title="More actions"
                       >
                         <MoreVertical className="w-4 h-4 text-gray-400" />
                       </button>
+
+                      {/* Inline Menu - positioned absolutely relative to the row */}
+                      {activeMenuTokenId === token.id && (
+                        <div
+                          ref={menuRef}
+                          className="absolute right-10 top-8 z-50 bg-black rounded-xl w-[200px] shadow-2xl border border-[#2C2C2C] overflow-hidden"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* Close Button - Top Left Corner */}
+                          <div className="absolute top-0 left-0 z-10">
+                            <button
+                              onClick={() => setActiveMenuTokenId(null)}
+                              className="p-2 hover:bg-[#1A1A1A] transition-colors rounded-tl-xl"
+                            >
+                              <X
+                                className="w-4 h-4 text-gray-400"
+                                strokeWidth={2}
+                              />
+                            </button>
+                          </div>
+
+                          {/* Button Container */}
+                          <div className="pt-10 p-3 space-y-2">
+                            {/* Copy Button */}
+                            <button
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleCopy(token.id);
+                              }}
+                              className="w-full flex items-center justify-between gap-2 px-8 py-2 bg-[#E2AF19] rounded-lg hover:bg-[#D4A853] transition-colors"
+                            >
+                              <span className="text-black font-satoshi text-sm font-medium">
+                                Copy
+                              </span>
+                              <Copy
+                                className="w-4 h-4 text-black"
+                                strokeWidth={2}
+                              />
+                            </button>
+
+                            {/* Remove Button */}
+                            <button
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleRemove(token.id);
+                              }}
+                              className="w-full flex items-center justify-between gap-2 px-8 py-2 bg-transparent border border-[#E74C3C] rounded-lg hover:bg-[#E74C3C]/10 transition-colors"
+                            >
+                              <span className="text-[#E74C3C] font-satoshi text-sm font-medium">
+                                Remove
+                              </span>
+                              <Minus
+                                className="w-4 h-4 text-[#E74C3C]"
+                                strokeWidth={2}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Mobile View - Horizontal Layout */}
-                  <div className="lg:hidden border-b border-[#2C2C2C] hover:bg-[#1A1A1A] transition-colors cursor-pointer">
+                  <div className="lg:hidden border-b border-[#2C2C2C] hover:bg-[#1A1A1A] transition-colors cursor-pointer relative">
                     <div className="px-2 py-2 flex items-center gap-2">
                       {/* Left Side: Token Info */}
                       <div className="flex items-center gap-1.5 w-[80px] flex-shrink-0">
@@ -608,17 +704,83 @@ export default function CoinLens() {
                         </div>
                       </div>
 
-                      {/* Action Button */}
-                      <button
-                        ref={(el) => {
-                          buttonRefs.current[token.id] = el;
-                        }}
-                        onClick={(e) => handleMoreClick(token.id, e)}
-                        className="p-0.5 hover:bg-[#2C2C2C] rounded transition-colors flex-shrink-0"
-                        title="More actions"
-                      >
-                        <MoreVertical className="w-3.5 h-3.5 text-gray-400" />
-                      </button>
+                      {/* Action Button with inline menu for mobile */}
+                      <div className="relative">
+                        <button
+                          onClick={(e) => handleMoreClick(token.id, e)}
+                          className="p-0.5 hover:bg-[#2C2C2C] rounded transition-colors flex-shrink-0"
+                          title="More actions"
+                        >
+                          <MoreVertical className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+
+                        {/* Mobile Inline Menu */}
+                        {activeMenuTokenId === token.id && (
+                          <div
+                            ref={menuRef}
+                            className="absolute right-8 top-6 z-50 bg-black rounded-xl w-[150px] shadow-2xl border border-[#2C2C2C] overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {/* Close Button - Top Left Corner */}
+                            <div className="absolute top-0 left-0 z-10">
+                              <button
+                                onClick={() => setActiveMenuTokenId(null)}
+                                className="p-1.5 hover:bg-[#1A1A1A] transition-colors rounded-tl-xl"
+                              >
+                                <X
+                                  className="w-3 h-3 text-gray-400"
+                                  strokeWidth={2}
+                                />
+                              </button>
+                            </div>
+
+                            {/* Button Container */}
+                            <div className="pt-8 p-2 space-y-1">
+                              <button
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleCopy(token.id);
+                                }}
+                                className="w-full flex items-center justify-between gap-1 px-3 py-1.5 bg-[#E2AF19] rounded-lg hover:bg-[#D4A853] transition-colors"
+                              >
+                                <span className="text-black font-satoshi text-xs font-medium">
+                                  Copy
+                                </span>
+                                <Copy
+                                  className="w-3 h-3 text-black"
+                                  strokeWidth={2}
+                                />
+                              </button>
+
+                              <button
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleRemove(token.id);
+                                }}
+                                className="w-full flex items-center justify-between gap-1 px-3 py-1.5 bg-transparent border border-[#E74C3C] rounded-lg hover:bg-[#E74C3C]/10 transition-colors"
+                              >
+                                <span className="text-[#E74C3C] font-satoshi text-xs font-medium">
+                                  Remove
+                                </span>
+                                <Minus
+                                  className="w-3 h-3 text-[#E74C3C]"
+                                  strokeWidth={2}
+                                />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -627,15 +789,6 @@ export default function CoinLens() {
           )}
         </div>
       </div>
-
-      {/* Token Actions Menu */}
-      <TokenActionsMenu
-        isOpen={activeMenuTokenId !== null}
-        onClose={() => setActiveMenuTokenId(null)}
-        position={menuPosition}
-        onCopy={handleCopy}
-        onRemove={handleRemove}
-      />
 
       {/* Add Tokens Modal */}
       <AddTokensModal
