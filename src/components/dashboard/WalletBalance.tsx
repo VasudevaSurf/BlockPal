@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - FIXED (No Double Skeleton)
+// src/components/dashboard/WalletBalance.tsx - COMPLETE CODE with Universal Skeleton
 "use client";
 
 import { useSelector } from "react-redux";
@@ -16,6 +16,7 @@ import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
 import { useWalletData } from "@/contexts/WalletDataContext";
 import { useDashboardLoading } from "@/contexts/DashboardLoadingContext";
+import { WalletBalanceSkeleton } from "@/components/ui/UniversalSkeleton";
 
 // Portfolio Change Component
 const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
@@ -137,13 +138,14 @@ export default function WalletBalance() {
     );
   }
 
-  // FIXED: Only show skeleton on initial load, let dashboard skeleton handle synchronization
+  // Determine if we should show universal skeleton or wait for all components
   const showInternalSkeleton =
-    walletData.isInitialLoading && !walletData.hasLoadedOnce;
+    (walletData.isInitialLoading && !walletData.hasLoadedOnce) ||
+    !allComponentsLoaded;
 
-  // Return null during initial load - dashboard skeleton will show instead
+  // Use universal skeleton instead of custom one
   if (showInternalSkeleton) {
-    return null;
+    return <WalletBalanceSkeleton />;
   }
 
   return (

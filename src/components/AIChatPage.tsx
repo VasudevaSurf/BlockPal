@@ -17,7 +17,7 @@ import {
   Edit3,
 } from "lucide-react";
 import { RootState } from "@/store";
-import { SkeletonAIChat } from "@/components/ui/Skeleton";
+import { AIChatSkeleton } from "@/components/ui/UniversalSkeleton";
 
 interface Message {
   id: string;
@@ -872,7 +872,7 @@ export default function AIChatPage() {
     }
   };
 
-  if (initialLoading) return <SkeletonAIChat />;
+  if (initialLoading) return <AIChatSkeleton />;
 
   const showWelcomeScreen = messages.length === 0;
   const sidebarOpen = activeTab === "history";

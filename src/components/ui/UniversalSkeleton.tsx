@@ -267,5 +267,34 @@ export function SwapSectionSkeleton() {
   );
 }
 
+export function AIChatSkeleton() {
+  return (
+    <>
+      <div className="h-full bg-[#000000] flex flex-col">
+        {/* Empty chat area - completely blank */}
+        <div className="flex-1"></div>
+
+        {/* Input Area at bottom - matches exact input styling */}
+        <div className="flex-shrink-0 p-3 lg:p-4">
+          <div className="relative max-w-4xl mx-auto">
+            <Skeleton className="w-full h-[44px] lg:h-[48px] rounded-[100px]" />
+          </div>
+        </div>
+      </div>
+
+      <style jsx global>{`
+        @keyframes shimmer {
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
+        }
+      `}</style>
+    </>
+  );
+}
+
 // Export individual components for use in other contexts
 export { Skeleton, SkeletonCard };
