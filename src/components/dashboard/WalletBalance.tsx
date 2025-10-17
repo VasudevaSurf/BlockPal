@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - UPDATED with synchronized loading
+// src/components/dashboard/WalletBalance.tsx - UPDATED with address below price on mobile
 "use client";
 
 import { useSelector } from "react-redux";
@@ -156,8 +156,8 @@ export default function WalletBalance() {
 
   return (
     <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
+      {/* Header - Desktop only */}
+      <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
         <div className="flex items-center gap-2">
           <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo">
             {walletData.chainName || currentChain?.name || "Ethereum"} Token
@@ -174,7 +174,7 @@ export default function WalletBalance() {
           )}
         </div>
 
-        {/* Address and Copy Button */}
+        {/* Address and Copy Button - Desktop */}
         <div className="flex items-center space-x-2">
           <span className="text-gray-400 text-xs sm:text-xs font-satoshi italic font-medium truncate max-w-[120px] sm:max-w-none tracking-wide">
             {address
@@ -194,6 +194,22 @@ export default function WalletBalance() {
             <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
           </button>
         </div>
+      </div>
+
+      {/* Mobile Header - Title only */}
+      <div className="lg:hidden flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
+          {walletData.chainName || currentChain?.name || "Ethereum"} Token
+          Balances
+        </h2>
+        {isRefreshing && (
+          <div className="flex items-center gap-1">
+            <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
+            <span className="text-xs text-[#E2AF19] font-satoshi">
+              Updating...
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Error Display */}
@@ -222,16 +238,37 @@ export default function WalletBalance() {
       ) : (
         <div className="space-y-2">
           <div className="flex items-end justify-between">
-            <div>
+            <div className="w-full">
               <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
                 {tokenService.formatCurrency(walletData.mainListValue)}
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap mb-3 lg:mb-0">
                 {walletData.total24hrChange !== 0 && (
                   <PortfolioChange
                     totalChange24h={walletData.total24hrChange}
                   />
                 )}
+              </div>
+
+              {/* Address and Copy Button - Mobile only, below price */}
+              <div className="lg:hidden flex items-center space-x-2 mt-2">
+                <span className="text-gray-400 text-xs font-satoshi italic font-medium truncate max-w-[150px] tracking-wide">
+                  {address
+                    ? `${address.slice(0, 8)}...${address.slice(-6)}`
+                    : "No wallet connected"}
+                </span>
+
+                <button
+                  onClick={() => copyToClipboard(address!)}
+                  disabled={!address}
+                  className={`transition-all duration-300 ease-in-out px-2 py-0.5 rounded-full text-xs font-satoshi flex items-center gap-1 flex-shrink-0 ${
+                    copyState.isCopied
+                      ? "bg-[#E2AF19] text-black scale-105"
+                      : "text-black hover:bg-[#D4A853] bg-[#E2AF19] bg-opacity-100 disabled:opacity-50"
+                  }`}
+                >
+                  <span>{copyState.isCopied ? "Copied!" : "Copy"}</span>
+                </button>
               </div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED to hide header on mobile for AI chat
+// src/app/dashboard/layout.tsx - UPDATED to hide header on mobile for dashboard page
 "use client";
 
 import { useSelector } from "react-redux";
@@ -93,6 +93,8 @@ export default function DashboardLayout({
   const isCodeLensPage = pathname === "/dashboard/coin-lens";
   // Check if we're on News Feed page
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
+  // Check if we're on main Dashboard page
+  const isDashboardPage = pathname === "/dashboard";
 
   // Listen for news chat active state from body attribute
   useEffect(() => {
@@ -172,17 +174,19 @@ export default function DashboardLayout({
                     ? "p-0"
                     : isAIChatPage
                     ? "p-0 lg:p-2 lg:px-4"
+                    : isDashboardPage
+                    ? "p-0 lg:p-2 lg:px-4" // Dashboard: no padding on mobile, padding on desktop
                     : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
                 } ${
                   // Add padding bottom on mobile for bottom nav
                   "pb-20 lg:pb-2"
                 }`}
               >
-                {/* Global Header - Hide on swap page, news chat active, AND on mobile for AI chat */}
+                {/* Global Header - Hide on swap page, news chat active, dashboard page on mobile, AND on mobile for AI chat */}
                 {!isSwapPage && !isNewsChatActive && (
                   <div
                     className={`flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2 ${
-                      isAIChatPage ? "hidden lg:block" : ""
+                      isAIChatPage || isDashboardPage ? "hidden lg:block" : ""
                     }`}
                   >
                     <GlobalDashboardHeader
@@ -222,7 +226,7 @@ export default function DashboardLayout({
                 {/* Content Area */}
                 <div
                   className={`flex-1 min-h-0 overflow-hidden ${
-                    isAIChatPage ? "p-0 mt-0" : ""
+                    isAIChatPage || isDashboardPage ? "p-0 mt-0" : ""
                   }`}
                 >
                   {children}

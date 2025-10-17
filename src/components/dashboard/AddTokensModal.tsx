@@ -1,6 +1,13 @@
-// src/components/dashboard/AddTokensModal.tsx - WITH DUPLICATE DETECTION
+// src/components/dashboard/AddTokensModal.tsx - RESPONSIVE VERSION WITH DUPLICATE DETECTION
 import { useState, useEffect, useRef } from "react";
-import { X, Search, Loader2, CheckCircle2 } from "lucide-react";
+import {
+  X,
+  Search,
+  Loader2,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { coinlesSocketClient } from "@/services/coinlesSocketClient";
@@ -14,7 +21,6 @@ interface AddTokensModalProps {
   onClose: () => void;
   onAddToken: (token: any) => void;
   existingTokens?: Array<{
-    // NEW: Accept existing tokens
     chainId: string;
     contractAddress: string;
   }>;
@@ -53,7 +59,7 @@ const getChainDisplayData = () => {
       name: "Ethereum",
       color: "bg-blue-500",
       icon: "Ξ",
-      image: "/chains/Ethereum.png",
+      image: "/chains/ethereum.png",
       fallbackIcon: "Ξ",
       useBackground: true,
     },
@@ -61,7 +67,7 @@ const getChainDisplayData = () => {
       name: "Base",
       color: "bg-blue-600",
       icon: "B",
-      image: "/chains/Base.png",
+      image: "/chains/base.png",
       fallbackIcon: "B",
       useBackground: false,
     },
@@ -69,7 +75,7 @@ const getChainDisplayData = () => {
       name: "Polygon",
       color: "bg-purple-500",
       icon: "◆",
-      image: "/chains/Polygon.png",
+      image: "/chains/polygon.png",
       fallbackIcon: "◆",
       useBackground: false,
     },
@@ -77,7 +83,7 @@ const getChainDisplayData = () => {
       name: "Arbitrum",
       color: "bg-blue-400",
       icon: "◉",
-      image: "/chains/Arbitrum.png",
+      image: "/chains/arbitrum.png",
       fallbackIcon: "◉",
       useBackground: false,
     },
@@ -85,7 +91,7 @@ const getChainDisplayData = () => {
       name: "Avalanche",
       color: "bg-red-500",
       icon: "A",
-      image: "/chains/Avalanche.png",
+      image: "/chains/avalanche.png",
       fallbackIcon: "A",
       useBackground: true,
     },
@@ -93,7 +99,7 @@ const getChainDisplayData = () => {
       name: "BSC",
       color: "bg-yellow-500",
       icon: "B",
-      image: "/chains/BSC.png",
+      image: "/chains/bsc.png",
       fallbackIcon: "B",
       useBackground: true,
     },
@@ -125,9 +131,9 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   const [imageError, setImageError] = useState(false);
 
   const sizeClasses = {
-    sm: "w-5 h-5",
-    md: "w-7 h-7",
-    lg: "w-8 h-8",
+    sm: "w-4 h-4 lg:w-5 lg:h-5",
+    md: "w-6 h-6 lg:w-7 lg:h-7",
+    lg: "w-7 h-7 lg:w-8 lg:h-8",
   };
 
   useEffect(() => {
@@ -170,7 +176,7 @@ const ChainIcon: React.FC<ChainIconProps> = ({
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
-          <span className="text-white text-xs font-bold font-satoshi">
+          <span className="text-white text-[10px] lg:text-xs font-bold font-satoshi">
             {chainData.fallbackIcon}
           </span>
         </div>
@@ -207,7 +213,9 @@ const TokenImage = ({
         style={{ backgroundColor: "#4A4A4A" }}
         title={name || symbol}
       >
-        <span className="text-white font-bold text-xs">{getFirstLetter()}</span>
+        <span className="text-white font-bold text-[10px] lg:text-xs">
+          {getFirstLetter()}
+        </span>
       </div>
     );
   }
@@ -236,7 +244,7 @@ export default function AddTokensModal({
   isOpen,
   onClose,
   onAddToken,
-  existingTokens = [], // NEW: Default empty array
+  existingTokens = [],
 }: AddTokensModalProps) {
   const { user } = useSelector((state: RootState) => state.auth);
 
@@ -253,7 +261,7 @@ export default function AddTokensModal({
 
   const chainDisplayData = getChainDisplayData();
 
-  // NEW: Helper function to check if token already exists
+  // Helper function to check if token already exists
   const isTokenAlreadyAdded = (
     contractAddress: string,
     chainId: string
@@ -400,7 +408,6 @@ export default function AddTokensModal({
   };
 
   const toggleTokenSelection = (tokenKey: string, contractAddress: string) => {
-    // NEW: Prevent selection if already added
     if (isTokenAlreadyAdded(contractAddress, selectedChain)) {
       console.log("Token already in watchlist, cannot select");
       return;
@@ -512,18 +519,21 @@ export default function AddTokensModal({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
+      <div className="absolute inset-0 bg-white/10 z-40" onClick={onClose} />
 
       {/* Modal Container */}
-      <div className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div
+        className="absolute inset-0 z-50 flex items-center justify-center p-2 lg:p-4"
+        onClick={onClose}
+      >
         <div
-          className="h-[550px] w-full max-w-4xl pointer-events-auto"
+          className="h-[70vh] lg:h-[550px] w-full max-w-[95vw] lg:max-w-4xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Main container */}
-          <div className="bg-[#000] rounded-[20px] h-full flex overflow-hidden border border-[#2C2C2C] shadow-2xl">
-            {/* Left Side - Chains */}
-            <div className="w-1/3 p-5">
+          <div className="bg-[#000] rounded-[16px] lg:rounded-[20px] h-full flex flex-col lg:flex-row overflow-hidden border border-[#2C2C2C]">
+            {/* Desktop Left Side - Chains */}
+            <div className="hidden lg:block lg:w-1/3 p-5">
               <div className="mb-8">
                 <h2 className="text-white font-mayeka text-xl">Add Tokens</h2>
               </div>
@@ -578,11 +588,7 @@ export default function AddTokensModal({
                           >
                             <div className="flex items-center gap-3">
                               <ChainIcon chainData={chainDisplay} size="md" />
-                              <span
-                                className={`text-sm font-satoshi font-medium ${
-                                  isSelected ? "text-white" : "text-white"
-                                }`}
-                              >
+                              <span className="text-sm font-satoshi font-medium text-white">
                                 {chainDisplay.name}
                               </span>
                             </div>
@@ -595,15 +601,28 @@ export default function AddTokensModal({
               </div>
             </div>
 
-            {/* Right Side - Tokens */}
-            <div className="flex flex-col bg-[#000] p-5 flex-1">
-              {/* Header with close button */}
-              <div className="flex justify-between items-center mb-5">
-                <div className="flex-1" />
+            {/* Mobile & Desktop Right Side - Content */}
+            <div className="flex flex-col bg-[#000] flex-1 min-h-0">
+              {/* Mobile Header */}
+              <div className="lg:hidden flex items-center justify-between p-3 border-b border-[#2C2C2C] flex-shrink-0">
+                <h2 className="text-white font-mayeka text-lg">Add Tokens</h2>
                 <button
                   onClick={onClose}
                   disabled={addingTokens}
-                  className={`text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg ml-auto ${
+                  className={`text-gray-400 hover:text-white transition-colors p-1.5 ${
+                    addingTokens ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Desktop Header */}
+              <div className="hidden lg:flex justify-end items-center p-5 pb-0 flex-shrink-0">
+                <button
+                  onClick={onClose}
+                  disabled={addingTokens}
+                  className={`text-gray-400 hover:text-white transition-colors p-2 hover:bg-[#2C2C2C] rounded-lg ${
                     addingTokens ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
@@ -611,252 +630,319 @@ export default function AddTokensModal({
                 </button>
               </div>
 
-              {/* Search Bar */}
-              <div className="relative mb-5">
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                  {searchLoading ? (
-                    <Loader2 size={16} className="text-gray-400 animate-spin" />
-                  ) : (
-                    <Search size={16} className="text-gray-400" />
-                  )}
-                </div>
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search name, symbol, or paste address"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  disabled={addingTokens}
-                  className={`w-full bg-[#0F0F0F] rounded-[15px] pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka ${
-                    addingTokens ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                />
-              </div>
+              {/* Content */}
+              <div className="flex-1 flex flex-col p-3 lg:p-5 lg:pt-0 min-h-0">
+                {/* Mobile Chain Selector */}
+                <div className="lg:hidden mb-4 flex-shrink-0">
+                  <div className="relative p-[2px] rounded-[12px]">
+                    <div
+                      className="absolute inset-0 rounded-[12px]"
+                      style={{
+                        background: `linear-gradient(135deg, 
+                          #E2AF19 0%, 
+                          #E2AF19 10%,
+                          #2C2C2C 25%, 
+                          #2C2C2C 75%, 
+                          #E2AF19 90%,
+                          #E2AF19 100%)`,
+                      }}
+                    />
+                    <div className="relative bg-[#000] rounded-[10px] p-3">
+                      <div className="mb-3">
+                        <h3 className="text-white font-mayeka text-sm">
+                          Select Chain
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {CHAINS.map((chain) => {
+                          const chainDisplay = chainDisplayData[chain.id];
+                          const isSelected = selectedChain === chain.id;
 
-              {/* Dynamic Heading */}
-              <div className="mb-4">
-                <h4 className="text-[#939393] font-satoshi font-medium text-base">
-                  {searchQuery
-                    ? "Search Results"
-                    : `Popular ${
-                        chainDisplayData[selectedChain]?.name || ""
-                      } Tokens`}
-                </h4>
-              </div>
-
-              {/* Token List */}
-              <div className="flex-1 overflow-y-auto">
-                {searchLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E2AF19]"></div>
-                  </div>
-                ) : showPopular ? (
-                  <div className="space-y-2">
-                    {popularTokens.map((token, index) => {
-                      const tokenKey = `popular_${token.address}`;
-                      const isSelected = selectedTokens.has(tokenKey);
-                      const alreadyAdded = isTokenAlreadyAdded(
-                        token.address,
-                        selectedChain
-                      ); // NEW
-
-                      return (
-                        <button
-                          key={`${tokenKey}_${index}`}
-                          onClick={() =>
-                            toggleTokenSelection(tokenKey, token.address)
-                          }
-                          disabled={addingTokens || alreadyAdded} // NEW: Disable if already added
-                          className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left ${
-                            alreadyAdded
-                              ? "bg-[#1A1A1A] opacity-60 cursor-not-allowed" // NEW: Different style for already added
-                              : addingTokens
-                              ? "opacity-50 cursor-not-allowed"
-                              : "hover:bg-[#1A1A1A]"
-                          }`}
-                        >
-                          <div className="flex items-center min-w-0 flex-1">
-                            <TokenImage
-                              src={token.logoURI}
-                              alt={token.symbol}
-                              symbol={token.symbol}
-                              name={token.name}
-                              className="w-10 h-10 mr-3 flex-shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-white font-medium font-satoshi text-sm flex items-center gap-2">
-                                {token.name}
-                              </div>
-                              <div className="text-gray-400 text-xs font-satoshi">
-                                {token.symbol}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {alreadyAdded ? ( // NEW: Show checkmark if already added
-                              <CheckCircle2
-                                size={16}
-                                className="text-green-400"
-                              />
-                            ) : (
-                              <div
-                                className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
-                                  isSelected
-                                    ? "bg-[#E2AF19]"
-                                    : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
-                                }`}
-                              >
-                                <div
-                                  className={`w-2 h-2 rounded-full ${
-                                    isSelected ? "bg-black" : ""
-                                  }`}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : displayTokens.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
-                      <span className="text-gray-400 text-lg">
-                        {searchQuery ? "🔍" : "💭"}
-                      </span>
+                          return (
+                            <button
+                              key={chain.id}
+                              onClick={() => setSelectedChain(chain.id)}
+                              disabled={addingTokens}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-[10px] transition-all ${
+                                isSelected
+                                  ? "bg-[#71570C]"
+                                  : "bg-[#0F0F0F] hover:bg-[#1A1A1A]"
+                              } ${
+                                addingTokens
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : ""
+                              }`}
+                            >
+                              <ChainIcon chainData={chainDisplay} size="sm" />
+                              <span className="text-xs font-satoshi font-medium text-white">
+                                {chainDisplay.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <p className="text-gray-400 font-satoshi">
-                      {searchQuery
-                        ? "No tokens found"
-                        : "Start typing to search"}
-                    </p>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    {displayTokens.map((token, index) => {
-                      const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
-                      const isSelected = selectedTokens.has(tokenKey);
-                      const alreadyAdded = isTokenAlreadyAdded(
-                        token.contractAddress,
-                        selectedChain
-                      ); // NEW
+                </div>
 
-                      return (
-                        <button
-                          key={`${tokenKey}_${index}`}
-                          onClick={() =>
-                            toggleTokenSelection(
-                              tokenKey,
-                              token.contractAddress
-                            )
-                          }
-                          disabled={addingTokens || alreadyAdded} // NEW: Disable if already added
-                          className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors text-left ${
-                            alreadyAdded
-                              ? "bg-[#1A1A1A] opacity-60 cursor-not-allowed" // NEW: Different style for already added
-                              : addingTokens
-                              ? "opacity-50 cursor-not-allowed"
-                              : "hover:bg-[#1A1A1A]"
-                          }`}
-                        >
-                          <div className="flex items-center min-w-0 flex-1">
-                            <TokenImage
-                              src={token.logo}
-                              alt={token.symbol}
-                              symbol={token.symbol}
-                              name={token.name}
-                              className="w-10 h-10 mr-3 flex-shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-white font-medium font-satoshi text-sm flex items-center gap-2">
-                                {token.name}
-                                {alreadyAdded && ( // NEW: Show "Already Added" badge
-                                  <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-satoshi">
-                                    Already Added
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-gray-400 text-xs font-satoshi">
-                                {token.symbol}
+                {/* Search Bar */}
+                <div className="relative mb-3 lg:mb-5 flex-shrink-0">
+                  <div className="absolute left-2.5 lg:left-3 top-1/2 transform -translate-y-1/2">
+                    {searchLoading ? (
+                      <Loader2
+                        size={14}
+                        className="lg:w-4 lg:h-4 text-gray-400 animate-spin"
+                      />
+                    ) : (
+                      <Search
+                        size={14}
+                        className="lg:w-4 lg:h-4 text-gray-400"
+                      />
+                    )}
+                  </div>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search name, symbol, or paste address"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    disabled={addingTokens}
+                    className={`w-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[15px] pl-8 lg:pl-10 pr-3 lg:pr-4 py-2 lg:py-3 text-sm lg:text-base text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka ${
+                      addingTokens ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  />
+                </div>
+
+                {/* Dynamic Heading */}
+                <div className="mb-3 lg:mb-4 flex-shrink-0">
+                  <h4 className="text-[#939393] font-satoshi font-medium text-sm lg:text-base">
+                    {searchQuery
+                      ? "Search Results"
+                      : `Popular ${
+                          chainDisplayData[selectedChain]?.name || ""
+                        } Tokens`}
+                  </h4>
+                </div>
+
+                {/* Token List */}
+                <div className="flex-1 overflow-y-auto relative min-h-0">
+                  {searchLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="animate-spin rounded-full h-6 w-6 lg:h-8 lg:w-8 border-b-2 border-[#E2AF19]"></div>
+                        <p className="text-gray-400 text-xs lg:text-sm font-satoshi">
+                          Loading tokens...
+                        </p>
+                      </div>
+                    </div>
+                  ) : showPopular ? (
+                    <div className="space-y-1.5 lg:space-y-2">
+                      {popularTokens.map((token, index) => {
+                        const tokenKey = `popular_${token.address}`;
+                        const isSelected = selectedTokens.has(tokenKey);
+                        const alreadyAdded = isTokenAlreadyAdded(
+                          token.address,
+                          selectedChain
+                        );
+
+                        return (
+                          <button
+                            key={`${tokenKey}_${index}`}
+                            onClick={() =>
+                              toggleTokenSelection(tokenKey, token.address)
+                            }
+                            disabled={addingTokens || alreadyAdded}
+                            className={`w-full flex items-center justify-between p-2 lg:p-3 rounded-lg transition-colors text-left ${
+                              alreadyAdded
+                                ? "bg-[#1A1A1A] opacity-60 cursor-not-allowed"
+                                : addingTokens
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:bg-[#1A1A1A]"
+                            }`}
+                          >
+                            <div className="flex items-center min-w-0 flex-1">
+                              <TokenImage
+                                src={token.logoURI}
+                                alt={token.symbol}
+                                symbol={token.symbol}
+                                name={token.name}
+                                className="w-8 h-8 lg:w-10 lg:h-10 mr-2 lg:mr-3 flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-white font-medium font-satoshi text-xs lg:text-sm flex items-center gap-2">
+                                  {token.name}
+                                </div>
+                                <div className="text-gray-400 text-[10px] lg:text-xs font-satoshi">
+                                  {token.symbol}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            {!alreadyAdded && ( // NEW: Only show price if not already added
-                              <div className="text-right">
-                                <div className="text-white font-medium font-satoshi text-sm">
-                                  {formatCurrency(token.price)}
-                                </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {alreadyAdded ? (
+                                <CheckCircle2
+                                  size={14}
+                                  className="lg:w-4 lg:h-4 text-green-400"
+                                />
+                              ) : (
                                 <div
-                                  className={`font-satoshi text-[10px] font-medium ${
-                                    token.change24h > 0
-                                      ? "text-green-500"
-                                      : "text-red-500"
+                                  className={`w-3.5 h-3.5 lg:w-4 lg:h-4 rounded-full flex items-center justify-center transition-all ${
+                                    isSelected
+                                      ? "bg-[#E2AF19]"
+                                      : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
                                   }`}
                                 >
-                                  {token.change24h > 0 ? "▲" : "▼"}{" "}
-                                  {Math.abs(token.change24h).toFixed(2)}%
+                                  <div
+                                    className={`w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full ${
+                                      isSelected ? "bg-black" : ""
+                                    }`}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : displayTokens.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center absolute inset-0">
+                      <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+                        <span className="text-gray-400 text-base lg:text-lg">
+                          {searchQuery ? "🔍" : "💭"}
+                        </span>
+                      </div>
+                      <p className="text-gray-400 font-satoshi text-sm lg:text-base">
+                        {searchQuery
+                          ? "No tokens found"
+                          : "Start typing to search"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 lg:space-y-2">
+                      {displayTokens.map((token, index) => {
+                        const tokenKey = `${token.contractAddress}_${token.poolAddress}`;
+                        const isSelected = selectedTokens.has(tokenKey);
+                        const alreadyAdded = isTokenAlreadyAdded(
+                          token.contractAddress,
+                          selectedChain
+                        );
+
+                        return (
+                          <button
+                            key={`${tokenKey}_${index}`}
+                            onClick={() =>
+                              toggleTokenSelection(
+                                tokenKey,
+                                token.contractAddress
+                              )
+                            }
+                            disabled={addingTokens || alreadyAdded}
+                            className={`w-full flex items-center justify-between p-2 lg:p-3 rounded-lg transition-colors text-left ${
+                              alreadyAdded
+                                ? "bg-[#1A1A1A] opacity-60 cursor-not-allowed"
+                                : addingTokens
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:bg-[#1A1A1A]"
+                            }`}
+                          >
+                            <div className="flex items-center min-w-0 flex-1">
+                              <TokenImage
+                                src={token.logo}
+                                alt={token.symbol}
+                                symbol={token.symbol}
+                                name={token.name}
+                                className="w-8 h-8 lg:w-10 lg:h-10 mr-2 lg:mr-3 flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-white font-medium font-satoshi text-xs lg:text-sm flex items-center gap-2">
+                                  {token.name}
+                                  {alreadyAdded && (
+                                    <span className="text-[9px] lg:text-[10px] bg-green-500/20 text-green-400 px-1.5 lg:px-2 py-0.5 rounded-full font-satoshi">
+                                      Already Added
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-gray-400 text-[10px] lg:text-xs font-satoshi">
+                                  {token.symbol}
                                 </div>
                               </div>
-                            )}
+                            </div>
 
-                            {alreadyAdded ? ( // NEW: Show checkmark if already added
-                              <CheckCircle2
-                                size={16}
-                                className="text-green-400"
-                              />
-                            ) : (
-                              <div
-                                className={`w-4 h-4 rounded-full flex items-center justify-center transition-all ${
-                                  isSelected
-                                    ? "bg-[#E2AF19]"
-                                    : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
-                                }`}
-                              >
-                                <div
-                                  className={`w-2 h-2 rounded-full ${
-                                    isSelected ? "bg-black" : ""
-                                  }`}
+                            <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
+                              {!alreadyAdded && (
+                                <div className="text-right">
+                                  <div className="text-white font-medium font-satoshi text-xs lg:text-sm">
+                                    {formatCurrency(token.price)}
+                                  </div>
+                                  <div
+                                    className={`font-satoshi text-[9px] lg:text-[10px] font-medium ${
+                                      token.change24h > 0
+                                        ? "text-green-500"
+                                        : "text-red-500"
+                                    }`}
+                                  >
+                                    {token.change24h > 0 ? "▲" : "▼"}{" "}
+                                    {Math.abs(token.change24h).toFixed(2)}%
+                                  </div>
+                                </div>
+                              )}
+
+                              {alreadyAdded ? (
+                                <CheckCircle2
+                                  size={14}
+                                  className="lg:w-4 lg:h-4 text-green-400"
                                 />
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Add Tokens Button */}
-              <div className="mt-3 flex-shrink-0 flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="text-gray-400 font-satoshi text-[10px]">
-                    {selectedTokens.size}{" "}
-                    {selectedTokens.size === 1 ? "Token" : "Tokens"} Selected
-                  </div>
+                              ) : (
+                                <div
+                                  className={`w-3.5 h-3.5 lg:w-4 lg:h-4 rounded-full flex items-center justify-center transition-all ${
+                                    isSelected
+                                      ? "bg-[#E2AF19]"
+                                      : "bg-[#2C2C2C] hover:bg-[#3C3C3C]"
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full ${
+                                      isSelected ? "bg-black" : ""
+                                    }`}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <button
-                    onClick={handleAddTokens}
-                    disabled={selectedTokens.size === 0 || addingTokens}
-                    className={`w-full py-2 rounded-[10px] font-satoshi font-medium text-xs transition-all flex items-center justify-center gap-2 ${
-                      selectedTokens.size === 0 || addingTokens
-                        ? "bg-[#E2AF19] opacity-50 cursor-not-allowed"
-                        : "bg-[#E2AF19] hover:bg-[#D4A853]"
-                    } text-black`}
-                  >
-                    {addingTokens ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        <span>Adding...</span>
-                      </>
-                    ) : (
-                      <span>Add Tokens</span>
-                    )}
-                  </button>
+
+                {/* Add Tokens Button */}
+                <div className="mt-3 flex-shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
+                  <div className="sm:flex-1 text-center sm:text-left">
+                    <div className="text-gray-400 font-satoshi text-[10px] lg:text-xs">
+                      {selectedTokens.size}{" "}
+                      {selectedTokens.size === 1 ? "Token" : "Tokens"} Selected
+                    </div>
+                  </div>
+                  <div className="sm:flex-1">
+                    <button
+                      onClick={handleAddTokens}
+                      disabled={selectedTokens.size === 0 || addingTokens}
+                      className={`w-full py-2 lg:py-2.5 rounded-[10px] font-satoshi font-medium text-xs lg:text-sm transition-all flex items-center justify-center gap-2 ${
+                        selectedTokens.size === 0 || addingTokens
+                          ? "bg-[#E2AF19] opacity-50 cursor-not-allowed"
+                          : "bg-[#E2AF19] hover:bg-[#D4A853]"
+                      } text-black`}
+                    >
+                      {addingTokens ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>Adding...</span>
+                        </>
+                      ) : (
+                        <span>Add Tokens</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

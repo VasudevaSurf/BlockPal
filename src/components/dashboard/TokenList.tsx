@@ -1,5 +1,7 @@
-// src/components/dashboard/TokenList.tsx - COMPLETE with synchronized loading
+// src/components/dashboard/TokenList.tsx - COMPLETE with mobile tabs and trending/gainers
 "use client";
+
+// NOTE: This component now includes tabs for Holdings/Trending/Top Gainers on mobile
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -9,6 +11,7 @@ import { RootState } from "@/store";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import { useWalletTracking } from "@/hooks/useWalletTracking";
 import { useDashboardLoading } from "@/contexts/DashboardLoadingContext";
+import { useCoinGecko, TrendingToken, TopGainer } from "@/hooks/useCoinGecko";
 import {
   RefreshCw,
   MoreVertical,
@@ -195,6 +198,63 @@ const TokenImage = ({
       onError={() => setHasError(true)}
       loading="lazy"
     />
+  );
+};
+
+// Trending/Gainer Token Image Component
+const TrendingTokenImage = ({
+  token,
+  size = "w-10 h-10",
+}: {
+  token: TrendingToken | TopGainer;
+  size?: string;
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+
+  const handleImageLoad = () => {
+    setImageLoading(false);
+    setImageError(false);
+  };
+
+  const handleImageError = () => {
+    setImageLoading(false);
+    setImageError(true);
+  };
+
+  if (!token.imageUrl || imageError || imageLoading) {
+    return (
+      <div
+        className={`${size} ${token.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}
+      >
+        <span className="text-white text-xs font-bold font-satoshi">
+          {token.icon}
+        </span>
+        {token.imageUrl && imageLoading && (
+          <img
+            src={token.imageUrl}
+            alt={token.name}
+            className="hidden"
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${size} rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-800`}
+    >
+      <img
+        src={token.imageUrl}
+        alt={token.name}
+        className="w-full h-full object-cover"
+        onLoad={handleImageLoad}
+        onError={handleImageError}
+      />
+    </div>
   );
 };
 
@@ -530,6 +590,14 @@ export default function TokenList() {
   // Use dashboard loading context
   const { allComponentsLoaded, setComponentLoading } = useDashboardLoading();
 
+  // CoinGecko data for trending and gainers
+  const {
+    data: coinGeckoData,
+    loading: coinGeckoLoading,
+    error: coinGeckoError,
+    refetch: refetchCoinGecko,
+  } = useCoinGecko();
+
   // Wallet integration
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -540,6 +608,12 @@ export default function TokenList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<
+    "holdings" | "trending" | "gainers"
+  >("holdings");
+  const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
 
   // Token management state
   const [showHidden, setShowHidden] = useState(false);
@@ -561,6 +635,10 @@ export default function TokenList() {
 
   // Track if we've loaded data at least once
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  // Get trending and gainers data
+  const trendingTokens = coinGeckoData?.trendingTokens || [];
+  const topGainersData = coinGeckoData?.topGainers || [];
 
   // Update loading state for dashboard synchronization
   useEffect(() => {
@@ -853,16 +931,53 @@ export default function TokenList() {
     <>
       <style jsx>{tokenRowStyles}</style>
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
-        {/* Header */}
+        {/* Header with Tabs */}
         <div className="flex items-center justify-between mb-3 px-2">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo flex-shrink-0">
-              Token Holdings
-            </h2>
+          <div className="flex items-center gap-4 lg:gap-6">
+            <button
+              onClick={() => setActiveTab("holdings")}
+              className={`pb-1 text-xs lg:text-sm font-mayeka font-medium transition-all relative ${
+                activeTab === "holdings"
+                  ? "text-white"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Holdings
+              {activeTab === "holdings" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("trending")}
+              className={`pb-1 text-xs lg:text-sm font-mayeka font-medium transition-all relative ${
+                activeTab === "trending"
+                  ? "text-white"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Trending
+              {activeTab === "trending" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("gainers")}
+              className={`pb-1 text-xs lg:text-sm font-mayeka font-medium transition-all relative ${
+                activeTab === "gainers"
+                  ? "text-white"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Top Gainers
+              {activeTab === "gainers" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white"></div>
+              )}
+            </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            {hasHiddenTokens && !showInternalSkeleton && (
+          {activeTab === "holdings" &&
+            hasHiddenTokens &&
+            !showInternalSkeleton && (
               <button
                 onClick={() => setShowHidden(!showHidden)}
                 className={`p-1.5 rounded-lg transition-colors flex items-center gap-1 ${
@@ -880,9 +995,33 @@ export default function TokenList() {
                 </span>
               </button>
             )}
-          </div>
-        </div>
 
+          {activeTab === "trending" && (
+            <div className="flex items-center gap-1 border border-[#2C2C2C] rounded-lg px-2 py-1">
+              <span className="text-gray-400 text-[10px] font-satoshi">
+                24h Change
+              </span>
+            </div>
+          )}
+
+          {activeTab === "gainers" && (
+            <div className="flex items-center bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-1">
+              {["1hr", "24h", "7d"].map((timeframe) => (
+                <button
+                  key={timeframe}
+                  onClick={() => setSelectedTimeframe(timeframe)}
+                  className={`px-2 py-1 text-[10px] font-satoshi rounded transition-colors ${
+                    selectedTimeframe === timeframe
+                      ? "bg-[#E2AF19] text-black"
+                      : "text-gray-400"
+                  }`}
+                >
+                  {timeframe}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {/* Error state */}
         {error && !showInternalSkeleton && (
           <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
@@ -900,174 +1039,326 @@ export default function TokenList() {
             </div>
           </div>
         )}
-
-        {/* Token List - Show skeleton while loading OR waiting for other components */}
+        {/* Tab Content */}
         {showInternalSkeleton ? (
           <TokenListLoadingSkeleton />
-        ) : allTokens.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center py-6 lg:py-8 flex-1">
-            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
-              <span className="text-gray-400 text-base lg:text-lg">🪙</span>
-            </div>
-            <h3 className="text-white text-sm lg:text-base font-satoshi mb-1">
-              No tokens found
-            </h3>
-            <p className="text-gray-400 font-satoshi text-xs lg:text-sm mb-3">
-              No token holdings found on {chainName || currentChain?.name}
-            </p>
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="px-3 py-1.5 bg-[#E2AF19] text-black rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi text-sm disabled:opacity-50"
-            >
-              {isRefreshing ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
         ) : (
           <div className="flex-1 overflow-y-auto scrollbar-hide">
-            {/* Main Tokens Section */}
-            {mainTokens.length > 0 && (
-              <div
-                className={
-                  additionalTokens.length > 0 && showHidden ? "mb-6" : ""
-                }
-              >
-                <div className="space-y-2 pr-1">
-                  {mainTokens.map((token, index) => (
-                    <div
-                      key={`${token.contractAddress}_${index}_main`}
-                      className={`token-row ${
-                        token.isUserAdded ? "has-menu" : ""
-                      } flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
-                        isNavigating || addingToken === token.contractAddress
-                          ? "opacity-70"
-                          : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
-                      }`}
-                      style={{ zIndex: mainTokens.length - index }}
+            {/* Holdings Tab */}
+            {activeTab === "holdings" && (
+              <>
+                {allTokens.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center py-8 min-h-[400px]">
+                    <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+                      <span className="text-gray-400 text-xl">🪙</span>
+                    </div>
+                    <h3 className="text-white text-base font-satoshi mb-1">
+                      No tokens found
+                    </h3>
+                    <p className="text-gray-400 font-satoshi text-sm mb-3 px-4">
+                      No token holdings found on{" "}
+                      {chainName || currentChain?.name}
+                    </p>
+                    <button
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                      className="px-4 py-2 bg-[#E2AF19] text-black rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi text-sm disabled:opacity-50"
                     >
-                      <div className="token-content-wrapper">
-                        <div className="token-info">
-                          <TokenImage
-                            src={token.logoUrl}
-                            alt={token.symbol}
-                            symbol={token.symbol}
-                            name={token.name}
-                            className="w-10 h-10 mr-2.5 flex-shrink-0"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="text-white font-medium font-satoshi text-sm flex items-center">
-                              {token.name}
-                              <PercentageDisplay
-                                change24h={token.change24h}
-                                usdChange24h={token.usdChange24h}
-                                size="xs"
-                              />
+                      {isRefreshing ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Main Tokens Section */}
+                    {mainTokens.length > 0 && (
+                      <div
+                        className={
+                          additionalTokens.length > 0 && showHidden
+                            ? "mb-6"
+                            : ""
+                        }
+                      >
+                        <div className="space-y-2 pr-1">
+                          {mainTokens.map((token, index) => (
+                            <div
+                              key={`${token.contractAddress}_${index}_main`}
+                              className={`token-row ${
+                                token.isUserAdded ? "has-menu" : ""
+                              } flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
+                                isNavigating ||
+                                addingToken === token.contractAddress
+                                  ? "opacity-70"
+                                  : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+                              }`}
+                              style={{ zIndex: mainTokens.length - index }}
+                            >
+                              <div className="token-content-wrapper">
+                                <div className="token-info">
+                                  <TokenImage
+                                    src={token.logoUrl}
+                                    alt={token.symbol}
+                                    symbol={token.symbol}
+                                    name={token.name}
+                                    className="w-10 h-10 mr-2.5 flex-shrink-0"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-white font-medium font-satoshi text-sm flex items-center">
+                                      {token.name}
+                                      <PercentageDisplay
+                                        change24h={token.change24h}
+                                        usdChange24h={token.usdChange24h}
+                                        size="xs"
+                                      />
+                                    </div>
+                                    <div className="text-gray-400 text-xs font-satoshi">
+                                      {enhancedTokenService.formatTokenAmount(
+                                        token.balance,
+                                        4
+                                      )}{" "}
+                                      {token.symbol}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="token-values-wrapper">
+                                  <div className="token-values">
+                                    <div className="text-white font-medium font-satoshi text-sm">
+                                      {enhancedTokenService.formatCurrency(
+                                        token.value
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {token.isUserAdded && (
+                                    <div className="menu-button-wrapper">
+                                      <ThreeDotMenu
+                                        token={token}
+                                        onRemoveFromMain={
+                                          handleRemoveFromMainList
+                                        }
+                                        isInMainList={true}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-gray-400 text-xs font-satoshi">
-                              {enhancedTokenService.formatTokenAmount(
-                                token.balance,
-                                4
-                              )}{" "}
-                              {token.symbol}
-                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Additional Tokens Section */}
+                    {additionalTokens.length > 0 && showHidden && (
+                      <div>
+                        <div className="flex items-center mb-3 px-2">
+                          <div className="flex-1 h-px bg-[#2C2C2C]"></div>
+                          <div className="px-3 text-xs text-gray-400 font-satoshi">
+                            Additional Tokens ({additionalTokens.length})
                           </div>
+                          <div className="flex-1 h-px bg-[#2C2C2C]"></div>
                         </div>
 
-                        <div className="token-values-wrapper">
-                          <div className="token-values">
-                            <div className="text-white font-medium font-satoshi text-sm">
-                              {enhancedTokenService.formatCurrency(token.value)}
-                            </div>
-                          </div>
+                        <div className="space-y-2 pr-1">
+                          {additionalTokens.map((token, index) => (
+                            <div
+                              key={`${token.contractAddress}_${index}_additional`}
+                              className={`token-row has-menu flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
+                                isNavigating ||
+                                addingToken === token.contractAddress
+                                  ? "opacity-70"
+                                  : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+                              }`}
+                              style={{
+                                zIndex: additionalTokens.length - index,
+                              }}
+                            >
+                              <div className="token-content-wrapper">
+                                <div className="token-info">
+                                  <TokenImage
+                                    src={token.logoUrl}
+                                    alt={token.symbol}
+                                    symbol={token.symbol}
+                                    name={token.name}
+                                    className="w-10 h-10 mr-2.5 flex-shrink-0"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-white font-medium font-satoshi text-sm flex items-center">
+                                      {token.name}
+                                      <PercentageDisplay
+                                        change24h={token.change24h}
+                                        usdChange24h={token.usdChange24h}
+                                        size="xs"
+                                      />
+                                    </div>
+                                    <div className="text-gray-400 text-xs font-satoshi">
+                                      {enhancedTokenService.formatTokenAmount(
+                                        token.balance,
+                                        4
+                                      )}{" "}
+                                      {token.symbol}
+                                    </div>
+                                  </div>
+                                </div>
 
-                          {token.isUserAdded && (
-                            <div className="menu-button-wrapper">
-                              <ThreeDotMenu
-                                token={token}
-                                onRemoveFromMain={handleRemoveFromMainList}
-                                isInMainList={true}
-                              />
+                                <div className="token-values-wrapper">
+                                  <div className="token-values">
+                                    <div className="text-white font-medium font-satoshi text-sm">
+                                      {enhancedTokenService.formatCurrency(
+                                        token.value
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="menu-button-wrapper">
+                                    <ThreeDotMenu
+                                      token={token}
+                                      onAddToMain={handleAddToMainList}
+                                      isInMainList={false}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          )}
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Trending Tab */}
+            {activeTab === "trending" && (
+              <div className="space-y-2 pr-1">
+                {coinGeckoLoading ? (
+                  <TokenListLoadingSkeleton />
+                ) : coinGeckoError ? (
+                  <div className="flex items-center justify-center p-4">
+                    <div className="text-center">
+                      <AlertCircle
+                        size={24}
+                        className="text-red-400 mx-auto mb-2"
+                      />
+                      <p className="text-red-400 text-xs font-satoshi mb-2">
+                        {coinGeckoError}
+                      </p>
+                      <button
+                        onClick={refetchCoinGecko}
+                        className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-xs"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  </div>
+                ) : trendingTokens.length > 0 ? (
+                  trendingTokens.map((token: TrendingToken, index: number) => (
+                    <div
+                      key={`${token.index}_${index}`}
+                      className="flex items-center justify-between p-2.5 rounded-lg hover:bg-[#1A1A1A] transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <TrendingTokenImage token={token} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-white text-sm font-medium font-satoshi flex items-center">
+                            {token.name}
+                            <span
+                              className={`text-xs ml-2 ${
+                                token.changeType === "positive"
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {token.change}
+                            </span>
+                          </div>
+                          <div className="text-gray-400 text-xs font-satoshi">
+                            {token.symbol}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-white text-sm font-medium font-satoshi">
+                          {token.price}
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  ))
+                ) : (
+                  <div className="flex items-center justify-center p-4">
+                    <p className="text-gray-400 text-sm font-satoshi">
+                      No trending tokens available
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Additional Tokens Section */}
-            {additionalTokens.length > 0 && showHidden && (
-              <div>
-                <div className="flex items-center mb-3 px-2">
-                  <div className="flex-1 h-px bg-[#2C2C2C]"></div>
-                  <div className="px-3 text-xs text-gray-400 font-satoshi">
-                    Additional Tokens ({additionalTokens.length})
+            {/* Top Gainers Tab */}
+            {activeTab === "gainers" && (
+              <div className="space-y-2 pr-1">
+                {coinGeckoLoading ? (
+                  <TokenListLoadingSkeleton />
+                ) : coinGeckoError ? (
+                  <div className="flex items-center justify-center p-4">
+                    <div className="text-center">
+                      <AlertCircle
+                        size={24}
+                        className="text-red-400 mx-auto mb-2"
+                      />
+                      <p className="text-red-400 text-xs font-satoshi mb-2">
+                        {coinGeckoError}
+                      </p>
+                      <button
+                        onClick={refetchCoinGecko}
+                        className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-xs"
+                      >
+                        Try Again
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex-1 h-px bg-[#2C2C2C]"></div>
-                </div>
-
-                <div className="space-y-2 pr-1">
-                  {additionalTokens.map((token, index) => (
+                ) : topGainersData.length > 0 ? (
+                  topGainersData.map((token: TopGainer, index: number) => (
                     <div
-                      key={`${token.contractAddress}_${index}_additional`}
-                      className={`token-row has-menu flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
-                        isNavigating || addingToken === token.contractAddress
-                          ? "opacity-70"
-                          : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
-                      }`}
-                      style={{ zIndex: additionalTokens.length - index }}
+                      key={`${token.index}_${index}`}
+                      className="flex items-center justify-between p-2.5 rounded-lg hover:bg-[#1A1A1A] transition-colors"
                     >
-                      <div className="token-content-wrapper">
-                        <div className="token-info">
-                          <TokenImage
-                            src={token.logoUrl}
-                            alt={token.symbol}
-                            symbol={token.symbol}
-                            name={token.name}
-                            className="w-10 h-10 mr-2.5 flex-shrink-0"
-                          />
-                          <div className="min-w-0 flex-1">
-                            {/* FIXED: Added percentage next to token name, matching main tokens */}
-                            <div className="text-white font-medium font-satoshi text-sm flex items-center">
-                              {token.name}
-                              <PercentageDisplay
-                                change24h={token.change24h}
-                                usdChange24h={token.usdChange24h}
-                                size="xs"
-                              />
-                            </div>
-                            <div className="text-gray-400 text-xs font-satoshi">
-                              {enhancedTokenService.formatTokenAmount(
-                                token.balance,
-                                4
-                              )}{" "}
-                              {token.symbol}
-                            </div>
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <TrendingTokenImage token={token} size="w-8 h-8" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-white text-xs font-medium font-satoshi truncate">
+                            {token.name}
                           </div>
-                        </div>
-
-                        <div className="token-values-wrapper">
-                          <div className="token-values">
-                            {/* FIXED: Removed duplicate percentage from here */}
-                            <div className="text-white font-medium font-satoshi text-sm">
-                              {enhancedTokenService.formatCurrency(token.value)}
-                            </div>
-                          </div>
-
-                          <div className="menu-button-wrapper">
-                            <ThreeDotMenu
-                              token={token}
-                              onAddToMain={handleAddToMainList}
-                              isInMainList={false}
-                            />
+                          <div className="text-gray-400 text-[10px] font-satoshi">
+                            {token.symbol}
                           </div>
                         </div>
                       </div>
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <div className="text-white text-xs font-medium font-satoshi">
+                          {token.price}
+                        </div>
+                        <div
+                          className={`text-[10px] font-medium font-satoshi ${
+                            token.changeType === "positive"
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {token.changeType === "positive" ? "▲" : "▼"}{" "}
+                          {token.change}
+                        </div>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  ))
+                ) : (
+                  <div className="flex items-center justify-center p-4">
+                    <p className="text-gray-400 text-sm font-satoshi">
+                      No top gainers available
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
