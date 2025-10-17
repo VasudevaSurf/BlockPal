@@ -1,4 +1,4 @@
-// src/app/dashboard/coin-lens/page.tsx - WITH INLINE MENU FIX
+// src/app/dashboard/coin-lens/page.tsx - COMPLETE UPDATED VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -9,6 +9,7 @@ import { MoreVertical, Copy, Minus, X } from "lucide-react";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
 import { coinlesSocketClient } from "@/services/coinlesSocketClient";
 import { useCodeLensContext } from "../layout";
+import { CoinLensSkeleton } from "@/components/ui/UniversalSkeleton";
 
 interface Token {
   id: string;
@@ -41,6 +42,7 @@ export default function CoinLens() {
   const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [connected, setConnected] = useState(false);
+  const [hasReceivedData, setHasReceivedData] = useState(false);
 
   const watchlistReceivedRef = useRef(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -83,11 +85,13 @@ export default function CoinLens() {
   useEffect(() => {
     if (!user?.email) {
       setIsLoading(false);
+      setHasReceivedData(true);
       return;
     }
 
     console.log("🔌 Setting up WebSocket connection...");
     setIsLoading(true);
+    setHasReceivedData(false);
 
     const isAlreadyConnected = coinlesSocketClient.isConnected();
     console.log(
@@ -103,6 +107,7 @@ export default function CoinLens() {
       setFilteredTokens(transformedTokens);
       setIsLoading(false);
       setConnected(true);
+      setHasReceivedData(true);
       watchlistReceivedRef.current = true;
     };
 
@@ -141,6 +146,7 @@ export default function CoinLens() {
     const handleError = (error: any) => {
       console.error("❌ WebSocket error:", error);
       setIsLoading(false);
+      setHasReceivedData(true);
     };
 
     const handleConnect = () => {
@@ -170,6 +176,7 @@ export default function CoinLens() {
       console.log("✅ Using cached watchlist data");
       setIsLoading(false);
       setConnected(true);
+      setHasReceivedData(true);
     }
 
     return () => {
@@ -370,17 +377,8 @@ export default function CoinLens() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <div className="h-full bg-[#0F0F0F] rounded-[16px] p-4 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19]"></div>
-          <p className="text-gray-400 font-satoshi text-sm">
-            Loading tokens...
-          </p>
-        </div>
-      </div>
-    );
+  if (isLoading || !hasReceivedData) {
+    return <CoinLensSkeleton />;
   }
 
   return (
