@@ -16,7 +16,7 @@ import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import DashboardIcon from "@/components/icons/DashboardIcon";
 import ScheduleIcon from "@/components/icons/ScheduleIcon";
 import BatchIcon from "@/components/icons/BatchIcon";
-import AIIcon from "@/components/icons/AIIcon";
+import AII1con from "@/components/icons/AII1con";
 import FriendsIcon from "@/components/icons/FriendsIcon";
 import WebsiteIcon from "@/components/icons/WebsiteIcon";
 import DarkModeIcon from "@/components/icons/DarkModeIcon";
@@ -24,6 +24,8 @@ import LogoutIcon from "@/components/icons/LogoutIcon";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 import SwapIcon from "../icons/SwapIcon";
 import UsersIcon from "../icons/UsersIcon";
+import CoinLensIcon from "@/components/icons/CoinLensIcon";
+import NewsFeedIcon from "../icons/NewsFeedIcon";
 
 const menuItems = [
   {
@@ -33,29 +35,35 @@ const menuItems = [
     comingSoon: false,
   },
   {
-    icon: AIIcon,
-    label: "Lumen",
-    href: "/dashboard/ai-chat",
-    comingSoon: false,
-  },
-  {
     icon: SwapIcon,
     label: "Swap",
     href: "/dashboard/swap",
     comingSoon: false,
   },
   {
-    icon: SwapIcon,
+    icon: CoinLensIcon, // ✅ Updated
     label: "CoinLens",
     href: "/dashboard/coin-lens",
     comingSoon: false,
   },
   {
-    icon: UsersIcon,
-    label: "NewsFeed",
+    icon: AII1con, // ✅ This should now use the new AI icon
+    label: "Lumen",
+    href: "/dashboard/ai-chat",
+    comingSoon: false,
+  },
+  {
+    icon: NewsFeedIcon,
+    label: "MarketPulse",
     href: "/dashboard/news-feed",
     comingSoon: false,
   },
+  // {
+  //   icon: UsersIcon,
+  //   label: "Connect",
+  //   href: "/dashboard/connect",
+  //   comingSoon: true,
+  // },
 ];
 
 interface SidebarProps {

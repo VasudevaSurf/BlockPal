@@ -1,8 +1,8 @@
-// src/components/NewsChatPage.tsx - FIXED background with absolute positioning
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { Send, RefreshCw } from "lucide-react";
+import { AIChatSkeleton } from "@/components/ui/UniversalSkeleton";
 
 interface Message {
   id: string;
@@ -22,6 +22,7 @@ export default function NewsChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -53,6 +54,15 @@ export default function NewsChatPage() {
       query: "Which news effecting the ETH price drop",
     },
   ];
+
+  // Simulate initial loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -349,6 +359,11 @@ export default function NewsChatPage() {
   };
 
   const showWelcomeScreen = messages.length === 0;
+
+  // Show skeleton while loading
+  if (isLoading) {
+    return <AIChatSkeleton />;
+  }
 
   return (
     <div className="h-full relative bg-[#000000] flex overflow-hidden">

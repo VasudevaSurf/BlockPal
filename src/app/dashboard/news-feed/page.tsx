@@ -1,12 +1,13 @@
-// src/app/dashboard/news-feed/page.tsx - FIXED with no padding for AI chat overlay
+// src/app/dashboard/news-feed/page.tsx - Full width news feed
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import TokenSidebar from "@/components/dashboard/TokenSidebar";
+// import TokenSidebar from "@/components/dashboard/TokenSidebar"; // COMMENTED OUT
 import NewsChatPage from "@/components/NewsChatPage";
 import { useNews } from "@/hooks/useNews";
 import { useNewsFeedContext } from "@/app/dashboard/layout";
+import { NewsFeedSkeleton } from "@/components/ui/UniversalSkeleton";
 
 interface NewsCardProps {
   title: string;
@@ -225,6 +226,11 @@ export default function NewsFeed() {
     };
   }, [showAIChat]);
 
+  // Show skeleton on initial load
+  if (loading && news.length === 0) {
+    return <NewsFeedSkeleton />;
+  }
+
   return (
     <>
       <style jsx global>{`
@@ -275,10 +281,10 @@ export default function NewsFeed() {
       `}</style>
 
       <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden relative">
-        {/* Desktop Layout */}
-        <div className="hidden xl:flex gap-3 flex-1 min-h-0 relative">
-          <div className="flex-[0_0_68%] flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
-            {/* Left side - News Feed */}
+        {/* Full Width Layout - Desktop & Mobile */}
+        <div className="flex gap-3 flex-1 min-h-0 relative">
+          {/* News Feed - Full Width */}
+          <div className="flex-1 w-full flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="w-full flex-1 h-full flex flex-col relative">
               <div className="flex-1 bg-black rounded-[14px] overflow-hidden flex flex-col">
                 {/* Search query display */}
@@ -301,7 +307,7 @@ export default function NewsFeed() {
                 {/* News Feed */}
                 <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-3">
                   {news.length === 0 && !loading && (
-                    <div className="text-center py-10">
+                    <div className="flex items-center justify-center h-full">
                       <p className="text-[#666666] text-[14px]">
                         {searchQuery
                           ? "No news found for your search"
@@ -351,124 +357,14 @@ export default function NewsFeed() {
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="w-full flex-1 h-full flex">
+          {/* Sidebar - COMMENTED OUT */}
+          {/* <div className="w-full flex-1 h-full flex hidden xl:flex">
             <TokenSidebar />
-          </div>
+          </div> */}
 
-          {/* AI Chat Overlay - Covers content area only, not sidebar */}
+          {/* AI Chat Overlay - Covers content area only */}
           {showAIChat && (
             <div className="absolute inset-0 z-50 slide-in">
-              <div className="h-full w-full bg-[#000000] overflow-hidden flex flex-col">
-                {/* Header with Back Button */}
-                <div className="flex-shrink-0 bg-black p-4 border-b border-[#2C2C2C]">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setShowAIChat(false)}
-                      className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
-                    >
-                      <ArrowLeft size={20} className="text-[#E2AF19]" />
-                    </button>
-                    <div>
-                      <h2 className="text-white text-xl font-mayeka font-bold">
-                        News Chat
-                      </h2>
-                    </div>
-                  </div>
-                </div>
-
-                {/* News Chat Component */}
-                <div className="flex-1 overflow-hidden">
-                  <NewsChatPage />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Mobile Layout */}
-        <div className="xl:hidden flex flex-col h-full">
-          {/* News Feed - Mobile */}
-          <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] overflow-hidden flex flex-col">
-            {/* Search query display */}
-            {searchQuery && (
-              <div className="px-4 pt-4">
-                <p className="text-[#6b7280] text-[14px]">
-                  Searching for:{" "}
-                  <strong className="text-white">{searchQuery}</strong>
-                </p>
-              </div>
-            )}
-
-            {/* Error Message */}
-            {error && (
-              <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-[10px]">
-                <p className="text-red-400 text-[14px]">{error}</p>
-              </div>
-            )}
-
-            {/* News Feed */}
-            <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-3">
-              {news.length === 0 && !loading && (
-                <div className="text-center py-10">
-                  <p className="text-[#666666] text-[14px]">
-                    {searchQuery
-                      ? "No news found for your search"
-                      : "No news available"}
-                  </p>
-                </div>
-              )}
-
-              {news.map((article, index) => (
-                <div
-                  key={article.news_url}
-                  ref={index === news.length - 1 ? lastNewsElementRef : null}
-                >
-                  <NewsCard
-                    title={article.title}
-                    description={article.text}
-                    author={article.source_name}
-                    date={article.date}
-                    image={article.image_url}
-                    sentiment={article.sentiment}
-                    tickers={article.tickers}
-                    url={article.news_url}
-                  />
-                </div>
-              ))}
-
-              {loading && (
-                <div className="text-center py-5">
-                  <div className="inline-block w-6 h-6 border-2 border-[#F7B410] border-t-transparent rounded-full animate-spin" />
-                  <p className="text-[#666666] text-[14px] mt-2">
-                    Loading more news...
-                  </p>
-                </div>
-              )}
-
-              {!hasMore && news.length > 0 && (
-                <div className="text-center py-5">
-                  <p className="text-[#666666] text-[14px]">
-                    No more news to load
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* AI Chat Overlay - Mobile - FIXED */}
-          {showAIChat && (
-            <div
-              className="fixed inset-0 z-50 slide-in"
-              style={{
-                left: "0",
-                right: "0",
-                top: "0",
-                bottom: "0",
-                margin: "0",
-                padding: "0",
-              }}
-            >
               <div className="h-full w-full bg-[#000000] overflow-hidden flex flex-col">
                 {/* Header with Back Button */}
                 <div className="flex-shrink-0 bg-black p-4 border-b border-[#2C2C2C]">

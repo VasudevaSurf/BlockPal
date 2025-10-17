@@ -1,4 +1,4 @@
-// src/components/ui/UniversalSkeleton.tsx - With animated shimmer effect
+// src/components/ui/UniversalSkeleton.tsx - With News Feed Skeleton
 "use client";
 
 import React from "react";
@@ -267,6 +267,7 @@ export function SwapSectionSkeleton() {
   );
 }
 
+// AI Chat Skeleton
 export function AIChatSkeleton() {
   return (
     <>
@@ -296,6 +297,78 @@ export function AIChatSkeleton() {
   );
 }
 
+// News Feed Skeleton - Simple and subtle
+export function NewsFeedSkeleton() {
+  return (
+    <>
+      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden">
+        <div className="flex-1 bg-black rounded-[14px] overflow-hidden flex flex-col">
+          {/* News Feed Items */}
+          <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-3">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div
+                key={index}
+                className="rounded-[24px] border border-[#2C2C2C] p-4"
+              >
+                <div className="flex gap-6 h-full">
+                  {/* Image Skeleton */}
+                  <Skeleton className="flex-shrink-0 w-[140px] h-[100px] rounded-[20px]" />
+
+                  {/* Content Skeleton */}
+                  <div className="flex-1 flex flex-col justify-between min-w-0">
+                    {/* Title */}
+                    <div className="space-y-2 mb-3">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-1.5 mb-3">
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-5/6" />
+                    </div>
+
+                    {/* Footer - Author, Date, Tickers */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-2.5 w-20" />
+                        <Skeleton className="h-2.5 w-16" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-2.5 w-24" />
+                        <Skeleton variant="circular" className="w-5 h-5" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <style jsx global>{`
+        @keyframes shimmer {
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+    </>
+  );
+}
+
+// CoinLens Skeleton
 export function CoinLensSkeleton() {
   return (
     <>

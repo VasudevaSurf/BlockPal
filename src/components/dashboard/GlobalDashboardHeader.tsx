@@ -553,7 +553,7 @@ export default function GlobalDashboardHeader({
             {isNewsFeedPage && (
               <form
                 onSubmit={handleNewsSearchSubmit}
-                className="flex-1 flex gap-2 mr-4 max-w-[810px]"
+                className="flex-1 flex gap-2 mr-4 max-w-[1100px]"
               >
                 <div className="relative flex-1">
                   <input
