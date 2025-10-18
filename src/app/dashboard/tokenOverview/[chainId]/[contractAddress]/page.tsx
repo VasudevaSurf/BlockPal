@@ -458,7 +458,7 @@ export default function TokenOverviewPage() {
           </div>
 
           {/* Sidebar - Right Section with reduced width */}
-          <div className="w-full flex-1 h-full flex flex-col gap-2 max-w-[320px]">
+          <div className="w-full flex-1 h-full flex flex-col gap-2">
             <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex flex-col justify-between space-y-1.5">
               {/* Header with token info */}
               <div className="flex items-center gap-2">
