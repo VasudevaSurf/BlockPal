@@ -1,8 +1,8 @@
-// src/components/dashboard/WalletBalance.tsx
+// src/components/dashboard/WalletBalance.tsx - COMPLETE CODE WITH IMPROVED DATA DETECTION
 "use client";
 
 import { useSelector } from "react-redux";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Copy,
   RefreshCw,
@@ -76,6 +76,7 @@ export default function WalletBalance() {
   const { address, isConnected } = useAccount();
   const hasReportedMountRef = useRef(false);
   const hasReportedDataRef = useRef(false);
+  const dataCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
@@ -109,34 +110,95 @@ export default function WalletBalance() {
     return () => {
       hasReportedMountRef.current = false;
       hasReportedDataRef.current = false;
+      if (dataCheckIntervalRef.current) {
+        clearInterval(dataCheckIntervalRef.current);
+      }
     };
   }, [setComponentLoaded]);
 
-  // Report data ready when wallet data is loaded
+  // Helper function to check if data is ready
+  const checkDataReady = useCallback(() => {
+    if (hasReportedDataRef.current) return;
+
+    const hasValue = walletData.mainListValue > 0;
+    const notLoading = !walletData.loading;
+    const hasError = !!walletData.error;
+
+    // Data is ready when:
+    // 1. We have a value > 0
+    // 2. OR loading is complete (even if value is 0)
+    // 3. OR there's an error
+    const isDataReady = hasValue || (notLoading && !hasError) || hasError;
+
+    if (isDataReady) {
+      console.log("✅ WalletBalance: Data ready -", {
+        value: walletData.mainListValue,
+        loading: walletData.loading,
+        error: !!walletData.error,
+      });
+
+      if (dataCheckIntervalRef.current) {
+        clearInterval(dataCheckIntervalRef.current);
+        dataCheckIntervalRef.current = null;
+      }
+
+      setComponentDataReady("walletBalance");
+      hasReportedDataRef.current = true;
+    } else {
+      console.log("⏳ WalletBalance: Still loading -", {
+        value: walletData.mainListValue,
+        loading: walletData.loading,
+        error: !!walletData.error,
+      });
+    }
+  }, [
+    walletData.mainListValue,
+    walletData.loading,
+    walletData.error,
+    setComponentDataReady,
+  ]);
+
+  // IMPROVED: Poll for data readiness with interval
   useEffect(() => {
     if (isConnected && address && !hasReportedDataRef.current) {
-      // Check if we have meaningful data
-      const hasData = walletData.mainListValue > 0 || walletData.error;
+      console.log("🔍 WalletBalance: Starting data polling...");
 
-      if (hasData && !walletData.loading) {
-        console.log("✅ WalletBalance: Data ready");
-        setComponentDataReady("walletBalance");
-        hasReportedDataRef.current = true;
-      }
+      // Check immediately
+      checkDataReady();
+
+      // Then check every 500ms
+      dataCheckIntervalRef.current = setInterval(() => {
+        checkDataReady();
+      }, 500);
+
+      // Cleanup interval after 10 seconds max (safety timeout)
+      const timeoutId = setTimeout(() => {
+        if (dataCheckIntervalRef.current) {
+          clearInterval(dataCheckIntervalRef.current);
+          dataCheckIntervalRef.current = null;
+        }
+        if (!hasReportedDataRef.current) {
+          console.warn("⚠️ WalletBalance: Timeout reached, forcing data ready");
+          setComponentDataReady("walletBalance");
+          hasReportedDataRef.current = true;
+        }
+      }, 10000);
+
+      return () => {
+        if (dataCheckIntervalRef.current) {
+          clearInterval(dataCheckIntervalRef.current);
+          dataCheckIntervalRef.current = null;
+        }
+        clearTimeout(timeoutId);
+      };
     } else if (!isConnected && !hasReportedDataRef.current) {
-      // No wallet connected, mark as ready immediately
-      console.log("✅ WalletBalance: No wallet, marking data ready");
+      console.log(
+        "✅ WalletBalance: No wallet, marking data ready immediately"
+      );
       setComponentDataReady("walletBalance");
       hasReportedDataRef.current = true;
     }
-  }, [
-    isConnected,
-    address,
-    walletData.mainListValue,
-    walletData.error,
-    walletData.loading,
-    setComponentDataReady,
-  ]);
+  }, [isConnected, address, checkDataReady, setComponentDataReady]);
 
   // Show wallet not connected state
   if (!isConnected || !address) {
