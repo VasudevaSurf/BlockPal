@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx
+// src/components/dashboard/GlobalDashboardHeader.tsx - COMPLETE FIXED VERSION
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -100,7 +100,7 @@ const getPageTitle = (
   }
 };
 
-// Chain data with proper image paths and conditional background colors
+// Chain data with proper image paths
 const getChainDisplayData = () => {
   const chainDisplayData: {
     [key: number]: {
@@ -165,7 +165,30 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// Chain Icon Component
+// ✅ FIXED: Image cache and preload system
+const imageCache = new Map<string, boolean>();
+
+const preloadImage = (src: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (imageCache.has(src)) {
+      resolve(imageCache.get(src) || false);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      imageCache.set(src, true);
+      resolve(true);
+    };
+    img.onerror = () => {
+      imageCache.set(src, false);
+      resolve(false);
+    };
+    img.src = src;
+  });
+};
+
+// ✅ FIXED: Chain Icon Component
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -184,63 +207,80 @@ const ChainIcon = ({
   size = "md",
   className = "",
 }: ChainIconProps) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageState, setImageState] = useState<"loading" | "loaded" | "error">(
+    () => {
+      // ✅ Check cache on initial render
+      if (chainData.image && imageCache.has(chainData.image)) {
+        return imageCache.get(chainData.image) ? "loaded" : "error";
+      }
+      return "loading";
+    }
+  );
+
+  const mountedRef = useRef(true);
 
   const sizeClasses = {
     sm: "w-5 h-5",
     md: "w-6 h-6 lg:w-7 lg:h-7",
-    lg: "w-7 h-7",
-  };
-
-  const iconSizes = {
-    sm: "text-xs",
-    md: "text-xs",
-    lg: "text-sm",
+    lg: "w-7 h-7 lg:w-8 lg:h-8",
   };
 
   useEffect(() => {
-    setImageError(false);
-    setImageLoaded(false);
+    mountedRef.current = true;
+
+    // Check cache first
+    if (chainData.image && imageCache.has(chainData.image)) {
+      const cached = imageCache.get(chainData.image);
+      setImageState(cached ? "loaded" : "error");
+      return;
+    }
+
+    // Preload image if not cached
+    if (chainData.image) {
+      preloadImage(chainData.image).then((success) => {
+        if (mountedRef.current) {
+          setImageState(success ? "loaded" : "error");
+        }
+      });
+    } else {
+      setImageState("error");
+    }
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, [chainData.image]);
-
-  const handleImageError = () => {
-    console.warn(`Failed to load chain image: ${chainData.image}`);
-    setImageError(true);
-  };
-
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-  };
-
-  const shouldShowBackground =
-    !chainData.image || imageError || !imageLoaded || chainData.useBackground;
-  const backgroundClass = shouldShowBackground ? chainData.color : "";
 
   return (
     <div
-      className={`${sizeClasses[size]} ${backgroundClass} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
+      style={{
+        // ✅ Hide completely during loading
+        opacity: imageState === "loading" ? 0 : 1,
+        transition: "opacity 0.15s ease-in",
+      }}
     >
-      {chainData.image && !imageError && (
+      {/* Show image when loaded */}
+      {imageState === "loaded" && chainData.image && (
         <img
           src={chainData.image}
           alt={chainData.name}
-          className={`w-full h-full object-contain transition-opacity duration-200 ${
-            imageLoaded ? "opacity-100" : "opacity-0"
-          } ${!chainData.useBackground && imageLoaded ? "p-0" : "p-1"}`}
-          onError={handleImageError}
-          onLoad={handleImageLoad}
-          loading="lazy"
+          className="w-full h-full object-contain p-1"
+          draggable={false}
+          style={{ userSelect: "none", pointerEvents: "none" }}
         />
       )}
 
-      {(!chainData.image || imageError || !imageLoaded) && (
-        <span
-          className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
+      {/* Show fallback only on error */}
+      {imageState === "error" && (
+        <div
+          className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
-          {chainData.fallbackIcon}
-        </span>
+          <span className="text-white text-xs font-bold font-satoshi">
+            {chainData.fallbackIcon}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -339,6 +379,23 @@ export default function GlobalDashboardHeader({
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // ✅ Preload all chain images on mount
+  useEffect(() => {
+    const chainDisplayData = getChainDisplayData();
+
+    const preloadAllChainImages = async () => {
+      const images = Object.values(chainDisplayData)
+        .map((data) => data.image)
+        .filter(Boolean) as string[];
+
+      console.log("🔄 GlobalDashboardHeader: Preloading chain images");
+      await Promise.all(images.map((src) => preloadImage(src)));
+      console.log("✅ GlobalDashboardHeader: All chain images preloaded");
+    };
+
+    preloadAllChainImages();
   }, []);
 
   // Report component as loaded (header loads immediately)

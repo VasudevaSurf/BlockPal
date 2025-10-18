@@ -1,4 +1,4 @@
-// src/app/dashboard/swap/page.tsx - Complete Responsive Version with Conditional Mobile/Desktop History
+// src/app/dashboard/swap/page.tsx - COMPLETE FIXED VERSION
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -117,7 +117,30 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// Chain Icon Component
+// ✅ FIXED: Image cache and preload function
+const imageCache = new Map<string, boolean>();
+
+const preloadImage = (src: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (imageCache.has(src)) {
+      resolve(imageCache.get(src) || false);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      imageCache.set(src, true);
+      resolve(true);
+    };
+    img.onerror = () => {
+      imageCache.set(src, false);
+      resolve(false);
+    };
+    img.src = src;
+  });
+};
+
+// ✅ FIXED: Chain Icon Component with NO fallback visibility during initial load
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -136,9 +159,17 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   size = "md",
   className = "",
 }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
+  const [imageState, setImageState] = useState<"loading" | "loaded" | "error">(
+    () => {
+      // ✅ Check cache on initial render to prevent flicker
+      if (chainData.image && imageCache.has(chainData.image)) {
+        return imageCache.get(chainData.image) ? "loaded" : "error";
+      }
+      return "loading";
+    }
+  );
+
+  const mountedRef = useRef(true);
 
   const sizeClasses = {
     sm: "w-4 h-4 lg:w-5 lg:h-5",
@@ -153,51 +184,54 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   };
 
   useEffect(() => {
-    setImageError(false);
-    setImageLoaded(false);
+    mountedRef.current = true;
 
-    if (chainData.image) {
-      const img = new Image();
-      img.src = chainData.image;
-
-      if (img.complete) {
-        setImageLoaded(true);
-      }
+    // Check cache first
+    if (chainData.image && imageCache.has(chainData.image)) {
+      const cached = imageCache.get(chainData.image);
+      setImageState(cached ? "loaded" : "error");
+      return;
     }
+
+    // Preload image if not cached
+    if (chainData.image) {
+      preloadImage(chainData.image).then((success) => {
+        if (mountedRef.current) {
+          setImageState(success ? "loaded" : "error");
+        }
+      });
+    } else {
+      setImageState("error");
+    }
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, [chainData.image]);
-
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoaded(true);
-  };
-
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-  };
 
   return (
     <div
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
+      style={{
+        // ✅ Hide component completely until image loads or fails
+        opacity: imageState === "loading" ? 0 : 1,
+        transition: "opacity 0.15s ease-in",
+      }}
     >
-      {!imageLoaded && !imageError && chainData.image && (
-        <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
-      )}
-
-      {chainData.image && !imageError && (
+      {/* Show image only when loaded */}
+      {imageState === "loaded" && chainData.image && (
         <img
-          ref={imgRef}
           src={chainData.image}
           alt={chainData.name}
-          className={`w-full h-full object-contain transition-opacity duration-200 ${
-            imageLoaded ? "opacity-100" : "opacity-0"
-          } p-1 relative z-10`}
-          onError={handleImageError}
-          onLoad={handleImageLoad}
+          className="w-full h-full object-contain p-1"
+          draggable={false}
+          style={{ userSelect: "none", pointerEvents: "none" }}
         />
       )}
 
-      {imageError && (
+      {/* Show fallback only on error, not during loading */}
+      {imageState === "error" && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
@@ -314,6 +348,22 @@ export default function SwapPage() {
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
 
+  const chainDisplayData = getChainDisplayData();
+  const currentChainDisplay = chainDisplayData[chainId] || chainDisplayData[1];
+
+  // ✅ Preload all chain images on component mount
+  useEffect(() => {
+    const preloadAllChainImages = async () => {
+      const images = Object.values(chainDisplayData)
+        .map((data) => data.image)
+        .filter(Boolean) as string[];
+
+      await Promise.all(images.map((src) => preloadImage(src)));
+    };
+
+    preloadAllChainImages();
+  }, []);
+
   const truncateBalance = (value: string, decimals: number = 5): string => {
     const num = parseFloat(value);
     if (isNaN(num) || num === 0) return "0.00000";
@@ -363,9 +413,6 @@ export default function SwapPage() {
   const x = useMotionValue(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const chainButtonRef = useRef<HTMLButtonElement>(null);
-
-  const chainDisplayData = getChainDisplayData();
-  const currentChainDisplay = chainDisplayData[chainId] || chainDisplayData[1];
 
   const bothTokensSelected = fromToken && toToken;
 

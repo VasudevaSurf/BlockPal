@@ -1,4 +1,4 @@
-// src/components/swap/TokenSelectorModal.tsx - RESPONSIVE VERSION
+// src/components/swap/TokenSelectorModal.tsx - FIXED CHAIN ICONS VERSION
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -8,7 +8,7 @@ import { chains } from "@/components/wallet/WalletProvider";
 import { tokenService } from "@/services/tokenService";
 import { swapService } from "@/services/swapService";
 
-// Chain data with proper PNG image paths
+// Chain data with proper PNG image paths - FIXED CASE SENSITIVITY
 const getChainDisplayData = () => {
   const chainDisplayData: {
     [key: number]: {
@@ -24,7 +24,7 @@ const getChainDisplayData = () => {
       name: "Ethereum",
       color: "bg-blue-500",
       icon: "Ξ",
-      image: "/chains/ethereum.png",
+      image: "/chains/Ethereum.png",
       fallbackIcon: "Ξ",
       useBackground: true,
     },
@@ -32,7 +32,7 @@ const getChainDisplayData = () => {
       name: "Base",
       color: "bg-blue-600",
       icon: "B",
-      image: "/chains/base.png",
+      image: "/chains/Base.png",
       fallbackIcon: "B",
       useBackground: false,
     },
@@ -40,7 +40,7 @@ const getChainDisplayData = () => {
       name: "Polygon",
       color: "bg-purple-500",
       icon: "◆",
-      image: "/chains/polygon.png",
+      image: "/chains/Polygon.png",
       fallbackIcon: "◆",
       useBackground: false,
     },
@@ -48,7 +48,7 @@ const getChainDisplayData = () => {
       name: "Avalanche",
       color: "bg-red-500",
       icon: "A",
-      image: "/chains/avalanche.png",
+      image: "/chains/Avalanche.png",
       fallbackIcon: "A",
       useBackground: true,
     },
@@ -56,7 +56,7 @@ const getChainDisplayData = () => {
       name: "Arbitrum",
       color: "bg-blue-400",
       icon: "◉",
-      image: "/chains/arbitrum.png",
+      image: "/chains/Arbitrum.png",
       fallbackIcon: "◉",
       useBackground: false,
     },
@@ -64,7 +64,7 @@ const getChainDisplayData = () => {
       name: "BSC",
       color: "bg-yellow-500",
       icon: "B",
-      image: "/chains/bsc.png",
+      image: "/chains/BSC.png",
       fallbackIcon: "B",
       useBackground: true,
     },
@@ -73,7 +73,31 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// Chain Icon Component
+// ✅ FIXED: Preload images cache to prevent flickering
+const imageCache = new Map<string, boolean>();
+
+// Preload function
+const preloadImage = (src: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (imageCache.has(src)) {
+      resolve(imageCache.get(src) || false);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      imageCache.set(src, true);
+      resolve(true);
+    };
+    img.onerror = () => {
+      imageCache.set(src, false);
+      resolve(false);
+    };
+    img.src = src;
+  });
+};
+
+// ✅ FIXED: Chain Icon Component - NO fallback visibility during loading
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -92,8 +116,17 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   size = "md",
   className = "",
 }) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [imageState, setImageState] = useState<"loading" | "loaded" | "error">(
+    () => {
+      // ✅ Check cache on initial render
+      if (chainData.image && imageCache.has(chainData.image)) {
+        return imageCache.get(chainData.image) ? "loaded" : "error";
+      }
+      return "loading";
+    }
+  );
+
+  const mountedRef = useRef(true);
 
   const sizeClasses = {
     sm: "w-4 h-4 lg:w-5 lg:h-5",
@@ -102,42 +135,53 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   };
 
   useEffect(() => {
-    setImageLoaded(false);
-    setImageError(false);
+    mountedRef.current = true;
+
+    // Check cache first
+    if (chainData.image && imageCache.has(chainData.image)) {
+      const cached = imageCache.get(chainData.image);
+      setImageState(cached ? "loaded" : "error");
+      return;
+    }
+
+    // Preload image if not cached
+    if (chainData.image) {
+      preloadImage(chainData.image).then((success) => {
+        if (mountedRef.current) {
+          setImageState(success ? "loaded" : "error");
+        }
+      });
+    } else {
+      setImageState("error");
+    }
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, [chainData.image]);
-
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoaded(true);
-  };
-
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-  };
 
   return (
     <div
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
+      style={{
+        // ✅ Hide completely during loading
+        opacity: imageState === "loading" ? 0 : 1,
+        transition: "opacity 0.15s ease-in",
+      }}
     >
-      {(!imageLoaded || imageError) && (
-        <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
-      )}
-
-      {chainData.image && !imageError && (
+      {/* Show image when loaded */}
+      {imageState === "loaded" && chainData.image && (
         <img
           src={chainData.image}
           alt={chainData.name}
-          className={`w-full h-full object-contain transition-opacity duration-300 ${
-            imageLoaded ? "opacity-100" : "opacity-0"
-          } p-1 relative z-10`}
-          onError={handleImageError}
-          onLoad={handleImageLoad}
-          loading="lazy"
+          className="w-full h-full object-contain p-1"
+          draggable={false}
         />
       )}
 
-      {imageError && (
+      {/* Show fallback only on error */}
+      {imageState === "error" && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
@@ -221,14 +265,24 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // State for showing additional tokens
   const [showAdditionalTokens, setShowAdditionalTokens] = useState(false);
-
-  // Track preset token count for filtering
   const [presetTokenCount, setPresetTokenCount] = useState(0);
   const [userAddedTokens, setUserAddedTokens] = useState<string[]>([]);
 
   const chainDisplayData = getChainDisplayData();
+
+  // ✅ Preload all chain images on mount
+  useEffect(() => {
+    const preloadAllChainImages = async () => {
+      const images = Object.values(chainDisplayData)
+        .map((data) => data.image)
+        .filter(Boolean) as string[];
+
+      await Promise.all(images.map((src) => preloadImage(src)));
+    };
+
+    preloadAllChainImages();
+  }, []);
 
   useEffect(() => {
     setSelectedChain(chainId);
@@ -278,7 +332,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     }
   }, [isOpen]);
 
-  // Format contract address (0x123...abc)
   const formatContractAddress = (address: string): string => {
     if (!address || address === "native") return "Native";
     if (address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
@@ -290,7 +343,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     return address;
   };
 
-  // Load user preferences to get user-added tokens
   const loadUserPreferences = async () => {
     if (!address || !isConnected) return { userAddedTokens: [] };
 
@@ -316,7 +368,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     }
   };
 
-  // Split tokens into main list and additional
   const splitTokens = (
     allTokens: any[],
     presetCount: number,
@@ -780,12 +831,10 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                     </div>
                   ) : (
                     <div className="space-y-1.5 lg:space-y-2">
-                      {/* Main List Tokens */}
                       {mainListTokens.map((token, index) =>
                         renderTokenButton(token, index)
                       )}
 
-                      {/* Divider with Expand Button */}
                       {additionalTokens.length > 0 && !searchQuery && (
                         <div className="py-2">
                           <button
@@ -817,7 +866,6 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                         </div>
                       )}
 
-                      {/* Additional Tokens - Expandable */}
                       {showAdditionalTokens && additionalTokens.length > 0 && (
                         <div className="space-y-1.5 lg:space-y-2 pt-2">
                           {additionalTokens.map((token, index) =>
