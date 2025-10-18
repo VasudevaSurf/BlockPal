@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - UPDATED with Universal Skeleton
+// src/app/dashboard/page.tsx - COMPLETE CODE WITHOUT SKELETON
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,7 +11,6 @@ import WalletStats from "@/components/dashboard/WalletStats";
 import MobileWalletMenu from "@/components/dashboard/MobileWalletMenu";
 import { WalletDataProvider } from "@/contexts/WalletDataContext";
 import { DashboardLoadingProvider } from "@/contexts/DashboardLoadingContext";
-import { DashboardSkeleton } from "@/components/ui/UniversalSkeleton";
 
 // Mock authentication state
 const mockAuth = {
@@ -44,11 +43,8 @@ const mockWallets = [
 const mockActiveWallet = mockWallets[0];
 
 interface DashboardState {
-  isLoading: boolean;
-  isInitialized: boolean;
   hasWallets: boolean;
   error: string | null;
-  isAuthenticating: boolean;
   showStats: boolean;
   mobileMenuOpen: boolean;
 }
@@ -62,11 +58,8 @@ function DashboardContent() {
   const activeWallet = mockActiveWallet;
 
   const [dashboardState, setDashboardState] = useState<DashboardState>({
-    isLoading: true,
-    isInitialized: false,
     hasWallets: false,
     error: null,
-    isAuthenticating: true,
     showStats: false,
     mobileMenuOpen: false,
   });
@@ -75,50 +68,27 @@ function DashboardContent() {
   useEffect(() => {
     console.log("🔍 Dashboard - Checking auth status");
 
-    setTimeout(() => {
-      if (!isAuthenticated) {
-        console.log("🚪 Dashboard - Not authenticated, redirecting to auth");
-        router.push("/auth");
-        return;
-      }
+    if (!isAuthenticated) {
+      console.log("🚪 Dashboard - Not authenticated, redirecting to auth");
+      router.push("/auth");
+      return;
+    }
 
-      setTimeout(() => {
-        setDashboardState((prev) => ({
-          ...prev,
-          isLoading: false,
-          isInitialized: true,
-          hasWallets: wallets.length > 0,
-          error: null,
-          isAuthenticating: false,
-          showStats: localStorage.getItem("show-wallet-stats") === "true",
-        }));
-        console.log("📊 Dashboard initialized with mock data");
-      }, 1000);
-    }, 500);
+    // Initialize dashboard state
+    setDashboardState((prev) => ({
+      ...prev,
+      hasWallets: wallets.length > 0,
+      error: null,
+      showStats: localStorage.getItem("show-wallet-stats") === "true",
+    }));
+
+    console.log("📊 Dashboard initialized with mock data");
   }, [isAuthenticated, router]);
 
   // Handle manual refresh
   const handleManualRefresh = () => {
     console.log("🔄 Manual refresh requested");
-    setDashboardState((prev) => ({ ...prev, isLoading: true }));
-
-    setTimeout(() => {
-      setDashboardState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: null,
-      }));
-    }, 1000);
   };
-
-  // Show centralized universal skeleton during initial setup
-  if (
-    dashboardState.isLoading ||
-    dashboardState.isAuthenticating ||
-    authLoading
-  ) {
-    return <DashboardSkeleton />;
-  }
 
   // Don't render if not authenticated
   if (!isAuthenticated) {

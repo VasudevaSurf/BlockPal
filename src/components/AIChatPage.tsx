@@ -1,3 +1,4 @@
+// src/components/AIChatPage.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -17,7 +18,6 @@ import {
   Edit3,
 } from "lucide-react";
 import { RootState } from "@/store";
-import { AIChatSkeleton } from "@/components/ui/UniversalSkeleton";
 
 interface Message {
   id: string;
@@ -50,7 +50,6 @@ export default function AIChatPage() {
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string>("");
-  const [initialLoading, setInitialLoading] = useState(true);
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeTab, setActiveTab] = useState<"chat" | "history">("chat");
@@ -213,7 +212,6 @@ export default function AIChatPage() {
     const initializeAI = async () => {
       if (!isAuthenticated || !user) {
         setError("Please log in to use Lumen AI");
-        setInitialLoading(false);
         return;
       }
 
@@ -260,10 +258,6 @@ export default function AIChatPage() {
         console.error("❌ Failed to initialize AI chat:", error);
         if (isMounted) {
           setError("Failed to initialize Lumen AI");
-        }
-      } finally {
-        if (isMounted) {
-          setInitialLoading(false);
         }
       }
     };
@@ -871,8 +865,6 @@ export default function AIChatPage() {
       inputRef.current.focus();
     }
   };
-
-  if (initialLoading) return <AIChatSkeleton />;
 
   const showWelcomeScreen = messages.length === 0;
   const sidebarOpen = activeTab === "history";

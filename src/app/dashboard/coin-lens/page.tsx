@@ -1,4 +1,4 @@
-// src/app/dashboard/coin-lens/page.tsx - COMPLETE UPDATED VERSION
+// src/app/dashboard/coin-lens/page.tsx - REMOVED ALL SKELETONS
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -9,7 +9,6 @@ import { MoreVertical, Copy, Minus, X } from "lucide-react";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
 import { coinlesSocketClient } from "@/services/coinlesSocketClient";
 import { useCodeLensContext } from "../layout";
-import { CoinLensSkeleton } from "@/components/ui/UniversalSkeleton";
 
 interface Token {
   id: string;
@@ -40,9 +39,7 @@ export default function CoinLens() {
     null
   );
   const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [connected, setConnected] = useState(false);
-  const [hasReceivedData, setHasReceivedData] = useState(false);
 
   const watchlistReceivedRef = useRef(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -84,14 +81,10 @@ export default function CoinLens() {
 
   useEffect(() => {
     if (!user?.email) {
-      setIsLoading(false);
-      setHasReceivedData(true);
       return;
     }
 
     console.log("🔌 Setting up WebSocket connection...");
-    setIsLoading(true);
-    setHasReceivedData(false);
 
     const isAlreadyConnected = coinlesSocketClient.isConnected();
     console.log(
@@ -105,9 +98,7 @@ export default function CoinLens() {
       const transformedTokens = transformWatchlistData(data);
       setTokens(transformedTokens);
       setFilteredTokens(transformedTokens);
-      setIsLoading(false);
       setConnected(true);
-      setHasReceivedData(true);
       watchlistReceivedRef.current = true;
     };
 
@@ -145,8 +136,6 @@ export default function CoinLens() {
 
     const handleError = (error: any) => {
       console.error("❌ WebSocket error:", error);
-      setIsLoading(false);
-      setHasReceivedData(true);
     };
 
     const handleConnect = () => {
@@ -174,9 +163,7 @@ export default function CoinLens() {
       }, 100);
     } else if (watchlistReceivedRef.current) {
       console.log("✅ Using cached watchlist data");
-      setIsLoading(false);
       setConnected(true);
-      setHasReceivedData(true);
     }
 
     return () => {
@@ -376,10 +363,6 @@ export default function CoinLens() {
       `/dashboard/tokenOverview/${token.chainId}/${token.contractAddress}?pool=${token.poolAddress}`
     );
   };
-
-  if (isLoading || !hasReceivedData) {
-    return <CoinLensSkeleton />;
-  }
 
   return (
     <div className="h-full bg-[#000000] rounded-[16px] p-2 sm:p-4 flex flex-col overflow-hidden relative">

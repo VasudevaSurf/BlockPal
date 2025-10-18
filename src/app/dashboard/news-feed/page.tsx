@@ -1,13 +1,11 @@
-// src/app/dashboard/news-feed/page.tsx - Full width news feed
+// src/app/dashboard/news-feed/page.tsx - Removed skeleton loading
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-// import TokenSidebar from "@/components/dashboard/TokenSidebar"; // COMMENTED OUT
 import NewsChatPage from "@/components/NewsChatPage";
 import { useNews } from "@/hooks/useNews";
 import { useNewsFeedContext } from "@/app/dashboard/layout";
-import { NewsFeedSkeleton } from "@/components/ui/UniversalSkeleton";
 
 interface NewsCardProps {
   title: string;
@@ -213,23 +211,16 @@ export default function NewsFeed() {
 
   // CRITICAL: Notify layout about AI chat state to hide header
   useEffect(() => {
-    // Add a data attribute to the body to signal AI chat is active
     if (showAIChat) {
       document.body.setAttribute("data-news-chat-active", "true");
     } else {
       document.body.removeAttribute("data-news-chat-active");
     }
 
-    // Cleanup on unmount
     return () => {
       document.body.removeAttribute("data-news-chat-active");
     };
   }, [showAIChat]);
-
-  // Show skeleton on initial load
-  if (loading && news.length === 0) {
-    return <NewsFeedSkeleton />;
-  }
 
   return (
     <>
@@ -274,7 +265,6 @@ export default function NewsFeed() {
           animation: slideOutToLeft 0.3s ease-out forwards;
         }
 
-        /* Hide header when news chat is active */
         .news-chat-active .global-dashboard-header {
           display: none !important;
         }
@@ -338,7 +328,6 @@ export default function NewsFeed() {
 
                   {loading && (
                     <div className="text-center py-5">
-                      <div className="inline-block w-6 h-6 border-2 border-[#F7B410] border-t-transparent rounded-full animate-spin" />
                       <p className="text-[#666666] text-[14px] mt-2">
                         Loading more news...
                       </p>
@@ -356,11 +345,6 @@ export default function NewsFeed() {
               </div>
             </div>
           </div>
-
-          {/* Sidebar - COMMENTED OUT */}
-          {/* <div className="w-full flex-1 h-full flex hidden xl:flex">
-            <TokenSidebar />
-          </div> */}
 
           {/* AI Chat Overlay - Covers content area only */}
           {showAIChat && (

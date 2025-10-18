@@ -1,4 +1,4 @@
-// src/components/dashboard/SwapSection.tsx - FIXED refresh flashing
+// src/components/dashboard/SwapSection.tsx - COMPLETE CODE WITHOUT SKELETON
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -12,7 +12,6 @@ import {
 import TokenSelectorModal from "@/components/swap/TokenSelectorModal";
 import SwapPreviewModal from "@/components/swap/SwapPreviewModal";
 import { useCoinGecko, TrendingToken, TopGainer } from "@/hooks/useCoinGecko";
-import { useDashboardLoading } from "@/contexts/DashboardLoadingContext";
 
 // Mock token data
 const mockTokens = [
@@ -148,12 +147,6 @@ export default function SwapSection() {
     refetch,
   } = useCoinGecko();
 
-  // Use dashboard loading context
-  const { allComponentsLoaded, setComponentLoading } = useDashboardLoading();
-
-  // Track initial load
-  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
-
   // Cache the last successful data to prevent flashing
   const [cachedTrendingTokens, setCachedTrendingTokens] = useState<
     TrendingToken[]
@@ -203,37 +196,30 @@ export default function SwapSection() {
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
   const [showGainersDropdown, setShowGainersDropdown] = useState(false);
 
-  // Update loading state for dashboard synchronization
-  useEffect(() => {
-    const isLoading = coinGeckoLoading && !hasInitiallyLoaded;
-    setComponentLoading("swapSection", isLoading);
-
-    // Mark as loaded once we have data
-    if (
-      !coinGeckoLoading &&
-      (trendingTokens.length > 0 || topGainersData.length > 0)
-    ) {
-      setHasInitiallyLoaded(true);
-    }
-  }, [
-    coinGeckoLoading,
-    trendingTokens.length,
-    topGainersData.length,
-    hasInitiallyLoaded,
-    setComponentLoading,
-  ]);
-
-  // Show skeleton only on initial load, use cached data during refreshes
-  const shouldShowSkeleton = !hasInitiallyLoaded && coinGeckoLoading;
-  const shouldShowContent = !shouldShowSkeleton;
-
   // Use cached data if refreshing, otherwise use current data
   const displayTrendingTokens =
-    coinGeckoLoading && hasInitiallyLoaded
+    coinGeckoLoading && cachedTrendingTokens.length > 0
       ? cachedTrendingTokens
       : trendingTokens;
   const displayTopGainers =
-    coinGeckoLoading && hasInitiallyLoaded ? cachedTopGainers : topGainersData;
+    coinGeckoLoading && cachedTopGainers.length > 0
+      ? cachedTopGainers
+      : topGainersData;
+
+  const truncateBalance = (value: string, decimals: number = 5): string => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num === 0) return "0.00000";
+
+    const parts = value.split(".");
+    if (parts.length === 1) {
+      return `${parts[0]}.00000`;
+    }
+
+    const truncatedDecimals = parts[1].substring(0, decimals);
+    const paddedDecimals = truncatedDecimals.padEnd(decimals, "0");
+
+    return `${parts[0]}.${paddedDecimals}`;
+  };
 
   // Close settings dropdown when clicking outside
   useEffect(() => {
@@ -418,8 +404,8 @@ export default function SwapSection() {
 
           <div className="border-t border-[#2C2C2C] mb-1"></div>
 
-          {/* Error State - only show when content should be visible */}
-          {coinGeckoError && shouldShowContent && (
+          {/* Error State */}
+          {coinGeckoError && (
             <div className="flex items-center justify-center p-4">
               <div className="text-center">
                 <AlertCircle size={24} className="text-red-400 mx-auto mb-2" />
@@ -436,31 +422,8 @@ export default function SwapSection() {
             </div>
           )}
 
-          {/* Loading State - show skeleton only on initial load */}
-          {shouldShowSkeleton && (
-            <div className="flex-1 overflow-y-auto space-y-2 animate-pulse">
-              {Array.from({ length: 7 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between py-1.5"
-                >
-                  <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
-                    <div className="w-7 h-7 bg-[#1A1A1A] rounded-full"></div>
-                    <div className="min-w-0 flex-1">
-                      <div className="h-2 bg-[#1A1A1A] rounded mb-1"></div>
-                      <div className="h-1.5 bg-[#1A1A1A] rounded"></div>
-                    </div>
-                  </div>
-                  <div className="w-20 h-2 bg-[#1A1A1A] rounded"></div>
-                  <div className="w-20 h-7 bg-[#1A1A1A] rounded"></div>
-                  <div className="w-16 h-2 bg-[#1A1A1A] rounded"></div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Token List - show cached data during refresh, new data when available */}
-          {shouldShowContent && !coinGeckoError && (
+          {/* Token List */}
+          {!coinGeckoError && (
             <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
               {displayTrendingTokens.length > 0 ? (
                 displayTrendingTokens.map((token: TrendingToken) => (
@@ -587,81 +550,56 @@ export default function SwapSection() {
             </div>
           </div>
 
-          {/* Loading State - show skeleton only on initial load */}
-          {shouldShowSkeleton && (
-            <div className="flex-1 overflow-y-auto space-y-1 animate-pulse">
-              {Array.from({ length: 6 }).map((_, index) => (
+          {/* Token List */}
+          <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide">
+            {displayTopGainers.length > 0 ? (
+              displayTopGainers.map((token: TopGainer) => (
                 <div
-                  key={index}
-                  className="flex items-center justify-between py-1.5"
+                  key={token.index}
+                  className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
                 >
-                  <div className="flex items-center gap-2.5 w-[100px]">
-                    <div className="w-6 h-6 bg-[#1A1A1A] rounded-full"></div>
+                  <div className="flex items-center gap-2.5 w-[100px] flex-shrink-0">
+                    <TokenImage token={token} size="w-6 h-6" />
                     <div className="min-w-0 flex-1">
-                      <div className="h-2 bg-[#1A1A1A] rounded mb-1"></div>
-                      <div className="h-1.5 bg-[#1A1A1A] rounded"></div>
-                    </div>
-                  </div>
-                  <div className="w-[80px] h-2 bg-[#1A1A1A] rounded"></div>
-                  <div className="w-[100px] h-2 bg-[#1A1A1A] rounded"></div>
-                  <div className="w-[60px] h-2 bg-[#1A1A1A] rounded"></div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Token List - show cached data during refresh, new data when available */}
-          {shouldShowContent && (
-            <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide">
-              {displayTopGainers.length > 0 ? (
-                displayTopGainers.map((token: TopGainer) => (
-                  <div
-                    key={token.index}
-                    className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 w-[100px] flex-shrink-0">
-                      <TokenImage token={token} size="w-6 h-6" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-white text-[11px] font-medium font-satoshi truncate">
-                          {token.name}
-                        </div>
-                        <div className="text-gray-400 text-[9px] font-satoshi">
-                          {token.symbol}
-                        </div>
+                      <div className="text-white text-[11px] font-medium font-satoshi truncate">
+                        {token.name}
                       </div>
-                    </div>
-
-                    <div className="text-white text-[11px] font-medium font-satoshi w-[80px] text-center flex-shrink-0">
-                      {token.price}
-                    </div>
-
-                    <div className="text-white text-[11px] font-medium font-satoshi w-[100px] text-center flex-shrink-0">
-                      {token.marketCap}
-                    </div>
-
-                    <div className="w-[60px] text-center flex-shrink-0">
-                      <div
-                        className={`text-[11px] font-medium font-satoshi ${
-                          token.changeType === "positive"
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {token.changeType === "positive" ? "▲" : "▼"}{" "}
-                        {token.change}
+                      <div className="text-gray-400 text-[9px] font-satoshi">
+                        {token.symbol}
                       </div>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center p-4">
-                  <p className="text-gray-400 text-sm font-satoshi">
-                    No top gainers available
-                  </p>
+
+                  <div className="text-white text-[11px] font-medium font-satoshi w-[80px] text-center flex-shrink-0">
+                    {token.price}
+                  </div>
+
+                  <div className="text-white text-[11px] font-medium font-satoshi w-[100px] text-center flex-shrink-0">
+                    {token.marketCap}
+                  </div>
+
+                  <div className="w-[60px] text-center flex-shrink-0">
+                    <div
+                      className={`text-[11px] font-medium font-satoshi ${
+                        token.changeType === "positive"
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }`}
+                    >
+                      {token.changeType === "positive" ? "▲" : "▼"}{" "}
+                      {token.change}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+              ))
+            ) : (
+              <div className="flex items-center justify-center p-4">
+                <p className="text-gray-400 text-sm font-satoshi">
+                  No top gainers available
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         <style jsx global>{`

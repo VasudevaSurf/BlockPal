@@ -1,8 +1,8 @@
-// src/components/dashboard/WalletBalance.tsx - COMPLETE CODE with Universal Skeleton
+// src/components/dashboard/WalletBalance.tsx - COMPLETE CODE WITHOUT SKELETON
 "use client";
 
 import { useSelector } from "react-redux";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Copy,
   RefreshCw,
@@ -15,8 +15,6 @@ import { RootState } from "@/store";
 import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
 import { useWalletData } from "@/contexts/WalletDataContext";
-import { useDashboardLoading } from "@/contexts/DashboardLoadingContext";
-import { WalletBalanceSkeleton } from "@/components/ui/UniversalSkeleton";
 
 // Portfolio Change Component
 const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
@@ -70,9 +68,6 @@ export default function WalletBalance() {
   // Use shared wallet data context
   const { walletData, refresh, isRefreshing } = useWalletData();
 
-  // Use dashboard loading context
-  const { allComponentsLoaded, setComponentLoading } = useDashboardLoading();
-
   // Wallet integration
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -83,16 +78,6 @@ export default function WalletBalance() {
     isCopied: false,
     isAnimating: false,
   });
-
-  // Update loading state
-  useEffect(() => {
-    const isLoading = walletData.isInitialLoading && !walletData.hasLoadedOnce;
-    setComponentLoading("walletBalance", isLoading);
-  }, [
-    walletData.isInitialLoading,
-    walletData.hasLoadedOnce,
-    setComponentLoading,
-  ]);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -108,11 +93,6 @@ export default function WalletBalance() {
 
   // Show wallet not connected state
   if (!isConnected || !address) {
-    // Not loading when wallet is not connected
-    useEffect(() => {
-      setComponentLoading("walletBalance", false);
-    }, [setComponentLoading]);
-
     return (
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
@@ -136,16 +116,6 @@ export default function WalletBalance() {
         </div>
       </div>
     );
-  }
-
-  // Determine if we should show universal skeleton or wait for all components
-  const showInternalSkeleton =
-    (walletData.isInitialLoading && !walletData.hasLoadedOnce) ||
-    !allComponentsLoaded;
-
-  // Use universal skeleton instead of custom one
-  if (showInternalSkeleton) {
-    return <WalletBalanceSkeleton />;
   }
 
   return (
