@@ -958,37 +958,36 @@ export default function TokenList() {
             Token Holdings
           </h2>
 
-          {activeTab === "holdings" &&
-            hasHiddenTokens &&
-            !showInternalSkeleton && (
-              <button
-                onClick={() => setShowHidden(!showHidden)}
-                className={`p-1.5 rounded-lg transition-colors flex items-center gap-1 ${
-                  showHidden
-                    ? "text-yellow-400 bg-yellow-500/10 hover:bg-yellow-500/20"
-                    : "text-gray-400 hover:text-yellow-400 hover:bg-[#2C2C2C]"
-                }`}
-                title={
-                  showHidden ? "Hide additional tokens" : "Show all tokens"
-                }
-              >
-                {showHidden ? <EyeOff size={14} /> : <Eye size={14} />}
-                <span className="text-xs font-satoshi hidden sm:inline">
-                  {showHidden ? "Hide All" : "Show All"}
-                </span>
-              </button>
-            )}
+          {/* Show/Hide All Button - For Holdings tab */}
+          {hasHiddenTokens && !showInternalSkeleton && (
+            <button
+              onClick={() => setShowHidden(!showHidden)}
+              className={`p-1.5 rounded-lg transition-colors flex items-center gap-1 ${
+                showHidden
+                  ? "text-yellow-400 bg-yellow-500/10 hover:bg-yellow-500/20"
+                  : "text-gray-400 hover:text-yellow-400 hover:bg-[#2C2C2C]"
+              } lg:flex ${activeTab === "holdings" ? "flex" : "hidden"}`}
+              title={showHidden ? "Hide additional tokens" : "Show all tokens"}
+            >
+              {showHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+              <span className="text-xs font-satoshi hidden sm:inline">
+                {showHidden ? "Hide All" : "Show All"}
+              </span>
+            </button>
+          )}
 
+          {/* 24h Change Label - Only for Trending tab on mobile */}
           {activeTab === "trending" && (
-            <div className="flex items-center gap-1 border border-[#2C2C2C] rounded-lg px-2 py-1">
+            <div className="flex lg:hidden items-center gap-1 border border-[#2C2C2C] rounded-lg px-2 py-1">
               <span className="text-gray-400 text-[10px] font-satoshi">
                 24h Change
               </span>
             </div>
           )}
 
+          {/* Timeframe Selector - Only for Gainers tab on mobile */}
           {activeTab === "gainers" && (
-            <div className="flex items-center bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-1">
+            <div className="flex lg:hidden items-center bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-1">
               {["1hr", "24h", "7d"].map((timeframe) => (
                 <button
                   key={timeframe}
@@ -1030,7 +1029,9 @@ export default function TokenList() {
         ) : (
           <div className="flex-1 overflow-y-auto scrollbar-hide">
             {/* Holdings Tab */}
-            {activeTab === "holdings" && (
+            <div
+              className={activeTab === "holdings" ? "block" : "hidden lg:block"}
+            >
               <>
                 {allTokens.length === 0 ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center py-8 min-h-[400px]">
@@ -1212,10 +1213,14 @@ export default function TokenList() {
                   </>
                 )}
               </>
-            )}
+            </div>
 
-            {/* Trending Tab */}
-            {activeTab === "trending" && (
+            {/* Trending Tab - Only show on mobile when active */}
+            <div
+              className={
+                activeTab === "trending" ? "block lg:hidden" : "hidden"
+              }
+            >
               <div className="space-y-2 pr-1">
                 {coinGeckoLoading ? (
                   <TokenListSkeleton />
@@ -1278,10 +1283,12 @@ export default function TokenList() {
                   </div>
                 )}
               </div>
-            )}
+            </div>
 
-            {/* Top Gainers Tab */}
-            {activeTab === "gainers" && (
+            {/* Top Gainers Tab - Only show on mobile when active */}
+            <div
+              className={activeTab === "gainers" ? "block lg:hidden" : "hidden"}
+            >
               <div className="space-y-2 pr-1">
                 {coinGeckoLoading ? (
                   <TokenListSkeleton />
@@ -1345,7 +1352,7 @@ export default function TokenList() {
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
