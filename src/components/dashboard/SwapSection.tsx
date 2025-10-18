@@ -142,6 +142,7 @@ const TokenImage = ({
 export default function SwapSection() {
   // ✅ UNIFIED LOADING INTEGRATION
   const { setComponentLoaded } = useUnifiedDashboard();
+  const hasReportedRef = useRef(false);
 
   // Use CoinGecko hook for real data
   const {
@@ -203,11 +204,16 @@ export default function SwapSection() {
   // ✅ MARK COMPONENT AS LOADED
   // SwapSection loads relatively quickly, mark as loaded after CoinGecko data attempt
   useEffect(() => {
+    // Reset the flag when component mounts
+    hasReportedRef.current = false;
+
     const timer = setTimeout(() => {
-      console.log("✅ SwapSection: Marking as loaded");
-      setComponentLoaded('swapSection');
-    }, 800); // Wait 800ms for CoinGecko data
-    
+      if (!hasReportedRef.current) {
+        console.log("✅ SwapSection reporting loaded");
+        setComponentLoaded("swapSection");
+        hasReportedRef.current = true;
+      }
+    }, 800);
     return () => clearTimeout(timer);
   }, [setComponentLoaded]);
 

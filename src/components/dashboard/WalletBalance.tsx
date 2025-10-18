@@ -2,7 +2,7 @@
 "use client";
 
 import { useSelector } from "react-redux";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Copy,
   RefreshCw,
@@ -74,6 +74,8 @@ export default function WalletBalance() {
 
   // Wallet integration
   const { address, isConnected } = useAccount();
+  const hasReportedRef = useRef(false);
+
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
 
@@ -101,32 +103,26 @@ export default function WalletBalance() {
   // ✅ UNIFIED LOADING INTEGRATION
   // Mark component as loaded when wallet data is ready
   useEffect(() => {
+    // Reset the flag when component mounts
+    hasReportedRef.current = false;
+
     if (isConnected && address) {
-      // Wait for wallet data to load
-      if (walletData.mainListValue >= 0 && !walletData.error) {
-        // Add a small delay to ensure data is fully rendered
-        const timer = setTimeout(() => {
-          console.log(
-            "✅ WalletBalance: Data loaded, marking component as ready"
-          );
-          setDataLoaded(true);
+      const timer = setTimeout(() => {
+        if (!hasReportedRef.current) {
+          console.log("✅ WalletBalance reporting loaded");
           setComponentLoaded("walletBalance");
-        }, 500);
-        return () => clearTimeout(timer);
-      }
+          hasReportedRef.current = true;
+        }
+      }, 500);
+      return () => clearTimeout(timer);
     } else if (!isConnected) {
-      // If wallet not connected, mark as loaded immediately (showing empty state)
-      console.log("✅ WalletBalance: No wallet connected, marking as ready");
-      setComponentLoaded("walletBalance");
-      setDataLoaded(true);
+      if (!hasReportedRef.current) {
+        console.log("✅ WalletBalance reporting loaded (no wallet)");
+        setComponentLoaded("walletBalance");
+        hasReportedRef.current = true;
+      }
     }
-  }, [
-    isConnected,
-    address,
-    walletData.mainListValue,
-    walletData.error,
-    setComponentLoaded,
-  ]);
+  }, [isConnected, address, setComponentLoaded]);
 
   // Show wallet not connected state
   if (!isConnected || !address) {

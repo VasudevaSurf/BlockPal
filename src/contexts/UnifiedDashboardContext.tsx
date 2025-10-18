@@ -1,7 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useAccount, useChainId } from 'wagmi';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
+import { useAccount, useChainId } from "wagmi";
+import { usePathname } from "next/navigation";
 
 interface ComponentLoadingState {
   walletBalance: boolean;
@@ -11,65 +19,64 @@ interface ComponentLoadingState {
 }
 
 interface UnifiedDashboardContextType {
-  // Overall loading state
   isLoading: boolean;
-  
-  // Individual component states
   componentStates: ComponentLoadingState;
-  
-  // Methods to update component states
   setComponentLoaded: (component: keyof ComponentLoadingState) => void;
-  
-  // Reset all states
   resetDashboard: () => void;
-  
-  // Check if all components are loaded
   allComponentsLoaded: boolean;
 }
 
-const UnifiedDashboardContext = createContext<UnifiedDashboardContextType | undefined>(undefined);
+const UnifiedDashboardContext = createContext<
+  UnifiedDashboardContextType | undefined
+>(undefined);
 
 export const useUnifiedDashboard = () => {
   const context = useContext(UnifiedDashboardContext);
   if (!context) {
-    throw new Error('useUnifiedDashboard must be used within UnifiedDashboardProvider');
+    throw new Error(
+      "useUnifiedDashboard must be used within UnifiedDashboardProvider"
+    );
   }
   return context;
 };
 
-export const UnifiedDashboardProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const UnifiedDashboardProvider: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  
-  const [componentStates, setComponentStates] = useState<ComponentLoadingState>({
-    walletBalance: true,
-    tokenList: true,
-    swapSection: true,
-    globalHeader: true,
-  });
+  const pathname = usePathname();
+
+  const [componentStates, setComponentStates] = useState<ComponentLoadingState>(
+    {
+      walletBalance: true,
+      tokenList: true,
+      swapSection: true,
+      globalHeader: true,
+    }
+  );
 
   const [isLoading, setIsLoading] = useState(true);
   const [allComponentsLoaded, setAllComponentsLoaded] = useState(false);
-  
-  // Timeout reference to prevent infinite loading
+
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Track previous wallet/chain to detect changes
   const prevWalletRef = useRef<string | undefined>(undefined);
   const prevChainRef = useRef<number | undefined>(undefined);
+  const prevPathnameRef = useRef<string | undefined>(undefined);
 
-  // Method to mark a component as loaded
-  const setComponentLoaded = useCallback((component: keyof ComponentLoadingState) => {
-    console.log(`✅ Component loaded: ${component}`);
-    setComponentStates(prev => ({
-      ...prev,
-      [component]: false, // false means loaded
-    }));
-  }, []);
+  const setComponentLoaded = useCallback(
+    (component: keyof ComponentLoadingState) => {
+      console.log(`✅ Component loaded: ${component}`);
+      setComponentStates((prev) => ({
+        ...prev,
+        [component]: false,
+      }));
+    },
+    []
+  );
 
-  // Reset dashboard state (when wallet changes)
   const resetDashboard = useCallback(() => {
-    console.log('🔄 Resetting dashboard state...');
+    console.log("🔄 Resetting dashboard state...");
     setComponentStates({
       walletBalance: true,
       tokenList: true,
@@ -78,8 +85,7 @@ export const UnifiedDashboardProvider: React.FC<{ children: React.ReactNode }> =
     });
     setIsLoading(true);
     setAllComponentsLoaded(false);
-    
-    // Clear any existing timeout
+
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
       loadingTimeoutRef.current = null;
@@ -88,12 +94,13 @@ export const UnifiedDashboardProvider: React.FC<{ children: React.ReactNode }> =
 
   // Check if all components are loaded
   useEffect(() => {
-    const allLoaded = Object.values(componentStates).every(state => state === false);
-    
+    const allLoaded = Object.values(componentStates).every(
+      (state) => state === false
+    );
+
     if (allLoaded && isLoading) {
-      console.log('✅ All components loaded! Hiding loader...');
-      
-      // Add a small delay for smooth transition
+      console.log("✅ All components loaded! Hiding loader...");
+
       setTimeout(() => {
         setAllComponentsLoaded(true);
         setIsLoading(false);
@@ -107,19 +114,32 @@ export const UnifiedDashboardProvider: React.FC<{ children: React.ReactNode }> =
     const chainChanged = prevChainRef.current !== chainId;
 
     if (walletChanged || chainChanged) {
-      console.log('🔄 Wallet or chain changed, resetting dashboard...');
+      console.log("🔄 Wallet or chain changed, resetting dashboard...");
       resetDashboard();
-      
+
       prevWalletRef.current = address;
       prevChainRef.current = chainId;
     }
   }, [address, chainId, resetDashboard]);
 
+  // CRITICAL: Handle route changes - Reset when navigating to dashboard
+  useEffect(() => {
+    const isDashboardPage = pathname === "/dashboard";
+    const pathnameChanged = prevPathnameRef.current !== pathname;
+
+    if (pathnameChanged && isDashboardPage) {
+      console.log("🔄 Navigated to dashboard, resetting loading state...");
+      resetDashboard();
+    }
+
+    prevPathnameRef.current = pathname;
+  }, [pathname, resetDashboard]);
+
   // Safety timeout - force hide loader after 15 seconds
   useEffect(() => {
     if (isLoading && isConnected && address) {
       loadingTimeoutRef.current = setTimeout(() => {
-        console.warn('⚠️ Loading timeout reached, forcing components to show');
+        console.warn("⚠️ Loading timeout reached, forcing components to show");
         setIsLoading(false);
         setAllComponentsLoaded(true);
       }, 15000);

@@ -269,6 +269,7 @@ export default function GlobalDashboardHeader({
 
   // UNIFIED LOADING INTEGRATION
   const { setComponentLoaded } = useUnifiedDashboard();
+  const hasReportedRef = useRef(false);
 
   // Wallet integration
   const { address, isConnected } = useAccount();
@@ -340,12 +341,23 @@ export default function GlobalDashboardHeader({
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    // Reset the flag when component mounts
+    hasReportedRef.current = false;
+
+    if (!hasReportedRef.current) {
+      console.log("✅ GlobalHeader reporting loaded");
+      setComponentLoaded("globalHeader");
+      hasReportedRef.current = true;
+    }
+  }, [setComponentLoaded]);
+
   // MARK COMPONENT AS LOADED
   useEffect(() => {
     // Header loads immediately after mount
     if (mounted) {
       console.log("✅ GlobalDashboardHeader: Marking as loaded");
-      setComponentLoaded('globalHeader');
+      setComponentLoaded("globalHeader");
     }
   }, [mounted, setComponentLoaded]);
 

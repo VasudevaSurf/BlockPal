@@ -554,6 +554,7 @@ export default function TokenList() {
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
   const { isLoading: isNavigating, startLoading } = useNavigationLoading();
+  const hasReportedRef = useRef(false);
 
   const {
     updateTrackingData,
@@ -613,11 +614,17 @@ export default function TokenList() {
 
   // ✅ NOTIFY UNIFIED DASHBOARD WHEN LOADING COMPLETES
   useEffect(() => {
-    if (!loading) {
-      console.log("✅ TokenList: Loading complete, notifying dashboard");
-      setComponentLoaded('tokenList');
+    if (!loading && !hasReportedRef.current) {
+      console.log("✅ TokenList reporting loaded");
+      setComponentLoaded("tokenList");
+      hasReportedRef.current = true;
     }
   }, [loading, setComponentLoaded]);
+
+  useEffect(() => {
+    // Reset the flag when component mounts
+    hasReportedRef.current = false;
+  }, []);
 
   // Load preferences and tokens when wallet connects
   useEffect(() => {
