@@ -526,7 +526,7 @@ export default function SwapSection() {
         </div>
 
         {/* Second Box - Top Gainers */}
-        <div className="bg-black rounded-[12px] lg:rounded-[16px] border border-[#2C2C2C] flex-1 flex flex-col p-2 lg:p-3 overflow-hidden">
+        <div className="bg-black rounded-[12px] lg:rounded-[16px] border border-[#2C2C2C] flex-1 flex flex-col p-2 lg:p-3 overflow-hidden -mb-4">
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <div className="relative">

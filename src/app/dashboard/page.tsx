@@ -206,7 +206,7 @@ function DashboardContent() {
               <div className="flex-shrink-0">
                 <WalletBalance />
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 -mb-4">
                 <TokenList />
               </div>
               {dashboardState.showStats && (
