@@ -1,9 +1,9 @@
-// src/components/wallet/WalletConnectButton.tsx - UPDATED with chain images
+// src/components/wallet/WalletConnectButton.tsx - COMPLETE FIXED VERSION
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId, useDisconnect } from "wagmi";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Copy, LogOut, Check, Wallet } from "lucide-react";
 import { chains } from "./WalletProvider";
 
@@ -12,7 +12,7 @@ interface WalletConnectButtonProps {
   height?: string;
 }
 
-// Chain display data with image paths (same as GlobalDashboardHeader)
+// Chain display data with image paths
 const getChainDisplayData = () => {
   const chainDisplayData: {
     [key: number]: {
@@ -77,7 +77,30 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// Chain Icon Component with image support
+// ✅ FIXED: Image cache and preload system
+const imageCache = new Map<string, boolean>();
+
+const preloadImage = (src: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (imageCache.has(src)) {
+      resolve(imageCache.get(src) || false);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      imageCache.set(src, true);
+      resolve(true);
+    };
+    img.onerror = () => {
+      imageCache.set(src, false);
+      resolve(false);
+    };
+    img.src = src;
+  });
+};
+
+// ✅ FIXED: Chain Icon Component
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -96,8 +119,17 @@ const ChainIcon = ({
   size = "md",
   className = "",
 }: ChainIconProps) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageState, setImageState] = useState<"loading" | "loaded" | "error">(
+    () => {
+      // ✅ Check cache on initial render
+      if (chainData.image && imageCache.has(chainData.image)) {
+        return imageCache.get(chainData.image) ? "loaded" : "error";
+      }
+      return "loading";
+    }
+  );
+
+  const mountedRef = useRef(true);
 
   const sizeClasses = {
     sm: "w-4 h-4",
@@ -111,52 +143,64 @@ const ChainIcon = ({
     lg: "text-sm",
   };
 
-  // Reset image error state when chainData changes
   useEffect(() => {
-    setImageError(false);
-    setImageLoaded(false);
+    mountedRef.current = true;
+
+    // Check cache first
+    if (chainData.image && imageCache.has(chainData.image)) {
+      const cached = imageCache.get(chainData.image);
+      setImageState(cached ? "loaded" : "error");
+      return;
+    }
+
+    // Preload image if not cached
+    if (chainData.image) {
+      preloadImage(chainData.image).then((success) => {
+        if (mountedRef.current) {
+          setImageState(success ? "loaded" : "error");
+        }
+      });
+    } else {
+      setImageState("error");
+    }
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, [chainData.image]);
-
-  const handleImageError = () => {
-    console.warn(`Failed to load chain image: ${chainData.image}`);
-    setImageError(true);
-  };
-
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-  };
-
-  // Determine if we should show background
-  const shouldShowBackground =
-    !chainData.image || imageError || !imageLoaded || chainData.useBackground;
-  const backgroundClass = shouldShowBackground ? chainData.color : "";
 
   return (
     <div
-      className={`${sizeClasses[size]} ${backgroundClass} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
+      style={{
+        // ✅ Hide completely during loading
+        opacity: imageState === "loading" ? 0 : 1,
+        transition: "opacity 0.15s ease-in",
+      }}
     >
-      {/* Chain Image */}
-      {chainData.image && !imageError && (
+      {/* Show image when loaded */}
+      {imageState === "loaded" && chainData.image && (
         <img
           src={chainData.image}
           alt={chainData.name}
-          className={`w-full h-full object-contain transition-opacity duration-200 ${
-            imageLoaded ? "opacity-100" : "opacity-0"
-          } ${!chainData.useBackground && imageLoaded ? "p-0" : "p-0.5"}`}
-          onError={handleImageError}
-          onLoad={handleImageLoad}
-          loading="lazy"
+          className="w-full h-full object-contain p-0.5"
+          draggable={false}
+          style={{ userSelect: "none", pointerEvents: "none" }}
         />
       )}
 
-      {/* Fallback Icon - only show when needed */}
-      {(!chainData.image || imageError || !imageLoaded) && (
-        <span
-          className={`text-white ${iconSizes[size]} font-bold font-satoshi absolute inset-0 flex items-center justify-center`}
+      {/* Show fallback only on error */}
+      {imageState === "error" && (
+        <div
+          className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
-          {chainData.fallbackIcon}
-        </span>
+          <span
+            className={`text-white ${iconSizes[size]} font-bold font-satoshi`}
+          >
+            {chainData.fallbackIcon}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -203,6 +247,23 @@ export default function WalletConnectButton({
   // Ensure component is mounted before accessing wallet state
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // ✅ Preload all chain images on mount
+  useEffect(() => {
+    const chainDisplayData = getChainDisplayData();
+
+    const preloadAllChainImages = async () => {
+      const images = Object.values(chainDisplayData)
+        .map((data) => data.image)
+        .filter(Boolean) as string[];
+
+      console.log("🔄 WalletConnectButton: Preloading chain images");
+      await Promise.all(images.map((src) => preloadImage(src)));
+      console.log("✅ WalletConnectButton: All chain images preloaded");
+    };
+
+    preloadAllChainImages();
   }, []);
 
   // Clear errors when successfully connected
@@ -338,14 +399,6 @@ export default function WalletConnectButton({
                         title={`Connected: ${account.displayName}`}
                       >
                         <ChainIcon chainData={currentChainDisplay} size="sm" />
-
-                        {/* Tooltip */}
-                        {/* <div className="absolute left-12 top-1/2 transform -translate-y-1/2 bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-xs text-white font-satoshi opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                          Connected: {currentChainDisplay.name}
-                          <br />
-                          {account.address?.slice(0, 6)}...
-                          {account.address?.slice(-6)}
-                        </div> */}
                       </div>
 
                       {/* Copy address button */}
@@ -359,11 +412,6 @@ export default function WalletConnectButton({
                         ) : (
                           <Copy size={14} className="text-black" />
                         )}
-
-                        {/* Tooltip */}
-                        {/* <div className="absolute left-12 top-1/2 transform -translate-y-1/2 bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-xs text-white font-satoshi opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                          {copied ? "Copied!" : "Copy Address"}
-                        </div> */}
                       </button>
 
                       {/* Disconnect button */}
@@ -373,11 +421,6 @@ export default function WalletConnectButton({
                         title="Disconnect"
                       >
                         <LogOut size={14} className="text-black" />
-
-                        {/* Tooltip */}
-                        {/* <div className="absolute left-12 top-1/2 transform -translate-y-1/2 bg-black border border-[#2C2C2C] rounded-lg px-3 py-2 text-xs text-white font-satoshi opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                          Disconnect
-                        </div> */}
                       </button>
                     </div>
                   );
@@ -391,7 +434,6 @@ export default function WalletConnectButton({
                       {/* Connection status */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          {/* <div className="w-2 h-2 bg-green-400 rounded-full"></div> */}
                           <span className="text-[#0F0F0F] text-xs font-satoshi font-medium">
                             Connected Wallet
                           </span>
@@ -402,13 +444,10 @@ export default function WalletConnectButton({
                             chainData={currentChainDisplay}
                             size="sm"
                           />
-                          {/* <span className="text-white text-xs font-satoshi">
-                            {currentChainDisplay.name}
-                          </span> */}
                         </div>
                       </div>
 
-                      {/* Wallet name */}
+                      {/* Wallet address */}
                       <div className="mb-2">
                         <span className="text-[#000] text-sm font-satoshi text-[16px]">
                           {account.address
@@ -419,11 +458,6 @@ export default function WalletConnectButton({
                             : account.displayName}
                         </span>
                       </div>
-
-                      {/* Wallet address */}
-                      {/* <div className="text-gray-400 text-xs font-satoshi font-mono break-all">
-                        {account.address}
-                      </div> */}
                     </div>
 
                     {/* Action buttons */}
