@@ -14,6 +14,8 @@ import {
   UnifiedDashboardProvider,
   useUnifiedDashboard,
 } from "@/contexts/UnifiedDashboardContext";
+import { CoinLensLoadingProvider } from "@/contexts/CoinLensLoadingContext";
+import { NewsFeedLoadingProvider } from "@/contexts/NewsFeedLoadingContext";
 import BlockPalLoader from "@/components/ui/BlockPalLoader";
 import { Menu, X } from "lucide-react";
 
@@ -172,7 +174,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             {/* Show loader only over main content area when loading */}
             {isLoading && isDashboardPage && (
               <div className="absolute inset-0 z-[9999]">
-                <BlockPalLoader />
+                <BlockPalLoader loadingText="Loading Dashboard" />
               </div>
             )}
 
@@ -289,11 +291,25 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const isCodeLensPage = pathname === "/dashboard/coin-lens";
+  const isNewsFeedPage = pathname === "/dashboard/news-feed";
+
   return (
     <NavigationLoadingProvider>
       <WalletIntegration>
         <UnifiedDashboardProvider>
-          <DashboardLayoutContent>{children}</DashboardLayoutContent>
+          {isCodeLensPage ? (
+            <CoinLensLoadingProvider>
+              <DashboardLayoutContent>{children}</DashboardLayoutContent>
+            </CoinLensLoadingProvider>
+          ) : isNewsFeedPage ? (
+            <NewsFeedLoadingProvider>
+              <DashboardLayoutContent>{children}</DashboardLayoutContent>
+            </NewsFeedLoadingProvider>
+          ) : (
+            <DashboardLayoutContent>{children}</DashboardLayoutContent>
+          )}
         </UnifiedDashboardProvider>
       </WalletIntegration>
     </NavigationLoadingProvider>

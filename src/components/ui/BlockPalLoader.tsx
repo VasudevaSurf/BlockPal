@@ -2,7 +2,13 @@
 
 import React from "react";
 
-const BlockPalLoader = () => {
+interface BlockPalLoaderProps {
+  loadingText?: string;
+}
+
+const BlockPalLoader: React.FC<BlockPalLoaderProps> = ({
+  loadingText = "Loading",
+}) => {
   return (
     <div className="absolute inset-0 bg-[#000000] flex items-center justify-center z-[9999]">
       <div className="flex flex-col items-center justify-center gap-8">
@@ -23,7 +29,7 @@ const BlockPalLoader = () => {
 
         {/* Loading Text */}
         <div className="flex items-center gap-2">
-          <span className="text-white text-lg font-mayeka">Loading</span>
+          <span className="text-white text-lg font-mayeka">{loadingText}</span>
           <div className="flex gap-1">
             <span
               className="animate-bounce-dot"

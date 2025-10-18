@@ -1,4 +1,3 @@
-// src/app/dashboard/coin-lens/page.tsx - REMOVED ALL SKELETONS
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -9,6 +8,8 @@ import { MoreVertical, Copy, Minus, X } from "lucide-react";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
 import { coinlesSocketClient } from "@/services/coinlesSocketClient";
 import { useCodeLensContext } from "../layout";
+import { useCoinLensLoading } from "@/contexts/CoinLensLoadingContext";
+import BlockPalLoader from "@/components/ui/BlockPalLoader";
 
 interface Token {
   id: string;
@@ -27,11 +28,12 @@ interface Token {
   logo?: string;
 }
 
-export default function CoinLens() {
+function CoinLensContent() {
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
   const { searchQuery, setSearchQuery, setOnAddTokenClick } =
     useCodeLensContext();
+  const { setDataReady } = useCoinLensLoading();
 
   const [tokens, setTokens] = useState<Token[]>([]);
   const [filteredTokens, setFilteredTokens] = useState<Token[]>([]);
@@ -42,20 +44,18 @@ export default function CoinLens() {
   const [connected, setConnected] = useState(false);
 
   const watchlistReceivedRef = useRef(false);
+  const hasReportedDataRef = useRef(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Handle clicking outside menu - modified to check properly
+  // Handle clicking outside menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Check if click is on the menu or any of its children
       const target = event.target as HTMLElement;
 
-      // Don't close if clicking inside the menu
       if (menuRef.current && menuRef.current.contains(target)) {
         return;
       }
 
-      // Don't close if clicking on the three dots button
       if (target.closest('button[title="More actions"]')) {
         return;
       }
@@ -64,7 +64,6 @@ export default function CoinLens() {
     };
 
     if (activeMenuTokenId) {
-      // Use timeout to avoid conflicts with click events
       setTimeout(() => {
         document.addEventListener("click", handleClickOutside);
       }, 0);
@@ -78,6 +77,24 @@ export default function CoinLens() {
   useEffect(() => {
     setOnAddTokenClick(() => () => setAddTokensModalOpen(true));
   }, [setOnAddTokenClick]);
+
+  // Report data ready when watchlist is received or when connected without tokens
+  useEffect(() => {
+    if (!hasReportedDataRef.current) {
+      // Data is ready when:
+      // 1. We have received the watchlist (with or without tokens)
+      // 2. OR we're connected and the watchlist request has been processed
+      if (watchlistReceivedRef.current || (connected && tokens.length === 0)) {
+        console.log("✅ CoinLens: Marking data as ready", {
+          tokensCount: tokens.length,
+          connected,
+          watchlistReceived: watchlistReceivedRef.current,
+        });
+        setDataReady();
+        hasReportedDataRef.current = true;
+      }
+    }
+  }, [tokens.length, connected, setDataReady]);
 
   useEffect(() => {
     if (!user?.email) {
@@ -298,7 +315,6 @@ export default function CoinLens() {
     if (token) {
       navigator.clipboard.writeText(token.contractAddress);
       console.log("Copied contract address:", token.contractAddress);
-      // Only close menu after action completes
       setTimeout(() => setActiveMenuTokenId(null), 100);
     }
   };
@@ -322,7 +338,6 @@ export default function CoinLens() {
         setFilteredTokens(newFilteredTokens);
 
         console.log("Removed token:", token.name);
-        // Menu closes automatically as token is removed from list
       } catch (error) {
         console.error("Error removing token:", error);
       }
@@ -500,14 +515,14 @@ export default function CoinLens() {
                         <MoreVertical className="w-4 h-4 text-gray-400" />
                       </button>
 
-                      {/* Inline Menu - positioned absolutely relative to the row */}
+                      {/* Inline Menu */}
                       {activeMenuTokenId === token.id && (
                         <div
                           ref={menuRef}
                           className="absolute right-10 top-8 z-50 bg-black rounded-xl w-[200px] shadow-2xl border border-[#2C2C2C] overflow-hidden"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {/* Close Button - Top Left Corner */}
+                          {/* Close Button */}
                           <div className="absolute top-0 left-0 z-10">
                             <button
                               onClick={() => setActiveMenuTokenId(null)}
@@ -571,7 +586,7 @@ export default function CoinLens() {
                     </div>
                   </div>
 
-                  {/* Mobile View - Horizontal Layout */}
+                  {/* Mobile View */}
                   <div className="lg:hidden border-b border-[#2C2C2C] hover:bg-[#1A1A1A] transition-colors cursor-pointer relative">
                     <div className="px-2 py-2 flex items-center gap-2">
                       {/* Left Side: Token Info */}
@@ -611,7 +626,7 @@ export default function CoinLens() {
                         </div>
                       </div>
 
-                      {/* Right Side: All Values with Labels in 2 Rows */}
+                      {/* Right Side: All Values */}
                       <div className="flex-1 min-w-0">
                         {/* First Row */}
                         <div className="flex items-center justify-end gap-2 mb-1.5">
@@ -685,7 +700,7 @@ export default function CoinLens() {
                         </div>
                       </div>
 
-                      {/* Action Button with inline menu for mobile */}
+                      {/* Action Button */}
                       <div className="relative">
                         <button
                           onClick={(e) => handleMoreClick(token.id, e)}
@@ -702,7 +717,7 @@ export default function CoinLens() {
                             className="absolute right-8 top-6 z-50 bg-black rounded-xl w-[150px] shadow-2xl border border-[#2C2C2C] overflow-hidden"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {/* Close Button - Top Left Corner */}
+                            {/* Close Button */}
                             <div className="absolute top-0 left-0 z-10">
                               <button
                                 onClick={() => setActiveMenuTokenId(null)}
@@ -792,5 +807,25 @@ export default function CoinLens() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function CoinLens() {
+  const { isLoading } = useCoinLensLoading();
+
+  return (
+    <>
+      {/* Show loader while loading */}
+      {isLoading && <BlockPalLoader loadingText="Loading CoinLens" />}
+
+      {/* Show content with fade transition */}
+      <div
+        className={`h-full transition-opacity duration-300 ${
+          isLoading ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <CoinLensContent />
+      </div>
+    </>
   );
 }

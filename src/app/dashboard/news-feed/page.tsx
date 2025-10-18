@@ -1,4 +1,3 @@
-// src/app/dashboard/news-feed/page.tsx - Removed skeleton loading
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -6,6 +5,8 @@ import { ArrowLeft } from "lucide-react";
 import NewsChatPage from "@/components/NewsChatPage";
 import { useNews } from "@/hooks/useNews";
 import { useNewsFeedContext } from "@/app/dashboard/layout";
+import { useNewsFeedLoading } from "@/contexts/NewsFeedLoadingContext";
+import BlockPalLoader from "@/components/ui/BlockPalLoader";
 
 interface NewsCardProps {
   title: string;
@@ -164,7 +165,7 @@ const NewsCard = ({
   );
 };
 
-export default function NewsFeed() {
+function NewsFeedContent() {
   const [showAIChat, setShowAIChat] = useState(false);
   const {
     news,
@@ -177,6 +178,10 @@ export default function NewsFeed() {
     clearSearch,
     searchQuery,
   } = useNews();
+
+  // Use loading context
+  const { setDataReady } = useNewsFeedLoading();
+  const hasReportedDataRef = useRef(false);
 
   // Use context from layout
   const newsFeedContext = useNewsFeedContext();
@@ -197,6 +202,25 @@ export default function NewsFeed() {
     },
     [loading, hasMore, fetchMore]
   );
+
+  // Report data ready when news is loaded or when initial load completes
+  useEffect(() => {
+    if (!hasReportedDataRef.current) {
+      // Data is ready when:
+      // 1. We have news loaded (news.length > 0)
+      // 2. OR we've finished loading and confirmed there's no news (!loading && news.length === 0)
+      // 3. OR there's an error
+      if (news.length > 0 || (!loading && news.length === 0) || error) {
+        console.log("✅ NewsFeed: Marking data as ready", {
+          newsCount: news.length,
+          loading,
+          error: !!error,
+        });
+        setDataReady();
+        hasReportedDataRef.current = true;
+      }
+    }
+  }, [news.length, loading, error, setDataReady]);
 
   // Connect context handlers
   useEffect(() => {
@@ -375,6 +399,26 @@ export default function NewsFeed() {
             </div>
           )}
         </div>
+      </div>
+    </>
+  );
+}
+
+export default function NewsFeed() {
+  const { isLoading } = useNewsFeedLoading();
+
+  return (
+    <>
+      {/* Show loader while loading */}
+      {isLoading && <BlockPalLoader loadingText="Loading News Feed" />}
+
+      {/* Show content with fade transition */}
+      <div
+        className={`h-full transition-opacity duration-300 ${
+          isLoading ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <NewsFeedContent />
       </div>
     </>
   );
