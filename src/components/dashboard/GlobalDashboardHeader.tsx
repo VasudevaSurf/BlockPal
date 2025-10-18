@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED wallet disconnect visibility
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED WITH UNIFIED LOADING
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -18,6 +18,7 @@ import { RootState, AppDispatch } from "@/store";
 import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { chains } from "@/components/wallet/WalletProvider";
+import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -266,9 +267,14 @@ export default function GlobalDashboardHeader({
   } = useSelector((state: RootState) => state.auth);
   const dispatch = useDispatch<AppDispatch>();
 
-  // Wallet integration - CRITICAL FIX: Use these for display logic
+  // UNIFIED LOADING INTEGRATION
+  const { setComponentLoaded } = useUnifiedDashboard();
+
+  // Wallet integration
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const currentChain = chains.find((c) => c.id === chainId);
+
   const {
     switchChain,
     isPending: isSwitchingChain,
@@ -334,6 +340,15 @@ export default function GlobalDashboardHeader({
     setMounted(true);
   }, []);
 
+  // MARK COMPONENT AS LOADED
+  useEffect(() => {
+    // Header loads immediately after mount
+    if (mounted) {
+      console.log("✅ GlobalDashboardHeader: Marking as loaded");
+      setComponentLoaded('globalHeader');
+    }
+  }, [mounted, setComponentLoaded]);
+
   useEffect(() => {
     if (!authChecked.current && !isAuthenticated && !authLoading) {
       authChecked.current = true;
@@ -352,7 +367,6 @@ export default function GlobalDashboardHeader({
     if (!isConnected) {
       setSwitchError(null);
       setSwitchingChain(null);
-      // CRITICAL: Close chain selector when wallet disconnects
       setChainSelectorOpen(false);
     }
   }, [isConnected]);
@@ -475,8 +489,6 @@ export default function GlobalDashboardHeader({
   };
 
   const chainDisplayData = getChainDisplayData();
-  const currentChain =
-    mounted && isConnected ? chains.find((c) => c.id === chainId) : null;
 
   const getCurrentChainDisplay = () => {
     if (mounted && isConnected && chainId && chainDisplayData[chainId]) {
@@ -501,7 +513,6 @@ export default function GlobalDashboardHeader({
     return null;
   }
 
-  // CRITICAL FIX: Only show wallet info when actually connected
   const showWalletInfo = mounted && isConnected && address;
 
   return (
@@ -628,7 +639,7 @@ export default function GlobalDashboardHeader({
         </div>
 
         <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4">
-          {/* CRITICAL FIX: Only show wallet display when connected */}
+          {/* Wallet Display */}
           {showWalletInfo && (
             <div className="relative" ref={chainSelectorRef}>
               <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] gap-1.5">
@@ -666,7 +677,7 @@ export default function GlobalDashboardHeader({
                 </button>
               </div>
 
-              {/* Chain Selector Dropdown - Only show when connected */}
+              {/* Chain Selector Dropdown */}
               {chainSelectorOpen && mounted && isConnected && (
                 <>
                   <div
@@ -795,7 +806,7 @@ export default function GlobalDashboardHeader({
             </div>
           )}
 
-          {/* Action Icons Container - Always show */}
+          {/* Action Icons Container */}
           <div className="flex items-center space-x-2 relative">
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-1.5 lg:px-2 py-1.5 lg:py-2">
               <button

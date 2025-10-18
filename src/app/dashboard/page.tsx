@@ -1,4 +1,3 @@
-// src/app/dashboard/page.tsx - COMPLETE CODE WITHOUT SKELETON
 "use client";
 
 import { useEffect, useState } from "react";
@@ -10,7 +9,6 @@ import SwapSection from "@/components/dashboard/SwapSection";
 import WalletStats from "@/components/dashboard/WalletStats";
 import MobileWalletMenu from "@/components/dashboard/MobileWalletMenu";
 import { WalletDataProvider } from "@/contexts/WalletDataContext";
-import { DashboardLoadingProvider } from "@/contexts/DashboardLoadingContext";
 
 // Mock authentication state
 const mockAuth = {
@@ -24,24 +22,6 @@ const mockAuth = {
   },
 };
 
-// Mock wallet data
-const mockWallets = [
-  {
-    id: "wallet1",
-    address: "0x742d35Cc6634C0532925a3b8d4Ae7F6eC1e7F5c7",
-    name: "Main Wallet",
-    balance: 1.25843,
-  },
-  {
-    id: "wallet2",
-    address: "0x8ba1f109551bD432803012645Hac136c22C7F6e2",
-    name: "Trading Wallet",
-    balance: 0.45621,
-  },
-];
-
-const mockActiveWallet = mockWallets[0];
-
 interface DashboardState {
   hasWallets: boolean;
   error: string | null;
@@ -49,13 +29,11 @@ interface DashboardState {
   mobileMenuOpen: boolean;
 }
 
-// Dashboard Content Component (wrapped with provider)
+// Dashboard Content Component
 function DashboardContent() {
   const router = useRouter();
 
   const { isAuthenticated, loading: authLoading, user } = mockAuth;
-  const wallets = mockWallets;
-  const activeWallet = mockActiveWallet;
 
   const [dashboardState, setDashboardState] = useState<DashboardState>({
     hasWallets: false,
@@ -64,7 +42,6 @@ function DashboardContent() {
     mobileMenuOpen: false,
   });
 
-  // Simulate authentication check
   useEffect(() => {
     console.log("🔍 Dashboard - Checking auth status");
 
@@ -74,10 +51,9 @@ function DashboardContent() {
       return;
     }
 
-    // Initialize dashboard state
     setDashboardState((prev) => ({
       ...prev,
-      hasWallets: wallets.length > 0,
+      hasWallets: true,
       error: null,
       showStats: localStorage.getItem("show-wallet-stats") === "true",
     }));
@@ -85,12 +61,10 @@ function DashboardContent() {
     console.log("📊 Dashboard initialized with mock data");
   }, [isAuthenticated, router]);
 
-  // Handle manual refresh
   const handleManualRefresh = () => {
     console.log("🔄 Manual refresh requested");
   };
 
-  // Don't render if not authenticated
   if (!isAuthenticated) {
     return null;
   }
@@ -154,7 +128,7 @@ function DashboardContent() {
         )}
 
         {/* Main Dashboard Content */}
-        {dashboardState.hasWallets && activeWallet ? (
+        {dashboardState.hasWallets ? (
           <div className="flex flex-col xl:flex-row gap-4 lg:gap-4 flex-1 min-h-0">
             {/* Mobile Layout */}
             <div className="flex xl:hidden flex-col gap-4 lg:gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
@@ -191,7 +165,6 @@ function DashboardContent() {
             </div>
           </div>
         ) : (
-          /* Empty state when no wallets */
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-4">
@@ -246,9 +219,7 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <WalletDataProvider>
-      <DashboardLoadingProvider>
-        <DashboardContent />
-      </DashboardLoadingProvider>
+      <DashboardContent />
     </WalletDataProvider>
   );
 }

@@ -1,8 +1,8 @@
-// src/components/dashboard/WalletBalance.tsx - COMPLETE CODE WITHOUT SKELETON
+// src/components/dashboard/WalletBalance.tsx - COMPLETE CODE WITH UNIFIED LOADING
 "use client";
 
 import { useSelector } from "react-redux";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Copy,
   RefreshCw,
@@ -15,6 +15,7 @@ import { RootState } from "@/store";
 import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
 import { useWalletData } from "@/contexts/WalletDataContext";
+import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 
 // Portfolio Change Component
 const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
@@ -68,6 +69,9 @@ export default function WalletBalance() {
   // Use shared wallet data context
   const { walletData, refresh, isRefreshing } = useWalletData();
 
+  // Unified dashboard loading integration
+  const { setComponentLoaded } = useUnifiedDashboard();
+
   // Wallet integration
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -78,6 +82,9 @@ export default function WalletBalance() {
     isCopied: false,
     isAnimating: false,
   });
+
+  // Track if component has loaded its data
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -90,6 +97,36 @@ export default function WalletBalance() {
       console.error("Failed to copy: ", err);
     }
   };
+
+  // ✅ UNIFIED LOADING INTEGRATION
+  // Mark component as loaded when wallet data is ready
+  useEffect(() => {
+    if (isConnected && address) {
+      // Wait for wallet data to load
+      if (walletData.mainListValue >= 0 && !walletData.error) {
+        // Add a small delay to ensure data is fully rendered
+        const timer = setTimeout(() => {
+          console.log(
+            "✅ WalletBalance: Data loaded, marking component as ready"
+          );
+          setDataLoaded(true);
+          setComponentLoaded("walletBalance");
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    } else if (!isConnected) {
+      // If wallet not connected, mark as loaded immediately (showing empty state)
+      console.log("✅ WalletBalance: No wallet connected, marking as ready");
+      setComponentLoaded("walletBalance");
+      setDataLoaded(true);
+    }
+  }, [
+    isConnected,
+    address,
+    walletData.mainListValue,
+    walletData.error,
+    setComponentLoaded,
+  ]);
 
   // Show wallet not connected state
   if (!isConnected || !address) {

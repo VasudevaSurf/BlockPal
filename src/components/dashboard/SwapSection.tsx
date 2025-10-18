@@ -1,4 +1,4 @@
-// src/components/dashboard/SwapSection.tsx - COMPLETE CODE WITHOUT SKELETON
+// src/components/dashboard/SwapSection.tsx - COMPLETE CODE WITH UNIFIED LOADING
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -12,6 +12,7 @@ import {
 import TokenSelectorModal from "@/components/swap/TokenSelectorModal";
 import SwapPreviewModal from "@/components/swap/SwapPreviewModal";
 import { useCoinGecko, TrendingToken, TopGainer } from "@/hooks/useCoinGecko";
+import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 
 // Mock token data
 const mockTokens = [
@@ -139,6 +140,9 @@ const TokenImage = ({
 };
 
 export default function SwapSection() {
+  // ✅ UNIFIED LOADING INTEGRATION
+  const { setComponentLoaded } = useUnifiedDashboard();
+
   // Use CoinGecko hook for real data
   const {
     data: coinGeckoData,
@@ -195,6 +199,17 @@ export default function SwapSection() {
   // Top Gainers state
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
   const [showGainersDropdown, setShowGainersDropdown] = useState(false);
+
+  // ✅ MARK COMPONENT AS LOADED
+  // SwapSection loads relatively quickly, mark as loaded after CoinGecko data attempt
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log("✅ SwapSection: Marking as loaded");
+      setComponentLoaded('swapSection');
+    }, 800); // Wait 800ms for CoinGecko data
+    
+    return () => clearTimeout(timer);
+  }, [setComponentLoaded]);
 
   // Use cached data if refreshing, otherwise use current data
   const displayTrendingTokens =

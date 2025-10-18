@@ -1,4 +1,3 @@
-// src/app/dashboard/layout.tsx - UPDATED to hide header on mobile for dashboard page
 "use client";
 
 import { useSelector } from "react-redux";
@@ -11,6 +10,11 @@ import NavigationLoadingIndicator from "@/components/ui/NavigationLoadingIndicat
 import GlobalDashboardHeader from "@/components/dashboard/GlobalDashboardHeader";
 import WalletIntegration from "@/components/dashboard/WalletIntegration";
 import { NavigationLoadingProvider } from "@/contexts/NavigationLoadingContext";
+import {
+  UnifiedDashboardProvider,
+  useUnifiedDashboard,
+} from "@/contexts/UnifiedDashboardContext";
+import BlockPalLoader from "@/components/ui/BlockPalLoader";
 import { Menu, X } from "lucide-react";
 
 // Create context for CodeLens search
@@ -55,25 +59,22 @@ const NewsFeedContext = createContext<NewsFeedContextType>({
 
 export const useNewsFeedContext = () => useContext(NewsFeedContext);
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// Inner layout component that uses the unified dashboard context
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { walletSelectorOpen } = useSelector((state: RootState) => state.ui);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  // State to track if news chat is active (to hide header)
+  // Get loading state from unified dashboard
+  const { isLoading, allComponentsLoaded } = useUnifiedDashboard();
+
   const [isNewsChatActive, setIsNewsChatActive] = useState(false);
 
-  // CodeLens search state
   const [codeLensSearchQuery, setCodeLensSearchQuery] = useState("");
   const [codeLensAddTokenHandler, setCodeLensAddTokenHandler] = useState<
     () => void
   >(() => () => {});
 
-  // News Feed state
   const [newsFeedSearchQuery, setNewsFeedSearchQuery] = useState("");
   const [newsFeedSearchHandler, setNewsFeedSearchHandler] = useState<
     (query: string) => void
@@ -85,18 +86,12 @@ export default function DashboardLayout({
     () => () => {}
   );
 
-  // Check if we're on AI chat page for special styling
   const isAIChatPage = pathname === "/dashboard/ai-chat";
-  // Check if we're on Swap page to show the effect and hide header
   const isSwapPage = pathname === "/dashboard/swap";
-  // Check if we're on CodeLens page
   const isCodeLensPage = pathname === "/dashboard/coin-lens";
-  // Check if we're on News Feed page
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
-  // Check if we're on main Dashboard page
   const isDashboardPage = pathname === "/dashboard";
 
-  // Listen for news chat active state from body attribute
   useEffect(() => {
     const checkNewsChatState = () => {
       const isActive =
@@ -104,10 +99,8 @@ export default function DashboardLayout({
       setIsNewsChatActive(isActive);
     };
 
-    // Check immediately
     checkNewsChatState();
 
-    // Set up a MutationObserver to watch for changes
     const observer = new MutationObserver(checkNewsChatState);
     observer.observe(document.body, {
       attributes: true,
@@ -138,151 +131,170 @@ export default function DashboardLayout({
   };
 
   return (
-    <NavigationLoadingProvider>
-      <WalletIntegration>
-        <CodeLensContext.Provider
-          value={{
-            searchQuery: codeLensSearchQuery,
-            setSearchQuery: setCodeLensSearchQuery,
-            onAddTokenClick: codeLensAddTokenHandler,
-            setOnAddTokenClick: setCodeLensAddTokenHandler,
-          }}
-        >
-          <NewsFeedContext.Provider
-            value={{
-              searchQuery: newsFeedSearchQuery,
-              setSearchQuery: setNewsFeedSearchQuery,
-              onSearch: newsFeedSearchHandler,
-              setOnSearch: setNewsFeedSearchHandler,
-              onClearSearch: newsFeedClearHandler,
-              setOnClearSearch: setNewsFeedClearHandler,
-              onAIClick: newsFeedAIHandler,
-              setOnAIClick: setNewsFeedAIHandler,
-            }}
+    <CodeLensContext.Provider
+      value={{
+        searchQuery: codeLensSearchQuery,
+        setSearchQuery: setCodeLensSearchQuery,
+        onAddTokenClick: codeLensAddTokenHandler,
+        setOnAddTokenClick: setCodeLensAddTokenHandler,
+      }}
+    >
+      <NewsFeedContext.Provider
+        value={{
+          searchQuery: newsFeedSearchQuery,
+          setSearchQuery: setNewsFeedSearchQuery,
+          onSearch: newsFeedSearchHandler,
+          setOnSearch: setNewsFeedSearchHandler,
+          onClearSearch: newsFeedClearHandler,
+          setOnClearSearch: setNewsFeedClearHandler,
+          onAIClick: newsFeedAIHandler,
+          setOnAIClick: setNewsFeedAIHandler,
+        }}
+      >
+        <div className="h-screen bg-[#000000] flex flex-col lg:flex-row overflow-hidden relative">
+          <NavigationLoadingIndicator />
+
+          {/* Sidebar - Always visible */}
+          <Sidebar />
+
+          {/* Main content area with conditional loading */}
+          <main
+            className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col relative ${
+              isSwapPage || isNewsChatActive
+                ? "p-0"
+                : isAIChatPage
+                ? "p-0 lg:p-2 lg:px-4"
+                : isDashboardPage
+                ? "p-0 lg:p-2 lg:px-4"
+                : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
+            } ${"pb-20 lg:pb-2"}`}
           >
-            <div className="h-screen bg-[#000000] flex flex-col lg:flex-row overflow-hidden relative">
-              {/* Navigation Loading Indicator */}
-              <NavigationLoadingIndicator />
+            {/* Show loader only over main content area when loading */}
+            {isLoading && isDashboardPage && (
+              <div className="absolute inset-0 z-[9999]">
+                <BlockPalLoader />
+              </div>
+            )}
 
-              {/* Sidebar - Contains both desktop sidebar and mobile bottom nav */}
-              <Sidebar />
-
-              {/* Main Content - FIXED: Added mobile bottom padding */}
-              <main
-                className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col ${
-                  isSwapPage || isNewsChatActive
-                    ? "p-0"
-                    : isAIChatPage
-                    ? "p-0 lg:p-2 lg:px-4"
-                    : isDashboardPage
-                    ? "p-0 lg:p-2 lg:px-4" // Dashboard: no padding on mobile, padding on desktop
-                    : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4"
-                } ${
-                  // Add padding bottom on mobile for bottom nav
-                  "pb-20 lg:pb-2"
-                }`}
-              >
-                {/* Global Header - Hide on swap page, news chat active, dashboard page on mobile, AND on mobile for AI chat */}
-                {!isSwapPage && !isNewsChatActive && (
-                  <div
-                    className={`flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2 ${
-                      isAIChatPage || isDashboardPage ? "hidden lg:block" : ""
-                    }`}
-                  >
-                    <GlobalDashboardHeader
-                      title={isAIChatPage ? "Chat with Lumen" : "Dashboard"}
-                      subtitle={
-                        isAIChatPage
-                          ? "Powered by advanced blockchain analysis"
-                          : "Welcome back"
-                      }
-                      // CodeLens props
-                      onSearchChange={
-                        isCodeLensPage ? handleCodeLensSearchChange : undefined
-                      }
-                      onAddTokenClick={
-                        isCodeLensPage ? handleCodeLensAddToken : undefined
-                      }
-                      searchQuery={
-                        isCodeLensPage ? codeLensSearchQuery : undefined
-                      }
-                      // News Feed props
-                      onNewsSearch={
-                        isNewsFeedPage ? handleNewsFeedSearch : undefined
-                      }
-                      onNewsClearSearch={
-                        isNewsFeedPage ? handleNewsFeedClearSearch : undefined
-                      }
-                      onNewsAIClick={
-                        isNewsFeedPage ? handleNewsFeedAIClick : undefined
-                      }
-                      newsSearchQuery={
-                        isNewsFeedPage ? newsFeedSearchQuery : undefined
-                      }
-                    />
-                  </div>
-                )}
-
-                {/* Content Area */}
+            {/* Main content with fade transition */}
+            <div
+              className={`flex-1 flex flex-col min-h-0 transition-opacity duration-300 ${
+                isDashboardPage
+                  ? allComponentsLoaded
+                    ? "opacity-100"
+                    : "opacity-0 pointer-events-none"
+                  : "opacity-100"
+              }`}
+            >
+              {!isSwapPage && !isNewsChatActive && (
                 <div
-                  className={`flex-1 min-h-0 overflow-hidden ${
-                    isAIChatPage || isDashboardPage ? "p-0 mt-0" : ""
+                  className={`flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2 ${
+                    isAIChatPage || isDashboardPage ? "hidden lg:block" : ""
                   }`}
                 >
-                  {children}
+                  <GlobalDashboardHeader
+                    title={isAIChatPage ? "Chat with Lumen" : "Dashboard"}
+                    subtitle={
+                      isAIChatPage
+                        ? "Powered by advanced blockchain analysis"
+                        : "Welcome back"
+                    }
+                    onSearchChange={
+                      isCodeLensPage ? handleCodeLensSearchChange : undefined
+                    }
+                    onAddTokenClick={
+                      isCodeLensPage ? handleCodeLensAddToken : undefined
+                    }
+                    searchQuery={
+                      isCodeLensPage ? codeLensSearchQuery : undefined
+                    }
+                    onNewsSearch={
+                      isNewsFeedPage ? handleNewsFeedSearch : undefined
+                    }
+                    onNewsClearSearch={
+                      isNewsFeedPage ? handleNewsFeedClearSearch : undefined
+                    }
+                    onNewsAIClick={
+                      isNewsFeedPage ? handleNewsFeedAIClick : undefined
+                    }
+                    newsSearchQuery={
+                      isNewsFeedPage ? newsFeedSearchQuery : undefined
+                    }
+                  />
                 </div>
-              </main>
+              )}
 
-              {walletSelectorOpen && <WalletSelector />}
-
-              <style jsx global>{`
-                .scrollbar-hide {
-                  -ms-overflow-style: none;
-                  scrollbar-width: none;
-                }
-                .scrollbar-hide::-webkit-scrollbar {
-                  display: none;
-                }
-
-                @media (max-width: 1024px) {
-                  html,
-                  body {
-                    overflow-x: hidden;
-                  }
-                }
-
-                @media (min-width: 1024px) {
-                  html,
-                  body {
-                    overflow: hidden;
-                  }
-                }
-
-                /* Modal backdrop styles for subtle blurred background */
-                .modal-backdrop-blur {
-                  backdrop-filter: blur(4px);
-                  -webkit-backdrop-filter: blur(4px);
-                }
-
-                /* Custom backdrop blur utilities */
-                .backdrop-blur-xs {
-                  backdrop-filter: blur(2px);
-                  -webkit-backdrop-filter: blur(2px);
-                }
-
-                /* Ensure modals appear above everything */
-                .modal-container {
-                  z-index: 9999;
-                }
-
-                /* Prevent body scroll when modals are open */
-                body.modal-open {
-                  overflow: hidden;
-                }
-              `}</style>
+              <div
+                className={`flex-1 min-h-0 overflow-hidden ${
+                  isAIChatPage || isDashboardPage ? "p-0 mt-0" : ""
+                }`}
+              >
+                {children}
+              </div>
             </div>
-          </NewsFeedContext.Provider>
-        </CodeLensContext.Provider>
+          </main>
+
+          {walletSelectorOpen && <WalletSelector />}
+
+          <style jsx global>{`
+            .scrollbar-hide {
+              -ms-overflow-style: none;
+              scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+              display: none;
+            }
+
+            @media (max-width: 1024px) {
+              html,
+              body {
+                overflow-x: hidden;
+              }
+            }
+
+            @media (min-width: 1024px) {
+              html,
+              body {
+                overflow: hidden;
+              }
+            }
+
+            .modal-backdrop-blur {
+              backdrop-filter: blur(4px);
+              -webkit-backdrop-filter: blur(4px);
+            }
+
+            .backdrop-blur-xs {
+              backdrop-filter: blur(2px);
+              -webkit-backdrop-filter: blur(2px);
+            }
+
+            .modal-container {
+              z-index: 9999;
+            }
+
+            body.modal-open {
+              overflow: hidden;
+            }
+          `}</style>
+        </div>
+      </NewsFeedContext.Provider>
+    </CodeLensContext.Provider>
+  );
+}
+
+// Main layout export with providers
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <NavigationLoadingProvider>
+      <WalletIntegration>
+        <UnifiedDashboardProvider>
+          <DashboardLayoutContent>{children}</DashboardLayoutContent>
+        </UnifiedDashboardProvider>
       </WalletIntegration>
     </NavigationLoadingProvider>
   );

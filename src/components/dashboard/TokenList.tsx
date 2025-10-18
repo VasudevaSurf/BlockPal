@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - COMPLETE CODE WITHOUT SKELETON
+// src/components/dashboard/TokenList.tsx - COMPLETE CODE WITH UNIFIED LOADING
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -9,6 +9,7 @@ import { RootState } from "@/store";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import { useWalletTracking } from "@/hooks/useWalletTracking";
 import { useCoinGecko, TrendingToken, TopGainer } from "@/hooks/useCoinGecko";
+import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 import {
   RefreshCw,
   MoreVertical,
@@ -560,6 +561,9 @@ export default function TokenList() {
     isConnected: trackingConnected,
   } = useWalletTracking();
 
+  // ✅ ADD UNIFIED DASHBOARD HOOK
+  const { setComponentLoaded } = useUnifiedDashboard();
+
   // CoinGecko data for trending and gainers
   const {
     data: coinGeckoData,
@@ -606,6 +610,14 @@ export default function TokenList() {
   // Get trending and gainers data
   const trendingTokens = coinGeckoData?.trendingTokens || [];
   const topGainersData = coinGeckoData?.topGainers || [];
+
+  // ✅ NOTIFY UNIFIED DASHBOARD WHEN LOADING COMPLETES
+  useEffect(() => {
+    if (!loading) {
+      console.log("✅ TokenList: Loading complete, notifying dashboard");
+      setComponentLoaded('tokenList');
+    }
+  }, [loading, setComponentLoaded]);
 
   // Load preferences and tokens when wallet connects
   useEffect(() => {
