@@ -29,6 +29,7 @@
     "framer-motion": "^12.23.16",
     "gpt-tokenizer": "^3.0.1",
     "jsonwebtoken": "^9.0.2",
+    "lightweight-charts": "^3.8.0",
     "lodash": "^4.17.21",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.515.0",
