@@ -814,10 +814,9 @@ export default function TokenList() {
                       {mainTokens.map((token, index) => (
                         <div
                           key={`${token.contractAddress}_${index}_main`}
-                          onClick={() => handleTokenClick(token)}
                           className={`token-row ${
                             token.isUserAdded ? "has-menu" : ""
-                          } flex items-center justify-between p-2.5 rounded-lg transition-colors relative cursor-pointer ${
+                          } flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
                             isNavigating ||
                             addingToken === token.contractAddress
                               ? "opacity-70"

@@ -1,3 +1,4 @@
+// src/contexts/CoinLensLoadingContext.tsx - FIXED WITH CACHE CHECK
 "use client";
 
 import React, {
@@ -9,6 +10,7 @@ import React, {
   useRef,
 } from "react";
 import { useAccount, useChainId } from "wagmi";
+import { coinlesSocketClient } from "@/services/coinlesSocketClient";
 
 interface CoinLensLoadingContextType {
   isLoading: boolean;
@@ -36,8 +38,12 @@ export const CoinLensLoadingProvider: React.FC<{
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [dataReady, setDataReadyState] = useState(false);
+  // ✅ Check if we already have cached data from WebSocket
+  const hasCachedData = coinlesSocketClient.isConnected();
+
+  // ✅ Start with isLoading=false if we have cached data
+  const [isLoading, setIsLoading] = useState(!hasCachedData);
+  const [dataReady, setDataReadyState] = useState(hasCachedData);
 
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevWalletRef = useRef<string | undefined>(undefined);
@@ -59,6 +65,15 @@ export const CoinLensLoadingProvider: React.FC<{
     }
   }, []);
 
+  // ✅ Check for cached data on mount
+  useEffect(() => {
+    if (hasCachedData) {
+      console.log("✅ CoinLens: Using cached WebSocket data, skipping loader");
+      setIsLoading(false);
+      setDataReadyState(true);
+    }
+  }, [hasCachedData]);
+
   // Hide loader when data is ready
   useEffect(() => {
     if (dataReady && isLoading) {
@@ -69,18 +84,22 @@ export const CoinLensLoadingProvider: React.FC<{
     }
   }, [dataReady, isLoading]);
 
-  // Handle wallet/chain changes
+  // Handle wallet/chain changes - ONLY reset if actually changed
   useEffect(() => {
     const walletChanged = prevWalletRef.current !== address;
     const chainChanged = prevChainRef.current !== chainId;
 
-    if (walletChanged || chainChanged) {
+    // Only reset if wallet or chain actually changed (not just initial mount)
+    if (
+      (walletChanged || chainChanged) &&
+      prevWalletRef.current !== undefined
+    ) {
       console.log("🔄 CoinLens: Wallet or chain changed, resetting...");
       resetLoading();
-
-      prevWalletRef.current = address;
-      prevChainRef.current = chainId;
     }
+
+    prevWalletRef.current = address;
+    prevChainRef.current = chainId;
   }, [address, chainId, resetLoading]);
 
   // Safety timeout - force hide loader after 10 seconds

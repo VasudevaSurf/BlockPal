@@ -1,3 +1,4 @@
+// src/app/dashboard/news-feed/page.tsx - WITH CACHE SUPPORT
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -179,12 +180,29 @@ function NewsFeedContent() {
     searchQuery,
   } = useNews();
 
-  // Use loading context
   const { setDataReady } = useNewsFeedLoading();
   const hasReportedDataRef = useRef(false);
 
-  // Use context from layout
   const newsFeedContext = useNewsFeedContext();
+
+  // ✅ Helper function to check cached news (same logic as context)
+  const checkCachedNews = useCallback(() => {
+    if (typeof window === "undefined") return false;
+    
+    try {
+      const cached = sessionStorage.getItem("newsFeedCache");
+      if (!cached) return false;
+      
+      const data = JSON.parse(cached);
+      const now = Date.now();
+      const cacheAge = now - (data.timestamp || 0);
+      const isValid = cacheAge < 5 * 60 * 1000; // 5 minutes
+      
+      return isValid && data.news && data.news.length > 0;
+    } catch (e) {
+      return false;
+    }
+  }, []);
 
   const observerRef = useRef<IntersectionObserver>();
   const lastNewsElementRef = useCallback(
@@ -203,15 +221,32 @@ function NewsFeedContent() {
     [loading, hasMore, fetchMore]
   );
 
-  // Report data ready when news is loaded or when initial load completes
+  // ✅ Cache news data in sessionStorage for instant tab switching
+  useEffect(() => {
+    if (news.length > 0) {
+      try {
+        sessionStorage.setItem(
+          "newsFeedCache",
+          JSON.stringify({
+            news,
+            timestamp: Date.now(),
+          })
+        );
+      } catch (e) {
+        console.error("Error caching news:", e);
+      }
+    }
+  }, [news]);
+
+  // ✅ Report data ready immediately if we have cached data
   useEffect(() => {
     if (!hasReportedDataRef.current) {
-      // Data is ready when:
-      // 1. We have news loaded (news.length > 0)
-      // 2. OR we've finished loading and confirmed there's no news (!loading && news.length === 0)
-      // 3. OR there's an error
-      if (news.length > 0 || (!loading && news.length === 0) || error) {
-        console.log("✅ NewsFeed: Marking data as ready", {
+      if (checkCachedNews()) {
+        console.log("✅ NewsFeed: Using cached data, marking ready immediately");
+        setDataReady();
+        hasReportedDataRef.current = true;
+      } else if (news.length > 0 || (!loading && news.length === 0) || error) {
+        console.log("✅ NewsFeed: Fresh data loaded, marking ready", {
           newsCount: news.length,
           loading,
           error: !!error,
@@ -220,7 +255,7 @@ function NewsFeedContent() {
         hasReportedDataRef.current = true;
       }
     }
-  }, [news.length, loading, error, setDataReady]);
+  }, [news.length, loading, error, setDataReady, checkCachedNews]);
 
   // Connect context handlers
   useEffect(() => {
@@ -233,7 +268,7 @@ function NewsFeedContent() {
     newsFeedContext.setOnAIClick(() => () => setShowAIChat(true));
   }, [search, clearSearch]);
 
-  // CRITICAL: Notify layout about AI chat state to hide header
+  // Notify layout about AI chat state
   useEffect(() => {
     if (showAIChat) {
       document.body.setAttribute("data-news-chat-active", "true");
@@ -295,13 +330,10 @@ function NewsFeedContent() {
       `}</style>
 
       <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden relative">
-        {/* Full Width Layout - Desktop & Mobile */}
         <div className="flex gap-3 flex-1 min-h-0 relative">
-          {/* News Feed - Full Width */}
           <div className="flex-1 w-full flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="w-full flex-1 h-full flex flex-col relative">
               <div className="flex-1 bg-black rounded-[14px] overflow-hidden flex flex-col">
-                {/* Search query display */}
                 {searchQuery && (
                   <div className="px-4 pt-4">
                     <p className="text-[#6b7280] text-[14px]">
@@ -311,14 +343,12 @@ function NewsFeedContent() {
                   </div>
                 )}
 
-                {/* Error Message */}
                 {error && (
                   <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-[10px]">
                     <p className="text-red-400 text-[14px]">{error}</p>
                   </div>
                 )}
 
-                {/* News Feed */}
                 <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-3">
                   {news.length === 0 && !loading && (
                     <div className="flex items-center justify-center h-full">
@@ -370,11 +400,9 @@ function NewsFeedContent() {
             </div>
           </div>
 
-          {/* AI Chat Overlay - Covers content area only */}
           {showAIChat && (
             <div className="absolute inset-0 z-50 slide-in">
               <div className="h-full w-full bg-[#000000] overflow-hidden flex flex-col">
-                {/* Header with Back Button */}
                 <div className="flex-shrink-0 bg-black p-4 border-b border-[#2C2C2C]">
                   <div className="flex items-center gap-3">
                     <button
@@ -391,7 +419,6 @@ function NewsFeedContent() {
                   </div>
                 </div>
 
-                {/* News Chat Component */}
                 <div className="flex-1 overflow-hidden">
                   <NewsChatPage />
                 </div>
@@ -409,10 +436,8 @@ export default function NewsFeed() {
 
   return (
     <>
-      {/* Show loader while loading */}
       {isLoading && <BlockPalLoader loadingText="Loading News Feed" />}
 
-      {/* Show content with fade transition */}
       <div
         className={`h-full transition-opacity duration-300 ${
           isLoading ? "opacity-0 pointer-events-none" : "opacity-100"

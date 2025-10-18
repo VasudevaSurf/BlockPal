@@ -64,8 +64,8 @@ export const useWalletData = () => {
   return context;
 };
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const BACKGROUND_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
+const CACHE_DURATION = 5 * 60 * 1000; // ✅ UNCHANGED: 5 minutes
+const BACKGROUND_REFRESH_INTERVAL = 5 * 60 * 1000; // ✅ CHANGED: 30s → 5 minutes
 
 export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -226,10 +226,12 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   // Background refresh - silently update data every 30 seconds
   useEffect(() => {
     if (isConnected && address && walletData.cacheValid) {
+      console.log("🔄 Starting background refresh: Every 5 minutes");
+
       backgroundRefreshRef.current = setInterval(() => {
-        console.log("🔄 Background refresh triggered");
+        console.log("🔄 Background refresh triggered (5 min interval)");
         fetchWalletData(false, true);
-      }, BACKGROUND_REFRESH_INTERVAL);
+      }, BACKGROUND_REFRESH_INTERVAL); // ✅ 5 minutes
     }
 
     return () => {

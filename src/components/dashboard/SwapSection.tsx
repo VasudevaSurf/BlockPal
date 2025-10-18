@@ -1,4 +1,4 @@
-// src/components/dashboard/SwapSection.tsx - COMPLETE CODE WITH IMPROVED DATA DETECTION
+// src/components/dashboard/SwapSection.tsx - COMPLETE WITH INSTANT LOAD
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -140,11 +140,10 @@ const TokenImage = ({
 };
 
 export default function SwapSection() {
-  // ✅ UNIFIED LOADING INTEGRATION
+  // UNIFIED LOADING INTEGRATION
   const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
   const hasReportedMountRef = useRef(false);
   const hasReportedDataRef = useRef(false);
-  const dataCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Use CoinGecko hook for real data
   const {
@@ -160,7 +159,7 @@ export default function SwapSection() {
   >([]);
   const [cachedTopGainers, setCachedTopGainers] = useState<TopGainer[]>([]);
 
-  // Use mock data instead of Redux
+  // Use mock data for tokens
   const tokens = mockTokens;
 
   // Get real trending tokens and top gainers from CoinGecko
@@ -179,6 +178,16 @@ export default function SwapSection() {
       setCachedTopGainers(topGainersData);
     }
   }, [topGainersData]);
+
+  // ✅ CHANGED: Use cached data if refreshing, otherwise use current data
+  const displayTrendingTokens =
+    coinGeckoLoading && cachedTrendingTokens.length > 0
+      ? cachedTrendingTokens
+      : trendingTokens;
+  const displayTopGainers =
+    coinGeckoLoading && cachedTopGainers.length > 0
+      ? cachedTopGainers
+      : topGainersData;
 
   // State
   const [sellToken, setSellToken] = useState<Token | null>(null);
@@ -203,17 +212,7 @@ export default function SwapSection() {
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
   const [showGainersDropdown, setShowGainersDropdown] = useState(false);
 
-  // Use cached data if refreshing, otherwise use current data
-  const displayTrendingTokens =
-    coinGeckoLoading && cachedTrendingTokens.length > 0
-      ? cachedTrendingTokens
-      : trendingTokens;
-  const displayTopGainers =
-    coinGeckoLoading && cachedTopGainers.length > 0
-      ? cachedTopGainers
-      : topGainersData;
-
-  // ✅ REPORT COMPONENT MOUNT
+  // Report component mount
   useEffect(() => {
     if (!hasReportedMountRef.current) {
       console.log("✅ SwapSection: Component mounted");
@@ -224,89 +223,24 @@ export default function SwapSection() {
     return () => {
       hasReportedMountRef.current = false;
       hasReportedDataRef.current = false;
-      if (dataCheckIntervalRef.current) {
-        clearInterval(dataCheckIntervalRef.current);
-      }
     };
   }, [setComponentLoaded]);
 
-  // ✅ IMPROVED: Poll for data readiness with interval
+  // ✅ CHANGED: Report data ready immediately if we have cached data
   useEffect(() => {
     if (!hasReportedDataRef.current) {
-      console.log("🔍 SwapSection: Starting data polling...");
+      const hasData =
+        displayTrendingTokens.length > 0 || displayTopGainers.length > 0;
 
-      // Check immediately
-      checkDataReady();
-
-      // Then check every 500ms
-      dataCheckIntervalRef.current = setInterval(() => {
-        checkDataReady();
-      }, 500);
-
-      // Cleanup interval after 10 seconds max
-      const timeoutId = setTimeout(() => {
-        if (dataCheckIntervalRef.current) {
-          clearInterval(dataCheckIntervalRef.current);
-          if (!hasReportedDataRef.current) {
-            console.warn("⚠️ SwapSection: Timeout reached, forcing data ready");
-            setComponentDataReady("swapSection");
-            hasReportedDataRef.current = true;
-          }
-        }
-      }, 10000);
-
-      return () => {
-        if (dataCheckIntervalRef.current) {
-          clearInterval(dataCheckIntervalRef.current);
-        }
-        clearTimeout(timeoutId);
-      };
-    }
-  }, [setComponentDataReady]);
-
-  // Helper function to check if data is ready
-  const checkDataReady = useCallback(() => {
-    if (hasReportedDataRef.current) return;
-
-    // Data is ready when:
-    // 1. We have trending tokens OR top gainers
-    // 2. OR loading is complete (not loading anymore)
-    // 3. OR there's an error
-    const hasTrendingTokens = displayTrendingTokens.length > 0;
-    const hasTopGainers = displayTopGainers.length > 0;
-    const loadingComplete = !coinGeckoLoading;
-    const hasError = !!coinGeckoError;
-
-    const isDataReady =
-      hasTrendingTokens || hasTopGainers || loadingComplete || hasError;
-
-    if (isDataReady) {
-      console.log("✅ SwapSection: Data ready -", {
-        trendingTokens: displayTrendingTokens.length,
-        topGainers: displayTopGainers.length,
-        loading: coinGeckoLoading,
-        error: !!coinGeckoError,
-      });
-
-      if (dataCheckIntervalRef.current) {
-        clearInterval(dataCheckIntervalRef.current);
+      if (hasData) {
+        console.log("✅ SwapSection: Data ready (cached or fresh)");
+        setComponentDataReady("swapSection");
+        hasReportedDataRef.current = true;
       }
-
-      setComponentDataReady("swapSection");
-      hasReportedDataRef.current = true;
-    } else {
-      console.log("⏳ SwapSection: Still loading -", {
-        trendingTokens: displayTrendingTokens.length,
-        topGainers: displayTopGainers.length,
-        loading: coinGeckoLoading,
-        error: !!coinGeckoError,
-      });
     }
   }, [
     displayTrendingTokens.length,
     displayTopGainers.length,
-    coinGeckoLoading,
-    coinGeckoError,
     setComponentDataReady,
   ]);
 
@@ -508,7 +442,7 @@ export default function SwapSection() {
 
           <div className="border-t border-[#2C2C2C] mb-1"></div>
 
-          {/* Loading State */}
+          {/* ✅ CHANGED: Only show loading if NO cached data */}
           {coinGeckoLoading && displayTrendingTokens.length === 0 && (
             <div className="flex items-center justify-center p-4">
               <div className="text-center">
@@ -520,8 +454,8 @@ export default function SwapSection() {
             </div>
           )}
 
-          {/* Error State */}
-          {coinGeckoError && (
+          {/* Error State - only if NO cached data */}
+          {coinGeckoError && displayTrendingTokens.length === 0 && (
             <div className="flex items-center justify-center p-4">
               <div className="text-center">
                 <AlertCircle size={24} className="text-red-400 mx-auto mb-2" />
@@ -538,68 +472,60 @@ export default function SwapSection() {
             </div>
           )}
 
-          {/* Token List */}
-          {!coinGeckoError && !coinGeckoLoading && (
+          {/* ✅ CHANGED: Show data immediately (cached or fresh) */}
+          {displayTrendingTokens.length > 0 && (
             <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
-              {displayTrendingTokens.length > 0 ? (
-                displayTrendingTokens.map((token: TrendingToken) => (
-                  <div
-                    key={token.index}
-                    className="flex items-center justify-between py-1.5"
-                  >
-                    <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
-                      <TokenImage token={token} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-white text-[11px] font-medium font-satoshi truncate">
-                          {token.name}
-                        </div>
-                        <div className="text-gray-400 text-[8px] font-satoshi">
-                          {token.symbol}
-                        </div>
+              {displayTrendingTokens.map((token: TrendingToken) => (
+                <div
+                  key={token.index}
+                  className="flex items-center justify-between py-1.5"
+                >
+                  <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
+                    <TokenImage token={token} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-white text-[11px] font-medium font-satoshi truncate">
+                        {token.name}
+                      </div>
+                      <div className="text-gray-400 text-[8px] font-satoshi">
+                        {token.symbol}
                       </div>
                     </div>
-
-                    <div className="text-white text-[13px] font-medium font-satoshi w-20 text-center flex-shrink-0">
-                      {token.price}
-                    </div>
-
-                    <div className="w-20 h-7 flex-shrink-0 flex items-center justify-center">
-                      {token.sparklineUrl ? (
-                        <img
-                          src={token.sparklineUrl}
-                          alt={`${token.name} chart`}
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = "/graph.png";
-                          }}
-                        />
-                      ) : (
-                        <img
-                          src="/graph.png"
-                          alt="chart placeholder"
-                          className="w-full h-full object-contain opacity-50"
-                        />
-                      )}
-                    </div>
-
-                    <div
-                      className={`text-xs font-medium font-satoshi w-16 text-center flex-shrink-0 ${
-                        token.changeType === "positive"
-                          ? "text-green-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {token.change}
-                    </div>
                   </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center p-4">
-                  <p className="text-gray-400 text-sm font-satoshi">
-                    No trending tokens available
-                  </p>
+
+                  <div className="text-white text-[13px] font-medium font-satoshi w-20 text-center flex-shrink-0">
+                    {token.price}
+                  </div>
+
+                  <div className="w-20 h-7 flex-shrink-0 flex items-center justify-center">
+                    {token.sparklineUrl ? (
+                      <img
+                        src={token.sparklineUrl}
+                        alt={`${token.name} chart`}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/graph.png";
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src="/graph.png"
+                        alt="chart placeholder"
+                        className="w-full h-full object-contain opacity-50"
+                      />
+                    )}
+                  </div>
+
+                  <div
+                    className={`text-xs font-medium font-satoshi w-16 text-center flex-shrink-0 ${
+                      token.changeType === "positive"
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {token.change}
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           )}
         </div>
@@ -666,7 +592,7 @@ export default function SwapSection() {
             </div>
           </div>
 
-          {/* Loading State */}
+          {/* ✅ CHANGED: Only show loading if NO cached data */}
           {coinGeckoLoading && displayTopGainers.length === 0 && (
             <div className="flex items-center justify-center p-4">
               <div className="text-center">
@@ -678,56 +604,48 @@ export default function SwapSection() {
             </div>
           )}
 
-          {/* Token List */}
-          {!coinGeckoLoading && (
+          {/* ✅ CHANGED: Show data immediately (cached or fresh) */}
+          {displayTopGainers.length > 0 && (
             <div className="flex-1 overflow-y-auto space-y-1 scrollbar-hide">
-              {displayTopGainers.length > 0 ? (
-                displayTopGainers.map((token: TopGainer) => (
-                  <div
-                    key={token.index}
-                    className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 w-[100px] flex-shrink-0">
-                      <TokenImage token={token} size="w-6 h-6" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-white text-[11px] font-medium font-satoshi truncate">
-                          {token.name}
-                        </div>
-                        <div className="text-gray-400 text-[9px] font-satoshi">
-                          {token.symbol}
-                        </div>
+              {displayTopGainers.map((token: TopGainer) => (
+                <div
+                  key={token.index}
+                  className="flex items-center justify-between py-1.5 hover:bg-[#1A1A1A] rounded-lg px-1 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 w-[100px] flex-shrink-0">
+                    <TokenImage token={token} size="w-6 h-6" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-white text-[11px] font-medium font-satoshi truncate">
+                        {token.name}
                       </div>
-                    </div>
-
-                    <div className="text-white text-[11px] font-medium font-satoshi w-[80px] text-center flex-shrink-0">
-                      {token.price}
-                    </div>
-
-                    <div className="text-white text-[11px] font-medium font-satoshi w-[100px] text-center flex-shrink-0">
-                      {token.marketCap}
-                    </div>
-
-                    <div className="w-[60px] text-center flex-shrink-0">
-                      <div
-                        className={`text-[11px] font-medium font-satoshi ${
-                          token.changeType === "positive"
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {token.changeType === "positive" ? "▲" : "▼"}{" "}
-                        {token.change}
+                      <div className="text-gray-400 text-[9px] font-satoshi">
+                        {token.symbol}
                       </div>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center p-4">
-                  <p className="text-gray-400 text-sm font-satoshi">
-                    No top gainers available
-                  </p>
+
+                  <div className="text-white text-[11px] font-medium font-satoshi w-[80px] text-center flex-shrink-0">
+                    {token.price}
+                  </div>
+
+                  <div className="text-white text-[11px] font-medium font-satoshi w-[100px] text-center flex-shrink-0">
+                    {token.marketCap}
+                  </div>
+
+                  <div className="w-[60px] text-center flex-shrink-0">
+                    <div
+                      className={`text-[11px] font-medium font-satoshi ${
+                        token.changeType === "positive"
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }`}
+                    >
+                      {token.changeType === "positive" ? "▲" : "▼"}{" "}
+                      {token.change}
+                    </div>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           )}
         </div>

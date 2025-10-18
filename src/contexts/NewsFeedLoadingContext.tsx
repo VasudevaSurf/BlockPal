@@ -1,3 +1,4 @@
+// src/contexts/NewsFeedLoadingContext.tsx - COMPLETELY FIXED
 "use client";
 
 import React, {
@@ -33,10 +34,39 @@ export const useNewsFeedLoading = () => {
 export const NewsFeedLoadingProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
-  const { address, isConnected } = useAccount();
+  const { address } = useAccount();
   const chainId = useChainId();
 
-  const [isLoading, setIsLoading] = useState(true);
+  // ✅ Check if we have cached news on initialization
+  const initialCacheCheck = useRef(false);
+  const [hasInitialCache, setHasInitialCache] = useState(false);
+
+  // Check cache only once on mount
+  useEffect(() => {
+    if (!initialCacheCheck.current) {
+      initialCacheCheck.current = true;
+
+      try {
+        const cached = sessionStorage.getItem("newsFeedCache");
+        if (cached) {
+          const data = JSON.parse(cached);
+          const now = Date.now();
+          const cacheAge = now - (data.timestamp || 0);
+          const isValid = cacheAge < 5 * 60 * 1000; // 5 minutes
+
+          if (isValid && data.news && data.news.length > 0) {
+            console.log("✅ NewsFeedContext: Found valid cached news on mount");
+            setHasInitialCache(true);
+          }
+        }
+      } catch (e) {
+        console.error("Error checking cache:", e);
+      }
+    }
+  }, []);
+
+  // ✅ Start with isLoading=false if we have cached data
+  const [isLoading, setIsLoading] = useState(false);
   const [dataReady, setDataReadyState] = useState(false);
 
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -59,6 +89,15 @@ export const NewsFeedLoadingProvider: React.FC<{
     }
   }, []);
 
+  // ✅ If we have initial cache, mark as ready immediately
+  useEffect(() => {
+    if (hasInitialCache && !dataReady) {
+      console.log("✅ NewsFeedContext: Using cached data, skipping loader");
+      setDataReadyState(true);
+      setIsLoading(false);
+    }
+  }, [hasInitialCache, dataReady]);
+
   // Hide loader when data is ready
   useEffect(() => {
     if (dataReady && isLoading) {
@@ -69,23 +108,28 @@ export const NewsFeedLoadingProvider: React.FC<{
     }
   }, [dataReady, isLoading]);
 
-  // Handle wallet/chain changes
+  // Handle wallet/chain changes - ONLY reset if actually changed
   useEffect(() => {
     const walletChanged = prevWalletRef.current !== address;
     const chainChanged = prevChainRef.current !== chainId;
 
-    if (walletChanged || chainChanged) {
+    // Only reset if this is not the initial mount AND something changed
+    if (
+      prevWalletRef.current !== undefined &&
+      (walletChanged || chainChanged)
+    ) {
       console.log("🔄 NewsFeed: Wallet or chain changed, resetting...");
       resetLoading();
-
-      prevWalletRef.current = address;
-      prevChainRef.current = chainId;
+      setHasInitialCache(false); // Clear cache flag on wallet change
     }
+
+    prevWalletRef.current = address;
+    prevChainRef.current = chainId;
   }, [address, chainId, resetLoading]);
 
   // Safety timeout - force hide loader after 10 seconds
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading && !hasInitialCache) {
       loadingTimeoutRef.current = setTimeout(() => {
         console.warn("⚠️ NewsFeed: Loading timeout reached, forcing show");
         setIsLoading(false);
@@ -97,7 +141,7 @@ export const NewsFeedLoadingProvider: React.FC<{
         clearTimeout(loadingTimeoutRef.current);
       }
     };
-  }, [isLoading]);
+  }, [isLoading, hasInitialCache]);
 
   const value = {
     isLoading,
