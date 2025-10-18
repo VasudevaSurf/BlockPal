@@ -1,16 +1,16 @@
+// src/app/dashboard/page.tsx - FIXED: NO WELCOME MESSAGE FLASH
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Menu } from "lucide-react";
+import { useAccount } from "wagmi";
 import WalletBalance from "@/components/dashboard/WalletBalance";
 import TokenList from "@/components/dashboard/TokenList";
 import SwapSection from "@/components/dashboard/SwapSection";
 import WalletStats from "@/components/dashboard/WalletStats";
 import MobileWalletMenu from "@/components/dashboard/MobileWalletMenu";
-import { WalletDataProvider } from "@/contexts/WalletDataContext";
+import { useWalletData } from "@/contexts/WalletDataContext";
 
-// Mock authentication state
 const mockAuth = {
   isAuthenticated: true,
   loading: false,
@@ -23,20 +23,25 @@ const mockAuth = {
 };
 
 interface DashboardState {
-  hasWallets: boolean;
   error: string | null;
   showStats: boolean;
   mobileMenuOpen: boolean;
 }
 
-// Dashboard Content Component
 function DashboardContent() {
   const router = useRouter();
+  const { isAuthenticated, user } = mockAuth;
+  const { address, isConnected } = useAccount();
+  const { walletData } = useWalletData();
 
-  const { isAuthenticated, loading: authLoading, user } = mockAuth;
+  // ✅ Determine if we should show wallet content based on:
+  // 1. Wallet is connected OR
+  // 2. We have cached wallet data (prevents flash on tab switch)
+  const hasWallets = useMemo(() => {
+    return isConnected || walletData.cacheValid || walletData.tokens.length > 0;
+  }, [isConnected, walletData.cacheValid, walletData.tokens.length]);
 
   const [dashboardState, setDashboardState] = useState<DashboardState>({
-    hasWallets: false,
     error: null,
     showStats: false,
     mobileMenuOpen: false,
@@ -53,17 +58,12 @@ function DashboardContent() {
 
     setDashboardState((prev) => ({
       ...prev,
-      hasWallets: true,
       error: null,
       showStats: localStorage.getItem("show-wallet-stats") === "true",
     }));
 
-    console.log("📊 Dashboard initialized with mock data");
-  }, [isAuthenticated, router]);
-
-  const handleManualRefresh = () => {
-    console.log("🔄 Manual refresh requested");
-  };
+    console.log("📊 Dashboard initialized with hasWallets:", hasWallets);
+  }, [isAuthenticated, router, hasWallets]);
 
   if (!isAuthenticated) {
     return null;
@@ -71,7 +71,7 @@ function DashboardContent() {
 
   return (
     <>
-      {/* Mobile Header - Only visible on mobile */}
+      {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] border-b border-[#2C2C2C] flex-shrink-0">
         <h1 className="text-white text-lg font-mayeka font-semibold">
           Dashboard
@@ -118,17 +118,11 @@ function DashboardContent() {
             <p className="text-red-400 text-xs font-satoshi">
               {dashboardState.error}
             </p>
-            <button
-              onClick={handleManualRefresh}
-              className="text-red-400 underline text-xs mt-1"
-            >
-              Try Again
-            </button>
           </div>
         )}
 
         {/* Main Dashboard Content */}
-        {dashboardState.hasWallets ? (
+        {hasWallets ? (
           <div className="flex flex-col xl:flex-row gap-4 lg:gap-4 flex-1 min-h-0">
             {/* Mobile Layout */}
             <div className="flex xl:hidden flex-col gap-4 lg:gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
@@ -174,21 +168,8 @@ function DashboardContent() {
                 Welcome to Blockpal, {user?.displayName || user?.name || "User"}
               </h3>
               <p className="text-gray-400 font-satoshi text-sm mb-4">
-                Create or import a wallet to get started with your crypto
-                journey
+                Connect your wallet to get started with your crypto journey
               </p>
-              <button
-                onClick={() => {
-                  console.log("🆕 Creating wallet (demo)");
-                  setDashboardState((prev) => ({
-                    ...prev,
-                    hasWallets: true,
-                  }));
-                }}
-                className="px-4 py-2 bg-[#E2AF19] text-black rounded-lg font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
-              >
-                Get Started
-              </button>
             </div>
           </div>
         )}
@@ -204,7 +185,6 @@ function DashboardContent() {
         `}</style>
       </div>
 
-      {/* Mobile Wallet Menu Modal */}
       <MobileWalletMenu
         isOpen={dashboardState.mobileMenuOpen}
         onClose={() =>
@@ -215,11 +195,6 @@ function DashboardContent() {
   );
 }
 
-// Main Dashboard Page Component with Providers
 export default function DashboardPage() {
-  return (
-    <WalletDataProvider>
-      <DashboardContent />
-    </WalletDataProvider>
-  );
+  return <DashboardContent />;
 }

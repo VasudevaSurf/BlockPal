@@ -1,3 +1,4 @@
+// src/contexts/UnifiedDashboardContext.tsx - UPDATED WITHOUT PATHNAME RESET
 "use client";
 
 import React, {
@@ -9,7 +10,6 @@ import React, {
   useRef,
 } from "react";
 import { useAccount, useChainId } from "wagmi";
-import { usePathname } from "next/navigation";
 
 interface ComponentLoadingState {
   walletBalance: boolean;
@@ -52,7 +52,6 @@ export const UnifiedDashboardProvider: React.FC<{
 }> = ({ children }) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const pathname = usePathname();
 
   const [componentStates, setComponentStates] = useState<ComponentLoadingState>(
     {
@@ -76,7 +75,7 @@ export const UnifiedDashboardProvider: React.FC<{
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevWalletRef = useRef<string | undefined>(undefined);
   const prevChainRef = useRef<number | undefined>(undefined);
-  const prevPathnameRef = useRef<string | undefined>(undefined);
+  const initialLoadDoneRef = useRef(false);
 
   const setComponentLoaded = useCallback(
     (component: keyof ComponentLoadingState) => {
@@ -115,6 +114,7 @@ export const UnifiedDashboardProvider: React.FC<{
     });
     setIsLoading(true);
     setAllComponentsLoaded(false);
+    initialLoadDoneRef.current = false;
 
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
@@ -137,11 +137,12 @@ export const UnifiedDashboardProvider: React.FC<{
       setTimeout(() => {
         setAllComponentsLoaded(true);
         setIsLoading(false);
+        initialLoadDoneRef.current = true;
       }, 300);
     }
   }, [componentStates, componentDataStates, isLoading]);
 
-  // Handle wallet/chain changes
+  // ONLY reset on wallet/chain changes, NOT on pathname changes
   useEffect(() => {
     const walletChanged = prevWalletRef.current !== address;
     const chainChanged = prevChainRef.current !== chainId;
@@ -155,19 +156,6 @@ export const UnifiedDashboardProvider: React.FC<{
     }
   }, [address, chainId, resetDashboard]);
 
-  // Handle route changes - Reset when navigating to dashboard
-  useEffect(() => {
-    const isDashboardPage = pathname === "/dashboard";
-    const pathnameChanged = prevPathnameRef.current !== pathname;
-
-    if (pathnameChanged && isDashboardPage) {
-      console.log("🔄 Navigated to dashboard, resetting loading state...");
-      resetDashboard();
-    }
-
-    prevPathnameRef.current = pathname;
-  }, [pathname, resetDashboard]);
-
   // Safety timeout - force hide loader after 15 seconds
   useEffect(() => {
     if (isLoading && isConnected && address) {
@@ -175,6 +163,7 @@ export const UnifiedDashboardProvider: React.FC<{
         console.warn("⚠️ Loading timeout reached, forcing components to show");
         setIsLoading(false);
         setAllComponentsLoaded(true);
+        initialLoadDoneRef.current = true;
       }, 15000);
     }
 
@@ -185,12 +174,13 @@ export const UnifiedDashboardProvider: React.FC<{
     };
   }, [isLoading, isConnected, address]);
 
-  // If wallet disconnects, reset immediately
+  // If wallet disconnects, show content immediately
   useEffect(() => {
     if (!isConnected || !address) {
       console.log("🔌 Wallet disconnected, showing content immediately");
       setIsLoading(false);
       setAllComponentsLoaded(true);
+      initialLoadDoneRef.current = true;
     }
   }, [isConnected, address]);
 

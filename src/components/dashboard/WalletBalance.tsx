@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - COMPLETE CODE WITH IMPROVED DATA DETECTION
+// src/components/dashboard/WalletBalance.tsx - UPDATED WITH CACHE SUPPORT
 "use client";
 
 import { useSelector } from "react-redux";
@@ -17,7 +17,6 @@ import { chains } from "@/components/wallet/WalletProvider";
 import { useWalletData } from "@/contexts/WalletDataContext";
 import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 
-// Portfolio Change Component
 const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
   const isValidChange =
     typeof totalChange24h === "number" &&
@@ -66,22 +65,16 @@ export default function WalletBalance() {
     (state: RootState) => state.auth
   );
 
-  // Use shared wallet data context
   const { walletData, refresh, isRefreshing } = useWalletData();
-
-  // Unified dashboard loading integration
   const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
 
-  // Wallet integration
   const { address, isConnected } = useAccount();
   const hasReportedMountRef = useRef(false);
   const hasReportedDataRef = useRef(false);
-  const dataCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
 
-  // Copy feedback state
   const [copyState, setCopyState] = useState({
     isCopied: false,
     isAnimating: false,
@@ -109,98 +102,25 @@ export default function WalletBalance() {
 
     return () => {
       hasReportedMountRef.current = false;
-      hasReportedDataRef.current = false;
-      if (dataCheckIntervalRef.current) {
-        clearInterval(dataCheckIntervalRef.current);
-      }
     };
   }, [setComponentLoaded]);
 
-  // Helper function to check if data is ready
-  const checkDataReady = useCallback(() => {
-    if (hasReportedDataRef.current) return;
-
-    const hasValue = walletData.mainListValue > 0;
-    const notLoading = !walletData.loading;
-    const hasError = !!walletData.error;
-
-    // Data is ready when:
-    // 1. We have a value > 0
-    // 2. OR loading is complete (even if value is 0)
-    // 3. OR there's an error
-    const isDataReady = hasValue || (notLoading && !hasError) || hasError;
-
-    if (isDataReady) {
-      console.log("✅ WalletBalance: Data ready -", {
-        value: walletData.mainListValue,
-        loading: walletData.loading,
-        error: !!walletData.error,
-      });
-
-      if (dataCheckIntervalRef.current) {
-        clearInterval(dataCheckIntervalRef.current);
-        dataCheckIntervalRef.current = null;
-      }
-
-      setComponentDataReady("walletBalance");
-      hasReportedDataRef.current = true;
-    } else {
-      console.log("⏳ WalletBalance: Still loading -", {
-        value: walletData.mainListValue,
-        loading: walletData.loading,
-        error: !!walletData.error,
-      });
-    }
-  }, [
-    walletData.mainListValue,
-    walletData.loading,
-    walletData.error,
-    setComponentDataReady,
-  ]);
-
-  // IMPROVED: Poll for data readiness with interval
+  // Report data ready - now checks cache validity
   useEffect(() => {
-    if (isConnected && address && !hasReportedDataRef.current) {
-      console.log("🔍 WalletBalance: Starting data polling...");
-
-      // Check immediately
-      checkDataReady();
-
-      // Then check every 500ms
-      dataCheckIntervalRef.current = setInterval(() => {
-        checkDataReady();
-      }, 500);
-
-      // Cleanup interval after 10 seconds max (safety timeout)
-      const timeoutId = setTimeout(() => {
-        if (dataCheckIntervalRef.current) {
-          clearInterval(dataCheckIntervalRef.current);
-          dataCheckIntervalRef.current = null;
-        }
-        if (!hasReportedDataRef.current) {
-          console.warn("⚠️ WalletBalance: Timeout reached, forcing data ready");
-          setComponentDataReady("walletBalance");
-          hasReportedDataRef.current = true;
-        }
-      }, 10000);
-
-      return () => {
-        if (dataCheckIntervalRef.current) {
-          clearInterval(dataCheckIntervalRef.current);
-          dataCheckIntervalRef.current = null;
-        }
-        clearTimeout(timeoutId);
-      };
-    } else if (!isConnected && !hasReportedDataRef.current) {
-      console.log(
-        "✅ WalletBalance: No wallet, marking data ready immediately"
-      );
+    if (!hasReportedDataRef.current && walletData.cacheValid) {
+      console.log("✅ WalletBalance: Data ready (from cache)");
       setComponentDataReady("walletBalance");
       hasReportedDataRef.current = true;
     }
-  }, [isConnected, address, checkDataReady, setComponentDataReady]);
+  }, [walletData.cacheValid, setComponentDataReady]);
 
-  // Show wallet not connected state
+  // Reset data reported flag when wallet/chain changes
+  useEffect(() => {
+    if (!walletData.cacheValid) {
+      hasReportedDataRef.current = false;
+    }
+  }, [walletData.cacheValid]);
+
   if (!isConnected || !address) {
     return (
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex-shrink-0">
@@ -239,15 +159,14 @@ export default function WalletBalance() {
 
           {isRefreshing && (
             <div className="flex items-center gap-1">
-              <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
+              {/* <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
               <span className="text-xs text-[#E2AF19] font-satoshi">
                 Updating...
-              </span>
+              </span> */}
             </div>
           )}
         </div>
 
-        {/* Address and Copy Button - Desktop */}
         <div className="flex items-center space-x-2">
           <span className="text-gray-400 text-xs sm:text-xs font-satoshi italic font-medium truncate max-w-[120px] sm:max-w-none tracking-wide">
             {address
@@ -269,7 +188,7 @@ export default function WalletBalance() {
         </div>
       </div>
 
-      {/* Mobile Header - Title only */}
+      {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
           {walletData.chainName || currentChain?.name || "Ethereum"} Token
@@ -295,7 +214,7 @@ export default function WalletBalance() {
                 {walletData.error}
               </p>
               <button
-                onClick={refresh}
+                onClick={() => refresh(true)}
                 className="text-red-400 underline text-xs mt-1 font-satoshi"
               >
                 Try Again
@@ -318,7 +237,7 @@ export default function WalletBalance() {
               )}
             </div>
 
-            {/* Address and Copy Button - Mobile only, below price */}
+            {/* Mobile Address */}
             <div className="lg:hidden flex items-center space-x-2 mt-2">
               <span className="text-gray-400 text-xs font-satoshi italic font-medium truncate max-w-[150px] tracking-wide">
                 {address

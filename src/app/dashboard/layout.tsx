@@ -1,3 +1,4 @@
+// src/app/dashboard/layout.tsx - UPDATED WITH WALLETDATAPROVIDER
 "use client";
 
 import { useSelector } from "react-redux";
@@ -14,12 +15,12 @@ import {
   UnifiedDashboardProvider,
   useUnifiedDashboard,
 } from "@/contexts/UnifiedDashboardContext";
+import { WalletDataProvider } from "@/contexts/WalletDataContext";
 import { CoinLensLoadingProvider } from "@/contexts/CoinLensLoadingContext";
 import { NewsFeedLoadingProvider } from "@/contexts/NewsFeedLoadingContext";
 import BlockPalLoader from "@/components/ui/BlockPalLoader";
-import { Menu, X } from "lucide-react";
 
-// Create context for CodeLens search
+// CodeLens Context
 interface CodeLensContextType {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -36,7 +37,7 @@ const CodeLensContext = createContext<CodeLensContextType>({
 
 export const useCodeLensContext = () => useContext(CodeLensContext);
 
-// Create context for News Feed
+// News Feed Context
 interface NewsFeedContextType {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -61,13 +62,10 @@ const NewsFeedContext = createContext<NewsFeedContextType>({
 
 export const useNewsFeedContext = () => useContext(NewsFeedContext);
 
-// Inner layout component that uses the unified dashboard context
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { walletSelectorOpen } = useSelector((state: RootState) => state.ui);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  // Get loading state from unified dashboard
   const { isLoading, allComponentsLoaded } = useUnifiedDashboard();
 
   const [isNewsChatActive, setIsNewsChatActive] = useState(false);
@@ -156,10 +154,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <div className="h-screen bg-[#000000] flex flex-col lg:flex-row overflow-hidden relative">
           <NavigationLoadingIndicator />
 
-          {/* Sidebar - Always visible */}
           <Sidebar />
 
-          {/* Main content area with conditional loading */}
           <main
             className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col relative ${
               isSwapPage || isNewsChatActive
@@ -285,7 +281,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Main layout export with providers
 export default function DashboardLayout({
   children,
 }: {
@@ -298,19 +293,21 @@ export default function DashboardLayout({
   return (
     <NavigationLoadingProvider>
       <WalletIntegration>
-        <UnifiedDashboardProvider>
-          {isCodeLensPage ? (
-            <CoinLensLoadingProvider>
+        <WalletDataProvider>
+          <UnifiedDashboardProvider>
+            {isCodeLensPage ? (
+              <CoinLensLoadingProvider>
+                <DashboardLayoutContent>{children}</DashboardLayoutContent>
+              </CoinLensLoadingProvider>
+            ) : isNewsFeedPage ? (
+              <NewsFeedLoadingProvider>
+                <DashboardLayoutContent>{children}</DashboardLayoutContent>
+              </NewsFeedLoadingProvider>
+            ) : (
               <DashboardLayoutContent>{children}</DashboardLayoutContent>
-            </CoinLensLoadingProvider>
-          ) : isNewsFeedPage ? (
-            <NewsFeedLoadingProvider>
-              <DashboardLayoutContent>{children}</DashboardLayoutContent>
-            </NewsFeedLoadingProvider>
-          ) : (
-            <DashboardLayoutContent>{children}</DashboardLayoutContent>
-          )}
-        </UnifiedDashboardProvider>
+            )}
+          </UnifiedDashboardProvider>
+        </WalletDataProvider>
       </WalletIntegration>
     </NavigationLoadingProvider>
   );

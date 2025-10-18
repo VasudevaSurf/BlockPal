@@ -1,4 +1,4 @@
-// src/contexts/WalletDataContext.tsx - Shared context for wallet data loading
+// src/contexts/WalletDataContext.tsx - ENHANCED WITH CACHING
 "use client";
 
 import React, {
@@ -6,44 +6,55 @@ import React, {
   useContext,
   useState,
   useEffect,
-  useRef,
   useCallback,
+  useRef,
 } from "react";
 import { useAccount, useChainId } from "wagmi";
 import { tokenService } from "@/services/tokenService";
+import { chains } from "@/components/wallet/WalletProvider";
 
-interface WalletDataState {
-  isInitialLoading: boolean;
-  hasLoadedOnce: boolean;
+interface TokenBalance {
+  id: string;
+  symbol: string;
+  name: string;
+  contractAddress: string;
+  decimals: number;
+  balance: number;
+  balanceWei: string;
+  value: number;
+  change24h: number;
+  usdChange24h?: number;
+  price: number;
+  isNative: boolean;
+  logoUrl?: string | null;
+  isPopular?: boolean;
+  possibleSpam?: boolean;
+  verifiedContract?: boolean;
+  isUserAdded?: boolean;
+  isPreset?: boolean;
+}
+
+interface WalletData {
   mainListValue: number;
   total24hrChange: number;
   chainName: string;
-  tokenCount: number;
-  presetTokenCount: number;
-  hiddenTokenCount: number;
+  tokens: TokenBalance[];
+  loading: boolean;
   error: string | null;
+  lastUpdated: number | null;
+  cacheValid: boolean;
 }
 
 interface WalletDataContextType {
-  walletData: WalletDataState;
-  fetchWalletData: () => Promise<void>;
+  walletData: WalletData;
+  refresh: (force?: boolean) => Promise<void>;
   isRefreshing: boolean;
-  refresh: () => Promise<void>;
+  clearCache: () => void;
 }
 
-const initialState: WalletDataState = {
-  isInitialLoading: false,
-  hasLoadedOnce: false,
-  mainListValue: 0,
-  total24hrChange: 0,
-  chainName: "",
-  tokenCount: 0,
-  presetTokenCount: 0,
-  hiddenTokenCount: 0,
-  error: null,
-};
-
-const WalletDataContext = createContext<WalletDataContextType | null>(null);
+const WalletDataContext = createContext<WalletDataContextType | undefined>(
+  undefined
+);
 
 export const useWalletData = () => {
   const context = useContext(WalletDataContext);
@@ -53,172 +64,201 @@ export const useWalletData = () => {
   return context;
 };
 
-export function WalletDataProvider({
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const BACKGROUND_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
+
+export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
-}: {
-  children: React.ReactNode;
-}) {
+}) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const currentChain = chains.find((c) => c.id === chainId);
 
-  const [walletData, setWalletData] = useState<WalletDataState>(initialState);
+  const [walletData, setWalletData] = useState<WalletData>({
+    mainListValue: 0,
+    total24hrChange: 0,
+    chainName: "",
+    tokens: [],
+    loading: true,
+    error: null,
+    lastUpdated: null,
+    cacheValid: false,
+  });
+
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const backgroundRefreshRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchInProgressRef = useRef(false);
+  const prevWalletRef = useRef<string | undefined>(undefined);
+  const prevChainRef = useRef<number | undefined>(undefined);
 
-  const lastWalletRef = useRef<string | null>(null);
-  const lastChainRef = useRef<number | null>(null);
-  const isFetchingRef = useRef(false);
+  // Check if cache is still valid
+  const isCacheValid = useCallback(() => {
+    if (!walletData.lastUpdated) return false;
+    const now = Date.now();
+    return now - walletData.lastUpdated < CACHE_DURATION;
+  }, [walletData.lastUpdated]);
 
-  // Load user preferences helper
-  const loadUserPreferences = async (
-    walletAddress: string,
-    chainId: number
-  ) => {
-    try {
-      const response = await fetch(
-        `/api/wallet/preferences?wallet=${walletAddress}&chain=${chainId}`
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to load preferences: ${response.statusText}`);
+  // Fetch wallet data
+  const fetchWalletData = useCallback(
+    async (
+      showLoading: boolean = true,
+      isBackgroundRefresh: boolean = false
+    ) => {
+      if (!address || !chainId || fetchInProgressRef.current) {
+        return;
       }
 
-      const data = await response.json();
-      return data.success ? data.data : null;
-    } catch (error: any) {
-      console.warn("⚠️ Could not load user preferences:", error.message);
-      return null;
-    }
-  };
+      fetchInProgressRef.current = true;
 
-  // Main fetch function
-  const fetchWalletData = useCallback(async () => {
-    if (!address || !chainId || isFetchingRef.current) {
-      return;
-    }
+      try {
+        if (showLoading) {
+          setWalletData((prev) => ({ ...prev, loading: true, error: null }));
+        }
 
-    isFetchingRef.current = true;
+        console.log(
+          `🔄 ${
+            isBackgroundRefresh ? "Background" : "Active"
+          } fetching wallet data...`
+        );
 
-    try {
-      // Only show loading skeleton on initial load
-      if (!walletData.hasLoadedOnce) {
+        // Fetch tokens
+        const response = await tokenService.getWalletTokens(
+          address,
+          chainId,
+          true
+        );
+
+        const tokensWithFlags = response.tokens.map((token, index) => ({
+          ...token,
+          isPreset: index < response.presetTokenCount,
+        }));
+
+        setWalletData({
+          mainListValue: response.totalValue,
+          total24hrChange: response.total24hrChange,
+          chainName: response.chainName,
+          tokens: tokensWithFlags,
+          loading: false,
+          error: null,
+          lastUpdated: Date.now(),
+          cacheValid: true,
+        });
+
+        console.log(
+          `✅ Wallet data ${
+            isBackgroundRefresh ? "background" : ""
+          } fetched successfully`
+        );
+      } catch (error: any) {
+        console.error("❌ Error fetching wallet data:", error);
         setWalletData((prev) => ({
           ...prev,
-          isInitialLoading: true,
-          error: null,
+          loading: false,
+          error: error.message || "Failed to fetch wallet data",
+          cacheValid: false,
         }));
+      } finally {
+        fetchInProgressRef.current = false;
+        if (showLoading) {
+          setIsRefreshing(false);
+        }
+      }
+    },
+    [address, chainId]
+  );
+
+  // Refresh function - can be called from components
+  const refresh = useCallback(
+    async (force: boolean = false) => {
+      if (force || !isCacheValid()) {
+        setIsRefreshing(true);
+        await fetchWalletData(true, false);
+      } else {
+        console.log("📦 Using cached data (still valid)");
+      }
+    },
+    [fetchWalletData, isCacheValid]
+  );
+
+  // Clear cache
+  const clearCache = useCallback(() => {
+    console.log("🗑️ Clearing wallet data cache");
+    setWalletData({
+      mainListValue: 0,
+      total24hrChange: 0,
+      chainName: "",
+      tokens: [],
+      loading: true,
+      error: null,
+      lastUpdated: null,
+      cacheValid: false,
+    });
+  }, []);
+
+  // Initial load and wallet/chain change handling
+  useEffect(() => {
+    const walletChanged = prevWalletRef.current !== address;
+    const chainChanged = prevChainRef.current !== chainId;
+
+    if (walletChanged || chainChanged) {
+      console.log("🔄 Wallet or chain changed, clearing cache and fetching...");
+      clearCache();
+
+      if (isConnected && address) {
+        fetchWalletData(true, false);
       }
 
-      console.log(`📊 Fetching wallet data for ${address} on chain ${chainId}`);
-
-      // Fetch ALL tokens
-      const response = await tokenService.getWalletTokens(
-        address,
-        chainId,
-        true
-      );
-
-      // Load user preferences
-      const userPreferences = await loadUserPreferences(address, chainId);
-
-      // Calculate main list value
-      let calculatedMainListValue = 0;
-      let calculatedMainList24hrChange = 0;
-      let mainListTokenCount = 0;
-
-      response.tokens.forEach((token, index) => {
-        const isPresetToken = index < response.presetTokenCount;
-        const isUserAddedToken =
-          userPreferences?.userAddedTokens?.includes(token.contractAddress) ||
-          false;
-
-        if (isPresetToken || isUserAddedToken) {
-          calculatedMainListValue += token.value || 0;
-          calculatedMainList24hrChange += token.usdChange24h || 0;
-          mainListTokenCount++;
-        }
-      });
-
-      // Update state with fetched data
-      setWalletData({
-        isInitialLoading: false,
-        hasLoadedOnce: true,
-        mainListValue: calculatedMainListValue,
-        total24hrChange: calculatedMainList24hrChange,
-        chainName: response.chainName,
-        tokenCount: mainListTokenCount,
-        presetTokenCount: response.presetTokenCount,
-        hiddenTokenCount: response.hiddenTokenCount,
-        error: null,
-      });
-
-      console.log(
-        `✅ Wallet data loaded - Main List Value: ${tokenService.formatCurrency(
-          calculatedMainListValue
-        )}`
-      );
-    } catch (err: any) {
-      console.error("❌ Error fetching wallet data:", err);
-      setWalletData((prev) => ({
-        ...prev,
-        isInitialLoading: false,
-        error: err.message || "Failed to load wallet data",
-      }));
-    } finally {
-      isFetchingRef.current = false;
+      prevWalletRef.current = address;
+      prevChainRef.current = chainId;
+    } else if (isConnected && address && !walletData.cacheValid) {
+      // Initial load
+      fetchWalletData(true, false);
     }
-  }, [address, chainId, walletData.hasLoadedOnce]);
+  }, [
+    address,
+    chainId,
+    isConnected,
+    fetchWalletData,
+    clearCache,
+    walletData.cacheValid,
+  ]);
 
-  // Refresh function
-  const refresh = useCallback(async () => {
-    if (!address || isRefreshing) return;
-
-    setIsRefreshing(true);
-    try {
-      await tokenService.refreshWalletTokens(address);
-      await fetchWalletData();
-    } catch (err: any) {
-      console.error("❌ Error refreshing wallet data:", err);
-      setWalletData((prev) => ({
-        ...prev,
-        error: "Failed to refresh wallet data",
-      }));
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [address, isRefreshing, fetchWalletData]);
-
-  // Handle wallet connection changes
+  // Background refresh - silently update data every 30 seconds
   useEffect(() => {
-    const hasWalletChanged =
-      lastWalletRef.current !== address || lastChainRef.current !== chainId;
-
-    if (isConnected && address && chainId && hasWalletChanged) {
-      lastWalletRef.current = address;
-      lastChainRef.current = chainId;
-
-      // Fetch data for new wallet/chain
-      fetchWalletData();
-    } else if (!isConnected || !address) {
-      // Reset when disconnected
-      lastWalletRef.current = null;
-      lastChainRef.current = null;
-      setWalletData(initialState);
+    if (isConnected && address && walletData.cacheValid) {
+      backgroundRefreshRef.current = setInterval(() => {
+        console.log("🔄 Background refresh triggered");
+        fetchWalletData(false, true);
+      }, BACKGROUND_REFRESH_INTERVAL);
     }
-  }, [isConnected, address, chainId, fetchWalletData]);
+
+    return () => {
+      if (backgroundRefreshRef.current) {
+        clearInterval(backgroundRefreshRef.current);
+      }
+    };
+  }, [isConnected, address, walletData.cacheValid, fetchWalletData]);
+
+  // Cleanup on disconnect
+  useEffect(() => {
+    if (!isConnected || !address) {
+      if (backgroundRefreshRef.current) {
+        clearInterval(backgroundRefreshRef.current);
+      }
+      clearCache();
+    }
+  }, [isConnected, address, clearCache]);
+
+  const value = {
+    walletData,
+    refresh,
+    isRefreshing,
+    clearCache,
+  };
 
   return (
-    <WalletDataContext.Provider
-      value={{
-        walletData,
-        fetchWalletData,
-        isRefreshing,
-        refresh,
-      }}
-    >
+    <WalletDataContext.Provider value={value}>
       {children}
     </WalletDataContext.Provider>
   );
-}
+};
