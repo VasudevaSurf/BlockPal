@@ -596,7 +596,7 @@ export default function TokenOverviewPage() {
 
         {/* Desktop Layout - keeping your exact design */}
         <div className="hidden xl:flex gap-3 flex-1 min-h-0">
-          <div className="flex-[0_0_60%] flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
+          <div className="flex-[0_0_66%] flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto space-y-3 scrollbar-hide flex flex-col">
               {/* Main Chart Section */}
               <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex-shrink-0">
