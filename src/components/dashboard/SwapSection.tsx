@@ -141,8 +141,9 @@ const TokenImage = ({
 
 export default function SwapSection() {
   // ✅ UNIFIED LOADING INTEGRATION
-  const { setComponentLoaded } = useUnifiedDashboard();
-  const hasReportedRef = useRef(false);
+  const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
+  const hasReportedMountRef = useRef(false);
+  const hasReportedDataRef = useRef(false);
 
   // Use CoinGecko hook for real data
   const {
@@ -201,21 +202,36 @@ export default function SwapSection() {
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
   const [showGainersDropdown, setShowGainersDropdown] = useState(false);
 
-  // ✅ MARK COMPONENT AS LOADED
-  // SwapSection loads relatively quickly, mark as loaded after CoinGecko data attempt
+  // ✅ REPORT COMPONENT MOUNT
   useEffect(() => {
-    // Reset the flag when component mounts
-    hasReportedRef.current = false;
+    if (!hasReportedMountRef.current) {
+      console.log("✅ SwapSection: Component mounted");
+      setComponentLoaded("swapSection");
+      hasReportedMountRef.current = true;
+    }
 
-    const timer = setTimeout(() => {
-      if (!hasReportedRef.current) {
-        console.log("✅ SwapSection reporting loaded");
-        setComponentLoaded("swapSection");
-        hasReportedRef.current = true;
-      }
-    }, 800);
-    return () => clearTimeout(timer);
+    return () => {
+      hasReportedMountRef.current = false;
+      hasReportedDataRef.current = false;
+    };
   }, [setComponentLoaded]);
+
+  // ✅ REPORT DATA READY
+  useEffect(() => {
+    if (!hasReportedDataRef.current) {
+      // SwapSection data is ready when CoinGecko has loaded or errored
+      const hasData =
+        displayTrendingTokens.length > 0 ||
+        displayTopGainers.length > 0 ||
+        coinGeckoError;
+
+      if (hasData || !coinGeckoLoading) {
+        console.log("✅ SwapSection: Data ready");
+        setComponentDataReady("swapSection");
+        hasReportedDataRef.current = true;
+      }
+    }
+  }, [coinGeckoLoading, coinGeckoError, setComponentDataReady]);
 
   // Use cached data if refreshing, otherwise use current data
   const displayTrendingTokens =

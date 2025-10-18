@@ -18,10 +18,17 @@ interface ComponentLoadingState {
   globalHeader: boolean;
 }
 
+interface ComponentDataState {
+  walletBalance: boolean;
+  tokenList: boolean;
+  swapSection: boolean;
+}
+
 interface UnifiedDashboardContextType {
   isLoading: boolean;
   componentStates: ComponentLoadingState;
   setComponentLoaded: (component: keyof ComponentLoadingState) => void;
+  setComponentDataReady: (component: keyof ComponentDataState) => void;
   resetDashboard: () => void;
   allComponentsLoaded: boolean;
 }
@@ -56,6 +63,13 @@ export const UnifiedDashboardProvider: React.FC<{
     }
   );
 
+  const [componentDataStates, setComponentDataStates] =
+    useState<ComponentDataState>({
+      walletBalance: true,
+      tokenList: true,
+      swapSection: true,
+    });
+
   const [isLoading, setIsLoading] = useState(true);
   const [allComponentsLoaded, setAllComponentsLoaded] = useState(false);
 
@@ -66,8 +80,19 @@ export const UnifiedDashboardProvider: React.FC<{
 
   const setComponentLoaded = useCallback(
     (component: keyof ComponentLoadingState) => {
-      console.log(`✅ Component loaded: ${component}`);
+      console.log(`✅ Component mounted: ${component}`);
       setComponentStates((prev) => ({
+        ...prev,
+        [component]: false,
+      }));
+    },
+    []
+  );
+
+  const setComponentDataReady = useCallback(
+    (component: keyof ComponentDataState) => {
+      console.log(`✅ Component data ready: ${component}`);
+      setComponentDataStates((prev) => ({
         ...prev,
         [component]: false,
       }));
@@ -83,6 +108,11 @@ export const UnifiedDashboardProvider: React.FC<{
       swapSection: true,
       globalHeader: true,
     });
+    setComponentDataStates({
+      walletBalance: true,
+      tokenList: true,
+      swapSection: true,
+    });
     setIsLoading(true);
     setAllComponentsLoaded(false);
 
@@ -92,21 +122,24 @@ export const UnifiedDashboardProvider: React.FC<{
     }
   }, []);
 
-  // Check if all components are loaded
+  // Check if all components are loaded AND their data is ready
   useEffect(() => {
-    const allLoaded = Object.values(componentStates).every(
+    const allComponentsMounted = Object.values(componentStates).every(
+      (state) => state === false
+    );
+    const allDataReady = Object.values(componentDataStates).every(
       (state) => state === false
     );
 
-    if (allLoaded && isLoading) {
-      console.log("✅ All components loaded! Hiding loader...");
+    if (allComponentsMounted && allDataReady && isLoading) {
+      console.log("✅ All components loaded with data! Hiding loader...");
 
       setTimeout(() => {
         setAllComponentsLoaded(true);
         setIsLoading(false);
       }, 300);
     }
-  }, [componentStates, isLoading]);
+  }, [componentStates, componentDataStates, isLoading]);
 
   // Handle wallet/chain changes
   useEffect(() => {
@@ -122,7 +155,7 @@ export const UnifiedDashboardProvider: React.FC<{
     }
   }, [address, chainId, resetDashboard]);
 
-  // CRITICAL: Handle route changes - Reset when navigating to dashboard
+  // Handle route changes - Reset when navigating to dashboard
   useEffect(() => {
     const isDashboardPage = pathname === "/dashboard";
     const pathnameChanged = prevPathnameRef.current !== pathname;
@@ -155,6 +188,7 @@ export const UnifiedDashboardProvider: React.FC<{
   // If wallet disconnects, reset immediately
   useEffect(() => {
     if (!isConnected || !address) {
+      console.log("🔌 Wallet disconnected, showing content immediately");
       setIsLoading(false);
       setAllComponentsLoaded(true);
     }
@@ -164,6 +198,7 @@ export const UnifiedDashboardProvider: React.FC<{
     isLoading,
     componentStates,
     setComponentLoaded,
+    setComponentDataReady,
     resetDashboard,
     allComponentsLoaded,
   };

@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED WITH UNIFIED LOADING
+// src/components/dashboard/GlobalDashboardHeader.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -341,25 +341,18 @@ export default function GlobalDashboardHeader({
     setMounted(true);
   }, []);
 
+  // Report component as loaded (header loads immediately)
   useEffect(() => {
-    // Reset the flag when component mounts
-    hasReportedRef.current = false;
-
     if (!hasReportedRef.current) {
-      console.log("✅ GlobalHeader reporting loaded");
+      console.log("✅ GlobalDashboardHeader: Component mounted and ready");
       setComponentLoaded("globalHeader");
       hasReportedRef.current = true;
     }
-  }, [setComponentLoaded]);
 
-  // MARK COMPONENT AS LOADED
-  useEffect(() => {
-    // Header loads immediately after mount
-    if (mounted) {
-      console.log("✅ GlobalDashboardHeader: Marking as loaded");
-      setComponentLoaded("globalHeader");
-    }
-  }, [mounted, setComponentLoaded]);
+    return () => {
+      hasReportedRef.current = false;
+    };
+  }, [setComponentLoaded]);
 
   useEffect(() => {
     if (!authChecked.current && !isAuthenticated && !authLoading) {

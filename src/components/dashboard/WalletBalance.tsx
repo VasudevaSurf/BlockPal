@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletBalance.tsx - COMPLETE CODE WITH UNIFIED LOADING
+// src/components/dashboard/WalletBalance.tsx
 "use client";
 
 import { useSelector } from "react-redux";
@@ -70,11 +70,12 @@ export default function WalletBalance() {
   const { walletData, refresh, isRefreshing } = useWalletData();
 
   // Unified dashboard loading integration
-  const { setComponentLoaded } = useUnifiedDashboard();
+  const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
 
   // Wallet integration
   const { address, isConnected } = useAccount();
-  const hasReportedRef = useRef(false);
+  const hasReportedMountRef = useRef(false);
+  const hasReportedDataRef = useRef(false);
 
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
@@ -84,9 +85,6 @@ export default function WalletBalance() {
     isCopied: false,
     isAnimating: false,
   });
-
-  // Track if component has loaded its data
-  const [dataLoaded, setDataLoaded] = useState(false);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -100,29 +98,45 @@ export default function WalletBalance() {
     }
   };
 
-  // ✅ UNIFIED LOADING INTEGRATION
-  // Mark component as loaded when wallet data is ready
+  // Report component mount
   useEffect(() => {
-    // Reset the flag when component mounts
-    hasReportedRef.current = false;
-
-    if (isConnected && address) {
-      const timer = setTimeout(() => {
-        if (!hasReportedRef.current) {
-          console.log("✅ WalletBalance reporting loaded");
-          setComponentLoaded("walletBalance");
-          hasReportedRef.current = true;
-        }
-      }, 500);
-      return () => clearTimeout(timer);
-    } else if (!isConnected) {
-      if (!hasReportedRef.current) {
-        console.log("✅ WalletBalance reporting loaded (no wallet)");
-        setComponentLoaded("walletBalance");
-        hasReportedRef.current = true;
-      }
+    if (!hasReportedMountRef.current) {
+      console.log("✅ WalletBalance: Component mounted");
+      setComponentLoaded("walletBalance");
+      hasReportedMountRef.current = true;
     }
-  }, [isConnected, address, setComponentLoaded]);
+
+    return () => {
+      hasReportedMountRef.current = false;
+      hasReportedDataRef.current = false;
+    };
+  }, [setComponentLoaded]);
+
+  // Report data ready when wallet data is loaded
+  useEffect(() => {
+    if (isConnected && address && !hasReportedDataRef.current) {
+      // Check if we have meaningful data
+      const hasData = walletData.mainListValue > 0 || walletData.error;
+
+      if (hasData && !walletData.loading) {
+        console.log("✅ WalletBalance: Data ready");
+        setComponentDataReady("walletBalance");
+        hasReportedDataRef.current = true;
+      }
+    } else if (!isConnected && !hasReportedDataRef.current) {
+      // No wallet connected, mark as ready immediately
+      console.log("✅ WalletBalance: No wallet, marking data ready");
+      setComponentDataReady("walletBalance");
+      hasReportedDataRef.current = true;
+    }
+  }, [
+    isConnected,
+    address,
+    walletData.mainListValue,
+    walletData.error,
+    walletData.loading,
+    setComponentDataReady,
+  ]);
 
   // Show wallet not connected state
   if (!isConnected || !address) {
