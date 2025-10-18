@@ -1,7 +1,7 @@
 // src/components/dashboard/TokenList.tsx - COMPLETE with Universal Skeleton
 "use client";
 
-// NOTE: This component now includes tabs for Holdings/Trending/Top Gainers on mobile
+// NOTE: This component now includes tabs for Holdings/Trending/Top Gainers on mobile ONLY
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -910,10 +910,11 @@ export default function TokenList() {
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         {/* Header with Tabs */}
         <div className="flex items-center justify-between mb-3 px-2">
-          <div className="flex items-center gap-4 lg:gap-6">
+          {/* Tabs - Only visible on mobile (< lg) */}
+          <div className="flex items-center gap-4 lg:hidden">
             <button
               onClick={() => setActiveTab("holdings")}
-              className={`pb-1 text-xs lg:text-sm font-mayeka font-medium transition-all relative ${
+              className={`pb-1 text-xs font-mayeka font-medium transition-all relative ${
                 activeTab === "holdings"
                   ? "text-white"
                   : "text-gray-400 hover:text-white"
@@ -926,7 +927,7 @@ export default function TokenList() {
             </button>
             <button
               onClick={() => setActiveTab("trending")}
-              className={`pb-1 text-xs lg:text-sm font-mayeka font-medium transition-all relative ${
+              className={`pb-1 text-xs font-mayeka font-medium transition-all relative ${
                 activeTab === "trending"
                   ? "text-white"
                   : "text-gray-400 hover:text-white"
@@ -939,7 +940,7 @@ export default function TokenList() {
             </button>
             <button
               onClick={() => setActiveTab("gainers")}
-              className={`pb-1 text-xs lg:text-sm font-mayeka font-medium transition-all relative ${
+              className={`pb-1 text-xs font-mayeka font-medium transition-all relative ${
                 activeTab === "gainers"
                   ? "text-white"
                   : "text-gray-400 hover:text-white"
@@ -951,6 +952,11 @@ export default function TokenList() {
               )}
             </button>
           </div>
+
+          {/* Desktop Title - Only visible on desktop (>= lg) */}
+          <h2 className="hidden lg:block text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo">
+            Token Holdings
+          </h2>
 
           {activeTab === "holdings" &&
             hasHiddenTokens &&
