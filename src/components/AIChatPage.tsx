@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx
+// src/components/AIChatPage.tsx - FIXED MOBILE LAYOUT
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -1006,11 +1006,11 @@ export default function AIChatPage() {
           )}
         </div>
 
-        {/* Messages or Welcome Screen */}
-        <div className="flex-1 overflow-y-auto px-4 min-h-0 pb-4 lg:pb-4">
+        {/* Messages or Welcome Screen - FIXED FOR MOBILE */}
+        <div className="flex-1 min-h-0 px-4 pb-4 lg:pb-4 mb-[140px] lg:mb-0 overflow-hidden">
           {showWelcomeScreen ? (
             /* Welcome Screen */
-            <div className="h-full flex flex-col items-center justify-center">
+            <div className="h-full flex flex-col items-center justify-center overflow-y-auto scrollbar-hide">
               <h1 className="text-[24px] lg:text-[35px] font-mayeka-demi-bold-demo font-bold mb-3 lg:mb-10 text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent px-4">
                 Chat with Lumen
               </h1>
@@ -1049,62 +1049,66 @@ export default function AIChatPage() {
             </div>
           ) : (
             /* Chat Messages */
-            <div className="py-4 space-y-4">
-              {messages.map((message) => (
-                <div key={message.id} className="flex flex-col space-y-2">
-                  {message.type === "assistant" ? (
-                    <div className="flex flex-col items-start space-y-2">
-                      {message.processing && !message.content ? (
-                        <div className="max-w-4xl bg-black/40 backdrop-blur-md p-3 lg:p-4 rounded-xl">
-                          <div className="flex items-center space-x-2">
-                            <div className="flex space-x-1">
-                              <div
-                                className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
-                                style={{ animationDelay: "0ms" }}
-                              ></div>
-                              <div
-                                className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
-                                style={{ animationDelay: "150ms" }}
-                              ></div>
-                              <div
-                                className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
-                                style={{ animationDelay: "300ms" }}
-                              ></div>
+            <div className="h-full overflow-y-auto scrollbar-hide">
+              <div className="py-4 space-y-4">
+                {messages.map((message) => (
+                  <div key={message.id} className="flex flex-col space-y-2">
+                    {message.type === "assistant" ? (
+                      <div className="flex flex-col items-start space-y-2">
+                        {message.processing && !message.content ? (
+                          <div className="max-w-4xl bg-black/40 backdrop-blur-md p-3 lg:p-4 rounded-xl">
+                            <div className="flex items-center space-x-2">
+                              <div className="flex space-x-1">
+                                <div
+                                  className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
+                                  style={{ animationDelay: "0ms" }}
+                                ></div>
+                                <div
+                                  className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
+                                  style={{ animationDelay: "150ms" }}
+                                ></div>
+                                <div
+                                  className="w-1 h-1 bg-[#E2AF19] rounded-full animate-bounce"
+                                  style={{ animationDelay: "300ms" }}
+                                ></div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="max-w-4xl bg-black/40 backdrop-blur-md p-3 lg:p-4 rounded-xl border border-[#F9EFD1]/30">
-                          <div className="text-[#F9EFD1] text-xs lg:text-sm leading-relaxed font-satoshi">
-                            <div
-                              className="message-content"
-                              dangerouslySetInnerHTML={{
-                                __html: formatMessage(message.content),
-                              }}
-                            />
-                            {message.typing && (
-                              <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
-                            )}
+                        ) : (
+                          <div className="max-w-4xl bg-black/40 backdrop-blur-md p-3 lg:p-4 rounded-xl border border-[#F9EFD1]/30">
+                            <div className="text-[#F9EFD1] text-xs lg:text-sm leading-relaxed font-satoshi">
+                              <div
+                                className="message-content"
+                                dangerouslySetInnerHTML={{
+                                  __html: formatMessage(message.content),
+                                }}
+                              />
+                              {message.typing && (
+                                <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex justify-end">
-                      <div className="bg-[#F9EFD1] text-black p-3 lg:p-4 max-w-2xl rounded-xl rounded-tr-none">
-                        <p className="text-xs lg:text-sm">{message.content}</p>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
+                    ) : (
+                      <div className="flex justify-end">
+                        <div className="bg-[#F9EFD1] text-black p-3 lg:p-4 max-w-2xl rounded-xl rounded-tr-none">
+                          <p className="text-xs lg:text-sm">
+                            {message.content}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
             </div>
           )}
         </div>
 
-        {/* Input */}
-        <div className="flex-shrink-0 p-3 lg:p-4">
+        {/* Input - FIXED ABOVE MOBILE NAV */}
+        <div className="flex-shrink-0 p-3 lg:p-4 fixed lg:relative bottom-[80px] lg:bottom-0 left-0 right-0 bg-[#000000] lg:bg-transparent z-10">
           <div className="relative max-w-4xl mx-auto">
             <textarea
               ref={inputRef}
@@ -1227,7 +1231,7 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Mobile History Sidebar */}
+      {/* Mobile History Sidebar - Keeping as is */}
       <div
         className={`lg:hidden fixed right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out ${
           mobileHistoryOpen
@@ -1250,7 +1254,7 @@ export default function AIChatPage() {
             </button>
           </div>
 
-          {/* Scrollable Chat History - with proper bottom padding */}
+          {/* Scrollable Chat History */}
           <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-4 min-h-0">
             <div className="mb-4">
               <span className="text-gray-300 text-sm font-satoshi font-medium">
