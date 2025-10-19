@@ -466,16 +466,24 @@ export default function AddTokensModal({
             coinlesSocketClient.on("search-results", handleResults);
           });
 
+          // ✅ FIXED: Search by contract address to get exact token
           coinlesSocketClient.searchTokens(
             selectedChain,
-            token.symbol,
+            token.address, // Use address instead of symbol
             user.email
           );
 
           const results = await searchPromise;
 
           if (results && results.length > 0) {
-            const foundToken = results[0];
+            // ✅ FIXED: Find the exact matching token by address
+            const foundToken =
+              results.find(
+                (r) =>
+                  r.contractAddress.toLowerCase() ===
+                  token.address.toLowerCase()
+              ) || results[0];
+
             const tokenData = {
               chainId: selectedChain,
               contractAddress: foundToken.contractAddress,

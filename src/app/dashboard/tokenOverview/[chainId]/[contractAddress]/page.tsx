@@ -94,7 +94,7 @@ export default function TokenOverviewPage() {
   };
 
   const getTokenIcon = (symbol: string) => {
-    return "bg-gradient-to-br from-blue-500 to-purple-600";
+    return "";
   };
 
   const formatCurrency = (value: number) => {
