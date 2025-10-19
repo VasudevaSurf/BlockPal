@@ -1,4 +1,4 @@
-// src/components/ChartUI.tsx
+// src/components/ChartUI.tsx - FIXED: Removed duplicate header & fixed resize issues
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -15,6 +15,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const candlestickSeriesRef = useRef<any>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [isClient, setIsClient] = useState(false);
 
   const [selectedTimeframe, setSelectedTimeframe] = useState("1h");
@@ -239,60 +240,70 @@ const ChartUI: React.FC<ChartUIProps> = ({
         // Dynamically import lightweight-charts
         const LightweightCharts = await import("lightweight-charts");
 
-        if (!isMounted) return;
+        if (!isMounted || !chartContainerRef.current) return;
 
-        const chart = LightweightCharts.createChart(
-          chartContainerRef.current!,
-          {
-            layout: {
-              background: { color: "#191a1a" },
-              textColor: "#9B9B9B",
+        const chart = LightweightCharts.createChart(chartContainerRef.current, {
+          layout: {
+            background: { color: "#191a1a" },
+            textColor: "#9B9B9B",
+          },
+          grid: {
+            vertLines: {
+              color: "rgba(242, 242, 242, 0.03)",
+              visible: true,
             },
-            grid: {
-              vertLines: {
-                color: "rgba(242, 242, 242, 0.03)",
-                visible: true,
-              },
-              horzLines: {
-                color: "rgba(242, 242, 242, 0.06)",
-                visible: true,
-              },
+            horzLines: {
+              color: "rgba(242, 242, 242, 0.06)",
+              visible: true,
             },
-            width: chartContainerRef.current!.clientWidth,
-            height: chartContainerRef.current!.clientHeight,
-            timeScale: {
-              timeVisible: true,
-              secondsVisible: false,
-              borderColor: "rgba(242, 242, 242, 0.1)",
+          },
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight,
+          timeScale: {
+            timeVisible: true,
+            secondsVisible: false,
+            borderColor: "rgba(242, 242, 242, 0.1)",
+            fixLeftEdge: true,
+            fixRightEdge: true,
+          },
+          rightPriceScale: {
+            borderColor: "rgba(242, 242, 242, 0.1)",
+            autoScale: true,
+            scaleMargins: {
+              top: 0.1,
+              bottom: 0.1,
             },
-            rightPriceScale: {
-              borderColor: "rgba(242, 242, 242, 0.1)",
-              autoScale: true,
-              scaleMargins: {
-                top: 0.1,
-                bottom: 0.1,
-              },
-              borderVisible: true,
+            borderVisible: true,
+          },
+          crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+            vertLine: {
+              color: "rgba(242, 242, 242, 0.5)",
+              width: 1,
+              style: 0,
+              labelBackgroundColor: "#2a2a2a",
+              labelVisible: true,
             },
-            crosshair: {
-              mode: LightweightCharts.CrosshairMode.Normal,
-              vertLine: {
-                color: "rgba(242, 242, 242, 0.5)",
-                width: 1,
-                style: 0,
-                labelBackgroundColor: "#2a2a2a",
-                labelVisible: true,
-              },
-              horzLine: {
-                color: "rgba(242, 242, 242, 0.5)",
-                width: 1,
-                style: 0,
-                labelBackgroundColor: "#2a2a2a",
-                labelVisible: true,
-              },
+            horzLine: {
+              color: "rgba(242, 242, 242, 0.5)",
+              width: 1,
+              style: 0,
+              labelBackgroundColor: "#2a2a2a",
+              labelVisible: true,
             },
-          }
-        );
+          },
+          handleScroll: {
+            mouseWheel: true,
+            pressedMouseMove: true,
+            horzTouchDrag: true,
+            vertTouchDrag: false,
+          },
+          handleScale: {
+            axisPressedMouseMove: true,
+            mouseWheel: true,
+            pinch: true,
+          },
+        });
 
         console.log("✅ Chart created, adding candlestick series...");
 
@@ -333,16 +344,25 @@ const ChartUI: React.FC<ChartUIProps> = ({
 
         // Subscribe to crosshair move
         chart.subscribeCrosshairMove((param: any) => {
-          if (param.time && isMounted) {
-            const data = param.seriesData.get(candlestickSeries);
-            if (data) {
-              setHoverData({
-                time: param.time,
-                high: (data as any).high,
-                low: (data as any).low,
-              });
+          if (!isMounted) return;
+
+          if (param.time && param.seriesData && candlestickSeries) {
+            try {
+              const data = param.seriesData.get(candlestickSeries);
+              if (data && (data as any).high && (data as any).low) {
+                setHoverData({
+                  time: param.time,
+                  high: (data as any).high,
+                  low: (data as any).low,
+                });
+              } else {
+                setHoverData(null);
+              }
+            } catch (error) {
+              // Silently handle any errors during crosshair move
+              setHoverData(null);
             }
-          } else if (isMounted) {
+          } else {
             setHoverData(null);
           }
         });
@@ -356,21 +376,38 @@ const ChartUI: React.FC<ChartUIProps> = ({
           console.log("✅ Chart data set successfully");
         }
 
-        // Handle resize
-        const handleResize = () => {
-          if (chartContainerRef.current && isMounted) {
-            chart.applyOptions({
-              width: chartContainerRef.current.clientWidth,
-              height: chartContainerRef.current.clientHeight,
-            });
-          }
-        };
+        // Handle resize with ResizeObserver for better performance
+        if (chartContainerRef.current) {
+          resizeObserverRef.current = new ResizeObserver((entries) => {
+            if (!isMounted || !chartRef.current || !chartContainerRef.current)
+              return;
 
-        window.addEventListener("resize", handleResize);
+            const { width, height } = entries[0].contentRect;
+
+            // Only resize if dimensions actually changed
+            if (width > 0 && height > 0) {
+              chartRef.current.applyOptions({
+                width: width,
+                height: height,
+              });
+
+              // Refit content after resize
+              setTimeout(() => {
+                if (chartRef.current && isMounted) {
+                  chartRef.current.timeScale().fitContent();
+                }
+              }, 0);
+            }
+          });
+
+          resizeObserverRef.current.observe(chartContainerRef.current);
+        }
 
         return () => {
           isMounted = false;
-          window.removeEventListener("resize", handleResize);
+          if (resizeObserverRef.current) {
+            resizeObserverRef.current.disconnect();
+          }
           chart.remove();
         };
       } catch (error) {
@@ -382,6 +419,9 @@ const ChartUI: React.FC<ChartUIProps> = ({
 
     return () => {
       isMounted = false;
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
       if (chartRef.current) {
         chartRef.current.remove();
       }
@@ -443,58 +483,15 @@ const ChartUI: React.FC<ChartUIProps> = ({
         padding: "12px",
       }}
     >
-      {/* Header */}
+      {/* Header - Only Timeframe Selector */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "flex-end",
           padding: "0",
         }}
       >
-        {/* Token Info */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div
-            style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              backgroundColor: "#2a2a2a",
-              border: "2px solid rgba(0, 217, 179, 0.2)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "14px",
-              fontWeight: "600",
-              color: "#00D9B3",
-            }}
-          >
-            {tokenInfo.symbol.charAt(0)}
-          </div>
-
-          <div>
-            <div
-              style={{
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "#ffffff",
-                marginBottom: "2px",
-              }}
-            >
-              {tokenInfo.name} ({tokenInfo.symbol})
-            </div>
-            <div
-              style={{
-                fontSize: "13px",
-                fontWeight: "500",
-                color: "#00D9B3",
-              }}
-            >
-              ${currentPrice}
-            </div>
-          </div>
-        </div>
-
         {/* Timeframe Selector */}
         <div
           style={{
@@ -552,7 +549,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
           flex: 1,
           backgroundColor: "#191a1a",
           borderRadius: "8px",
-          overflow: "visible",
+          overflow: "hidden",
           position: "relative",
           minHeight: 0,
         }}

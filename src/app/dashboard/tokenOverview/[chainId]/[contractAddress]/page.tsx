@@ -1,4 +1,4 @@
-// src/app/dashboard/tokenOverview/[chainId]/[contractAddress]/page.tsx - WITH NEW CHART UI
+// src/app/dashboard/tokenOverview/[chainId]/[contractAddress]/page.tsx - FIXED LAYOUT
 "use client";
 
 import { useEffect, useState } from "react";
@@ -15,7 +15,7 @@ import {
   QrCode,
 } from "lucide-react";
 import WarningIcon from "@/components/icons/WarningIcon";
-import ChartUI from "@/components/ChartUI"; // Import the new chart component
+import ChartUI from "@/components/ChartUI";
 
 export default function TokenOverviewPage() {
   const router = useRouter();
@@ -273,195 +273,100 @@ export default function TokenOverviewPage() {
           </div>
         </div>
 
-        {/* Desktop Layout */}
-        <div className="hidden xl:flex gap-3 flex-1 min-h-0">
-          <div className="flex-[0_0_66%] flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
-            <div className="flex-1 overflow-y-auto space-y-3 scrollbar-hide flex flex-col">
-              {/* Main Chart Section with New Chart UI */}
-              <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex-shrink-0">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center">
-                    <div
-                      className={`w-8 h-8 ${getTokenIcon(
-                        metadata.symbol || ""
-                      )} rounded-full mr-2 flex items-center justify-center`}
-                    >
-                      {metadata.logo ? (
-                        <img
-                          src={metadata.logo}
-                          alt={metadata.symbol}
-                          className="w-8 h-8 rounded-full"
-                        />
-                      ) : (
-                        <span className="text-white text-base font-bold">
-                          {(metadata.symbol || "?").charAt(0)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-row items-center justify-center space-x-2">
-                      <h2 className="text-lg font-bold text-white font-mayeka">
-                        {metadata.name}
-                      </h2>
-                      <p className="text-gray-400 font-satoshi mt-1 text-sm">
-                        {metadata.symbol}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="text-white text-[10px] font-satoshi mb-0.5">
-                      Contract Address
-                    </div>
-                    <div className="flex items-center space-x-1.5 mb-2 justify-end">
-                      <span className="text-gray-400 text-[10px] font-satoshi">
-                        {`${contractAddress.slice(
-                          0,
-                          9
-                        )}...${contractAddress.slice(-7)}`}
+        {/* Desktop Layout - FIXED */}
+        <div className="hidden xl:flex gap-3 flex-1 min-h-0 max-h-full overflow-hidden">
+          <div className="flex-[0_0_66%] flex flex-col gap-3 min-w-0 max-h-full">
+            {/* Main Chart Section with New Chart UI */}
+            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                <div className="flex items-center">
+                  <div
+                    className={`w-8 h-8 ${getTokenIcon(
+                      metadata.symbol || ""
+                    )} rounded-full mr-2 flex items-center justify-center`}
+                  >
+                    {metadata.logo ? (
+                      <img
+                        src={metadata.logo}
+                        alt={metadata.symbol}
+                        className="w-8 h-8 rounded-full"
+                      />
+                    ) : (
+                      <span className="text-white text-base font-bold">
+                        {(metadata.symbol || "?").charAt(0)}
                       </span>
-                      <button
-                        onClick={() => copyToClipboard(contractAddress)}
-                        className="hover:text-white transition-colors"
-                      >
-                        <Copy size={12} className="text-gray-400" />
-                      </button>
-                    </div>
+                    )}
+                  </div>
+                  <div className="flex flex-row items-center justify-center space-x-2">
+                    <h2 className="text-lg font-bold text-white font-mayeka">
+                      {metadata.name}
+                    </h2>
+                    <p className="text-gray-400 font-satoshi mt-1 text-sm">
+                      {metadata.symbol}
+                    </p>
                   </div>
                 </div>
 
-                {/* Price Section */}
-                <div className="flex items-end justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex flex-row items-center gap-[10px] text-xl lg:text-2xl font-bold text-white mb-1 font-satoshi">
-                      {formatCurrency(marketData.price || 0)}
-                      <div
-                        className={`text-xs font-satoshi ${
-                          (marketData.change24h || 0) >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        <span className="mr-1">
-                          {(marketData.change24h || 0) >= 0 ? "▲" : "▼"}
-                        </span>
-                        {Math.abs(marketData.change24h || 0).toFixed(2)}%
-                      </div>
-                    </div>
+                <div className="text-right">
+                  <div className="text-white text-[10px] font-satoshi mb-0.5">
+                    Contract Address
                   </div>
-                </div>
-
-                {/* New Chart Component - Desktop */}
-                <div className="mb-3 h-[500px]">
-                  {poolAddress ? (
-                    <ChartUI poolAddress={poolAddress} network={chainId} />
-                  ) : (
-                    <div className="h-full flex items-center justify-center">
-                      <p className="text-gray-500">No chart data available</p>
-                    </div>
-                  )}
+                  <div className="flex items-center space-x-1.5 mb-2 justify-end">
+                    <span className="text-gray-400 text-[10px] font-satoshi">
+                      {`${contractAddress.slice(
+                        0,
+                        9
+                      )}...${contractAddress.slice(-7)}`}
+                    </span>
+                    <button
+                      onClick={() => copyToClipboard(contractAddress)}
+                      className="hover:text-white transition-colors"
+                    >
+                      <Copy size={12} className="text-gray-400" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* About Section */}
-              <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex-1 flex flex-col">
-                <div className="flex items-center space-x-2 mb-5">
-                  {metadata.websites && metadata.websites[0] && (
-                    <div className="relative">
-                      <div className="relative p-[1px] rounded-lg overflow-hidden">
-                        <div
-                          className="absolute inset-0"
-                          style={{
-                            background: `linear-gradient(135deg, 
-                            rgba(255, 255, 255, 0.3) 0%,
-                            rgba(255, 255, 255, 0.1) 20%,
-                            rgba(226, 175, 25, 0.2) 40%,
-                            rgba(255, 255, 255, 0.05) 60%,
-                            rgba(226, 175, 25, 0.15) 80%,
-                            rgba(255, 255, 255, 0.2) 100%)`,
-                          }}
-                        />
-                        <a
-                          href={metadata.websites[0]}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="relative text-white px-2 py-1 rounded-[7px] font-satoshi flex items-center text-[10px] hover:opacity-80 transition-opacity"
-                          style={{
-                            background: `linear-gradient(135deg, 
-                            rgba(25, 25, 25, 0.85) 0%,
-                            rgba(40, 40, 40, 0.75) 50%,
-                            rgba(25, 25, 25, 0.85) 100%)`,
-                            backdropFilter: "blur(1px)",
-                            boxShadow: `
-                            inset 0 1px 2px rgba(255, 255, 255, 0.05),
-                            inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-                            0 2px 8px rgba(0, 0, 0, 0.3)
-                          `,
-                          }}
-                        >
-                          <Globe size={10} className="mr-1" />
-                          Website
-                        </a>
-                      </div>
+              {/* Price Section */}
+              <div className="flex items-end justify-between mb-3 flex-shrink-0">
+                <div className="flex-1">
+                  <div className="flex flex-row items-center gap-[10px] text-xl lg:text-2xl font-bold text-white mb-1 font-satoshi">
+                    {formatCurrency(marketData.price || 0)}
+                    <div
+                      className={`text-xs font-satoshi ${
+                        (marketData.change24h || 0) >= 0
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }`}
+                    >
+                      <span className="mr-1">
+                        {(marketData.change24h || 0) >= 0 ? "▲" : "▼"}
+                      </span>
+                      {Math.abs(marketData.change24h || 0).toFixed(2)}%
                     </div>
-                  )}
-                  {metadata.socials?.twitter && (
-                    <div className="relative">
-                      <div className="relative p-[1px] rounded-lg overflow-hidden">
-                        <div
-                          className="absolute inset-0"
-                          style={{
-                            background: `linear-gradient(135deg, 
-                            rgba(255, 255, 255, 0.3) 0%,
-                            rgba(255, 255, 255, 0.1) 20%,
-                            rgba(226, 175, 25, 0.2) 40%,
-                            rgba(255, 255, 255, 0.05) 60%,
-                            rgba(226, 175, 25, 0.15) 80%,
-                            rgba(255, 255, 255, 0.2) 100%)`,
-                          }}
-                        />
-                        <a
-                          href={metadata.socials.twitter}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="relative text-white px-2 py-1 rounded-[7px] font-satoshi flex items-center text-[10px] hover:opacity-80 transition-opacity"
-                          style={{
-                            background: `linear-gradient(135deg, 
-                            rgba(25, 25, 25, 0.85) 0%,
-                            rgba(40, 40, 40, 0.75) 50%,
-                            rgba(25, 25, 25, 0.85) 100%)`,
-                            backdropFilter: "blur(1px)",
-                            boxShadow: `
-                            inset 0 1px 2px rgba(255, 255, 255, 0.05),
-                            inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-                            0 2px 8px rgba(0, 0, 0, 0.3)
-                          `,
-                          }}
-                        >
-                          <Twitter size={10} className="mr-1" />
-                          Twitter
-                        </a>
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
+              </div>
 
-                <h3 className="text-md font-semibold text-white mb-1.5 font-mayeka">
-                  About {metadata.name}
-                </h3>
-                <div className="flex-1 overflow-y-auto scrollbar-hide">
-                  <p className="text-gray-400 text-[12px] leading-relaxed font-satoshi">
-                    {metadata.description || "No description available."}
-                  </p>
-                </div>
+              {/* New Chart Component - Desktop - TAKES REMAINING SPACE */}
+              <div className="flex-1 min-h-0">
+                {poolAddress ? (
+                  <ChartUI poolAddress={poolAddress} network={chainId} />
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-gray-500">No chart data available</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Sidebar - Right Section with reduced width */}
-          <div className="w-full flex-1 h-full flex flex-col gap-2">
-            <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex flex-col justify-between space-y-1.5">
+          {/* Sidebar - Right Section */}
+          <div className="w-full flex-1 max-h-full flex flex-col gap-2 overflow-hidden">
+            <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex flex-col justify-between space-y-1.5 min-h-0 overflow-y-auto scrollbar-hide">
               {/* Header with token info */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <div
                   className={`w-10 h-10 ${getTokenIcon(
                     metadata.symbol || ""
@@ -496,7 +401,7 @@ export default function TokenOverviewPage() {
               </div>
 
               {/* Price and Balance */}
-              <div className="mb-1">
+              <div className="mb-1 flex-shrink-0">
                 <div className="flex flex-row items-center justify-start text-xl font-bold text-white mb-0.5 font-satoshi gap-1">
                   {formatCurrency(marketData.price || 0)}
                   <div
@@ -515,7 +420,7 @@ export default function TokenOverviewPage() {
               </div>
 
               {/* Social Links */}
-              <div className="flex gap-1.5 mb-2">
+              <div className="flex gap-1.5 mb-2 flex-shrink-0">
                 {metadata.socials?.twitter && (
                   <div className="relative">
                     <div className="relative p-[1px] rounded-lg overflow-hidden">
@@ -595,7 +500,7 @@ export default function TokenOverviewPage() {
               </div>
 
               {/* Time Period Buttons */}
-              <div className="grid grid-cols-4 gap-1.5 mb-2">
+              <div className="grid grid-cols-4 gap-1.5 mb-2 flex-shrink-0">
                 {[
                   { label: "5M", value: priceChangeData.m5 || 0 },
                   { label: "1H", value: priceChangeData.h1 || 0 },
@@ -625,7 +530,7 @@ export default function TokenOverviewPage() {
               </div>
 
               {/* Stats Grid */}
-              <div className="rounded-lg border border-[#2C2C2C] p-2 mb-2">
+              <div className="rounded-lg border border-[#2C2C2C] p-2 mb-2 flex-shrink-0">
                 <div className="grid grid-cols-3 gap-3 mb-3">
                   <div>
                     <div className="text-gray-400 text-[9px] font-satoshi mb-0.5">
@@ -684,7 +589,7 @@ export default function TokenOverviewPage() {
               </div>
 
               {/* Buy/Sell Section */}
-              <div className="rounded-lg border border-[#2C2C2C] p-2">
+              <div className="rounded-lg border border-[#2C2C2C] p-2 flex-shrink-0">
                 <div className="flex gap-2 items-center justify-center">
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-1.5">
@@ -781,7 +686,7 @@ export default function TokenOverviewPage() {
             </div>
 
             {/* PAL Score Card */}
-            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-2.5 flex flex-col">
+            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-2.5 flex flex-col flex-shrink-0">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-white text-base font-semibold font-mayeka whitespace-nowrap">
                   PAL Score
