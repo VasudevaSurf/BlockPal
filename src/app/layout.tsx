@@ -5,6 +5,7 @@ import "./globals.css";
 import { Provider } from "react-redux";
 import { store } from "@/store";
 import { WalletProvider } from "@/components/wallet/WalletProvider";
+import { ToastProvider } from "@/contexts/ToastContext";
 import {
   mayekaBoldDemo,
   mayekaDemiBoldDemo,
@@ -81,9 +82,11 @@ export default function RootLayout({
         className={`${mayekaBoldDemo.variable} ${mayekaDemiBoldDemo.variable} ${mayeka.variable} ${satoshi.variable} antialiased`}
       >
         <Provider store={store}>
-          <WalletErrorBoundary>
-            <WalletProvider>{children}</WalletProvider>
-          </WalletErrorBoundary>
+          <ToastProvider>
+            <WalletErrorBoundary>
+              <WalletProvider>{children}</WalletProvider>
+            </WalletErrorBoundary>
+          </ToastProvider>
         </Provider>
       </body>
     </html>

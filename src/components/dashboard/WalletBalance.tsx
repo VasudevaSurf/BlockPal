@@ -16,6 +16,7 @@ import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
 import { useWalletData } from "@/contexts/WalletDataContext";
 import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
+import { useToast } from "@/contexts/ToastContext";
 
 const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
   const isValidChange =
@@ -75,6 +76,8 @@ export default function WalletBalance() {
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
 
+  const { showToast } = useToast();
+
   const [copyState, setCopyState] = useState({
     isCopied: false,
     isAnimating: false,
@@ -84,11 +87,15 @@ export default function WalletBalance() {
     try {
       await navigator.clipboard.writeText(text);
       setCopyState({ isCopied: true, isAnimating: true });
+
+      showToast("success", "Wallet address copied to clipboard!", 2000);
+
       setTimeout(() => {
         setCopyState({ isCopied: false, isAnimating: false });
       }, 2000);
     } catch (err) {
       console.error("Failed to copy: ", err);
+      showToast("error", "Failed to copy address", 2000);
     }
   };
 

@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - UPDATED TO USE CACHE
+// src/components/dashboard/TokenList.tsx - UPDATED TO USE CACHE WITH FIXED MENU
 "use client";
 
 import React, {
@@ -28,6 +28,7 @@ import {
   Minus,
 } from "lucide-react";
 import { chains } from "@/components/wallet/WalletProvider";
+import { useToast } from "@/contexts/ToastContext";
 
 // CSS for sliding menu
 const tokenRowStyles = `
@@ -303,11 +304,18 @@ const ThreeDotMenu = ({
     }
   }, [isOpen]);
 
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsOpen(!isOpen);
+  };
+
   const handleAction = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (isAnimating) return;
+
     setIsAnimating(true);
 
     if (isInMainList && onRemoveFromMain && !token.isPreset) {
@@ -326,12 +334,11 @@ const ThreeDotMenu = ({
     <div ref={menuRef} className="relative" style={{ zIndex: 10 }}>
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
+        onClick={handleButtonClick}
+        onMouseDown={(e) => e.stopPropagation()}
         className="p-1 text-gray-400 hover:text-white hover:bg-[#2C2C2C] rounded-lg transition-colors relative z-10"
         title={isInMainList ? "Remove from main list" : "Add to main list"}
+        style={{ pointerEvents: "auto" }}
       >
         <MoreVertical size={14} />
       </button>
@@ -433,6 +440,8 @@ export default function TokenList() {
 
   const trendingTokens = coinGeckoData?.trendingTokens || [];
   const topGainersData = coinGeckoData?.topGainers || [];
+
+  const { showToast } = useToast();
 
   // ✅ Get tokens from cached wallet data
   const allTokens = walletData.tokens;
@@ -547,10 +556,13 @@ export default function TokenList() {
         setPreferences(updatedPrefs);
         // Refresh wallet data to update token flags
         await refresh(true);
+        showToast("success", "Token added to main list successfully!", 3000);
+
         console.log(`✅ Token added to main list: ${tokenAddress}`);
       }
     } catch (error: any) {
       console.error("❌ Error adding token:", error);
+      showToast("error", "Failed to add token. Please try again.", 4000);
     } finally {
       setAddingToken(null);
     }
@@ -579,10 +591,13 @@ export default function TokenList() {
         setPreferences(updatedPrefs);
         // Refresh wallet data to update token flags
         await refresh(true);
+        showToast("success", "Token removed from main list", 3000);
+
         console.log(`✅ Token removed from main list: ${tokenAddress}`);
       }
     } catch (error: any) {
       console.error("❌ Error removing token:", error);
+      showToast("error", "Failed to remove token. Please try again.", 4000);
     } finally {
       setAddingToken(null);
     }
@@ -811,63 +826,74 @@ export default function TokenList() {
                     }
                   >
                     <div className="space-y-2 pr-1">
-                      {mainTokens.map((token, index) => (
-                        <div
-                          key={`${token.contractAddress}_${index}_main`}
-                          className={`token-row ${
-                            token.isUserAdded ? "has-menu" : ""
-                          } flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
-                            isNavigating ||
-                            addingToken === token.contractAddress
-                              ? "opacity-70"
-                              : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
-                          }`}
-                          style={{ zIndex: mainTokens.length - index }}
-                        >
-                          <div className="token-content-wrapper">
-                            <div className="token-info">
-                              <TokenImage
-                                src={token.logoUrl}
-                                alt={token.symbol}
-                                symbol={token.symbol}
-                                name={token.name}
-                                className="w-10 h-10 mr-2.5 flex-shrink-0"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <div className="text-white font-medium font-satoshi text-sm flex items-center">
-                                  {token.name}
-                                  <PercentageDisplay
-                                    change24h={token.change24h}
-                                    size="xs"
-                                  />
-                                </div>
-                                <div className="text-gray-400 text-xs font-satoshi">
-                                  {formatTokenAmount(token.balance, 4)}{" "}
-                                  {token.symbol}
+                      {mainTokens.map((token, index) => {
+                        // ✅ FIXED: Check if token is user-added (not preset)
+                        const isUserAddedInMain =
+                          preferences?.userAddedTokens?.includes(
+                            token.contractAddress
+                          ) && !token.isPreset;
+
+                        return (
+                          <div
+                            key={`${token.contractAddress}_${index}_main`}
+                            className={`token-row ${
+                              isUserAddedInMain ? "has-menu" : ""
+                            } flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
+                              isNavigating ||
+                              addingToken === token.contractAddress
+                                ? "opacity-70"
+                                : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+                            }`}
+                            style={{ zIndex: mainTokens.length - index }}
+                          >
+                            <div className="token-content-wrapper">
+                              <div className="token-info">
+                                <TokenImage
+                                  src={token.logoUrl}
+                                  alt={token.symbol}
+                                  symbol={token.symbol}
+                                  name={token.name}
+                                  className="w-10 h-10 mr-2.5 flex-shrink-0"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-white font-medium font-satoshi text-sm flex items-center">
+                                    {token.name}
+                                    <PercentageDisplay
+                                      change24h={token.change24h}
+                                      size="xs"
+                                    />
+                                  </div>
+                                  <div className="text-gray-400 text-xs font-satoshi">
+                                    {formatTokenAmount(token.balance, 4)}{" "}
+                                    {token.symbol}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            <div className="token-values-wrapper">
-                              <div className="token-values">
-                                <div className="text-white font-medium font-satoshi text-sm">
-                                  {formatCurrency(token.value)}
+                              <div className="token-values-wrapper">
+                                <div className="token-values">
+                                  <div className="text-white font-medium font-satoshi text-sm">
+                                    {formatCurrency(token.value)}
+                                  </div>
                                 </div>
+
+                                {/* ✅ FIXED: Only show menu for user-added tokens */}
+                                {isUserAddedInMain && (
+                                  <div className="menu-button-wrapper">
+                                    <ThreeDotMenu
+                                      token={token}
+                                      onRemoveFromMain={
+                                        handleRemoveFromMainList
+                                      }
+                                      isInMainList={true}
+                                    />
+                                  </div>
+                                )}
                               </div>
-
-                              {token.isUserAdded && (
-                                <div className="menu-button-wrapper">
-                                  <ThreeDotMenu
-                                    token={token}
-                                    onRemoveFromMain={handleRemoveFromMainList}
-                                    isInMainList={true}
-                                  />
-                                </div>
-                              )}
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -887,8 +913,8 @@ export default function TokenList() {
                       {additionalTokens.map((token, index) => (
                         <div
                           key={`${token.contractAddress}_${index}_additional`}
-                          onClick={() => handleTokenClick(token)}
-                          className={`token-row has-menu flex items-center justify-between p-2.5 rounded-lg transition-colors relative cursor-pointer ${
+                          // ✅ FIXED: Removed onClick handler to allow menu to work
+                          className={`token-row has-menu flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
                             isNavigating ||
                             addingToken === token.contractAddress
                               ? "opacity-70"

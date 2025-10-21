@@ -275,7 +275,7 @@ export default function TokenOverviewPage() {
 
         {/* Desktop Layout - FIXED */}
         <div className="hidden xl:flex gap-3 flex-1 min-h-0 max-h-full overflow-hidden">
-          <div className="flex-[0_0_66%] flex flex-col gap-3 min-w-0 max-h-full">
+          <div className="flex-[0_0_70%] flex flex-col gap-3 min-w-0 max-h-full">
             {/* Main Chart Section with New Chart UI */}
             <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex-1 flex flex-col min-h-0">
               <div className="flex items-center justify-between mb-3 flex-shrink-0">
@@ -363,8 +363,8 @@ export default function TokenOverviewPage() {
           </div>
 
           {/* Sidebar - Right Section */}
-          <div className="w-full flex-1 max-h-full flex flex-col gap-2 overflow-hidden">
-            <div className="flex-1 bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex flex-col justify-between space-y-1.5 min-h-0 overflow-y-auto scrollbar-hide">
+          <div className="w-full flex-1 max-h-full flex flex-col gap-2 overflow-y-auto scrollbar-hide">
+            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex flex-col justify-between space-y-1.5 flex-shrink-0">
               {/* Header with token info */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div
@@ -685,34 +685,34 @@ export default function TokenOverviewPage() {
               </div>
             </div>
 
-            {/* PAL Score Card */}
-            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-2.5 flex flex-col flex-shrink-0">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-white text-base font-semibold font-mayeka whitespace-nowrap">
+            {/* PAL Score Card - MINIMIZED */}
+            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-2 flex flex-col flex-shrink-0 pt-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className="text-white text-sm font-semibold font-mayeka whitespace-nowrap">
                   PAL Score
                 </h3>
-                <div className="flex-1 h-[1.5px] bg-white mx-10"></div>
+                <div className="flex-1 h-[1.5px] bg-white mx-6"></div>
                 <div className="flex items-center gap-0.5">
-                  <span className="text-[#F39C12] text-xl font-bold font-mayeka">
+                  <span className="text-[#F39C12] text-lg font-bold font-mayeka">
                     {Math.round(metadata.palScore || 0)}
                   </span>
-                  <span className="text-[#4CAF50] text-xl font-bold font-mayeka">
+                  <span className="text-[#4CAF50] text-lg font-bold font-mayeka">
                     /100
                   </span>
                 </div>
               </div>
 
-              <div className="flex gap-3 flex-1">
+              <div className="flex gap-2 flex-1">
                 {/* Left Side - Gauge */}
                 <div
-                  className="flex-shrink-0 bg-gradient-to-br from-[#0F0F0F] to-[#1a1a1a] rounded-2xl p-1.5 flex flex-col items-center justify-center relative overflow-hidden"
-                  style={{ width: "140px" }}
+                  className="flex-shrink-0 bg-gradient-to-br from-[#0F0F0F] to-[#1a1a1a] rounded-2xl p-1 flex flex-col items-center justify-center relative overflow-hidden"
+                  style={{ width: "110px" }}
                 >
                   <div className="relative w-full flex flex-col items-center justify-center z-10">
                     <div className="relative mb-0.5">
                       <svg
-                        width="85"
-                        height="85"
+                        width="70"
+                        height="70"
                         viewBox="0 0 100 100"
                         className="absolute inset-0"
                       >
@@ -766,8 +766,8 @@ export default function TokenOverviewPage() {
                       </svg>
 
                       <svg
-                        width="85"
-                        height="85"
+                        width="70"
+                        height="70"
                         viewBox="0 0 100 100"
                         className="transform -rotate-90"
                       >
@@ -809,9 +809,9 @@ export default function TokenOverviewPage() {
                       </svg>
 
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <div className="relative px-2.5 py-1.5 rounded-lg flex items-center justify-center flex-col">
+                        <div className="relative px-2 py-1 rounded-lg flex items-center justify-center flex-col">
                           <div
-                            className={`text-xl font-bold font-satoshi ${
+                            className={`text-lg font-bold font-satoshi ${
                               (metadata.palScore || 0) < 30
                                 ? "text-[#E74C3C]"
                                 : (metadata.palScore || 0) < 60
@@ -821,7 +821,7 @@ export default function TokenOverviewPage() {
                           >
                             {Math.round(metadata.palScore || 0)}
                           </div>
-                          <div className="text-gray-400 text-[7px] font-satoshi text-center leading-tight">
+                          <div className="text-gray-400 text-[6px] font-satoshi text-center leading-tight">
                             {(metadata.palScore || 0) < 30
                               ? "HIGH RISK"
                               : (metadata.palScore || 0) < 60
@@ -875,48 +875,48 @@ export default function TokenOverviewPage() {
                 </div>
 
                 {/* Right Side - Scores */}
-                <div className="flex-1 flex flex-col justify-start gap-3 pt-2">
-                  <div className="space-y-2">
+                <div className="flex-1 flex flex-col justify-start gap-2 pt-1">
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-white text-xs font-satoshi">
+                      <span className="text-white text-[11px] font-satoshi">
                         Pool Score
                       </span>
                       <div className="flex items-center gap-0.5">
-                        <span className="text-[#F39C12] text-base font-bold font-satoshi">
+                        <span className="text-[#F39C12] text-sm font-bold font-satoshi">
                           {Math.round(metadata.poolScore || 0)}
                         </span>
-                        <span className="text-[#4CAF50] text-xs font-satoshi">
+                        <span className="text-[#4CAF50] text-[10px] font-satoshi">
                           / 100
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-white text-xs font-satoshi">
+                      <span className="text-white text-[11px] font-satoshi">
                         Token Score
                       </span>
                       <div className="flex items-center gap-0.5">
-                        <span className="text-[#F39C12] text-base font-bold font-satoshi">
+                        <span className="text-[#F39C12] text-sm font-bold font-satoshi">
                           {Math.round(metadata.tokenScore || 0)}
                         </span>
-                        <span className="text-[#4CAF50] text-xs font-satoshi">
+                        <span className="text-[#4CAF50] text-[10px] font-satoshi">
                           /100
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-[#2C2C2C] p-2 flex items-center justify-between">
+                  <div className="rounded-lg border border-[#2C2C2C] p-1.5 flex items-center justify-between">
                     <div>
-                      <div className="text-[#F39C12] text-xs font-semibold font-satoshi">
+                      <div className="text-[#F39C12] text-[11px] font-semibold font-satoshi">
                         {metadata.riskLevel || "Unknown"}
                       </div>
-                      <div className="text-white text-[10px] font-satoshi mt-0.5">
+                      <div className="text-white text-[9px] font-satoshi mt-0.5">
                         {metadata.isHoneypot
                           ? "Honeypot Detected"
                           : metadata.cautionNotes?.[0] || "No warnings"}
                       </div>
                     </div>
-                    <div className="scale-75">
+                    <div className="scale-[0.65]">
                       <WarningIcon />
                     </div>
                   </div>
