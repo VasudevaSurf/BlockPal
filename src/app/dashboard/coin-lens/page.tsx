@@ -33,7 +33,7 @@ function CoinLensContent() {
   const { user } = useSelector((state: RootState) => state.auth);
   const { searchQuery, setSearchQuery, setOnAddTokenClick } =
     useCodeLensContext();
-  const { setDataReady } = useCoinLensLoading();
+  const { setDataReady, resetLoading } = useCoinLensLoading();
 
   const [tokens, setTokens] = useState<Token[]>([]);
   const [filteredTokens, setFilteredTokens] = useState<Token[]>([]);
@@ -43,9 +43,15 @@ function CoinLensContent() {
   const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
   const [connected, setConnected] = useState(false);
 
+  // ✅ NEW: Track if we've received initial data
+  const [hasReceivedData, setHasReceivedData] = useState(false);
+  // ✅ NEW: Track loading state for cache/data
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
   const watchlistReceivedRef = useRef(false);
   const hasReportedDataRef = useRef(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const mountTimeRef = useRef(Date.now());
 
   // Handle clicking outside menu
   useEffect(() => {
@@ -78,23 +84,36 @@ function CoinLensContent() {
     setOnAddTokenClick(() => () => setAddTokensModalOpen(true));
   }, [setOnAddTokenClick]);
 
-  // Report data ready when watchlist is received or when connected without tokens
+  // ✅ FIXED: Report data ready when we receive watchlist
   useEffect(() => {
-    if (!hasReportedDataRef.current) {
-      // Data is ready when:
-      // 1. We have received the watchlist (with or without tokens)
-      // 2. OR we're connected and the watchlist request has been processed
-      if (watchlistReceivedRef.current || (connected && tokens.length === 0)) {
-        console.log("✅ CoinLens: Marking data as ready", {
-          tokensCount: tokens.length,
-          connected,
-          watchlistReceived: watchlistReceivedRef.current,
-        });
-        setDataReady();
-        hasReportedDataRef.current = true;
-      }
+    if (!hasReportedDataRef.current && watchlistReceivedRef.current) {
+      const timeSinceMount = Date.now() - mountTimeRef.current;
+      console.log("✅ CoinLens: Marking data as ready", {
+        tokensCount: tokens.length,
+        connected,
+        timeSinceMount: `${timeSinceMount}ms`,
+      });
+
+      setHasReceivedData(true);
+      setDataReady();
+      hasReportedDataRef.current = true;
     }
-  }, [tokens.length, connected, setDataReady]);
+  }, [tokens.length, connected, setDataReady, watchlistReceivedRef.current]);
+
+  // ✅ FIXED: Reset loading state when component mounts or user changes
+  useEffect(() => {
+    console.log("🔄 CoinLens: Component mounted/user changed");
+
+    // Reset states
+    setHasReceivedData(false);
+    setIsLoadingData(true); // ✅ Show loading when switching tabs
+    watchlistReceivedRef.current = false;
+    hasReportedDataRef.current = false;
+    mountTimeRef.current = Date.now();
+
+    // Reset loading context
+    resetLoading();
+  }, [user?.email, resetLoading]);
 
   useEffect(() => {
     if (!user?.email) {
@@ -108,7 +127,18 @@ function CoinLensContent() {
       `Connection status: ${isAlreadyConnected ? "Connected" : "Not connected"}`
     );
 
-    coinlesSocketClient.connect(user.email);
+    // If already connected, request fresh data
+    if (isAlreadyConnected) {
+      console.log("🔄 Already connected, requesting fresh watchlist...");
+      setConnected(true);
+
+      // ✅ IMPORTANT: Request watchlist immediately
+      setTimeout(() => {
+        coinlesSocketClient.emit("register", { email: user.email });
+      }, 100);
+    } else {
+      coinlesSocketClient.connect(user.email);
+    }
 
     const handleWatchlist = (data: any[]) => {
       console.log("📋 Received watchlist:", data.length, "tokens");
@@ -117,6 +147,7 @@ function CoinLensContent() {
       setFilteredTokens(transformedTokens);
       setConnected(true);
       watchlistReceivedRef.current = true;
+      setIsLoadingData(false); // ✅ Hide loading when data arrives
     };
 
     const handleTokenUpdate = (update: any) => {
@@ -158,11 +189,24 @@ function CoinLensContent() {
     const handleConnect = () => {
       console.log("✅ WebSocket connected");
       setConnected(true);
+
+      // ✅ Request fresh data on connect
+      if (user?.email) {
+        setTimeout(() => {
+          coinlesSocketClient.emit("register", { email: user.email });
+        }, 100);
+      }
     };
 
     const handleDisconnect = () => {
       console.log("❌ WebSocket disconnected");
       setConnected(false);
+
+      // ✅ Reset states on disconnect
+      setHasReceivedData(false);
+      setIsLoadingData(true); // ✅ Show loading on disconnect
+      watchlistReceivedRef.current = false;
+      hasReportedDataRef.current = false;
     };
 
     coinlesSocketClient.on("watchlist", handleWatchlist);
@@ -172,16 +216,6 @@ function CoinLensContent() {
     coinlesSocketClient.on("error", handleError);
     coinlesSocketClient.on("connect", handleConnect);
     coinlesSocketClient.on("disconnect", handleDisconnect);
-
-    if (isAlreadyConnected && !watchlistReceivedRef.current) {
-      console.log("🔄 Already connected, requesting watchlist...");
-      setTimeout(() => {
-        coinlesSocketClient.emit("register", { email: user.email });
-      }, 100);
-    } else if (watchlistReceivedRef.current) {
-      console.log("✅ Using cached watchlist data");
-      setConnected(true);
-    }
 
     return () => {
       coinlesSocketClient.off("watchlist", handleWatchlist);
@@ -272,10 +306,33 @@ function CoinLensContent() {
     return `$${num.toFixed(2)}`;
   };
 
+  // const formatPrice = (price: number): string => {
+  //   if (!isValidValue(price)) {
+  //     return "N/A";
+  //   }
+  //   return `$${price.toLocaleString(undefined, {
+  //     minimumFractionDigits: 2,
+  //     maximumFractionDigits: 6,
+  //   })}`;
+  // };
+
   const formatPrice = (price: number): string => {
     if (!isValidValue(price)) {
       return "N/A";
     }
+
+    // Get the integer part of the number
+    const integerPart = Math.floor(Math.abs(price));
+
+    // If integer part is greater than 0, show only 2 decimal places
+    if (integerPart > 0) {
+      return `$${price.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    }
+
+    // If integer part is 0, use the previous logic (2-6 decimal places)
     return `$${price.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 6,
@@ -379,6 +436,12 @@ function CoinLensContent() {
     );
   };
 
+  // ✅ FIXED: Show message only when we've received data and it's empty
+  const showEmptyMessage =
+    hasReceivedData && filteredTokens.length === 0 && !isLoadingData;
+  const showLoadingState = isLoadingData && filteredTokens.length === 0;
+  const showRefreshingIndicator = isLoadingData && filteredTokens.length > 0;
+
   return (
     <div className="h-full bg-[#000000] rounded-[16px] p-2 sm:p-4 flex flex-col overflow-hidden relative">
       {/* Token List Table */}
@@ -398,7 +461,28 @@ function CoinLensContent() {
 
         {/* Table Body */}
         <div className="flex-1 overflow-y-auto scrollbar-hide relative">
-          {filteredTokens.length === 0 ? (
+          {/* ✅ NEW: Refreshing indicator for cached data */}
+          {showRefreshingIndicator && (
+            <div className="absolute top-4 right-4 z-10 bg-black/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-[#2C2C2C] shadow-lg">
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#E2AF19]"></div>
+                <p className="text-gray-300 font-satoshi text-xs">
+                  Refreshing...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {showLoadingState ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                {/* <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19]"></div> */}
+                <p className="text-gray-400 font-satoshi text-xs sm:text-sm">
+                  Loading tokens...
+                </p>
+              </div>
+            </div>
+          ) : showEmptyMessage ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-gray-500 font-satoshi text-xs sm:text-sm">
                 {searchQuery
