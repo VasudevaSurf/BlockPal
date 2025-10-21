@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED: Mobile width alignment
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED: Hide on mobile for token overview
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -362,6 +362,15 @@ export default function GlobalDashboardHeader({
   const isCoinLensPage = pathname === "/dashboard/coin-lens";
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
   const isPortfolioPage = pathname === "/dashboard";
+
+  // Hide header completely on mobile for token overview page
+  if (
+    isTokenOverviewPage &&
+    typeof window !== "undefined" &&
+    window.innerWidth < 1024
+  ) {
+    return null;
+  }
 
   const pageInfo = getPageTitle(pathname);
   const displayTitle = propTitle !== "Dashboard" ? propTitle : pageInfo.title;

@@ -1,4 +1,4 @@
-// src/components/ChartUI.tsx - FIXED: Added High/Low hover display
+// src/components/ChartUI.tsx - MOBILE OPTIMIZED: Fixed responsive layout
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -24,7 +24,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
   const chartRef = useRef<any>(null);
   const candlestickSeriesRef = useRef<any>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const chartDataRef = useRef<any[]>([]); // ✅ Store chart data for crosshair lookup
+  const chartDataRef = useRef<any[]>([]);
   const [isClient, setIsClient] = useState(false);
 
   const [selectedTimeframe, setSelectedTimeframe] = useState("1h");
@@ -32,6 +32,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoverData, setHoverData] = useState<HoverData | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [tokenInfo, setTokenInfo] = useState({
     name: "Loading...",
     symbol: "Loading...",
@@ -106,6 +107,16 @@ const ChartUI: React.FC<ChartUIProps> = ({
 
   useEffect(() => {
     setIsClient(true);
+
+    // Detect mobile on mount and window resize
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Fetch OHLCV data from CoinGecko
@@ -334,7 +345,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
         chartRef.current = chart;
         candlestickSeriesRef.current = candlestickSeries;
 
-        // ✅ Subscribe to crosshair move - shows H/L values on hover
+        // Subscribe to crosshair move - shows H/L values on hover
         chart.subscribeCrosshairMove((param: any) => {
           if (!isMounted) return;
 
@@ -370,7 +381,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
         const data = await fetchChartData(selectedTimeframe);
         if (isMounted && data.length > 0) {
           console.log("📊 Setting initial chart data:", data.length, "points");
-          chartDataRef.current = data; // ✅ Store data in ref for crosshair lookup
+          chartDataRef.current = data;
           candlestickSeries.setData(data);
           chart.timeScale().fitContent();
           console.log("✅ Chart data set successfully");
@@ -433,7 +444,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
       fetchChartData(selectedTimeframe).then((data) => {
         if (data.length > 0 && candlestickSeriesRef.current) {
           console.log("📊 Updating chart data:", data.length, "points");
-          chartDataRef.current = data; // ✅ Update stored data
+          chartDataRef.current = data;
           candlestickSeriesRef.current.setData(data);
           chartRef.current.timeScale().fitContent();
           console.log("✅ Chart updated");
@@ -476,33 +487,37 @@ const ChartUI: React.FC<ChartUIProps> = ({
         borderRadius: "12px",
         display: "flex",
         flexDirection: "column",
-        gap: "12px",
+        gap: isMobile ? "8px" : "12px",
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        padding: "12px",
+        padding: isMobile ? "8px" : "12px",
       }}
     >
-      {/* Header - Timeframe Selector and H/L Display */}
+      {/* Header - Mobile: Stack vertically, Desktop: Side by side */}
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "stretch" : "center",
           justifyContent: "space-between",
+          gap: isMobile ? "8px" : "0",
           padding: "0",
         }}
       >
-        {/* H/L Display on the left - only shows when hovering */}
+        {/* H/L Display - Full width on mobile when hovering */}
         {hoverData && (
           <div
             style={{
               display: "flex",
-              gap: "20px",
-              padding: "8px 12px",
-              fontSize: "12px",
+              gap: isMobile ? "12px" : "20px",
+              padding: isMobile ? "6px 10px" : "8px 12px",
+              fontSize: isMobile ? "11px" : "12px",
               color: "#9B9B9B",
               backgroundColor: "rgba(25, 26, 26, 0.95)",
               borderRadius: "6px",
               border: "1px solid rgba(255, 255, 255, 0.1)",
+              justifyContent: isMobile ? "center" : "flex-start",
+              order: isMobile ? 2 : 1,
             }}
           >
             <div>
@@ -520,18 +535,25 @@ const ChartUI: React.FC<ChartUIProps> = ({
           </div>
         )}
 
-        {/* Spacer to push timeframe selector to the right */}
-        <div style={{ flex: 1 }}></div>
+        {/* Spacer - only on desktop when not hovering */}
+        {!isMobile && !hoverData && <div style={{ flex: 1 }}></div>}
 
-        {/* Timeframe Selector on the right */}
+        {/* Timeframe Selector - Scrollable on mobile */}
         <div
           style={{
             display: "flex",
-            gap: "6px",
+            gap: isMobile ? "4px" : "6px",
             backgroundColor: "#191a1a",
-            padding: "3px",
+            padding: isMobile ? "2px" : "3px",
             borderRadius: "6px",
+            overflowX: isMobile ? "auto" : "visible",
+            overflowY: "hidden",
+            order: isMobile ? 1 : 2,
+            // Hide scrollbar but keep functionality
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
           }}
+          className="timeframe-scroll"
         >
           {timeframes.map((tf) => (
             <button
@@ -539,7 +561,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
               onClick={() => setSelectedTimeframe(tf.value)}
               disabled={isLoading}
               style={{
-                padding: "6px 12px",
+                padding: isMobile ? "5px 10px" : "6px 12px",
                 backgroundColor:
                   selectedTimeframe === tf.value ? "#2a2a2a" : "transparent",
                 color: selectedTimeframe === tf.value ? "#ffffff" : "#9B9B9B",
@@ -548,12 +570,14 @@ const ChartUI: React.FC<ChartUIProps> = ({
                     ? "1px solid rgba(255, 255, 255, 0.1)"
                     : "1px solid transparent",
                 borderRadius: "4px",
-                fontSize: "11px",
+                fontSize: isMobile ? "10px" : "11px",
                 fontWeight: "500",
                 cursor: isLoading ? "not-allowed" : "pointer",
                 transition: "all 0.2s ease",
                 outline: "none",
                 opacity: isLoading ? 0.5 : 1,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 if (selectedTimeframe !== tf.value && !isLoading) {
@@ -604,10 +628,10 @@ const ChartUI: React.FC<ChartUIProps> = ({
                 left: "50%",
                 transform: "translate(-50%, -50%)",
                 color: "#FF5252",
-                fontSize: "12px",
+                fontSize: isMobile ? "11px" : "12px",
                 zIndex: 10,
                 textAlign: "center",
-                padding: "20px",
+                padding: isMobile ? "15px" : "20px",
                 backgroundColor: "rgba(25, 26, 26, 0.95)",
                 borderRadius: "8px",
                 border: "1px solid rgba(255, 82, 82, 0.3)",
@@ -617,7 +641,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
               <div
                 style={{
                   marginBottom: "8px",
-                  fontSize: "14px",
+                  fontSize: isMobile ? "13px" : "14px",
                   fontWeight: "600",
                 }}
               >
@@ -636,7 +660,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
                 left: "50%",
                 transform: "translate(-50%, -50%)",
                 color: "#9B9B9B",
-                fontSize: "12px",
+                fontSize: isMobile ? "11px" : "12px",
                 zIndex: 10,
               }}
             >
@@ -651,19 +675,31 @@ const ChartUI: React.FC<ChartUIProps> = ({
             position: "absolute",
             bottom: "6px",
             left: "6px",
-            fontSize: "10px",
+            fontSize: isMobile ? "9px" : "10px",
             color: "#666",
             display: "flex",
             alignItems: "center",
             gap: "4px",
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <svg
+            width={isMobile ? "12" : "14"}
+            height={isMobile ? "12" : "14"}
+            viewBox="0 0 16 16"
+            fill="currentColor"
+          >
             <path d="M8 0L0 2.5V6C0 10 3 14 8 16C13 14 16 10 16 6V2.5L8 0Z" />
           </svg>
           TV
         </div>
       </div>
+
+      {/* CSS for hiding scrollbar */}
+      <style jsx>{`
+        .timeframe-scroll::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 };
