@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED: Hide wallet/notifications on mobile CoinLens
+// src/components/dashboard/GlobalDashboardHeader.tsx - FIXED: Mobile width alignment
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -602,7 +602,7 @@ export default function GlobalDashboardHeader({
 
         {/* CoinLens Search Bar - Centered on mobile, starts from left on desktop */}
         {isCoinLensPage && (
-          <div className="flex-1 relative lg:mr-4">
+          <div className="flex-1 relative lg:mr-4 mx-2 sm:mx-0">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
             <input
               type="text"
@@ -625,7 +625,7 @@ export default function GlobalDashboardHeader({
         {isNewsFeedPage && (
           <form
             onSubmit={handleNewsSearchSubmit}
-            className="flex-1 flex gap-2 lg:mr-4"
+            className="flex-1 flex gap-2 lg:mr-4 mx-2.5 sm:mx-0"
           >
             <div className="relative flex-1">
               <input
@@ -693,7 +693,7 @@ export default function GlobalDashboardHeader({
           </form>
         )}
 
-        {/* ✅ UPDATED: Hide wallet/notifications on mobile for CoinLens and NewsFeed pages */}
+        {/* ✅ Hide wallet/notifications on mobile for CoinLens and NewsFeed pages */}
         <div
           className={`flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4 ${
             isCoinLensPage || isNewsFeedPage ? "hidden lg:flex" : ""
@@ -869,18 +869,6 @@ export default function GlobalDashboardHeader({
           {/* Action Icons Container */}
           <div className="flex items-center space-x-2 relative">
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-1.5 lg:px-2 py-1.5 lg:py-2">
-              {/* <button
-                onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full relative"
-              >
-                <Bell size={14} className="text-gray-400 lg:w-4 lg:h-4" />
-                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-satoshi">
-                  3
-                </span>
-              </button>
-
-              <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div> */}
-
               <button
                 onClick={handleProfileClick}
                 className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full"
