@@ -18,6 +18,7 @@ import {
   Edit3,
 } from "lucide-react";
 import { RootState } from "@/store";
+import { useToast } from "@/contexts/ToastContext";
 
 interface Message {
   id: string;
@@ -46,6 +47,7 @@ interface Conversation {
 }
 
 export default function AIChatPage() {
+  const { showToast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -639,6 +641,13 @@ export default function AIChatPage() {
         throw new Error("Failed to update star status");
       }
 
+      showToast(
+        "success",
+        newStarredState
+          ? "Conversation starred successfully"
+          : "Conversation unstarred"
+      );
+
       console.log(
         `⭐ ${
           newStarredState ? "Starred" : "Unstarred"
@@ -659,6 +668,7 @@ export default function AIChatPage() {
       // Show error to user
       setError("Failed to update star status");
       setTimeout(() => setError(null), 3000);
+      showToast("error", "Failed to update star status");
     } finally {
       setOpenMenuId(null);
     }
@@ -709,6 +719,7 @@ export default function AIChatPage() {
       if (!response.ok) {
         throw new Error("Failed to rename conversation");
       }
+      showToast("success", "Conversation renamed successfully");
 
       console.log(`✏️ Renamed conversation ${conversationId} to: ${newTitle}`);
     } catch (error) {
@@ -726,6 +737,7 @@ export default function AIChatPage() {
       // Show error to user
       setError("Failed to rename conversation");
       setTimeout(() => setError(null), 3000);
+      showToast("error", "Failed to rename conversation");
     } finally {
       setRenamingId(null);
       setEditingId(null);
@@ -773,6 +785,7 @@ export default function AIChatPage() {
       if (!response.ok) {
         throw new Error("Failed to delete conversation");
       }
+      showToast("success", "Conversation deleted successfully");
 
       console.log(`🗑️ Deleted conversation: ${conversationIdToDelete}`);
     } catch (error) {
@@ -786,6 +799,7 @@ export default function AIChatPage() {
       // Show error to user
       setError("Failed to delete conversation");
       setTimeout(() => setError(null), 3000);
+      showToast("error", "Failed to delete conversation");
     } finally {
       setOpenMenuId(null);
     }

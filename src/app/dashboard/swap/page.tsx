@@ -20,6 +20,7 @@ import TokenSelector from "@/components/swap/TokenSelectorModal";
 import SwapIcon from "@/components/icons/SwapIcon";
 import { useSwap } from "@/hooks/useSwap";
 import { swapHistoryService } from "@/services/swapHistoryService";
+import { useToast } from "@/contexts/ToastContext";
 
 // Icon Components
 const LightningIcon = ({ size = 16, className = "", ...props }: any) => (
@@ -337,6 +338,7 @@ const SelectTokenButton = ({ onClick }: { onClick: () => void }) => {
 };
 
 export default function SwapPage() {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState("swap");
   const [showChainSelector, setShowChainSelector] = useState(false);
   const [showFromTokenSelector, setShowFromTokenSelector] = useState(false);
@@ -425,14 +427,49 @@ export default function SwapPage() {
       setSwipeCompleted(true);
       x.set(containerWidth - 50);
 
-      const success = await executeSwap();
+      try {
+        const success = await executeSwap();
 
-      if (success) {
-        setTimeout(() => {
+        if (success) {
+          // ✅ Show success toast
+          showToast(
+            "success",
+            `Successfully swapped ${fromAmount} ${fromToken?.symbol} to ${toAmount} ${toToken?.symbol}`,
+            4000
+          );
+
+          setTimeout(() => {
+            setSwipeCompleted(false);
+            x.set(0);
+          }, 2000);
+        } else {
+          // ✅ Show error toast for failed swap
+          showToast(
+            "error",
+            "Swap failed. Please try again or check your wallet.",
+            5000
+          );
+
           setSwipeCompleted(false);
           x.set(0);
-        }, 2000);
-      } else {
+        }
+      } catch (error: any) {
+        // ✅ Show error toast for exceptions
+        console.error("Swap error:", error);
+
+        // Provide specific error messages based on error type
+        let errorMessage = "Swap failed unexpectedly. Please try again.";
+
+        if (error.message?.includes("user rejected")) {
+          errorMessage = "Transaction was rejected by user.";
+        } else if (error.message?.includes("insufficient funds")) {
+          errorMessage = "Insufficient funds for this transaction.";
+        } else if (error.message?.includes("network")) {
+          errorMessage = "Network error. Please check your connection.";
+        }
+
+        showToast("error", errorMessage, 5000);
+
         setSwipeCompleted(false);
         x.set(0);
       }

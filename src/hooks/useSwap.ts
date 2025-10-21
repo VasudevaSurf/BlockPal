@@ -1047,14 +1047,14 @@ export function useSwap() {
         await loadSwapHistory();
 
         const explorerLink = getExplorerLink(tx, chainId);
-        alert(
-          `Swap successful! \nTransaction: ${tx.substring(
-            0,
-            10
-          )}...${tx.substring(
-            tx.length - 8
-          )}\n\nView on explorer: ${explorerLink}`
-        );
+        // alert(
+        //   `Swap successful! \nTransaction: ${tx.substring(
+        //     0,
+        //     10
+        //   )}...${tx.substring(
+        //     tx.length - 8
+        //   )}\n\nView on explorer: ${explorerLink}`
+        // );
 
         return true;
       } else {
@@ -1096,7 +1096,7 @@ export function useSwap() {
         );
       }
 
-      alert(`Swap failed: ${errorMessage}`);
+      // alert(`Swap failed: ${errorMessage}`);
       return false;
     } finally {
       setSwapping(false);

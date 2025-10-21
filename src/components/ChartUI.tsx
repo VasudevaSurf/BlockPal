@@ -1,4 +1,4 @@
-// src/components/ChartUI.tsx - FIXED: Removed duplicate header & fixed resize issues
+// src/components/ChartUI.tsx - FIXED: Added High/Low hover display
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -6,6 +6,14 @@ import React, { useEffect, useRef, useState } from "react";
 interface ChartUIProps {
   poolAddress?: string;
   network?: string;
+}
+
+interface HoverData {
+  time: any;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
 }
 
 const ChartUI: React.FC<ChartUIProps> = ({
@@ -16,17 +24,14 @@ const ChartUI: React.FC<ChartUIProps> = ({
   const chartRef = useRef<any>(null);
   const candlestickSeriesRef = useRef<any>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const chartDataRef = useRef<any[]>([]); // ✅ Store chart data for crosshair lookup
   const [isClient, setIsClient] = useState(false);
 
   const [selectedTimeframe, setSelectedTimeframe] = useState("1h");
   const [currentPrice, setCurrentPrice] = useState("0.00");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hoverData, setHoverData] = useState<{
-    time: any;
-    high: number;
-    low: number;
-  } | null>(null);
+  const [hoverData, setHoverData] = useState<HoverData | null>(null);
   const [tokenInfo, setTokenInfo] = useState({
     name: "Loading...",
     symbol: "Loading...",
@@ -128,7 +133,6 @@ const ChartUI: React.FC<ChartUIProps> = ({
         networkId: networkId,
         poolAddress: poolAddress,
         timeframe: tfConfig.timeframe,
-        url: url,
       });
 
       const response = await fetch(url, {
@@ -156,13 +160,6 @@ const ChartUI: React.FC<ChartUIProps> = ({
 
       const data = await response.json();
 
-      console.log("✅ API Response received:", {
-        hasData: !!data,
-        hasMeta: !!data.meta,
-        hasOHLCV: !!data.data?.attributes?.ohlcv_list,
-        ohlcvCount: data.data?.attributes?.ohlcv_list?.length,
-      });
-
       // Extract base token info from meta
       if (data.meta && data.meta.base) {
         setTokenInfo({
@@ -170,11 +167,6 @@ const ChartUI: React.FC<ChartUIProps> = ({
           symbol: data.meta.base.symbol,
           logo: null,
         });
-        console.log(
-          "📝 Token info:",
-          data.meta.base.name,
-          data.meta.base.symbol
-        );
       }
 
       // Transform OHLCV data
@@ -307,7 +299,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
 
         console.log("✅ Chart created, adding candlestick series...");
 
-        // Try different methods based on version
+        // Add candlestick series
         let candlestickSeries;
         try {
           if (typeof chart.addCandlestickSeries === "function") {
@@ -342,27 +334,34 @@ const ChartUI: React.FC<ChartUIProps> = ({
         chartRef.current = chart;
         candlestickSeriesRef.current = candlestickSeries;
 
-        // Subscribe to crosshair move
+        // ✅ Subscribe to crosshair move - shows H/L values on hover
         chart.subscribeCrosshairMove((param: any) => {
           if (!isMounted) return;
 
-          if (param.time && param.seriesData && candlestickSeries) {
+          if (param.time && chartDataRef.current.length > 0) {
             try {
-              const data = param.seriesData.get(candlestickSeries);
-              if (data && (data as any).high && (data as any).low) {
+              // Find the data point that matches this timestamp
+              const dataPoint = chartDataRef.current.find(
+                (item: any) => item.time === param.time
+              );
+
+              if (dataPoint) {
                 setHoverData({
                   time: param.time,
-                  high: (data as any).high,
-                  low: (data as any).low,
+                  open: dataPoint.open,
+                  high: dataPoint.high,
+                  low: dataPoint.low,
+                  close: dataPoint.close,
                 });
               } else {
                 setHoverData(null);
               }
             } catch (error) {
-              // Silently handle any errors during crosshair move
+              console.error("❌ Error in crosshair handler:", error);
               setHoverData(null);
             }
           } else {
+            // Clear hover data when not hovering
             setHoverData(null);
           }
         });
@@ -371,12 +370,13 @@ const ChartUI: React.FC<ChartUIProps> = ({
         const data = await fetchChartData(selectedTimeframe);
         if (isMounted && data.length > 0) {
           console.log("📊 Setting initial chart data:", data.length, "points");
+          chartDataRef.current = data; // ✅ Store data in ref for crosshair lookup
           candlestickSeries.setData(data);
           chart.timeScale().fitContent();
           console.log("✅ Chart data set successfully");
         }
 
-        // Handle resize with ResizeObserver for better performance
+        // Handle resize with ResizeObserver
         if (chartContainerRef.current) {
           resizeObserverRef.current = new ResizeObserver((entries) => {
             if (!isMounted || !chartRef.current || !chartContainerRef.current)
@@ -384,14 +384,12 @@ const ChartUI: React.FC<ChartUIProps> = ({
 
             const { width, height } = entries[0].contentRect;
 
-            // Only resize if dimensions actually changed
             if (width > 0 && height > 0) {
               chartRef.current.applyOptions({
                 width: width,
                 height: height,
               });
 
-              // Refit content after resize
               setTimeout(() => {
                 if (chartRef.current && isMounted) {
                   chartRef.current.timeScale().fitContent();
@@ -435,6 +433,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
       fetchChartData(selectedTimeframe).then((data) => {
         if (data.length > 0 && candlestickSeriesRef.current) {
           console.log("📊 Updating chart data:", data.length, "points");
+          chartDataRef.current = data; // ✅ Update stored data
           candlestickSeriesRef.current.setData(data);
           chartRef.current.timeScale().fitContent();
           console.log("✅ Chart updated");
@@ -483,16 +482,48 @@ const ChartUI: React.FC<ChartUIProps> = ({
         padding: "12px",
       }}
     >
-      {/* Header - Only Timeframe Selector */}
+      {/* Header - Timeframe Selector and H/L Display */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
           padding: "0",
         }}
       >
-        {/* Timeframe Selector */}
+        {/* H/L Display on the left - only shows when hovering */}
+        {hoverData && (
+          <div
+            style={{
+              display: "flex",
+              gap: "20px",
+              padding: "8px 12px",
+              fontSize: "12px",
+              color: "#9B9B9B",
+              backgroundColor: "rgba(25, 26, 26, 0.95)",
+              borderRadius: "6px",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+            }}
+          >
+            <div>
+              <span style={{ color: "#666" }}>H: </span>
+              <span style={{ color: "#00D9B3", fontWeight: "500" }}>
+                ${formatNumber(hoverData.high)}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: "#666" }}>L: </span>
+              <span style={{ color: "#FF5252", fontWeight: "500" }}>
+                ${formatNumber(hoverData.low)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Spacer to push timeframe selector to the right */}
+        <div style={{ flex: 1 }}></div>
+
+        {/* Timeframe Selector on the right */}
         <div
           style={{
             display: "flex",
@@ -564,40 +595,6 @@ const ChartUI: React.FC<ChartUIProps> = ({
             overflow: "hidden",
           }}
         >
-          {/* OHLCV Info Display */}
-          {hoverData && (
-            <div
-              style={{
-                position: "absolute",
-                top: "12px",
-                left: "12px",
-                display: "flex",
-                gap: "20px",
-                padding: "6px 10px",
-                fontSize: "11px",
-                color: "#9B9B9B",
-                backgroundColor: "rgba(25, 26, 26, 0.95)",
-                borderRadius: "4px",
-                zIndex: 1000,
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                pointerEvents: "none",
-              }}
-            >
-              <div>
-                <span style={{ color: "#666" }}>H: </span>
-                <span style={{ color: "#00D9B3", fontWeight: "500" }}>
-                  ${formatNumber(hoverData.high)}
-                </span>
-              </div>
-              <div>
-                <span style={{ color: "#666" }}>L: </span>
-                <span style={{ color: "#FF5252", fontWeight: "500" }}>
-                  ${formatNumber(hoverData.low)}
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* Error Display */}
           {error && (
             <div

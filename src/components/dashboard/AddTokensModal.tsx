@@ -15,6 +15,7 @@ import {
   getPopularTokensForChain,
   PopularToken,
 } from "@/services/popularTokensService";
+import { useToast } from "@/contexts/ToastContext";
 
 interface AddTokensModalProps {
   isOpen: boolean;
@@ -260,6 +261,8 @@ export default function AddTokensModal({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const chainDisplayData = getChainDisplayData();
+
+  const { showToast } = useToast();
 
   // Helper function to check if token already exists
   const isTokenAlreadyAdded = (

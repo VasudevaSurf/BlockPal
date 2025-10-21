@@ -10,6 +10,7 @@ import { coinlesSocketClient } from "@/services/coinlesSocketClient";
 import { useCodeLensContext } from "../layout";
 import { useCoinLensLoading } from "@/contexts/CoinLensLoadingContext";
 import BlockPalLoader from "@/components/ui/BlockPalLoader";
+import { useToast } from "@/contexts/ToastContext";
 
 interface Token {
   id: string;
@@ -52,6 +53,8 @@ function CoinLensContent() {
   const hasReportedDataRef = useRef(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const mountTimeRef = useRef(Date.now());
+
+  const { showToast } = useToast();
 
   // Handle clicking outside menu
   useEffect(() => {
@@ -372,6 +375,7 @@ function CoinLensContent() {
     if (token) {
       navigator.clipboard.writeText(token.contractAddress);
       console.log("Copied contract address:", token.contractAddress);
+      showToast("success", `Contract address copied to clipboard`, 3000);
       setTimeout(() => setActiveMenuTokenId(null), 100);
     }
   };
@@ -395,8 +399,14 @@ function CoinLensContent() {
         setFilteredTokens(newFilteredTokens);
 
         console.log("Removed token:", token.name);
+        showToast("success", `${token.symbol} removed from watchlist`, 3000);
       } catch (error) {
         console.error("Error removing token:", error);
+        showToast(
+          "error",
+          `Failed to remove ${token.symbol}. Please try again.`,
+          4000
+        );
       }
     }
   };
@@ -414,8 +424,14 @@ function CoinLensContent() {
         tokenName: tokenData.name,
         tokenSymbol: tokenData.symbol,
       });
+      showToast("success", `${tokenData.symbol} added to watchlist`, 3000);
     } catch (error) {
       console.error("Error adding token:", error);
+      showToast(
+        "error",
+        `Failed to add ${tokenData.symbol}. Please try again.`,
+        4000
+      );
     }
   };
 

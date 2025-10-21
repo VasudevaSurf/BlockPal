@@ -16,11 +16,14 @@ import {
 } from "lucide-react";
 import WarningIcon from "@/components/icons/WarningIcon";
 import ChartUI from "@/components/ChartUI";
+import { useToast } from "@/contexts/ToastContext";
 
 export default function TokenOverviewPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
+
+  const { showToast } = useToast();
 
   const chainId = params.chainId as string;
   const contractAddress = params.contractAddress as string;
@@ -83,13 +86,20 @@ export default function TokenOverviewPage() {
     }
   };
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (
+    text: string,
+    label: string = "Contract address"
+  ) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+
+      // ✅ Show success toast instead of state
+      showToast("success", `${label} copied to clipboard`, 3000);
     } catch (err) {
       console.error("Failed to copy:", err);
+
+      // ✅ Show error toast if copy fails
+      showToast("error", "Failed to copy. Please try again.", 3000);
     }
   };
 

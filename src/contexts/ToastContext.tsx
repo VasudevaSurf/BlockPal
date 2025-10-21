@@ -58,13 +58,13 @@ const ToastItem: React.FC<{
   const getBgColor = () => {
     switch (toast.type) {
       case "success":
-        return "bg-green-500/10 border-green-500/50";
+        return "bg-[#0F0F0F]";
       case "error":
-        return "bg-red-500/10 border-red-500/50";
+        return "bg-[#0F0F0F]";
       case "info":
-        return "bg-blue-500/10 border-blue-500/50";
+        return "bg-[#0F0F0F]";
       default:
-        return "bg-gray-500/10 border-gray-500/50";
+        return "bg-[#0F0F0F]";
     }
   };
 
