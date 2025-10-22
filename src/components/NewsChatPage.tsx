@@ -533,7 +533,7 @@ export default function NewsChatPage() {
                             {message.typing && (
                               <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
                             )}
-
+                            {/* 
                             {message.functionCalls &&
                               message.functionCalls.length > 0 &&
                               !message.typing && (
@@ -547,7 +547,7 @@ export default function NewsChatPage() {
                                     </span>
                                   ))}
                                 </div>
-                              )}
+                              )} */}
                           </div>
                         )}
                       </div>

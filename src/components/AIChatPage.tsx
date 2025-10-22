@@ -746,16 +746,6 @@ export default function AIChatPage() {
   };
 
   const deleteConversation = async (conversationIdToDelete: string) => {
-    // Show confirmation dialog
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this conversation? This action cannot be undone."
-      )
-    ) {
-      setOpenMenuId(null);
-      return;
-    }
-
     try {
       // Optimistically update UI
       const conversationToDelete = conversations.find(
