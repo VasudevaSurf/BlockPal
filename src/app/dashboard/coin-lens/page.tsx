@@ -1,4 +1,4 @@
-// src/app/dashboard/coin-lens/page.tsx - FIXED: No loading text, only BlockPal loader
+// src/app/dashboard/coin-lens/page.tsx - FIXED: No flash on reload
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -63,9 +63,8 @@ function CoinLensContent() {
   const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
   const [connected, setConnected] = useState(false);
 
-  const [hasReceivedData, setHasReceivedData] = useState(
-    () => getCachedTokens().length > 0
-  );
+  // ✅ NEW: Track if we've received watchlist data from WebSocket
+  const [hasReceivedWatchlist, setHasReceivedWatchlist] = useState(false);
 
   const watchlistReceivedRef = useRef(false);
   const hasReportedDataRef = useRef(false);
@@ -105,27 +104,20 @@ function CoinLensContent() {
     setOnAddTokenClick(() => () => setAddTokensModalOpen(true));
   }, [setOnAddTokenClick]);
 
-  // ✅ Report data ready when we have cached data OR receive watchlist
+  // ✅ Report data ready ONLY when we receive watchlist from WebSocket
   useEffect(() => {
-    const hasCachedData = tokens.length > 0;
-
-    if (
-      !hasReportedDataRef.current &&
-      (hasCachedData || watchlistReceivedRef.current)
-    ) {
+    if (!hasReportedDataRef.current && hasReceivedWatchlist) {
       const timeSinceMount = Date.now() - mountTimeRef.current;
       console.log("✅ CoinLens: Marking data as ready", {
         tokensCount: tokens.length,
         connected,
-        hasCachedData,
         timeSinceMount: `${timeSinceMount}ms`,
       });
 
-      setHasReceivedData(true);
       setDataReady();
       hasReportedDataRef.current = true;
     }
-  }, [tokens.length, connected, setDataReady]);
+  }, [hasReceivedWatchlist, tokens.length, connected, setDataReady]);
 
   // ✅ Reset loading state ONLY on user change, not on every mount
   useEffect(() => {
@@ -137,14 +129,13 @@ function CoinLensContent() {
 
     if (hasCachedData) {
       console.log("✅ Found cached data, skipping loading state");
-      setHasReceivedData(true);
       setDataReady();
       hasReportedDataRef.current = true;
       // DON'T call resetLoading() here!
     } else {
       // Only reset loading if no cache AND this is a user change
       if (user?.email) {
-        setHasReceivedData(false);
+        setHasReceivedWatchlist(false);
         watchlistReceivedRef.current = false;
         hasReportedDataRef.current = false;
         resetLoading();
@@ -184,6 +175,7 @@ function CoinLensContent() {
       setFilteredTokens(transformedTokens);
       setConnected(true);
       watchlistReceivedRef.current = true;
+      setHasReceivedWatchlist(true); // ✅ NEW: Mark that we received watchlist
 
       // Cache tokens
       try {
@@ -247,7 +239,7 @@ function CoinLensContent() {
       console.log("❌ WebSocket disconnected");
       setConnected(false);
 
-      setHasReceivedData(false);
+      setHasReceivedWatchlist(false);
       watchlistReceivedRef.current = false;
       hasReportedDataRef.current = false;
     };
@@ -479,9 +471,9 @@ function CoinLensContent() {
     );
   };
 
-  // ✅ FIXED: Only show empty message when we have data but it's filtered to nothing
+  // ✅ FIXED: Only show empty message when we have received watchlist and it's empty
   const showEmptyMessage =
-    hasReceivedData && filteredTokens.length === 0 && tokens.length === 0;
+    hasReceivedWatchlist && filteredTokens.length === 0 && tokens.length === 0;
 
   return (
     <div className="h-full bg-[#000000] rounded-[16px] p-2 sm:p-4 flex flex-col overflow-hidden relative">
@@ -502,7 +494,7 @@ function CoinLensContent() {
 
         {/* Table Body */}
         <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-3">
-          {/* ✅ FIXED: Only show empty message when actually empty */}
+          {/* ✅ FIXED: Only show empty message when we've received watchlist data */}
           {showEmptyMessage ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-gray-500 font-satoshi text-xs sm:text-sm">
