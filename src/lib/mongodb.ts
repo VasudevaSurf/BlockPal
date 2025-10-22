@@ -1,4 +1,4 @@
-// src/lib/mongodb.ts - ENHANCED with proper collection setup
+// src/lib/mongodb.ts - ENHANCED with user email in indexes
 import { MongoClient, Db } from "mongodb";
 
 interface Connection {
@@ -55,12 +55,17 @@ async function setupCollections(db: Db) {
     );
     await walletConnections.createIndex({ chainId: 1 }, { background: true });
 
-    // Wallet Preferences Collection
+    // ✅ UPDATED: Wallet Preferences Collection with userEmail
     const walletPreferences = db.collection("walletPreferences");
+
+    // Primary unique index: userEmail + walletAddress + chainId
     await walletPreferences.createIndex(
-      { walletAddress: 1, chainId: 1 },
+      { userEmail: 1, walletAddress: 1, chainId: 1 },
       { unique: true, background: true }
     );
+
+    // Secondary indexes for queries
+    await walletPreferences.createIndex({ userEmail: 1 }, { background: true });
     await walletPreferences.createIndex(
       { walletAddress: 1 },
       { background: true }
@@ -100,24 +105,41 @@ async function setupCollections(db: Db) {
   }
 }
 
-// Utility functions for common database operations
+// ✅ UPDATED: Utility function with userEmail
+export async function findWalletPreferences(
+  userEmail: string,
+  walletAddress: string,
+  chainId: number
+) {
+  const { db } = await connectToDatabase();
+  return db.collection("walletPreferences").findOne({
+    userEmail: userEmail.toLowerCase(),
+    walletAddress: walletAddress.toLowerCase(),
+    chainId: chainId,
+  });
+}
+
+// ✅ UPDATED: Upsert function with userEmail
+export async function upsertWalletPreferences(preferencesData: any) {
+  const { db } = await connectToDatabase();
+  return db.collection("walletPreferences").replaceOne(
+    {
+      userEmail: preferencesData.userEmail.toLowerCase(),
+      walletAddress: preferencesData.walletAddress.toLowerCase(),
+      chainId: preferencesData.chainId,
+    },
+    preferencesData,
+    { upsert: true }
+  );
+}
+
+// Other functions remain the same...
 export async function findWalletConnection(
   walletAddress: string,
   chainId: number
 ) {
   const { db } = await connectToDatabase();
   return db.collection("walletConnections").findOne({
-    walletAddress: walletAddress.toLowerCase(),
-    chainId: chainId,
-  });
-}
-
-export async function findWalletPreferences(
-  walletAddress: string,
-  chainId: number
-) {
-  const { db } = await connectToDatabase();
-  return db.collection("walletPreferences").findOne({
     walletAddress: walletAddress.toLowerCase(),
     chainId: chainId,
   });
@@ -131,18 +153,6 @@ export async function upsertWalletConnection(connectionData: any) {
       chainId: connectionData.chainId,
     },
     connectionData,
-    { upsert: true }
-  );
-}
-
-export async function upsertWalletPreferences(preferencesData: any) {
-  const { db } = await connectToDatabase();
-  return db.collection("walletPreferences").replaceOne(
-    {
-      walletAddress: preferencesData.walletAddress.toLowerCase(),
-      chainId: preferencesData.chainId,
-    },
-    preferencesData,
     { upsert: true }
   );
 }

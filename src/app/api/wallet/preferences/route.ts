@@ -1,13 +1,14 @@
-// src/app/api/wallet/preferences/route.ts - COMPLETE wallet preferences API
+// src/app/api/wallet/preferences/route.ts - COMPLETE WITH USER EMAIL
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 
 interface WalletPreferences {
+  userEmail: string; // ✅ ADDED
   walletAddress: string;
   chainId: number;
-  userAddedTokens: string[]; // Contract addresses of tokens user manually added to main list
-  hiddenTokens: string[]; // Contract addresses of tokens user manually hid
-  tokenDisplayOrder?: string[]; // Custom order for tokens (optional)
+  userAddedTokens: string[];
+  hiddenTokens: string[];
+  tokenDisplayOrder?: string[];
   lastUpdated: string;
   // Additional metadata
   totalTokenCount?: number;
@@ -21,12 +22,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const walletAddress = searchParams.get("wallet");
     const chainId = searchParams.get("chain");
+    const userEmail = searchParams.get("email"); // ✅ ADDED
 
-    if (!walletAddress || !chainId) {
+    if (!walletAddress || !chainId || !userEmail) {
       return NextResponse.json(
         {
           success: false,
-          error: "Wallet address and chain ID are required",
+          error: "Wallet address, chain ID, and user email are required",
         },
         { status: 400 }
       );
@@ -47,10 +49,12 @@ export async function GET(request: NextRequest) {
     const collection = db.collection("walletPreferences");
 
     console.log(
-      `📥 Loading preferences for wallet: ${walletAddress} on chain: ${chainId}`
+      `📥 Loading preferences for user: ${userEmail}, wallet: ${walletAddress} on chain: ${chainId}`
     );
 
+    // ✅ CHANGED: Query with user email
     const preferences = await collection.findOne({
+      userEmail: userEmail.toLowerCase(),
       walletAddress: walletAddress.toLowerCase(),
       chainId: parseInt(chainId),
     });
@@ -62,6 +66,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
+          userEmail: userEmail.toLowerCase(),
           walletAddress: walletAddress.toLowerCase(),
           chainId: parseInt(chainId),
           userAddedTokens: [],
@@ -78,7 +83,7 @@ export async function GET(request: NextRequest) {
     const { _id, ...cleanPreferences } = preferences;
 
     console.log(
-      `✅ Preferences loaded: ${
+      `✅ Preferences loaded for ${userEmail}: ${
         cleanPreferences.userAddedTokens?.length || 0
       } user-added tokens, ${
         cleanPreferences.hiddenTokens?.length || 0
@@ -109,6 +114,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
+      userEmail,
       walletAddress,
       chainId,
       userAddedTokens,
@@ -117,11 +123,11 @@ export async function POST(request: NextRequest) {
     }: Partial<WalletPreferences> = body;
 
     // Validation
-    if (!walletAddress || !chainId) {
+    if (!userEmail || !walletAddress || !chainId) {
       return NextResponse.json(
         {
           success: false,
-          error: "walletAddress and chainId are required",
+          error: "userEmail, walletAddress and chainId are required",
         },
         { status: 400 }
       );
@@ -163,19 +169,21 @@ export async function POST(request: NextRequest) {
     const collection = db.collection("walletPreferences");
 
     console.log(
-      `💾 Saving preferences for wallet: ${walletAddress} on chain: ${chainId}`
+      `💾 Saving preferences for user: ${userEmail}, wallet: ${walletAddress} on chain: ${chainId}`
     );
     console.log(`📊 User-added tokens: ${userAddedTokens?.length || 0}`);
     console.log(`📊 Hidden tokens: ${hiddenTokens?.length || 0}`);
 
     // Check if preferences already exist
     const existingPreferences = await collection.findOne({
+      userEmail: userEmail.toLowerCase(),
       walletAddress: walletAddress.toLowerCase(),
       chainId: chainId,
     });
 
     // Prepare preferences data with proper defaults
     const preferencesData: WalletPreferences = {
+      userEmail: userEmail.toLowerCase(), // ✅ ADDED
       walletAddress: walletAddress.toLowerCase(),
       chainId: chainId,
       userAddedTokens: (userAddedTokens || []).map((addr: string) =>
@@ -195,9 +203,10 @@ export async function POST(request: NextRequest) {
         existingPreferences?.firstConnected || new Date().toISOString(),
     };
 
-    // Upsert (update or insert)
+    // ✅ CHANGED: Upsert with user email
     const result = await collection.replaceOne(
       {
+        userEmail: userEmail.toLowerCase(),
         walletAddress: walletAddress.toLowerCase(),
         chainId: chainId,
       },
@@ -206,13 +215,16 @@ export async function POST(request: NextRequest) {
     );
 
     console.log(
-      `✅ Preferences ${result.upsertedId ? "created" : "updated"} successfully`
+      `✅ Preferences ${
+        result.upsertedId ? "created" : "updated"
+      } successfully for user ${userEmail}`
     );
 
     // Return success response with analytics
     return NextResponse.json({
       success: true,
       data: {
+        userEmail: preferencesData.userEmail,
         walletAddress: preferencesData.walletAddress,
         chainId: preferencesData.chainId,
         userAddedCount: preferencesData.userAddedTokens.length,
@@ -244,11 +256,13 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const {
+      userEmail,
       walletAddress,
       chainId,
       action,
       tokenAddress,
     }: {
+      userEmail: string;
       walletAddress: string;
       chainId: number;
       action:
@@ -260,12 +274,12 @@ export async function PUT(request: NextRequest) {
     } = body;
 
     // Validation
-    if (!walletAddress || !chainId || !action || !tokenAddress) {
+    if (!userEmail || !walletAddress || !chainId || !action || !tokenAddress) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "walletAddress, chainId, action, and tokenAddress are required",
+            "userEmail, walletAddress, chainId, action, and tokenAddress are required",
         },
         { status: 400 }
       );
@@ -300,20 +314,23 @@ export async function PUT(request: NextRequest) {
     const collection = db.collection("walletPreferences");
 
     console.log(
-      `🔄 Updating preference: ${action} for token ${tokenAddress} on wallet ${walletAddress}`
+      `🔄 Updating preference for user ${userEmail}: ${action} for token ${tokenAddress} on wallet ${walletAddress}`
     );
 
+    const normalizedEmail = userEmail.toLowerCase();
     const normalizedWallet = walletAddress.toLowerCase();
     const normalizedToken = tokenAddress.toLowerCase();
 
     // Get current preferences or create default
     let currentPreferences = await collection.findOne({
+      userEmail: normalizedEmail,
       walletAddress: normalizedWallet,
       chainId: chainId,
     });
 
     if (!currentPreferences) {
       currentPreferences = {
+        userEmail: normalizedEmail,
         walletAddress: normalizedWallet,
         chainId: chainId,
         userAddedTokens: [],
@@ -396,6 +413,7 @@ export async function PUT(request: NextRequest) {
     // Save updated preferences
     const result = await collection.replaceOne(
       {
+        userEmail: normalizedEmail,
         walletAddress: normalizedWallet,
         chainId: chainId,
       },
@@ -403,11 +421,14 @@ export async function PUT(request: NextRequest) {
       { upsert: true }
     );
 
-    console.log(`✅ ${actionDescription}: ${tokenAddress}`);
+    console.log(
+      `✅ ${actionDescription}: ${tokenAddress} for user ${userEmail}`
+    );
 
     return NextResponse.json({
       success: true,
       data: {
+        userEmail: updatedPreferences.userEmail,
         walletAddress: updatedPreferences.walletAddress,
         chainId: updatedPreferences.chainId,
         action,
@@ -439,12 +460,13 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const walletAddress = searchParams.get("wallet");
     const chainId = searchParams.get("chain");
+    const userEmail = searchParams.get("email"); // ✅ ADDED
 
-    if (!walletAddress || !chainId) {
+    if (!walletAddress || !chainId || !userEmail) {
       return NextResponse.json(
         {
           success: false,
-          error: "Wallet address and chain ID are required",
+          error: "Wallet address, chain ID, and user email are required",
         },
         { status: 400 }
       );
@@ -465,10 +487,12 @@ export async function DELETE(request: NextRequest) {
     const collection = db.collection("walletPreferences");
 
     console.log(
-      `🗑️ Deleting preferences for wallet: ${walletAddress} on chain: ${chainId}`
+      `🗑️ Deleting preferences for user: ${userEmail}, wallet: ${walletAddress} on chain: ${chainId}`
     );
 
+    // ✅ CHANGED: Delete with user email
     const result = await collection.deleteOne({
+      userEmail: userEmail.toLowerCase(),
       walletAddress: walletAddress.toLowerCase(),
       chainId: parseInt(chainId),
     });
@@ -483,11 +507,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    console.log(`✅ Preferences deleted successfully`);
+    console.log(`✅ Preferences deleted successfully for user ${userEmail}`);
 
     return NextResponse.json({
       success: true,
       data: {
+        userEmail: userEmail.toLowerCase(),
         walletAddress: walletAddress.toLowerCase(),
         chainId: parseInt(chainId),
         deletedCount: result.deletedCount,
@@ -513,10 +538,12 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const {
+      userEmail,
       walletAddress,
       chainId,
       operations,
     }: {
+      userEmail: string;
       walletAddress: string;
       chainId: number;
       operations: Array<{
@@ -531,6 +558,7 @@ export async function PATCH(request: NextRequest) {
 
     // Validation
     if (
+      !userEmail ||
       !walletAddress ||
       !chainId ||
       !operations ||
@@ -539,7 +567,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "walletAddress, chainId, and operations array are required",
+          error:
+            "userEmail, walletAddress, chainId, and operations array are required",
         },
         { status: 400 }
       );
@@ -580,19 +609,22 @@ export async function PATCH(request: NextRequest) {
     const collection = db.collection("walletPreferences");
 
     console.log(
-      `🔄 Bulk updating ${operations.length} preferences for wallet: ${walletAddress} on chain: ${chainId}`
+      `🔄 Bulk updating ${operations.length} preferences for user: ${userEmail}, wallet: ${walletAddress} on chain: ${chainId}`
     );
 
+    const normalizedEmail = userEmail.toLowerCase();
     const normalizedWallet = walletAddress.toLowerCase();
 
     // Get current preferences or create default
     let currentPreferences = await collection.findOne({
+      userEmail: normalizedEmail,
       walletAddress: normalizedWallet,
       chainId: chainId,
     });
 
     if (!currentPreferences) {
       currentPreferences = {
+        userEmail: normalizedEmail,
         walletAddress: normalizedWallet,
         chainId: chainId,
         userAddedTokens: [],
@@ -640,7 +672,6 @@ export async function PATCH(request: NextRequest) {
               updatedPreferences.userAddedTokens.push(normalizedToken);
               actionSuccess = true;
             }
-            // Remove from hidden if it was there
             updatedPreferences.hiddenTokens =
               updatedPreferences.hiddenTokens.filter(
                 (addr: string) => addr !== normalizedToken
@@ -662,7 +693,6 @@ export async function PATCH(request: NextRequest) {
               updatedPreferences.hiddenTokens.push(normalizedToken);
               actionSuccess = true;
             }
-            // Remove from main list if it was there
             updatedPreferences.userAddedTokens =
               updatedPreferences.userAddedTokens.filter(
                 (addr: string) => addr !== normalizedToken
@@ -715,6 +745,7 @@ export async function PATCH(request: NextRequest) {
     // Save updated preferences
     const result = await collection.replaceOne(
       {
+        userEmail: normalizedEmail,
         walletAddress: normalizedWallet,
         chainId: chainId,
       },
@@ -726,12 +757,13 @@ export async function PATCH(request: NextRequest) {
     const failureCount = results.length - successCount;
 
     console.log(
-      `✅ Bulk update completed: ${successCount} successful, ${failureCount} failed`
+      `✅ Bulk update completed for user ${userEmail}: ${successCount} successful, ${failureCount} failed`
     );
 
     return NextResponse.json({
       success: true,
       data: {
+        userEmail: updatedPreferences.userEmail,
         walletAddress: updatedPreferences.walletAddress,
         chainId: updatedPreferences.chainId,
         operationsProcessed: operations.length,

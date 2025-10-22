@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - FIXED: Show tabs and trending/gainers even without wallet
+// src/components/dashboard/TokenList.tsx - COMPLETE WITH USER EMAIL INTEGRATION
 "use client";
 
 import React, {
@@ -9,6 +9,8 @@ import React, {
   useMemo,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux"; // ✅ ADDED
+import { RootState } from "@/store"; // ✅ ADDED
 import { useAccount, useChainId } from "wagmi";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import { useWalletTracking } from "@/hooks/useWalletTracking";
@@ -110,15 +112,16 @@ interface TokenBalance {
   isPreset?: boolean;
 }
 
-// Wallet Preferences
 interface WalletPreferences {
+  userEmail: string;
   walletAddress: string;
   chainId: number;
   userAddedTokens: string[];
   lastUpdated: string;
 }
 
-// Token Image Component
+// ... (keep all your component definitions: TokenImage, TrendingTokenImage, PercentageDisplay, ThreeDotMenu)
+
 const TokenImage = ({
   src,
   alt,
@@ -165,7 +168,6 @@ const TokenImage = ({
   );
 };
 
-// Trending Token Image
 const TrendingTokenImage = ({
   token,
   size = "w-10 h-10",
@@ -224,7 +226,6 @@ const TrendingTokenImage = ({
   );
 };
 
-// Percentage Display
 const PercentageDisplay = ({
   change24h,
   usdChange24h,
@@ -274,7 +275,6 @@ const PercentageDisplay = ({
   );
 };
 
-// Three Dot Menu
 const ThreeDotMenu = ({
   token,
   onAddToMain,
@@ -384,7 +384,6 @@ const ThreeDotMenu = ({
   );
 };
 
-// Format helpers
 const formatCurrency = (value: number): string => {
   if (value === 0) return "$0.000";
   if (value < 0.001) return "< $0.001";
@@ -406,7 +405,45 @@ export default function TokenList() {
   const { isLoading: isNavigating, startLoading } = useNavigationLoading();
   const { updateTrackingData, trackNow } = useWalletTracking();
 
-  // ✅ USE CACHED WALLET DATA
+  // ✅ FIXED: Get user from Redux with proper type checking and debugging
+  const authState = useSelector((state: RootState) => state.auth);
+
+  // ✅ DEBUG: Log the entire auth state to see its structure
+  useEffect(() => {
+    console.log("🔍 DEBUG Auth State:", authState);
+    console.log("🔍 DEBUG User:", authState?.user);
+    console.log("🔍 DEBUG User Email:", authState?.user?.email);
+    console.log("🔍 DEBUG User Gmail:", authState?.user?.gmail);
+  }, [authState]);
+
+  // ✅ FIXED: Try multiple possible email fields
+  const getUserEmail = (): string | null => {
+    if (!authState?.user) {
+      console.warn("⚠️ No user in auth state");
+      return null;
+    }
+
+    // Try different possible field names
+    const email =
+      authState.user.gmail ||
+      authState.user.email ||
+      authState.user.emailAddress ||
+      authState.user.userEmail ||
+      null;
+
+    if (!email) {
+      console.warn(
+        "⚠️ User object exists but no email field found:",
+        authState.user
+      );
+    }
+
+    return email;
+  };
+
+  const userEmail = getUserEmail();
+
+  // USE CACHED WALLET DATA
   const { walletData, refresh, isRefreshing } = useWalletData();
   const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
 
@@ -417,7 +454,6 @@ export default function TokenList() {
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
 
-  // CoinGecko data - ✅ ALWAYS FETCH, regardless of wallet connection
   const {
     data: coinGeckoData,
     loading: coinGeckoLoading,
@@ -425,13 +461,11 @@ export default function TokenList() {
     refetch: refetchCoinGecko,
   } = useCoinGecko();
 
-  // Tab state - ✅ Default to trending when wallet not connected
   const [activeTab, setActiveTab] = useState<
     "holdings" | "trending" | "gainers"
   >(isConnected ? "holdings" : "trending");
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
 
-  // Token management
   const [showHidden, setShowHidden] = useState(false);
   const [preferences, setPreferences] = useState<WalletPreferences | null>(
     null
@@ -443,20 +477,17 @@ export default function TokenList() {
 
   const { showToast } = useToast();
 
-  // ✅ Get tokens from cached wallet data
   const allTokens = walletData.tokens;
   const presetTokenCount = useMemo(() => {
     return allTokens.filter((t) => t.isPreset).length;
   }, [allTokens]);
 
-  // ✅ Switch to holdings tab when wallet connects
   useEffect(() => {
     if (isConnected && activeTab !== "holdings") {
       setActiveTab("holdings");
     }
   }, [isConnected]);
 
-  // Report component mount
   useEffect(() => {
     if (!hasReportedMountRef.current) {
       console.log("✅ TokenList: Component mounted");
@@ -469,52 +500,81 @@ export default function TokenList() {
     };
   }, [setComponentLoaded]);
 
-  // Report data ready when cache is valid OR when we have CoinGecko data
   useEffect(() => {
     if (!hasReportedDataRef.current) {
-      const hasCoinGeckoData = trendingTokens.length > 0 || topGainersData.length > 0;
+      const hasCoinGeckoData =
+        trendingTokens.length > 0 || topGainersData.length > 0;
       const hasWalletData = walletData.cacheValid;
-      
+
       if (hasCoinGeckoData || hasWalletData) {
         console.log("✅ TokenList: Data ready");
         setComponentDataReady("tokenList");
         hasReportedDataRef.current = true;
       }
     }
-  }, [walletData.cacheValid, trendingTokens.length, topGainersData.length, setComponentDataReady]);
+  }, [
+    walletData.cacheValid,
+    trendingTokens.length,
+    topGainersData.length,
+    setComponentDataReady,
+  ]);
 
-  // Reset data reported flag when cache invalidates
   useEffect(() => {
-    if (!walletData.cacheValid && !trendingTokens.length && !topGainersData.length) {
+    if (
+      !walletData.cacheValid &&
+      !trendingTokens.length &&
+      !topGainersData.length
+    ) {
       hasReportedDataRef.current = false;
     }
   }, [walletData.cacheValid, trendingTokens.length, topGainersData.length]);
 
-  // Load preferences
+  // ✅ FIXED: Load preferences with proper user email checking
   useEffect(() => {
     const loadPreferences = async () => {
-      if (!address || !chainId) return;
+      if (!address || !chainId) {
+        console.log("⚠️ Cannot load preferences: missing address or chainId");
+        return;
+      }
+
+      if (!userEmail) {
+        console.log("⚠️ Cannot load preferences: user email not available");
+        console.log("   Auth state:", authState);
+        return;
+      }
 
       try {
+        console.log(
+          `📥 Loading preferences for user: ${userEmail}, wallet: ${address}, chain: ${chainId}`
+        );
+
         const response = await fetch(
-          `/api/wallet/preferences?wallet=${address}&chain=${chainId}`
+          `/api/wallet/preferences?wallet=${address}&chain=${chainId}&email=${encodeURIComponent(
+            userEmail
+          )}`
         );
 
         if (response.ok) {
           const data = await response.json();
           setPreferences(data.data);
+          console.log(
+            `✅ Preferences loaded for ${userEmail}:`,
+            data.data.userAddedTokens?.length || 0,
+            "user-added tokens"
+          );
+        } else {
+          console.error("❌ Failed to load preferences:", response.status);
         }
       } catch (error) {
         console.error("❌ Error loading preferences:", error);
       }
     };
 
-    if (isConnected && address) {
+    if (isConnected && address && userEmail) {
       loadPreferences();
     }
-  }, [address, chainId, isConnected]);
+  }, [address, chainId, isConnected, userEmail, authState]);
 
-  // Update tracking data when tokens change
   useEffect(() => {
     if (allTokens.length > 0) {
       const trackingTokens = allTokens.map((token) => ({
@@ -540,12 +600,39 @@ export default function TokenList() {
     }
   }, [allTokens, walletData.mainListValue, walletData.total24hrChange]);
 
+  // ✅ FIXED: Add token with proper user email checking
   const handleAddToMainList = async (tokenAddress: string) => {
-    if (!address || !chainId || addingToken) return;
+    console.log("🔍 DEBUG handleAddToMainList called");
+    console.log("   - address:", address);
+    console.log("   - chainId:", chainId);
+    console.log("   - userEmail:", userEmail);
+    console.log("   - addingToken:", addingToken);
+
+    if (!address || !chainId || !userEmail || addingToken) {
+      console.log(
+        "⚠️ Cannot add token: missing address, chainId, user email, or already adding"
+      );
+      console.log("   - Missing address?", !address);
+      console.log("   - Missing chainId?", !chainId);
+      console.log("   - Missing userEmail?", !userEmail);
+      console.log("   - Already adding?", !!addingToken);
+
+      // Show user-friendly error
+      if (!userEmail) {
+        showToast("error", "Please sign in to add tokens to your list", 4000);
+      }
+      return;
+    }
+
     setAddingToken(tokenAddress);
 
     try {
+      console.log(
+        `➕ Adding token ${tokenAddress} for user ${userEmail} on wallet ${address}`
+      );
+
       const currentPrefs = preferences || {
+        userEmail: userEmail,
         walletAddress: address,
         chainId,
         userAddedTokens: [],
@@ -554,9 +641,12 @@ export default function TokenList() {
 
       const updatedPrefs = {
         ...currentPrefs,
+        userEmail: userEmail,
         userAddedTokens: [...currentPrefs.userAddedTokens, tokenAddress],
         lastUpdated: new Date().toISOString(),
       };
+
+      console.log("📤 Sending preferences:", updatedPrefs);
 
       const response = await fetch(`/api/wallet/preferences`, {
         method: "POST",
@@ -565,10 +655,23 @@ export default function TokenList() {
       });
 
       if (response.ok) {
+        const data = await response.json();
+        console.log("✅ Server response:", data);
+
         setPreferences(updatedPrefs);
         await refresh(true);
         showToast("success", "Token added to main list successfully!", 3000);
-        console.log(`✅ Token added to main list: ${tokenAddress}`);
+        console.log(
+          `✅ Token ${tokenAddress} added to main list for user ${userEmail}`
+        );
+      } else {
+        const errorData = await response.json();
+        console.error("❌ Server error:", errorData);
+        showToast(
+          "error",
+          errorData.error || "Failed to add token. Please try again.",
+          4000
+        );
       }
     } catch (error: any) {
       console.error("❌ Error adding token:", error);
@@ -578,13 +681,29 @@ export default function TokenList() {
     }
   };
 
+  // ✅ FIXED: Remove token with proper user email checking
   const handleRemoveFromMainList = async (tokenAddress: string) => {
-    if (!address || !chainId || !preferences || addingToken) return;
+    if (!address || !chainId || !preferences || !userEmail || addingToken) {
+      console.log(
+        "⚠️ Cannot remove token: missing address, chainId, preferences, user email, or already processing"
+      );
+
+      if (!userEmail) {
+        showToast("error", "Please sign in to modify your token list", 4000);
+      }
+      return;
+    }
+
     setAddingToken(tokenAddress);
 
     try {
+      console.log(
+        `➖ Removing token ${tokenAddress} for user ${userEmail} on wallet ${address}`
+      );
+
       const updatedPrefs = {
         ...preferences,
+        userEmail: userEmail,
         userAddedTokens: preferences.userAddedTokens.filter(
           (addr) => addr !== tokenAddress
         ),
@@ -601,7 +720,17 @@ export default function TokenList() {
         setPreferences(updatedPrefs);
         await refresh(true);
         showToast("success", "Token removed from main list", 3000);
-        console.log(`✅ Token removed from main list: ${tokenAddress}`);
+        console.log(
+          `✅ Token ${tokenAddress} removed from main list for user ${userEmail}`
+        );
+      } else {
+        const errorData = await response.json();
+        console.error("❌ Failed to remove token:", errorData);
+        showToast(
+          "error",
+          errorData.error || "Failed to remove token. Please try again.",
+          4000
+        );
       }
     } catch (error: any) {
       console.error("❌ Error removing token:", error);
@@ -652,7 +781,7 @@ export default function TokenList() {
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
         {/* Header with Tabs */}
         <div className="flex items-center justify-between mb-3 px-2">
-          {/* Mobile Tabs - ✅ ALWAYS SHOW */}
+          {/* Mobile Tabs - ALWAYS SHOW */}
           <div className="flex items-center gap-4 lg:hidden">
             {isConnected && (
               <button
@@ -772,7 +901,11 @@ export default function TokenList() {
         {/* Tab Content */}
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           {/* Holdings Tab - ALWAYS SHOW ON DESKTOP */}
-          <div className={`${activeTab === "holdings" ? "flex" : "hidden"} lg:flex flex-col h-full`}>
+          <div
+            className={`${
+              activeTab === "holdings" ? "flex" : "hidden"
+            } lg:flex flex-col h-full`}
+          >
             {!isConnected ? (
               <div className="flex flex-col items-center justify-center text-center flex-1">
                 <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
@@ -786,134 +919,60 @@ export default function TokenList() {
                 </p>
               </div>
             ) : walletData.loading && !walletData.cacheValid ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center py-8 min-h-[400px]">
-                  <div className="w-12 h-12 border-4 border-[#E2AF19] border-t-transparent rounded-full animate-spin mb-3"></div>
-                  <p className="text-gray-400 font-satoshi text-sm">
-                    Loading tokens...
-                  </p>
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-8 min-h-[400px]">
+                <div className="w-12 h-12 border-4 border-[#E2AF19] border-t-transparent rounded-full animate-spin mb-3"></div>
+                <p className="text-gray-400 font-satoshi text-sm">
+                  Loading tokens...
+                </p>
+              </div>
+            ) : allTokens.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-8 min-h-[400px]">
+                <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
+                  <span className="text-gray-400 text-xl">🪙</span>
                 </div>
-              ) : allTokens.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center py-8 min-h-[400px]">
-                  <div className="w-12 h-12 bg-[#2C2C2C] rounded-full flex items-center justify-center mb-3">
-                    <span className="text-gray-400 text-xl">🪙</span>
-                  </div>
-                  <h3 className="text-white text-base font-satoshi mb-1">
-                    No tokens found
-                  </h3>
-                  <p className="text-gray-400 font-satoshi text-sm mb-3 px-4">
-                    No token holdings found on{" "}
-                    {walletData.chainName || currentChain?.name}
-                  </p>
-                  <button
-                    onClick={() => refresh(true)}
-                    disabled={isRefreshing}
-                    className="px-4 py-2 bg-[#E2AF19] text-black rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi text-sm disabled:opacity-50"
+                <h3 className="text-white text-base font-satoshi mb-1">
+                  No tokens found
+                </h3>
+                <p className="text-gray-400 font-satoshi text-sm mb-3 px-4">
+                  No token holdings found on{" "}
+                  {walletData.chainName || currentChain?.name}
+                </p>
+                <button
+                  onClick={() => refresh(true)}
+                  disabled={isRefreshing}
+                  className="px-4 py-2 bg-[#E2AF19] text-black rounded-lg hover:bg-[#D4A853] transition-colors font-satoshi text-sm disabled:opacity-50"
+                >
+                  {isRefreshing ? "Refreshing..." : "Refresh"}
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Main Tokens */}
+                {mainTokens.length > 0 && (
+                  <div
+                    className={
+                      additionalTokens.length > 0 && showHidden ? "mb-6" : ""
+                    }
                   >
-                    {isRefreshing ? "Refreshing..." : "Refresh"}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Main Tokens */}
-                  {mainTokens.length > 0 && (
-                    <div
-                      className={
-                        additionalTokens.length > 0 && showHidden ? "mb-6" : ""
-                      }
-                    >
-                      <div className="space-y-2 pr-1">
-                        {mainTokens.map((token, index) => {
-                          const isUserAddedInMain =
-                            preferences?.userAddedTokens?.includes(
-                              token.contractAddress
-                            ) && !token.isPreset;
+                    <div className="space-y-2 pr-1">
+                      {mainTokens.map((token, index) => {
+                        const isUserAddedInMain =
+                          preferences?.userAddedTokens?.includes(
+                            token.contractAddress
+                          ) && !token.isPreset;
 
-                          return (
-                            <div
-                              key={`${token.contractAddress}_${index}_main`}
-                              className={`token-row ${
-                                isUserAddedInMain ? "has-menu" : ""
-                              } flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
-                                isNavigating ||
-                                addingToken === token.contractAddress
-                                  ? "opacity-70"
-                                  : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
-                              }`}
-                              style={{ zIndex: mainTokens.length - index }}
-                            >
-                              <div className="token-content-wrapper">
-                                <div className="token-info">
-                                  <TokenImage
-                                    src={token.logoUrl}
-                                    alt={token.symbol}
-                                    symbol={token.symbol}
-                                    name={token.name}
-                                    className="w-10 h-10 mr-2.5 flex-shrink-0"
-                                  />
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-white font-medium font-satoshi text-sm flex items-center">
-                                      {token.name}
-                                      <PercentageDisplay
-                                        change24h={token.change24h}
-                                        size="xs"
-                                      />
-                                    </div>
-                                    <div className="text-gray-400 text-xs font-satoshi">
-                                      {formatTokenAmount(token.balance, 4)}{" "}
-                                      {token.symbol}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="token-values-wrapper">
-                                  <div className="token-values">
-                                    <div className="text-white font-medium font-satoshi text-sm">
-                                      {formatCurrency(token.value)}
-                                    </div>
-                                  </div>
-
-                                  {isUserAddedInMain && (
-                                    <div className="menu-button-wrapper">
-                                      <ThreeDotMenu
-                                        token={token}
-                                        onRemoveFromMain={
-                                          handleRemoveFromMainList
-                                        }
-                                        isInMainList={true}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Additional Tokens */}
-                  {additionalTokens.length > 0 && showHidden && (
-                    <div>
-                      <div className="flex items-center mb-3 px-2">
-                        <div className="flex-1 h-px bg-[#2C2C2C]"></div>
-                        <div className="px-3 text-xs text-gray-400 font-satoshi">
-                          Additional Tokens ({additionalTokens.length})
-                        </div>
-                        <div className="flex-1 h-px bg-[#2C2C2C]"></div>
-                      </div>
-
-                      <div className="space-y-2 pr-1">
-                        {additionalTokens.map((token, index) => (
+                        return (
                           <div
-                            key={`${token.contractAddress}_${index}_additional`}
-                            className={`token-row has-menu flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
+                            key={`${token.contractAddress}_${index}_main`}
+                            className={`token-row ${
+                              isUserAddedInMain ? "has-menu" : ""
+                            } flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
                               isNavigating ||
                               addingToken === token.contractAddress
                                 ? "opacity-70"
                                 : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
                             }`}
-                            style={{ zIndex: additionalTokens.length - index }}
+                            style={{ zIndex: mainTokens.length - index }}
                           >
                             <div className="token-content-wrapper">
                               <div className="token-info">
@@ -946,173 +1005,252 @@ export default function TokenList() {
                                   </div>
                                 </div>
 
-                                <div className="menu-button-wrapper">
-                                  <ThreeDotMenu
-                                    token={token}
-                                    onAddToMain={handleAddToMainList}
-                                    isInMainList={false}
-                                  />
-                                </div>
+                                {isUserAddedInMain && (
+                                  <div className="menu-button-wrapper">
+                                    <ThreeDotMenu
+                                      token={token}
+                                      onRemoveFromMain={
+                                        handleRemoveFromMainList
+                                      }
+                                      isInMainList={true}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
-                        ))}
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Tokens */}
+                {additionalTokens.length > 0 && showHidden && (
+                  <div>
+                    <div className="flex items-center mb-3 px-2">
+                      <div className="flex-1 h-px bg-[#2C2C2C]"></div>
+                      <div className="px-3 text-xs text-gray-400 font-satoshi">
+                        Additional Tokens ({additionalTokens.length})
+                      </div>
+                      <div className="flex-1 h-px bg-[#2C2C2C]"></div>
+                    </div>
+
+                    <div className="space-y-2 pr-1">
+                      {additionalTokens.map((token, index) => (
+                        <div
+                          key={`${token.contractAddress}_${index}_additional`}
+                          className={`token-row has-menu flex items-center justify-between p-2.5 rounded-lg transition-colors relative ${
+                            isNavigating ||
+                            addingToken === token.contractAddress
+                              ? "opacity-70"
+                              : "hover:bg-[#1A1A1A] active:bg-[#2A2A2A]"
+                          }`}
+                          style={{ zIndex: additionalTokens.length - index }}
+                        >
+                          <div className="token-content-wrapper">
+                            <div className="token-info">
+                              <TokenImage
+                                src={token.logoUrl}
+                                alt={token.symbol}
+                                symbol={token.symbol}
+                                name={token.name}
+                                className="w-10 h-10 mr-2.5 flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-white font-medium font-satoshi text-sm flex items-center">
+                                  {token.name}
+                                  <PercentageDisplay
+                                    change24h={token.change24h}
+                                    size="xs"
+                                  />
+                                </div>
+                                <div className="text-gray-400 text-xs font-satoshi">
+                                  {formatTokenAmount(token.balance, 4)}{" "}
+                                  {token.symbol}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="token-values-wrapper">
+                              <div className="token-values">
+                                <div className="text-white font-medium font-satoshi text-sm">
+                                  {formatCurrency(token.value)}
+                                </div>
+                              </div>
+
+                              <div className="menu-button-wrapper">
+                                <ThreeDotMenu
+                                  token={token}
+                                  onAddToMain={handleAddToMainList}
+                                  isInMainList={false}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Trending Tab - ALWAYS SHOW (works without wallet) */}
+          <div
+            className={`${
+              activeTab === "trending" ? "block" : "hidden"
+            } lg:hidden`}
+          >
+            <div className="space-y-2 pr-1">
+              {coinGeckoLoading ? (
+                <div className="flex items-center justify-center p-4">
+                  <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-[#E2AF19] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    <p className="text-gray-400 text-xs font-satoshi">
+                      Loading trending tokens...
+                    </p>
+                  </div>
+                </div>
+              ) : coinGeckoError ? (
+                <div className="flex items-center justify-center p-4">
+                  <div className="text-center">
+                    <AlertCircle
+                      size={24}
+                      className="text-red-400 mx-auto mb-2"
+                    />
+                    <p className="text-red-400 text-xs font-satoshi mb-2">
+                      {coinGeckoError}
+                    </p>
+                    <button
+                      onClick={refetchCoinGecko}
+                      className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-xs"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                </div>
+              ) : trendingTokens.length > 0 ? (
+                trendingTokens.map((token: TrendingToken, index: number) => (
+                  <div
+                    key={`${token.index}_${index}`}
+                    className="flex items-center justify-between p-2.5 rounded-lg hover:bg-[#1A1A1A] transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <TrendingTokenImage token={token} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-white text-sm font-medium font-satoshi flex items-center">
+                          {token.name}
+                          <span
+                            className={`text-xs ml-2 ${
+                              token.changeType === "positive"
+                                ? "text-green-400"
+                                : "text-red-400"
+                            }`}
+                          >
+                            {token.change}
+                          </span>
+                        </div>
+                        <div className="text-gray-400 text-xs font-satoshi">
+                          {token.symbol}
+                        </div>
                       </div>
                     </div>
-                  )}
-                </>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-white text-sm font-medium font-satoshi">
+                        {token.price}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center p-4">
+                  <p className="text-gray-400 text-sm font-satoshi">
+                    No trending tokens available
+                  </p>
+                </div>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Trending Tab - ✅ ALWAYS SHOW (works without wallet) */}
-          <div className={`${activeTab === "trending" ? "block" : "hidden"} lg:hidden`}>
-              <div className="space-y-2 pr-1">
-                {coinGeckoLoading ? (
-                  <div className="flex items-center justify-center p-4">
-                    <div className="text-center">
-                      <div className="w-8 h-8 border-4 border-[#E2AF19] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                      <p className="text-gray-400 text-xs font-satoshi">
-                        Loading trending tokens...
-                      </p>
-                    </div>
-                  </div>
-                ) : coinGeckoError ? (
-                  <div className="flex items-center justify-center p-4">
-                    <div className="text-center">
-                      <AlertCircle
-                        size={24}
-                        className="text-red-400 mx-auto mb-2"
-                      />
-                      <p className="text-red-400 text-xs font-satoshi mb-2">
-                        {coinGeckoError}
-                      </p>
-                      <button
-                        onClick={refetchCoinGecko}
-                        className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-xs"
-                      >
-                        Try Again
-                      </button>
-                    </div>
-                  </div>
-                ) : trendingTokens.length > 0 ? (
-                  trendingTokens.map((token: TrendingToken, index: number) => (
-                    <div
-                      key={`${token.index}_${index}`}
-                      className="flex items-center justify-between p-2.5 rounded-lg hover:bg-[#1A1A1A] transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <TrendingTokenImage token={token} />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-white text-sm font-medium font-satoshi flex items-center">
-                            {token.name}
-                            <span
-                              className={`text-xs ml-2 ${
-                                token.changeType === "positive"
-                                  ? "text-green-400"
-                                  : "text-red-400"
-                              }`}
-                            >
-                              {token.change}
-                            </span>
-                          </div>
-                          <div className="text-gray-400 text-xs font-satoshi">
-                            {token.symbol}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-white text-sm font-medium font-satoshi">
-                          {token.price}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex items-center justify-center p-4">
-                    <p className="text-gray-400 text-sm font-satoshi">
-                      No trending tokens available
+          {/* Top Gainers Tab - ALWAYS SHOW (works without wallet) */}
+          <div
+            className={`${
+              activeTab === "gainers" ? "block" : "hidden"
+            } lg:hidden`}
+          >
+            <div className="space-y-2 pr-1">
+              {coinGeckoLoading ? (
+                <div className="flex items-center justify-center p-4">
+                  <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-[#E2AF19] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    <p className="text-gray-400 text-xs font-satoshi">
+                      Loading top gainers...
                     </p>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Top Gainers Tab - ✅ ALWAYS SHOW (works without wallet) */}
-          <div className={`${activeTab === "gainers" ? "block" : "hidden"} lg:hidden`}>
-              <div className="space-y-2 pr-1">
-                {coinGeckoLoading ? (
-                  <div className="flex items-center justify-center p-4">
-                    <div className="text-center">
-                      <div className="w-8 h-8 border-4 border-[#E2AF19] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                      <p className="text-gray-400 text-xs font-satoshi">
-                        Loading top gainers...
-                      </p>
-                    </div>
-                  </div>
-                ) : coinGeckoError ? (
-                  <div className="flex items-center justify-center p-4">
-                    <div className="text-center">
-                      <AlertCircle
-                        size={24}
-                        className="text-red-400 mx-auto mb-2"
-                      />
-                      <p className="text-red-400 text-xs font-satoshi mb-2">
-                        {coinGeckoError}
-                      </p>
-                      <button
-                        onClick={refetchCoinGecko}
-                        className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-xs"
-                      >
-                        Try Again
-                      </button>
-                    </div>
-                  </div>
-                ) : topGainersData.length > 0 ? (
-                  topGainersData.map((token: TopGainer, index: number) => (
-                    <div
-                      key={`${token.index}_${index}`}
-                      className="flex items-center justify-between p-2.5 rounded-lg hover:bg-[#1A1A1A] transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <TrendingTokenImage token={token} size="w-8 h-8" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-white text-xs font-medium font-satoshi truncate">
-                            {token.name}
-                          </div>
-                          <div className="text-gray-400 text-[10px] font-satoshi">
-                            {token.symbol}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0 ml-2">
-                        <div className="text-white text-xs font-medium font-satoshi">
-                          {token.price}
-                        </div>
-                        <div
-                          className={`text-[10px] font-medium font-satoshi ${
-                            token.changeType === "positive"
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }`}
-                        >
-                          {token.changeType === "positive" ? "▲" : "▼"}{" "}
-                          {token.change}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex items-center justify-center p-4">
-                    <p className="text-gray-400 text-sm font-satoshi">
-                      No top gainers available
+                </div>
+              ) : coinGeckoError ? (
+                <div className="flex items-center justify-center p-4">
+                  <div className="text-center">
+                    <AlertCircle
+                      size={24}
+                      className="text-red-400 mx-auto mb-2"
+                    />
+                    <p className="text-red-400 text-xs font-satoshi mb-2">
+                      {coinGeckoError}
                     </p>
+                    <button
+                      onClick={refetchCoinGecko}
+                      className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-xs"
+                    >
+                      Try Again
+                    </button>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : topGainersData.length > 0 ? (
+                topGainersData.map((token: TopGainer, index: number) => (
+                  <div
+                    key={`${token.index}_${index}`}
+                    className="flex items-center justify-between p-2.5 rounded-lg hover:bg-[#1A1A1A] transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <TrendingTokenImage token={token} size="w-8 h-8" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-white text-xs font-medium font-satoshi truncate">
+                          {token.name}
+                        </div>
+                        <div className="text-gray-400 text-[10px] font-satoshi">
+                          {token.symbol}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-2">
+                      <div className="text-white text-xs font-medium font-satoshi">
+                        {token.price}
+                      </div>
+                      <div
+                        className={`text-[10px] font-medium font-satoshi ${
+                          token.changeType === "positive"
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {token.changeType === "positive" ? "▲" : "▼"}{" "}
+                        {token.change}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center p-4">
+                  <p className="text-gray-400 text-sm font-satoshi">
+                    No top gainers available
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </>
