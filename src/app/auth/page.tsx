@@ -1,4 +1,4 @@
-// src/app/auth/page.tsx - COMPLETE FIXED VERSION
+// src/app/auth/page.tsx - ENHANCED with aggressive cleanup
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,8 +7,9 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/store";
 import { clearWalletState } from "@/store/slices/walletSlice";
 import { resetUIState } from "@/store/slices/uiSlice";
-import { clearError } from "@/store/slices/authSlice";
+import { clearError, checkAuthStatus } from "@/store/slices/authSlice";
 import { appCleanupService } from "@/lib/app-cleanup-service";
+import { performCompleteCleanup } from "@/utils/walletCleanup";
 import LoginForm from "@/components/auth/LoginForm";
 import RegisterForm from "@/components/auth/RegisterForm";
 
@@ -16,40 +17,56 @@ export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
-  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, loading } = useSelector(
+    (state: RootState) => state.auth
+  );
 
-  // Cleanup on component mount to ensure clean state
+  // ✅ NEW: Aggressive cleanup on mount
   useEffect(() => {
-    console.log("🔍 Auth page mounted, performing cleanup check");
+    console.log("🔍 Auth page mounted, performing aggressive cleanup");
 
-    // Verify clean state
-    const isClean = appCleanupService.verifyCleanState();
-    if (!isClean) {
-      console.log("🧹 Detected unclean state on auth page, cleaning up...");
+    // Always clear wallet connections on auth page
+    performCompleteCleanup();
 
-      // Dispatch cleanup actions
-      dispatch(clearWalletState());
-      dispatch(resetUIState());
-
-      // Perform full cleanup
-      appCleanupService.performFullCleanup();
-    }
-
-    // Clear any existing errors
+    // Clear Redux state
+    dispatch(clearWalletState());
+    dispatch(resetUIState());
     dispatch(clearError());
+
+    // Verify auth status with backend
+    const verifyAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          console.log("🧹 Auth verification failed, ensuring complete cleanup");
+          performCompleteCleanup();
+
+          // Also clear the cookie
+          document.cookie =
+            "auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        }
+      } catch (error) {
+        console.log("🧹 Auth verification error, ensuring complete cleanup");
+        performCompleteCleanup();
+      }
+    };
+
+    verifyAuth();
   }, [dispatch]);
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !loading) {
       console.log("✅ User authenticated, redirecting to dashboard");
       router.push("/dashboard");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, loading, router]);
 
   // Cleanup when switching between login and register
   const handleFormSwitch = (toLogin: boolean) => {
-    // Clear any errors when switching forms
     dispatch(clearError());
     setIsLogin(toLogin);
   };
@@ -102,7 +119,7 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Right side - Image with exact 20px edges */}
+      {/* Right side - Image */}
       <div className="hidden lg:flex flex-1 bg-[#0F0F0F] pr-0">
         <div className="w-full h-full flex items-center justify-end">
           <div

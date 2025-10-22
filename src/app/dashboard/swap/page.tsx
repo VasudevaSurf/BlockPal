@@ -1399,8 +1399,10 @@ export default function SwapPage() {
 
                   <div className="overflow-y-auto pr-1.5 sm:pr-2 space-y-3 sm:space-y-6 custom-gold-scrollbar max-h-[300px] sm:max-h-[450px]">
                     {dbTransactions.length === 0 && !loadingHistory ? (
-                      <div className="text-center text-gray-400 py-6 sm:py-8 text-sm">
-                        No swap history yet
+                      <div className="flex items-center justify-center h-full min-h-[250px] sm:min-h-[400px]">
+                        <span className="text-gray-400 text-sm">
+                          No swap history yet
+                        </span>
                       </div>
                     ) : (
                       dbTransactions.slice(0, 10).map((item, index) => {
@@ -1590,8 +1592,10 @@ export default function SwapPage() {
 
                   <div className="flex-1 overflow-y-auto pr-2 space-y-6 custom-gold-scrollbar">
                     {dbTransactions.length === 0 && !loadingHistory ? (
-                      <div className="text-center text-gray-400 py-8">
-                        No swap history yet
+                      <div className="flex items-center justify-center h-full">
+                        <span className="text-gray-400">
+                          No swap history yet
+                        </span>
                       </div>
                     ) : (
                       dbTransactions.slice(0, 10).map((item, index) => {

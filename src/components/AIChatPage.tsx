@@ -1260,11 +1260,11 @@ export default function AIChatPage() {
 
           {/* Scrollable Chat History */}
           <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-4 min-h-0">
-            <div className="mb-4">
+            {/* <div className="mb-4">
               <span className="text-gray-300 text-sm font-satoshi font-medium">
                 Recent
               </span>
-            </div>
+            </div> */}
 
             <div className="space-y-2">
               {/* Current Session */}
@@ -1464,12 +1464,16 @@ export default function AIChatPage() {
 
               {/* Empty State */}
               {conversations.length === 0 && messages.length === 0 && (
-                <div className="text-center py-8">
-                  <Brain className="text-gray-500 mx-auto mb-3" size={32} />
-                  <p className="text-gray-500 text-sm">No conversations yet</p>
-                  <p className="text-gray-600 text-xs mt-1">
-                    Start chatting to see history
-                  </p>
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Brain className="text-gray-500 mx-auto mb-3" size={32} />
+                    <p className="text-gray-500 text-sm">
+                      No conversations yet
+                    </p>
+                    <p className="text-gray-600 text-xs mt-1">
+                      Start chatting to see history
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -1516,11 +1520,11 @@ export default function AIChatPage() {
 
           {/* Scrollable Chat History */}
           <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-20">
-            <div className="mb-4">
+            {/* <div className="mb-4">
               <span className="text-gray-300 text-sm font-satoshi font-medium">
                 Recent
               </span>
-            </div>
+            </div> */}
 
             <div className="space-y-2">
               {/* Current Session - only show if we have messages AND a conversation ID */}
@@ -1722,12 +1726,16 @@ export default function AIChatPage() {
 
               {/* Empty State */}
               {conversations.length === 0 && messages.length === 0 && (
-                <div className="text-center py-8">
-                  <Brain className="text-gray-500 mx-auto mb-3" size={32} />
-                  <p className="text-gray-500 text-sm">No conversations yet</p>
-                  <p className="text-gray-600 text-xs mt-1">
-                    Start chatting to see history
-                  </p>
+                <div className="flex items-center justify-center h-full min-h-[400px]">
+                  <div className="text-center">
+                    <Brain className="text-gray-500 mx-auto mb-3" size={32} />
+                    <p className="text-gray-500 text-sm">
+                      No conversations yet
+                    </p>
+                    <p className="text-gray-600 text-xs mt-1">
+                      Start chatting to see history
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

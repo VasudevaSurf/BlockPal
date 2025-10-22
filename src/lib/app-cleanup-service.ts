@@ -1,4 +1,4 @@
-// src/lib/app-cleanup-service.ts
+// src/lib/app-cleanup-service.ts - UPDATED with Wagmi cleanup
 /**
  * Service to handle cleanup when switching users or logging out
  * Ensures no data leakage between user sessions
@@ -7,6 +7,10 @@
 import { store } from "@/store";
 import { clearWalletState } from "@/store/slices/walletSlice";
 import { resetUIState } from "@/store/slices/uiSlice";
+import {
+  clearWalletConnection,
+  clearBlockpalData,
+} from "@/utils/walletCleanup";
 
 class AppCleanupService {
   private static instance: AppCleanupService;
@@ -47,16 +51,13 @@ class AppCleanupService {
     // 1. Clear Redux state
     this.clearReduxState();
 
-    // 2. Clear browser storage
+    // 2. Clear browser storage (including Wagmi)
     this.clearBrowserStorage();
 
-    // 3. Clear service caches
-    // this.clearServiceCaches();
-
-    // 4. Stop any running intervals/timers
+    // 3. Stop any running intervals/timers
     this.stopBackgroundProcesses();
 
-    // 5. Clear any in-memory caches
+    // 4. Clear any in-memory caches
     this.clearMemoryCaches();
 
     console.log("✅ Full app cleanup completed");
@@ -81,61 +82,9 @@ class AppCleanupService {
 
     if (typeof window === "undefined") return;
 
-    // Clear localStorage
-    const localStorageKeys = [
-      "activeWalletId",
-      "auth-token",
-      "dashboard-user-data",
-      "dashboard-user-data-v2",
-      "wallet-cache",
-      "token-cache",
-      "price-cache",
-    ];
-
-    localStorageKeys.forEach((key) => {
-      localStorage.removeItem(key);
-    });
-
-    // Clear prefixed localStorage keys
-    const allLocalKeys = Object.keys(localStorage);
-    allLocalKeys.forEach((key) => {
-      if (
-        key.startsWith("wallet-") ||
-        key.startsWith("token-") ||
-        key.startsWith("blockpal-") ||
-        key.startsWith("dashboard-") ||
-        key.startsWith("cache-") ||
-        key.startsWith("realtime-") ||
-        key.startsWith("user-")
-      ) {
-        localStorage.removeItem(key);
-      }
-    });
-
-    // Clear sessionStorage
-    const sessionStorageKeys = [
-      "walletNameOverrides",
-      "tempWalletData",
-      "dashboardState",
-    ];
-
-    sessionStorageKeys.forEach((key) => {
-      sessionStorage.removeItem(key);
-    });
-
-    // Clear prefixed sessionStorage keys
-    const allSessionKeys = Object.keys(sessionStorage);
-    allSessionKeys.forEach((key) => {
-      if (
-        key.includes("wallet") ||
-        key.includes("token") ||
-        key.includes("dashboard") ||
-        key.includes("cache") ||
-        key.includes("temp")
-      ) {
-        sessionStorage.removeItem(key);
-      }
-    });
+    // ✅ UPDATED: Use utility functions for thorough cleanup
+    clearWalletConnection(); // Clear Wagmi data
+    clearBlockpalData(); // Clear Blockpal data
 
     // Clear IndexedDB if exists
     this.clearIndexedDB();
@@ -152,7 +101,12 @@ class AppCleanupService {
       const databases = await indexedDB.databases?.();
       if (databases) {
         for (const db of databases) {
-          if (db.name && db.name.includes("blockpal")) {
+          if (
+            db.name &&
+            (db.name.includes("blockpal") ||
+              db.name.includes("wagmi") ||
+              db.name.includes("walletconnect"))
+          ) {
             await indexedDB.deleteDatabase(db.name);
             console.log(`🗑️ Deleted IndexedDB: ${db.name}`);
           }
@@ -162,33 +116,6 @@ class AppCleanupService {
       console.warn("Could not clear IndexedDB:", error);
     }
   }
-
-  /**
-   * Clear service caches
-   */
-  // private clearServiceCaches() {
-  //   console.log("🗑️ Clearing service caches");
-
-  //   // Clear dashboard service cache
-  //   if (dashboardServiceV2) {
-  //     // Clear all wallet data from dashboard service
-  //     const walletsToClean = Array.from(
-  //       { length: 10 },
-  //       (_, i) => `0x${i.toString(16).padStart(40, "0")}`
-  //     );
-
-  //     walletsToClean.forEach((wallet) => {
-  //       try {
-  //         dashboardServiceV2.clearUserData(wallet);
-  //       } catch (error) {
-  //         // Ignore errors for non-existent wallets
-  //       }
-  //     });
-  //   }
-
-  //   // Clear browser caches if available
-  //   this.clearBrowserCaches();
-  // }
 
   /**
    * Clear browser caches (Service Worker, Cache API)
@@ -235,10 +162,6 @@ class AppCleanupService {
 
     // Clear any global intervals/timeouts
     if (typeof window !== "undefined") {
-      // Store original functions
-      const originalSetInterval = window.setInterval;
-      const originalSetTimeout = window.setTimeout;
-
       // Clear high-numbered intervals/timeouts (likely app-created)
       for (let i = 1; i < 10000; i++) {
         try {
@@ -257,15 +180,15 @@ class AppCleanupService {
   private clearMemoryCaches() {
     console.log("🗑️ Clearing memory caches");
 
-    // Clear any global variables that might hold user data
+    // Clear any custom properties on window
     if (typeof window !== "undefined") {
-      // Clear any custom properties on window
       const windowKeys = Object.keys(window);
       windowKeys.forEach((key) => {
         if (
           key.startsWith("__blockpal") ||
           key.startsWith("__wallet") ||
-          key.startsWith("__cache")
+          key.startsWith("__cache") ||
+          key.startsWith("__wagmi")
         ) {
           try {
             delete (window as any)[key];
@@ -319,14 +242,17 @@ class AppCleanupService {
           (key) =>
             key.includes("wallet") ||
             key.includes("token") ||
-            key.includes("dashboard")
+            key.includes("dashboard") ||
+            key.includes("wagmi") ||
+            key.includes("walletconnect")
         ).length === 0,
       sessionStorage:
         Object.keys(sessionStorage).filter(
           (key) =>
             key.includes("wallet") ||
             key.includes("token") ||
-            key.includes("dashboard")
+            key.includes("dashboard") ||
+            key.includes("wagmi")
         ).length === 0,
       reduxState: store.getState().wallet.wallets.length === 0,
     };

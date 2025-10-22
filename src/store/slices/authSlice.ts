@@ -1,11 +1,10 @@
-// src/store/slices/authSlice.ts - FIXED with proper state cleanup
+// src/store/slices/authSlice.ts - COMPLETELY FIXED
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { AuthState, User } from "@/types";
 import { AppDispatch } from "@/store";
-
-// Import wallet actions for cleanup
 import { clearWalletState } from "./walletSlice";
 import { resetUIState } from "./uiSlice";
+import { performCompleteCleanup } from "@/utils/walletCleanup";
 
 const initialState: AuthState = {
   user: null,
@@ -31,55 +30,11 @@ const safeJsonParse = async (response: Response) => {
   }
 };
 
-// Helper function to clear all app data
+// Helper function to clear all app data including Wagmi
 const clearAllAppData = () => {
   if (typeof window !== "undefined") {
     console.log("🧹 Clearing all app data from storage");
-
-    // Clear specific keys
-    const keysToRemove = [
-      "activeWalletId",
-      "auth-token",
-      "walletNameOverrides",
-      "dashboard-user-data-v2",
-      "dashboard-user-data",
-    ];
-
-    keysToRemove.forEach((key) => {
-      localStorage.removeItem(key);
-      sessionStorage.removeItem(key);
-    });
-
-    // Clear any prefixed keys
-    const allLocalKeys = Object.keys(localStorage);
-    const allSessionKeys = Object.keys(sessionStorage);
-
-    allLocalKeys.forEach((key) => {
-      if (
-        key.startsWith("wallet-") ||
-        key.startsWith("token-") ||
-        key.startsWith("blockpal-") ||
-        key.startsWith("dashboard-") ||
-        key.startsWith("cache-") ||
-        key.startsWith("realtime-")
-      ) {
-        localStorage.removeItem(key);
-      }
-    });
-
-    allSessionKeys.forEach((key) => {
-      if (
-        key.startsWith("wallet") ||
-        key.startsWith("token") ||
-        key.startsWith("blockpal") ||
-        key.startsWith("dashboard") ||
-        key.startsWith("cache") ||
-        key.startsWith("realtime")
-      ) {
-        sessionStorage.removeItem(key);
-      }
-    });
-
+    performCompleteCleanup();
     console.log("✅ Storage cleared");
   }
 };
@@ -142,8 +97,6 @@ export const loginUser = createAsyncThunk<
     }
 
     console.log("✅ Redux: Login successful", data.user);
-
-    // Clear wallet state after successful login to ensure clean slate
     dispatch(clearWalletState());
 
     return data.user;
@@ -199,8 +152,6 @@ export const registerUser = createAsyncThunk<
     }
 
     console.log("✅ Redux: Registration successful");
-
-    // Clear wallet state after successful registration
     dispatch(clearWalletState());
 
     return data.user;
@@ -261,10 +212,7 @@ export const logoutUser = createAsyncThunk<
     return null;
   } catch (error) {
     console.error("💥 Redux: Network error during logout:", error);
-
-    // Still clear local state even if network fails
     clearAllAppData();
-
     return null;
   }
 });
@@ -288,7 +236,6 @@ export const checkAuthStatus = createAsyncThunk<
 
     if (!response.ok) {
       console.log("❌ Redux: Auth check failed");
-      // Clear state if auth check fails
       dispatch(clearWalletState());
       clearAllAppData();
       return rejectWithValue("Not authenticated");
@@ -356,7 +303,6 @@ const authSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // Login cases
     builder
       .addCase(loginUser.pending, (state) => {
         console.log("🔄 Redux: Login pending");
@@ -381,7 +327,6 @@ const authSlice = createSlice({
 
         state.error = action.payload as string;
       })
-      // Register cases
       .addCase(registerUser.pending, (state) => {
         console.log("🔄 Redux: Registration pending");
         state.loading = true;
@@ -401,22 +346,18 @@ const authSlice = createSlice({
         state.user = null;
         state.error = action.payload as string;
       })
-      // Logout cases
       .addCase(logoutUser.pending, (state) => {
         console.log("🔄 Redux: Logout pending");
         state.loading = true;
       })
       .addCase(logoutUser.fulfilled, (state) => {
         console.log("✅ Redux: Logout fulfilled");
-        // Reset to initial state
         Object.assign(state, initialState);
       })
       .addCase(logoutUser.rejected, (state) => {
         console.log("⚠️ Redux: Logout rejected, but clearing state anyway");
-        // Even if logout API fails, clear the state
         Object.assign(state, initialState);
       })
-      // Check auth status cases
       .addCase(checkAuthStatus.pending, (state) => {
         console.log("🔄 Redux: Auth status check pending");
         state.loading = true;
@@ -430,7 +371,6 @@ const authSlice = createSlice({
       })
       .addCase(checkAuthStatus.rejected, (state) => {
         console.log("❌ Redux: Auth status check rejected");
-        // Reset to initial state on auth check failure
         Object.assign(state, initialState);
       });
   },

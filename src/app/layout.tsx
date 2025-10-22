@@ -1,4 +1,4 @@
-// src/app/layout.tsx - UPDATED with WalletProvider
+// src/app/layout.tsx - UPDATED with auth check and wallet cleanup
 "use client";
 
 import "./globals.css";
@@ -13,6 +13,40 @@ import {
   satoshi,
 } from "@/lib/fonts";
 import WalletErrorBoundary from "@/components/wallet/WalletErrorBoundary";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { performCompleteCleanup } from "@/utils/walletCleanup";
+
+// ✅ NEW: Component to handle wallet cleanup on auth failure
+function WalletCleanupHandler() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Only check on auth page
+    if (pathname === "/auth") {
+      // Check if we have a token
+      const checkAuth = async () => {
+        try {
+          const response = await fetch("/api/auth/me", {
+            credentials: "include",
+          });
+
+          if (!response.ok) {
+            console.log("🧹 Auth failed, cleaning up wallet connections");
+            performCompleteCleanup();
+          }
+        } catch (error) {
+          console.log("🧹 Auth check failed, cleaning up wallet connections");
+          performCompleteCleanup();
+        }
+      };
+
+      checkAuth();
+    }
+  }, [pathname]);
+
+  return null;
+}
 
 export default function RootLayout({
   children,
@@ -84,6 +118,7 @@ export default function RootLayout({
         <Provider store={store}>
           <ToastProvider>
             <WalletErrorBoundary>
+              <WalletCleanupHandler />
               <WalletProvider>{children}</WalletProvider>
             </WalletErrorBoundary>
           </ToastProvider>

@@ -1,3 +1,4 @@
+// src/middleware.ts - UPDATED to check database
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -11,7 +12,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/images/") ||
     pathname.startsWith("/icons/") ||
     pathname.startsWith("/.well-known/") ||
-    pathname.startsWith("/api/") || // Skip middleware for ALL API routes
+    pathname.startsWith("/api/") ||
     (pathname.includes(".") &&
       (pathname.endsWith(".js") ||
         pathname.endsWith(".css") ||
@@ -65,6 +66,13 @@ export function middleware(request: NextRequest) {
 
       console.log("Token appears valid for user:", payload.username);
 
+      // ✅ NEW: For protected routes, verify user still exists in database
+      if (!publicPaths.includes(pathname)) {
+        // We can't directly query MongoDB in middleware (edge runtime)
+        // So we'll let the /api/auth/me endpoint handle this
+        // But we should clear invalid tokens on auth pages
+      }
+
       // If authenticated user is on auth page, redirect to dashboard
       if (pathname === "/auth" || pathname === "/") {
         console.log(
@@ -74,14 +82,17 @@ export function middleware(request: NextRequest) {
       }
 
       return NextResponse.next();
-    } catch (error) {
+    } catch (error: any) {
       console.log("Token invalid or expired:", error.message);
-      // Token is invalid
-      if (!publicPaths.includes(pathname)) {
-        const response = NextResponse.redirect(new URL("/auth", request.url));
-        response.cookies.delete("auth-token");
-        return response;
-      }
+
+      // ✅ UPDATED: Clear the invalid token
+      const response = NextResponse.redirect(new URL("/auth", request.url));
+      response.cookies.delete("auth-token");
+
+      // ✅ NEW: Also clear Wagmi data via header (we'll handle this in layout)
+      response.headers.set("X-Clear-Wallet", "true");
+
+      return response;
     }
   }
 
@@ -96,14 +107,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -1,4 +1,4 @@
-// src/components/wallet/WalletConnectButton.tsx - COMPLETE FIXED VERSION WITH DISCONNECT MODAL
+// src/components/wallet/WalletConnectButton.tsx - UPDATED with Wagmi cleanup
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { Copy, LogOut, Check, Wallet } from "lucide-react";
 import { chains } from "./WalletProvider";
 import { useToast } from "@/contexts/ToastContext";
+import { clearWalletConnection } from "@/utils/walletCleanup"; // ✅ UPDATED
 import DisconnectModal from "@/components/modals/DisconnectModal";
 
 interface WalletConnectButtonProps {
@@ -264,7 +265,7 @@ export default function WalletConnectButton({
     }
   }, [mounted, isConnected, address]);
 
-  // ✅ CLOSE MODAL WHEN WALLET DISCONNECTS
+  // Close modal when wallet disconnects
   useEffect(() => {
     if (!isConnected) {
       setShowDisconnectModal(false);
@@ -285,15 +286,21 @@ export default function WalletConnectButton({
     }
   };
 
-  // ✅ SHOW MODAL INSTEAD OF DIRECT DISCONNECT
+  // Show modal instead of direct disconnect
   const handleDisconnectClick = () => {
     setShowDisconnectModal(true);
   };
 
-  // ✅ ACTUAL DISCONNECT HANDLER
+  // ✅ UPDATED: Actual disconnect handler with Wagmi cleanup
   const confirmDisconnect = () => {
     console.log("🔌 Confirming wallet disconnect...");
+
+    // Disconnect from Wagmi
     disconnect();
+
+    // ✅ UPDATED: Clear Wagmi localStorage
+    clearWalletConnection();
+
     setConnectionError(null);
     setShowDisconnectModal(false);
     showToast("success", "Wallet disconnected successfully", 3000);
@@ -429,7 +436,6 @@ export default function WalletConnectButton({
                           )}
                         </button>
 
-                        {/* ✅ FIXED: Use handleDisconnectClick instead of handleDisconnect */}
                         <button
                           onClick={handleDisconnectClick}
                           className={`w-10 ${height} bg-[#F9EFD1] border border-[#F9EFD1] rounded-[12px] hover:bg-[#F5E8C4] transition-colors flex items-center justify-center group relative`}
@@ -493,7 +499,6 @@ export default function WalletConnectButton({
                           )}
                         </button>
 
-                        {/* ✅ FIXED: Use handleDisconnectClick instead of handleDisconnect */}
                         <button
                           onClick={handleDisconnectClick}
                           className="bg-[#F9EFD1] border rounded-[12px] px-3 py-2 transition-colors flex items-center justify-center gap-2"
@@ -513,7 +518,7 @@ export default function WalletConnectButton({
         </ConnectButton.Custom>
       </div>
 
-      {/* ✅ DISCONNECT MODAL - Only shows when explicitly opened AND wallet is connected */}
+      {/* Disconnect Modal - Only shows when explicitly opened AND wallet is connected */}
       {isConnected && (
         <DisconnectModal
           isOpen={showDisconnectModal}
