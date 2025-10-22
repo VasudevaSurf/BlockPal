@@ -535,7 +535,7 @@ export default function SwapPage() {
   return (
     <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] flex flex-col overflow-hidden relative">
       {/* Swap Effect Image - Top Right Corner */}
-      <div className="absolute -top-0 -right-0 z-10 pointer-events-none">
+      <div className="absolute -top-0 -right-0 z-[5] pointer-events-none">
         <img
           src="/swapEffect.png"
           alt=""
@@ -549,7 +549,7 @@ export default function SwapPage() {
       </div>
 
       {/* Centered Content Container */}
-      <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative z-20">
+      <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative z-[5]">
         {/* Title */}
         <div className="mb-3 sm:mb-4 lg:mb-8 relative z-20">
           <h1 className="text-lg sm:text-[24px] lg:text-[30px] font-mayeka-demi-bold-demo font-bold text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent px-4">

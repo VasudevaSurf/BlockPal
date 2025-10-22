@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 interface DisconnectModalProps {
@@ -10,57 +11,39 @@ interface DisconnectModalProps {
   walletAddress?: string;
 }
 
-export default function DisconnectModal({
+function DisconnectModalContent({
   isOpen,
   onClose,
   onConfirm,
   walletAddress,
-}: DisconnectModalProps) {
-  const [isExiting, setIsExiting] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsExiting(false);
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen]);
-
-  const handleClose = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      onClose();
-      setIsExiting(false);
-    }, 200);
-  };
-
-  const handleConfirm = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      onConfirm();
-      setIsExiting(false);
-    }, 200);
-  };
-
+  isExiting,
+  handleClose,
+  handleConfirm,
+}: DisconnectModalProps & {
+  isExiting: boolean;
+  handleClose: () => void;
+  handleConfirm: () => void;
+}) {
   if (!isOpen && !isExiting) return null;
 
   return (
     <>
+      {/* Backdrop with extremely high z-index */}
       <div
-        className={`fixed inset-0 bg-black/50 z-[9997] transition-opacity duration-200 ${
+        className={`fixed inset-0 bg-black/50 transition-opacity duration-200 ${
           isExiting ? "opacity-0" : "opacity-100"
         }`}
+        style={{ zIndex: 999999 }}
         onClick={handleClose}
       />
 
-      <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
+      {/* Modal Container with extremely high z-index */}
+      <div
+        className="fixed inset-0 flex items-center justify-center p-4 pointer-events-none"
+        style={{ zIndex: 1000000 }}
+      >
         <div
-          className={`bg-[#1A1A1A] border border-[#2C2C2C] rounded-2xl p-6 max-w-md w-full shadow-2xl transition-all duration-200 ${
+          className={`bg-[#1A1A1A] border border-[#2C2C2C] rounded-2xl p-6 max-w-md w-full shadow-2xl transition-all duration-200 pointer-events-auto ${
             isExiting
               ? "opacity-0 scale-95"
               : "opacity-100 scale-100 animate-modal-in"
@@ -129,5 +112,65 @@ export default function DisconnectModal({
         }
       `}</style>
     </>
+  );
+}
+
+export default function DisconnectModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  walletAddress,
+}: DisconnectModalProps) {
+  const [isExiting, setIsExiting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsExiting(false);
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  const handleClose = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onClose();
+      setIsExiting(false);
+    }, 200);
+  };
+
+  const handleConfirm = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onConfirm();
+      setIsExiting(false);
+    }, 200);
+  };
+
+  // Don't render on server
+  if (!mounted) return null;
+
+  // Use createPortal to render at document.body level
+  return createPortal(
+    <DisconnectModalContent
+      isOpen={isOpen}
+      onClose={onClose}
+      onConfirm={onConfirm}
+      walletAddress={walletAddress}
+      isExiting={isExiting}
+      handleClose={handleClose}
+      handleConfirm={handleConfirm}
+    />,
+    document.body
   );
 }
