@@ -1,4 +1,4 @@
-// src/app/dashboard/swap/page.tsx - COMPLETE FIXED VERSION
+// src/app/dashboard/swap/page.tsx - Complete Updated Version with Mobile Responsive
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -118,7 +118,7 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// ✅ FIXED: Image cache and preload function
+// Image cache and preload function
 const imageCache = new Map<string, boolean>();
 
 const preloadImage = (src: string): Promise<boolean> => {
@@ -141,7 +141,7 @@ const preloadImage = (src: string): Promise<boolean> => {
   });
 };
 
-// ✅ FIXED: Chain Icon Component with NO fallback visibility during initial load
+// Chain Icon Component
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -162,7 +162,6 @@ const ChainIcon: React.FC<ChainIconProps> = ({
 }) => {
   const [imageState, setImageState] = useState<"loading" | "loaded" | "error">(
     () => {
-      // ✅ Check cache on initial render to prevent flicker
       if (chainData.image && imageCache.has(chainData.image)) {
         return imageCache.get(chainData.image) ? "loaded" : "error";
       }
@@ -173,13 +172,13 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   const mountedRef = useRef(true);
 
   const sizeClasses = {
-    sm: "w-4 h-4 lg:w-5 lg:h-5",
-    md: "w-5 h-5 lg:w-6 lg:h-6 xl:w-7 xl:h-7",
-    lg: "w-6 h-6 lg:w-8 lg:h-8",
+    sm: "w-5 h-5",
+    md: "w-6 h-6 lg:w-7 lg:h-7",
+    lg: "w-8 h-8",
   };
 
   const iconSizes = {
-    sm: "text-[10px] lg:text-xs",
+    sm: "text-xs",
     md: "text-xs",
     lg: "text-sm",
   };
@@ -187,14 +186,12 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   useEffect(() => {
     mountedRef.current = true;
 
-    // Check cache first
     if (chainData.image && imageCache.has(chainData.image)) {
       const cached = imageCache.get(chainData.image);
       setImageState(cached ? "loaded" : "error");
       return;
     }
 
-    // Preload image if not cached
     if (chainData.image) {
       preloadImage(chainData.image).then((success) => {
         if (mountedRef.current) {
@@ -215,12 +212,10 @@ const ChainIcon: React.FC<ChainIconProps> = ({
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
       style={{
-        // ✅ Hide component completely until image loads or fails
         opacity: imageState === "loading" ? 0 : 1,
         transition: "opacity 0.15s ease-in",
       }}
     >
-      {/* Show image only when loaded */}
       {imageState === "loaded" && chainData.image && (
         <img
           src={chainData.image}
@@ -231,7 +226,6 @@ const ChainIcon: React.FC<ChainIconProps> = ({
         />
       )}
 
-      {/* Show fallback only on error, not during loading */}
       {imageState === "error" && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
@@ -280,7 +274,7 @@ const TokenImage: React.FC<TokenImageProps> = ({
         style={{ userSelect: "none", pointerEvents: "none" }}
       >
         <span
-          className="text-white font-bold text-[10px] lg:text-xs text-center px-1"
+          className="text-white font-bold text-xs text-center px-1"
           style={{ userSelect: "none", pointerEvents: "none" }}
         >
           {firstWord.charAt(0)}
@@ -323,14 +317,14 @@ const scrollbarStyles = `
   }
 `;
 
-// Reusable Button Component
+// Select Token Button
 const SelectTokenButton = ({ onClick }: { onClick: () => void }) => {
   return (
     <button
       onClick={onClick}
-      className="relative w-full h-[44px] lg:h-[50px] rounded-[100px] bg-[#E2AF19] hover:bg-[#D4A853] transition-colors flex items-center justify-center overflow-hidden"
+      className="relative w-full h-[50px] rounded-[100px] bg-[#E2AF19] hover:bg-[#D4A853] transition-colors flex items-center justify-center overflow-hidden"
     >
-      <span className="text-black font-mayeka-bold-demo text-sm lg:text-base">
+      <span className="text-black font-mayeka-bold-demo text-base">
         Select Tokens
       </span>
     </button>
@@ -339,6 +333,7 @@ const SelectTokenButton = ({ onClick }: { onClick: () => void }) => {
 
 export default function SwapPage() {
   const { showToast } = useToast();
+
   const [activeTab, setActiveTab] = useState("swap");
   const [showChainSelector, setShowChainSelector] = useState(false);
   const [showFromTokenSelector, setShowFromTokenSelector] = useState(false);
@@ -353,7 +348,6 @@ export default function SwapPage() {
   const chainDisplayData = getChainDisplayData();
   const currentChainDisplay = chainDisplayData[chainId] || chainDisplayData[1];
 
-  // ✅ Preload all chain images on component mount
   useEffect(() => {
     const preloadAllChainImages = async () => {
       const images = Object.values(chainDisplayData)
@@ -431,7 +425,6 @@ export default function SwapPage() {
         const success = await executeSwap();
 
         if (success) {
-          // ✅ Show success toast
           showToast(
             "success",
             `Successfully swapped ${fromAmount} ${fromToken?.symbol} to ${toAmount} ${toToken?.symbol}`,
@@ -443,7 +436,6 @@ export default function SwapPage() {
             x.set(0);
           }, 2000);
         } else {
-          // ✅ Show error toast for failed swap
           showToast(
             "error",
             "Swap failed. Please try again or check your wallet.",
@@ -454,10 +446,8 @@ export default function SwapPage() {
           x.set(0);
         }
       } catch (error: any) {
-        // ✅ Show error toast for exceptions
         console.error("Swap error:", error);
 
-        // Provide specific error messages based on error type
         let errorMessage = "Swap failed unexpectedly. Please try again.";
 
         if (error.message?.includes("user rejected")) {
@@ -506,6 +496,18 @@ export default function SwapPage() {
     });
   };
 
+  const formatTokenAmount = (
+    amount: number | string,
+    decimals: number = 4
+  ): string => {
+    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (isNaN(num) || num === 0) return "0";
+    if (num < 0.000001) return num.toExponential(2);
+    if (num >= 1000000) return `${(num / 1000000).toFixed(2)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(2)}K`;
+    return num.toFixed(Math.min(decimals, 8));
+  };
+
   const rate =
     fromAmount && toAmount && parseFloat(fromAmount) > 0
       ? (parseFloat(toAmount) / parseFloat(fromAmount)).toFixed(6)
@@ -530,720 +532,6 @@ export default function SwapPage() {
     setShowFromTokenSelector(true);
   };
 
-  // Swap Card Content Component - Reusable for both mobile and desktop
-  const SwapCardContent = () => (
-    <div className="py-3 lg:py-4 px-3 lg:px-16">
-      {/* Chain selector and slippage */}
-      <div className="flex flex-row items-center justify-between mb-3 lg:mb-4 gap-2">
-        <button
-          ref={chainButtonRef}
-          onClick={() => setShowChainSelector(true)}
-          className="flex items-center gap-1.5 lg:gap-2 hover:opacity-80 min-w-fit justify-center px-2 lg:px-3 py-1.5 lg:py-2"
-        >
-          <ChainIcon chainData={currentChainDisplay} size="md" />
-          <span className="text-white text-sm lg:text-base font-satoshi font-medium">
-            {currentChainDisplay.name}
-          </span>
-          <svg
-            className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </button>
-
-        <div className="relative">
-          <div className="relative p-[1px] rounded-[20px] lg:rounded-[25px] overflow-hidden">
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `linear-gradient(135deg, 
-                  rgba(255, 255, 255, 0.3) 0%,
-                  rgba(255, 255, 255, 0.1) 20%,
-                  rgba(226, 175, 25, 0.2) 40%,
-                  rgba(255, 255, 255, 0.05) 60%,
-                  rgba(226, 175, 25, 0.15) 80%,
-                  rgba(255, 255, 255, 0.2) 100%)`,
-              }}
-            />
-
-            <div
-              className="relative flex items-center gap-2 lg:gap-3 px-2 lg:px-3 py-1.5 lg:py-2 rounded-[19px] lg:rounded-[24px]"
-              style={{
-                background: `linear-gradient(135deg, 
-                  rgba(25, 25, 25, 0.85) 0%,
-                  rgba(40, 40, 40, 0.75) 0%,
-                  rgba(25, 25, 25, 0.85) 0%)`,
-                backdropFilter: "blur(1px)",
-                boxShadow: `
-                  inset 0 1px 2px rgba(255, 255, 255, 0.05),
-                  inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-                  0 2px 8px rgba(0, 0, 0, 0.3)
-                `,
-              }}
-            >
-              <span className="text-[#E2AF19] text-[10px] lg:text-xs font-satoshi font-medium">
-                Slippage%
-              </span>
-
-              <div className="relative flex items-center gap-0.5 lg:gap-1">
-                <button
-                  onClick={() => {
-                    setSlippage("5.5");
-                    setCustomSlippage(false);
-                    setShowSlippageSettings(false);
-                  }}
-                  className="relative"
-                >
-                  {!customSlippage && (
-                    <div
-                      className="absolute inset-0 p-[0.5px] rounded-full"
-                      style={{
-                        background: `linear-gradient(135deg, 
-                          rgba(255, 255, 255, 0.4) 0%,
-                          rgba(255, 255, 255, 0.15) 25%,
-                          rgba(226, 175, 25, 0.3) 50%,
-                          rgba(255, 255, 255, 0.1) 75%,
-                          rgba(255, 255, 255, 0.3) 100%)`,
-                      }}
-                    >
-                      <div
-                        className="w-full h-full rounded-full"
-                        style={{
-                          background: `linear-gradient(135deg, 
-                            rgba(25, 25, 25, 0.85) 0%,
-                            rgba(40, 40, 40, 0.75) 50%,
-                            rgba(25, 25, 25, 0.85) 100%)`,
-                        }}
-                      />
-                    </div>
-                  )}
-                  <span className="relative z-10 block px-2 lg:px-3 py-0.5 lg:py-1 text-[9px] lg:text-[10px] font-satoshi font-medium text-white hover:text-white transition-colors">
-                    Auto
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowSlippageSettings(!showSlippageSettings);
-                    setCustomSlippage(true);
-                  }}
-                  className="relative"
-                >
-                  {customSlippage && (
-                    <div
-                      className="absolute inset-0 p-[0.5px] rounded-full"
-                      style={{
-                        background: `linear-gradient(135deg, 
-                          rgba(255, 255, 255, 0.4) 0%,
-                          rgba(255, 255, 255, 0.15) 25%,
-                          rgba(226, 175, 25, 0.3) 50%,
-                          rgba(255, 255, 255, 0.1) 75%,
-                          rgba(255, 255, 255, 0.3) 100%)`,
-                      }}
-                    >
-                      <div
-                        className="w-full h-full rounded-full"
-                        style={{
-                          background: `linear-gradient(135deg, 
-                            rgba(25, 25, 25, 0.85) 0%,
-                            rgba(40, 40, 40, 0.75) 50%,
-                            rgba(25, 25, 25, 0.85) 100%)`,
-                        }}
-                      />
-                    </div>
-                  )}
-                  <span className="relative z-10 block px-2 lg:px-3 py-0.5 lg:py-1 text-[9px] lg:text-[10px] font-satoshi font-medium text-white hover:text-white transition-colors">
-                    Custom
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Slippage Settings Overlay */}
-          {showSlippageSettings && (
-            <div className="absolute top-full mt-2 right-0 z-50">
-              <div className="relative p-[1px] rounded-[16px] lg:rounded-[20px] overflow-hidden">
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: `linear-gradient(135deg, 
-                      rgba(255, 255, 255, 0.3) 0%,
-                      rgba(255, 255, 255, 0.1) 20%,
-                      rgba(226, 175, 25, 0.2) 40%,
-                      rgba(255, 255, 255, 0.05) 60%,
-                      rgba(226, 175, 25, 0.15) 80%,
-                      rgba(255, 255, 255, 0.2) 100%)`,
-                  }}
-                />
-
-                <div
-                  className="relative rounded-[15px] lg:rounded-[19px] p-3 lg:p-4 min-w-[220px] lg:min-w-[250px]"
-                  style={{
-                    background: `linear-gradient(135deg, 
-                      rgba(25, 25, 25, 0.95) 0%,
-                      rgba(40, 40, 40, 0.85) 50%,
-                      rgba(25, 25, 25, 0.95) 100%)`,
-                    backdropFilter: "blur(10px)",
-                    boxShadow: `
-                      inset 0 1px 2px rgba(255, 255, 255, 0.05),
-                      inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-                      0 4px 12px rgba(0, 0, 0, 0.5)
-                    `,
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-2 lg:mb-3">
-                    <span className="text-[#E2AF19] text-xs lg:text-sm font-mayeka">
-                      Set Slippage
-                    </span>
-                    <button
-                      onClick={() => setShowSlippageSettings(false)}
-                      className="text-gray-400 hover:text-white transition-colors"
-                    >
-                      <X size={12} className="lg:w-3.5 lg:h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="flex gap-1.5 lg:gap-2 mb-2 lg:mb-3">
-                    {slippagePresets.map((preset) => (
-                      <button
-                        key={preset}
-                        onClick={() => {
-                          setSlippage(preset);
-                          setCustomSlippage(true);
-                        }}
-                        className={`px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg text-[10px] lg:text-xs font-satoshi transition-all ${
-                          slippage === preset && customSlippage
-                            ? "bg-[#E2AF19] text-black"
-                            : "bg-[#191919] text-white hover:bg-[#2C2C2C] border border-[#2C2C2C]"
-                        }`}
-                      >
-                        {preset}%
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400 text-[10px] lg:text-xs font-satoshi">
-                      Custom:
-                    </span>
-                    <div className="relative flex-1">
-                      <input
-                        type="number"
-                        placeholder="0.0"
-                        value={slippage}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          const numValue = parseFloat(value);
-                          if (
-                            value === "" ||
-                            (!isNaN(numValue) && numValue < 49)
-                          ) {
-                            setSlippage(value);
-                            setCustomSlippage(true);
-                          }
-                        }}
-                        onKeyPress={(e) => {
-                          if (e.key === "Enter") {
-                            setShowSlippageSettings(false);
-                          }
-                        }}
-                        className="w-full px-2 lg:px-3 py-1 lg:py-1.5 bg-[#191919] text-white rounded-lg text-[10px] lg:text-xs border border-[#2C2C2C] focus:border-[#E2AF19] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        min="0"
-                        max="49"
-                        step="0.1"
-                        autoFocus
-                      />
-                      <span className="absolute right-2 lg:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-[10px] lg:text-xs">
-                        %
-                      </span>
-                    </div>
-                  </div>
-
-                  {customSlippage && parseFloat(slippage) >= 49 && (
-                    <p className="text-red-400 text-[9px] lg:text-[10px] mt-2 font-satoshi">
-                      Maximum slippage is 49%
-                    </p>
-                  )}
-
-                  <button
-                    onClick={() => setShowSlippageSettings(false)}
-                    className="w-full mt-2 lg:mt-3 px-3 lg:px-4 py-1.5 lg:py-2 bg-[#E2AF19] text-black rounded-lg text-[10px] lg:text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* From Token Box */}
-      <div className="bg-[#191919] p-3 lg:p-4" style={{ borderRadius: "20px" }}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex-1">
-            <h2 className="text-[#E2AF19] text-sm lg:text-base font-mayeka mb-1">
-              Swap
-            </h2>
-            <input
-              type="text"
-              value={fromAmount}
-              onChange={(e) => setFromAmount(e.target.value)}
-              className="bg-transparent text-white text-2xl lg:text-3xl font-satoshi outline-none w-full"
-              placeholder="0"
-              disabled={swapping}
-            />
-          </div>
-
-          <div className="relative">
-            <div className="relative p-[1px] rounded-[20px] lg:rounded-[25px] overflow-hidden">
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.3) 0%,
-    rgba(255, 255, 255, 0.1) 20%,
-    rgba(226, 175, 25, 0.2) 40%,
-    rgba(255, 255, 255, 0.05) 60%,
-    rgba(226, 175, 25, 0.15) 80%,
-    rgba(255, 255, 255, 0.2) 100%)`,
-                }}
-              />
-
-              <button
-                onClick={() => setShowFromTokenSelector(true)}
-                className="relative flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[5px] lg:p-[6px] rounded-[19px] lg:rounded-[24px]"
-                style={{
-                  background: `linear-gradient(135deg, 
-    rgba(25, 25, 25, 0.85) 0%,
-    rgba(40, 40, 40, 0.75) 50%,
-    rgba(25, 25, 25, 0.85) 100%)`,
-                  backdropFilter: "blur(1px)",
-                  boxShadow: `
-    inset 0 1px 2px rgba(255, 255, 255, 0.05),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-    0 2px 8px rgba(0, 0, 0, 0.3)
-  `,
-                }}
-              >
-                {fromToken ? (
-                  <TokenImage
-                    src={fromToken.logoURI}
-                    alt={fromToken.symbol}
-                    symbol={fromToken.symbol}
-                    name={fromToken.name}
-                    className="w-6 h-6 lg:w-7 lg:h-7"
-                  />
-                ) : (
-                  <div className="w-6 h-6 lg:w-7 lg:h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <span className="text-white text-[10px] lg:text-xs font-bold">
-                      E
-                    </span>
-                  </div>
-                )}
-                <span className="text-white text-sm lg:text-base font-satoshi">
-                  {fromToken?.symbol || "ETH"}
-                </span>
-                <svg
-                  className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between text-xs lg:text-sm">
-          <div className="flex items-center gap-1.5 lg:gap-2">
-            <span className="text-[#939393] font-satoshi">Available:</span>
-            <span className="text-[#FFFFFF] font-satoshi">
-              {fromTokenBalance
-                ? `${truncateBalance(fromTokenBalance.formatted, 5)} ${
-                    fromTokenBalance.symbol
-                  }`
-                : "0.00000"}
-            </span>
-          </div>
-          <button
-            onClick={calculateMaxAmount}
-            className="text-[10px] lg:text-xs bg-[#191919] hover:bg-[#3C3C3C] text-white px-2 py-0.5 lg:py-1 rounded-md transition-colors"
-          >
-            MAX
-          </button>
-        </div>
-      </div>
-
-      {/* Swap Icon */}
-      <div className="flex justify-center relative -my-3 lg:-my-[22px] z-10">
-        <button
-          onClick={swapTokenPositions}
-          className="bg-[#E2AF19] p-2 lg:p-3 rounded-full hover:bg-[#D4A853] transition-colors group border-3 lg:border-4 border-[#0F0F0F]"
-        >
-          <SwapIcon className="text-black w-4 h-4 lg:w-5 lg:h-5" />
-        </button>
-      </div>
-
-      {/* To Token Box */}
-      <div
-        className="bg-[#191919] p-3 lg:p-5 mb-2"
-        style={{ borderRadius: "20px" }}
-      >
-        <div className="flex items-center justify-between mb-2 lg:mb-3">
-          <div className="flex-1">
-            <h2 className="text-[#E2AF19] text-sm lg:text-base font-mayeka mb-1 lg:mb-2">
-              GET
-            </h2>
-            <input
-              type="text"
-              value={loading ? "Loading..." : toAmount}
-              readOnly
-              className="bg-transparent text-white text-2xl lg:text-3xl font-satoshi outline-none w-full"
-              placeholder="0"
-            />
-          </div>
-
-          <div className="relative">
-            <div className="relative p-[1px] rounded-[20px] lg:rounded-[25px] overflow-hidden">
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(135deg, 
-      rgba(255, 255, 255, 0.3) 0%,
-      rgba(255, 255, 255, 0.1) 20%,
-      rgba(226, 175, 25, 0.2) 40%,
-      rgba(255, 255, 255, 0.05) 60%,
-      rgba(226, 175, 25, 0.15) 80%,
-      rgba(255, 255, 255, 0.2) 100%)`,
-                }}
-              />
-
-              <button
-                onClick={() => setShowToTokenSelector(true)}
-                className="relative flex items-center gap-1 hover:opacity-80 transition-opacity min-w-fit p-[5px] lg:p-[6px] rounded-[19px] lg:rounded-[24px]"
-                style={{
-                  background: `linear-gradient(135deg, 
-      rgba(25, 25, 25, 0.85) 0%,
-      rgba(40, 40, 40, 0.75) 50%,
-      rgba(25, 25, 25, 0.85) 100%)`,
-                  backdropFilter: "blur(1px)",
-                  boxShadow: `
-      inset 0 1px 2px rgba(255, 255, 255, 0.05),
-      inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-      0 2px 8px rgba(0, 0, 0, 0.3)
-    `,
-                }}
-              >
-                {toToken && (
-                  <TokenImage
-                    src={toToken.logoURI}
-                    alt={toToken.symbol}
-                    symbol={toToken.symbol}
-                    name={toToken.name}
-                    className="w-6 h-6 lg:w-7 lg:h-7"
-                  />
-                )}
-
-                <span
-                  className={`text-white text-sm lg:text-base font-satoshi ${
-                    !toToken ? "pl-1" : ""
-                  }`}
-                >
-                  {toToken?.symbol || "Select Token"}
-                </span>
-
-                <svg
-                  className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between text-xs lg:text-sm">
-          <div className="flex items-center gap-1.5 lg:gap-2">
-            <span className="text-[#939393] font-satoshi">Estimated Fee:</span>
-            <span className="text-[#FFFFFF] font-satoshi">
-              {gasPrice ? `(~${gasPrice.gasCostUSD})` : "(~$0.00)"}
-            </span>
-          </div>
-          {/* Gas Mode Selection Buttons */}
-          <div className="flex gap-1.5 lg:gap-2">
-            {/* Fast Button */}
-            <div className="relative">
-              <div className="relative p-[1px] rounded-[10px] lg:rounded-[12px] overflow-hidden">
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      gasMode === "high"
-                        ? `linear-gradient(135deg, 
-        rgba(255, 152, 0, 0.6) 0%,
-        rgba(255, 152, 0, 0.3) 20%,
-        rgba(255, 152, 0, 0.4) 40%,
-        rgba(255, 152, 0, 0.2) 60%,
-        rgba(255, 152, 0, 0.5) 80%,
-        rgba(255, 152, 0, 0.4) 100%)`
-                        : `linear-gradient(135deg, 
-        rgba(255, 255, 255, 0.3) 0%,
-        rgba(255, 255, 255, 0.1) 20%,
-        rgba(226, 175, 25, 0.2) 40%,
-        rgba(255, 255, 255, 0.05) 60%,
-        rgba(226, 175, 25, 0.15) 80%,
-        rgba(255, 255, 255, 0.2) 100%)`,
-                  }}
-                />
-
-                <button
-                  onClick={() => setGasMode("high")}
-                  className={`relative flex items-center gap-0.5 lg:gap-1 px-2 lg:px-3 py-1 lg:py-1.5 rounded-[9px] lg:rounded-[11px] transition-all ${
-                    gasMode === "high"
-                      ? "text-black"
-                      : "text-white hover:opacity-80"
-                  }`}
-                  style={{
-                    background:
-                      gasMode === "high"
-                        ? `linear-gradient(135deg, 
-        rgba(255, 152, 0, 0.9) 0%,
-        rgba(255, 152, 0, 1) 50%,
-        rgba(255, 152, 0, 0.9) 100%)`
-                        : `linear-gradient(135deg, 
-        rgba(25, 25, 25, 0.85) 0%,
-        rgba(40, 40, 40, 0.75) 50%,
-        rgba(25, 25, 25, 0.85) 100%)`,
-                    backdropFilter: "blur(1px)",
-                    boxShadow:
-                      gasMode === "high"
-                        ? `0 2px 8px rgba(255, 152, 0, 0.3)`
-                        : `
-        inset 0 1px 2px rgba(255, 255, 255, 0.05),
-        inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-        0 2px 8px rgba(0, 0, 0, 0.3)
-      `,
-                  }}
-                >
-                  <LightningIcon size={12} className="lg:w-3.5 lg:h-3.5" />
-                  <span className="text-[10px] lg:text-xs font-satoshi font-medium">
-                    Fast
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* Instant Button */}
-            <div className="relative">
-              <div className="relative p-[1px] rounded-[10px] lg:rounded-[12px] overflow-hidden">
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      gasMode === "instant"
-                        ? `linear-gradient(135deg, 
-        rgba(244, 67, 54, 0.6) 0%,
-        rgba(244, 67, 54, 0.3) 20%,
-        rgba(244, 67, 54, 0.4) 40%,
-        rgba(244, 67, 54, 0.2) 60%,
-        rgba(244, 67, 54, 0.5) 80%,
-        rgba(244, 67, 54, 0.4) 100%)`
-                        : `linear-gradient(135deg, 
-        rgba(255, 255, 255, 0.3) 0%,
-        rgba(255, 255, 255, 0.1) 20%,
-        rgba(226, 175, 25, 0.2) 40%,
-        rgba(255, 255, 255, 0.05) 60%,
-        rgba(226, 175, 25, 0.15) 80%,
-        rgba(255, 255, 255, 0.2) 100%)`,
-                  }}
-                />
-
-                <button
-                  onClick={() => setGasMode("instant")}
-                  className={`relative flex items-center gap-0.5 lg:gap-1 px-2 lg:px-3 py-1 lg:py-1.5 rounded-[9px] lg:rounded-[11px] transition-all ${
-                    gasMode === "instant"
-                      ? "text-white"
-                      : "text-white hover:opacity-80"
-                  }`}
-                  style={{
-                    background:
-                      gasMode === "instant"
-                        ? `linear-gradient(135deg, 
-        rgba(244, 67, 54, 0.9) 0%,
-        rgba(244, 67, 54, 1) 50%,
-        rgba(244, 67, 54, 0.9) 100%)`
-                        : `linear-gradient(135deg, 
-        rgba(25, 25, 25, 0.85) 0%,
-        rgba(40, 40, 40, 0.75) 50%,
-        rgba(25, 25, 25, 0.85) 100%)`,
-                    backdropFilter: "blur(1px)",
-                    boxShadow:
-                      gasMode === "instant"
-                        ? `0 2px 8px rgba(244, 67, 54, 0.3)`
-                        : `
-        inset 0 1px 2px rgba(255, 255, 255, 0.05),
-        inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-        0 2px 8px rgba(0, 0, 0, 0.3)
-      `,
-                  }}
-                >
-                  <LightningIcon size={12} className="lg:w-3.5 lg:h-3.5" />
-                  <span className="text-[10px] lg:text-xs font-satoshi font-medium">
-                    Instant
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quote Info */}
-      {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
-        <div className="px-1 py-1 bg-[#000000] rounded-lg text-xs lg:text-sm">
-          <div className="flex justify-between mb-1">
-            <span className="text-gray-400">Rate:</span>
-            <span className="text-white">
-              1 {fromToken?.symbol} = {rate} {toToken?.symbol}
-            </span>
-          </div>
-          <div className="flex justify-between mb-1">
-            <span className="text-gray-400">Slippage:</span>
-            <span className="text-white">{slippage}%</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Min Received:</span>
-            <span className="text-white">
-              {minimumReceived} {toToken?.symbol}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Button Logic */}
-      {!isConnected ? (
-        <WalletConnectButton />
-      ) : !bothTokensSelected ? (
-        <SelectTokenButton onClick={handleSelectTokensClick} />
-      ) : (
-        <div
-          className="relative w-full h-[44px] lg:h-[50px] overflow-hidden animate-pulse-subtle"
-          style={{
-            borderRadius: "100px",
-            background:
-              "linear-gradient(90deg, rgba(110, 110, 110, 0.37) 0%, rgba(256, 175, 25, 0.25) 100%)",
-          }}
-          ref={containerRef}
-        >
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="shimmer-effect"></div>
-          </div>
-
-          <motion.div
-            className="absolute left-1 top-1/2 transform -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing"
-            style={{ x }}
-            drag={
-              !swapping &&
-              fromToken &&
-              toToken &&
-              fromAmount &&
-              !loading &&
-              !insufficientBalance
-                ? "x"
-                : false
-            }
-            dragConstraints={{ left: 0, right: 350 }}
-            dragElastic={0.1}
-            onDragEnd={handleSwipeEnd}
-            animate={{
-              x: [0, 10, 0],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              repeatType: "loop",
-              ease: "easeInOut",
-            }}
-          >
-            <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-full flex items-center justify-center pointer-events-none select-none relative">
-              <div className="absolute inset-0 rounded-full bg-[#E2AF19] opacity-30 blur-md animate-pulse"></div>
-
-              {fromToken ? (
-                <TokenImage
-                  src={fromToken.logoURI}
-                  alt={fromToken.symbol}
-                  symbol={fromToken.symbol}
-                  name={fromToken.name}
-                  className="w-9 h-9 lg:w-10 lg:h-10 pointer-events-none select-none relative z-10"
-                />
-              ) : (
-                <span className="text-white text-xs font-bold pointer-events-none select-none relative z-10">
-                  E
-                </span>
-              )}
-            </div>
-          </motion.div>
-
-          <div className="absolute right-1 top-1/2 transform -translate-y-1/2 z-10">
-            <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-full flex items-center justify-center">
-              {toToken ? (
-                <TokenImage
-                  src={toToken.logoURI}
-                  alt={toToken.symbol}
-                  symbol={toToken.symbol}
-                  name={toToken.name}
-                  className="w-9 h-9 lg:w-10 lg:h-10"
-                />
-              ) : (
-                <span className="text-white text-xs font-bold">E</span>
-              )}
-            </div>
-          </div>
-
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-white font-mayeka-bold-demo text-sm lg:text-base">
-              {swapping ? (
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-3 w-3 lg:h-4 lg:w-4 border-b-2 border-white"></div>
-                  SWAPPING...
-                </div>
-              ) : insufficientBalance ? (
-                "Insufficient Balance"
-              ) : (
-                "Swap >>>"
-              )}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] flex flex-col overflow-hidden relative">
       {/* Swap Effect Image - Top Right Corner */}
@@ -1251,7 +539,7 @@ export default function SwapPage() {
         <img
           src="/swapEffect.png"
           alt=""
-          className="w-48 h-48 md:w-64 md:h-64 lg:w-80 lg:h-80 xl:w-96 xl:h-96 2xl:w-[32rem] 2xl:h-[32rem] opacity-50"
+          className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] 2xl:w-[32rem] 2xl:h-[32rem] opacity-50"
           style={{
             filter: "blur(0px)",
             marginTop: "-1px",
@@ -1261,19 +549,19 @@ export default function SwapPage() {
       </div>
 
       {/* Centered Content Container */}
-      <div className="flex-1 flex flex-col items-center justify-center p-3 lg:p-4 relative z-20">
+      <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative z-20">
         {/* Title */}
-        <div className="mb-4 lg:mb-8 relative z-20">
-          <h1 className="text-[22px] lg:text-[30px] font-mayeka-demi-bold-demo font-bold text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent px-2">
+        <div className="mb-3 sm:mb-4 lg:mb-8 relative z-20">
+          <h1 className="text-lg sm:text-[24px] lg:text-[30px] font-mayeka-demi-bold-demo font-bold text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent px-4">
             Secure and Best Rates Everytime
           </h1>
         </div>
 
         {/* Tab Navigation */}
-        <div className="mb-4 lg:mb-6 relative z-20">
-          <div className="relative inline-flex py-[4px] lg:py-[6px] px-[4px] lg:px-[6px] gap-[4px] lg:gap-[6px] border border-[#4B3A08] rounded-[12px]">
+        <div className="mb-3 sm:mb-4 lg:mb-6 relative z-20">
+          <div className="relative inline-flex py-[4px] sm:py-[6px] px-[4px] sm:px-[6px] gap-[4px] sm:gap-[6px] border border-[#4B3A08] rounded-[12px]">
             <motion.div
-              className="absolute h-[calc(100%-8px)] lg:h-[calc(100%-12px)] bg-[#E2AF19] rounded-[13px] top-[4px] lg:top-[6px]"
+              className="absolute h-[calc(100%-8px)] sm:h-[calc(100%-12px)] bg-[#E2AF19] rounded-[10px] sm:rounded-[13px] top-[4px] sm:top-[6px]"
               initial={false}
               animate={activeTab}
               variants={{
@@ -1289,7 +577,7 @@ export default function SwapPage() {
 
             <button
               onClick={() => setActiveTab("swap")}
-              className={`relative z-10 px-4 lg:px-6 py-1.5 lg:py-2.5 font-mayeka text-sm lg:text-md rounded-[13px] transition-colors duration-200 ${
+              className={`relative z-10 px-4 sm:px-6 py-1.5 sm:py-2.5 font-mayeka text-sm sm:text-md rounded-[10px] sm:rounded-[13px] transition-colors duration-200 ${
                 activeTab === "swap"
                   ? "text-black"
                   : "text-white hover:text-gray-300"
@@ -1300,7 +588,7 @@ export default function SwapPage() {
 
             <button
               onClick={() => setActiveTab("history")}
-              className={`relative z-10 px-4 lg:px-6 py-1.5 lg:py-2.5 font-mayeka text-sm lg:text-md rounded-[13px] transition-colors duration-200 ${
+              className={`relative z-10 px-4 sm:px-6 py-1.5 sm:py-2.5 font-mayeka text-sm sm:text-md rounded-[10px] sm:rounded-[13px] transition-colors duration-200 ${
                 activeTab === "history"
                   ? "text-black"
                   : "text-white hover:text-gray-300"
@@ -1311,201 +599,782 @@ export default function SwapPage() {
           </div>
         </div>
 
-        {/* Main Content - MOBILE: Conditional Rendering | DESKTOP: Always Show Swap */}
-        <div className="w-full max-w-[340px] lg:max-w-xl mx-auto relative z-20 px-2 lg:px-0">
-          {/* Mobile - Conditional Rendering */}
-          <div className="block lg:hidden">
-            <AnimatePresence mode="wait">
-              {activeTab === "swap" ? (
-                <motion.div
-                  key="swap"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="relative p-[2px] rounded-[20px]">
-                    <div
-                      className="absolute inset-0 rounded-[20px]"
-                      style={{
-                        background: `linear-gradient(135deg, 
-                          #E2AF19 0%, 
-                          #E2AF19 3%,
-                          #2C2C2C 10%, 
-                          #2C2C2C 90%, 
-                          #E2AF19 97%,
-                          #E2AF19 100%)`,
-                      }}
+        {/* Main Swap Card - Always visible on desktop, conditional on mobile */}
+        <motion.div
+          key="swap-card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.2 }}
+          className={`w-[95%] sm:w-full max-w-[340px] sm:max-w-xl relative z-20 ${
+            activeTab === "history" ? "hidden lg:block" : ""
+          }`}
+        >
+          <div className="relative p-[2px] sm:p-[3px] rounded-[20px] sm:rounded-[30px]">
+            <div
+              className="absolute inset-0 rounded-[20px] sm:rounded-[30px]"
+              style={{
+                background: `linear-gradient(135deg, 
+                  #E2AF19 0%, 
+                  #E2AF19 3%,
+                  #2C2C2C 10%, 
+                  #2C2C2C 90%, 
+                  #E2AF19 97%,
+                  #E2AF19 100%)`,
+              }}
+            />
+
+            <div className="relative bg-[#000000] rounded-[18px] sm:rounded-[26px] overflow-hidden">
+              <div className="py-2.5 px-3 sm:py-4 sm:px-8 lg:px-16">
+                {/* Chain selector and slippage */}
+                <div className="flex flex-row items-center justify-between mb-2.5 sm:mb-4 gap-1.5 sm:gap-2">
+                  <button
+                    ref={chainButtonRef}
+                    onClick={() => setShowChainSelector(true)}
+                    className="flex items-center gap-1 sm:gap-2 hover:opacity-80 min-w-fit justify-center px-1.5 sm:px-3 py-1 sm:py-2"
+                  >
+                    <ChainIcon
+                      chainData={currentChainDisplay}
+                      size="sm"
+                      className="w-4 h-4 sm:w-6 sm:h-6"
                     />
-                    <div className="relative bg-[#000000] rounded-[18px] overflow-hidden">
-                      <SwapCardContent />
+                    <span className="text-white text-xs sm:text-base font-satoshi font-medium">
+                      {currentChainDisplay.name}
+                    </span>
+                    <svg
+                      className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  <div className="relative">
+                    <div className="relative p-[1px] rounded-[18px] sm:rounded-[25px] overflow-hidden">
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          background: `linear-gradient(135deg, 
+                            rgba(255, 255, 255, 0.3) 0%,
+                            rgba(255, 255, 255, 0.1) 20%,
+                            rgba(226, 175, 25, 0.2) 40%,
+                            rgba(255, 255, 255, 0.05) 60%,
+                            rgba(226, 175, 25, 0.15) 80%,
+                            rgba(255, 255, 255, 0.2) 100%)`,
+                        }}
+                      />
+
+                      <div
+                        className="relative flex items-center gap-1.5 sm:gap-3 px-1.5 sm:px-3 py-1 sm:py-2 rounded-[17px] sm:rounded-[24px]"
+                        style={{
+                          background: `linear-gradient(135deg, 
+                            rgba(25, 25, 25, 0.85) 0%,
+                            rgba(40, 40, 40, 0.75) 0%,
+                            rgba(25, 25, 25, 0.85) 0%)`,
+                          backdropFilter: "blur(1px)",
+                          boxShadow: `
+                            inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                            inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                            0 2px 8px rgba(0, 0, 0, 0.3)
+                          `,
+                        }}
+                      >
+                        <span className="text-[#E2AF19] text-[9px] sm:text-xs font-satoshi font-medium whitespace-nowrap">
+                          Slippage%
+                        </span>
+
+                        <div className="relative flex items-center gap-0.5 sm:gap-1">
+                          <button
+                            onClick={() => {
+                              setSlippage("5.5");
+                              setCustomSlippage(false);
+                              setShowSlippageSettings(false);
+                            }}
+                            className="relative"
+                          >
+                            {!customSlippage && (
+                              <div
+                                className="absolute inset-0 p-[0.5px] rounded-full"
+                                style={{
+                                  background: `linear-gradient(135deg, 
+                                    rgba(255, 255, 255, 0.4) 0%,
+                                    rgba(255, 255, 255, 0.15) 25%,
+                                    rgba(226, 175, 25, 0.3) 50%,
+                                    rgba(255, 255, 255, 0.1) 75%,
+                                    rgba(255, 255, 255, 0.3) 100%)`,
+                                }}
+                              >
+                                <div
+                                  className="w-full h-full rounded-full"
+                                  style={{
+                                    background: `linear-gradient(135deg, 
+                                      rgba(25, 25, 25, 0.85) 0%,
+                                      rgba(40, 40, 40, 0.75) 50%,
+                                      rgba(25, 25, 25, 0.85) 100%)`,
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <span className="relative z-10 block px-2 sm:px-3 py-0.5 sm:py-1 text-[8px] sm:text-[10px] font-satoshi font-medium text-white hover:text-white transition-colors">
+                              Auto
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setShowSlippageSettings(!showSlippageSettings);
+                              setCustomSlippage(true);
+                            }}
+                            className="relative"
+                          >
+                            {customSlippage && (
+                              <div
+                                className="absolute inset-0 p-[0.5px] rounded-full"
+                                style={{
+                                  background: `linear-gradient(135deg, 
+                                    rgba(255, 255, 255, 0.4) 0%,
+                                    rgba(255, 255, 255, 0.15) 25%,
+                                    rgba(226, 175, 25, 0.3) 50%,
+                                    rgba(255, 255, 255, 0.1) 75%,
+                                    rgba(255, 255, 255, 0.3) 100%)`,
+                                }}
+                              >
+                                <div
+                                  className="w-full h-full rounded-full"
+                                  style={{
+                                    background: `linear-gradient(135deg, 
+                                      rgba(25, 25, 25, 0.85) 0%,
+                                      rgba(40, 40, 40, 0.75) 50%,
+                                      rgba(25, 25, 25, 0.85) 100%)`,
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <span className="relative z-10 block px-2 sm:px-3 py-0.5 sm:py-1 text-[8px] sm:text-[10px] font-satoshi font-medium text-white hover:text-white transition-colors">
+                              Custom
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {showSlippageSettings && (
+                      <div className="absolute top-full mt-2 right-0 z-50">
+                        <div className="relative p-[1px] rounded-[20px] overflow-hidden">
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              background: `linear-gradient(135deg, 
+                                rgba(255, 255, 255, 0.3) 0%,
+                                rgba(255, 255, 255, 0.1) 20%,
+                                rgba(226, 175, 25, 0.2) 40%,
+                                rgba(255, 255, 255, 0.05) 60%,
+                                rgba(226, 175, 25, 0.15) 80%,
+                                rgba(255, 255, 255, 0.2) 100%)`,
+                            }}
+                          />
+
+                          <div
+                            className="relative rounded-[19px] p-4 min-w-[250px]"
+                            style={{
+                              background: `linear-gradient(135deg, 
+                                rgba(25, 25, 25, 0.95) 0%,
+                                rgba(40, 40, 40, 0.85) 50%,
+                                rgba(25, 25, 25, 0.95) 100%)`,
+                              backdropFilter: "blur(10px)",
+                              boxShadow: `
+                                inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                                inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                                0 4px 12px rgba(0, 0, 0, 0.5)
+                              `,
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[#E2AF19] text-sm font-mayeka">
+                                Set Slippage
+                              </span>
+                              <button
+                                onClick={() => setShowSlippageSettings(false)}
+                                className="text-gray-400 hover:text-white transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+
+                            <div className="flex gap-2 mb-3">
+                              {slippagePresets.map((preset) => (
+                                <button
+                                  key={preset}
+                                  onClick={() => {
+                                    setSlippage(preset);
+                                    setCustomSlippage(true);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-satoshi transition-all ${
+                                    slippage === preset && customSlippage
+                                      ? "bg-[#E2AF19] text-black"
+                                      : "bg-[#191919] text-white hover:bg-[#2C2C2C] border border-[#2C2C2C]"
+                                  }`}
+                                >
+                                  {preset}%
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 text-xs font-satoshi">
+                                Custom:
+                              </span>
+                              <div className="relative flex-1">
+                                <input
+                                  type="number"
+                                  placeholder="0.0"
+                                  value={slippage}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    const numValue = parseFloat(value);
+                                    if (
+                                      value === "" ||
+                                      (!isNaN(numValue) && numValue < 49)
+                                    ) {
+                                      setSlippage(value);
+                                      setCustomSlippage(true);
+                                    }
+                                  }}
+                                  onKeyPress={(e) => {
+                                    if (e.key === "Enter") {
+                                      setShowSlippageSettings(false);
+                                    }
+                                  }}
+                                  className="w-full px-3 py-1.5 bg-[#191919] text-white rounded-lg text-xs border border-[#2C2C2C] focus:border-[#E2AF19] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  min="0"
+                                  max="49"
+                                  step="0.1"
+                                  autoFocus
+                                />
+                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">
+                                  %
+                                </span>
+                              </div>
+                            </div>
+
+                            {customSlippage && parseFloat(slippage) >= 49 && (
+                              <p className="text-red-400 text-[10px] mt-2 font-satoshi">
+                                Maximum slippage is 49%
+                              </p>
+                            )}
+
+                            <button
+                              onClick={() => setShowSlippageSettings(false)}
+                              className="w-full mt-3 px-4 py-2 bg-[#E2AF19] text-black rounded-lg text-xs font-satoshi font-medium hover:bg-[#D4A853] transition-colors"
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* From Token Box */}
+                <div
+                  className="bg-[#191919] p-2.5 sm:p-4"
+                  style={{ borderRadius: "18px" }}
+                >
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                    <div className="flex-1">
+                      <h2 className="text-[#E2AF19] text-xs sm:text-base font-mayeka mb-0.5 sm:mb-1">
+                        Swap
+                      </h2>
+                      <input
+                        type="text"
+                        value={fromAmount}
+                        onChange={(e) => setFromAmount(e.target.value)}
+                        className="bg-transparent text-white text-xl sm:text-3xl font-satoshi outline-none w-full"
+                        placeholder="0"
+                        disabled={swapping}
+                      />
+                    </div>
+
+                    <div className="relative">
+                      <div className="relative p-[1px] rounded-[18px] sm:rounded-[25px] overflow-hidden">
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            background: `linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.3) 0%,
+            rgba(255, 255, 255, 0.1) 20%,
+            rgba(226, 175, 25, 0.2) 40%,
+            rgba(255, 255, 255, 0.05) 60%,
+            rgba(226, 175, 25, 0.15) 80%,
+            rgba(255, 255, 255, 0.2) 100%)`,
+                          }}
+                        />
+
+                        <button
+                          onClick={() => setShowFromTokenSelector(true)}
+                          className="relative flex items-center gap-0.5 sm:gap-1 hover:opacity-80 transition-opacity min-w-fit p-[4px] sm:p-[6px] rounded-[17px] sm:rounded-[24px]"
+                          style={{
+                            background: `linear-gradient(135deg, 
+            rgba(25, 25, 25, 0.85) 0%,
+            rgba(40, 40, 40, 0.75) 50%,
+            rgba(25, 25, 25, 0.85) 100%)`,
+                            backdropFilter: "blur(1px)",
+                            boxShadow: `
+            inset 0 1px 2px rgba(255, 255, 255, 0.05),
+            inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+            0 2px 8px rgba(0, 0, 0, 0.3)
+          `,
+                          }}
+                        >
+                          {fromToken ? (
+                            <TokenImage
+                              src={fromToken.logoURI}
+                              alt={fromToken.symbol}
+                              symbol={fromToken.symbol}
+                              name={fromToken.name}
+                              className="w-5 h-5 sm:w-7 sm:h-7"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 sm:w-7 sm:h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                              <span className="text-white text-[10px] sm:text-xs font-bold">
+                                E
+                              </span>
+                            </div>
+                          )}
+                          <span className="text-white text-xs sm:text-base font-satoshi">
+                            {fromToken?.symbol || "ETH"}
+                          </span>
+                          <svg
+                            className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="history"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
+
+                  <div className="flex items-center justify-between text-[10px] sm:text-sm">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[#939393] font-satoshi">
+                        Available:
+                      </span>
+                      <span className="text-[#FFFFFF] font-satoshi truncate max-w-[100px] sm:max-w-none">
+                        {fromTokenBalance
+                          ? `${truncateBalance(
+                              fromTokenBalance.formatted,
+                              5
+                            )} ${fromTokenBalance.symbol}`
+                          : "0.00000"}
+                      </span>
+                    </div>
+                    <button
+                      onClick={calculateMaxAmount}
+                      className="text-[9px] sm:text-xs bg-[#191919] hover:bg-[#3C3C3C] text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md transition-colors"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                </div>
+
+                {/* Swap Icon */}
+                <div className="flex justify-center relative -my-[11px] sm:-my-[22px] z-10">
+                  <button
+                    onClick={swapTokenPositions}
+                    className="bg-[#E2AF19] p-1.5 sm:p-3 rounded-full hover:bg-[#D4A853] transition-colors group border-2 sm:border-4 border-[#0F0F0F]"
+                  >
+                    <SwapIcon className="text-black w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                  </button>
+                </div>
+
+                {/* To Token Box */}
+                <div
+                  className="bg-[#191919] p-2.5 sm:p-5 mb-1.5 sm:mb-2"
+                  style={{ borderRadius: "18px" }}
                 >
-                  <div className="relative p-[2px] rounded-[20px]">
-                    <div
-                      className="absolute inset-0 rounded-[20px]"
-                      style={{
-                        background: `linear-gradient(135deg, 
-                          #E2AF19 0%, 
-                          #E2AF19 3%,
-                          #2C2C2C 10%, 
-                          #2C2C2C 90%, 
-                          #E2AF19 97%,
-                          #E2AF19 100%)`,
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-3">
+                    <div className="flex-1">
+                      <h2 className="text-[#E2AF19] text-xs sm:text-base font-mayeka mb-0.5 sm:mb-2">
+                        GET
+                      </h2>
+                      <input
+                        type="text"
+                        value={loading ? "Loading..." : toAmount}
+                        readOnly
+                        className="bg-transparent text-white text-xl sm:text-3xl font-satoshi outline-none w-full"
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div className="relative">
+                      <div className="relative p-[1px] rounded-[18px] sm:rounded-[25px] overflow-hidden">
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            background: `linear-gradient(135deg, 
+              rgba(255, 255, 255, 0.3) 0%,
+              rgba(255, 255, 255, 0.1) 20%,
+              rgba(226, 175, 25, 0.2) 40%,
+              rgba(255, 255, 255, 0.05) 60%,
+              rgba(226, 175, 25, 0.15) 80%,
+              rgba(255, 255, 255, 0.2) 100%)`,
+                          }}
+                        />
+
+                        <button
+                          onClick={() => setShowToTokenSelector(true)}
+                          className="relative flex items-center gap-0.5 sm:gap-1 hover:opacity-80 transition-opacity min-w-fit p-[4px] sm:p-[6px] rounded-[17px] sm:rounded-[24px]"
+                          style={{
+                            background: `linear-gradient(135deg, 
+              rgba(25, 25, 25, 0.85) 0%,
+              rgba(40, 40, 40, 0.75) 50%,
+              rgba(25, 25, 25, 0.85) 100%)`,
+                            backdropFilter: "blur(1px)",
+                            boxShadow: `
+              inset 0 1px 2px rgba(255, 255, 255, 0.05),
+              inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+              0 2px 8px rgba(0, 0, 0, 0.3)
+            `,
+                          }}
+                        >
+                          {toToken && (
+                            <TokenImage
+                              src={toToken.logoURI}
+                              alt={toToken.symbol}
+                              symbol={toToken.symbol}
+                              name={toToken.name}
+                              className="w-5 h-5 sm:w-7 sm:h-7"
+                            />
+                          )}
+
+                          <span
+                            className={`text-white text-xs sm:text-base font-satoshi ${
+                              !toToken ? "pl-0.5 sm:pl-1" : ""
+                            }`}
+                          >
+                            {toToken?.symbol || "Select Token"}
+                          </span>
+
+                          <svg
+                            className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] sm:text-sm flex-wrap gap-1.5 sm:gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[#939393] font-satoshi whitespace-nowrap">
+                        Estimated Fee:
+                      </span>
+                      <span className="text-[#FFFFFF] font-satoshi">
+                        {gasPrice ? `(~${gasPrice.gasCostUSD})` : "(~$0.00)"}
+                      </span>
+                    </div>
+
+                    {/* Gas Mode Selection Buttons */}
+                    <div className="flex gap-1.5 sm:gap-2">
+                      {/* Fast Button */}
+                      <div className="relative">
+                        <div className="relative p-[1px] rounded-[12px] overflow-hidden">
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              background:
+                                gasMode === "high"
+                                  ? `linear-gradient(135deg, 
+                rgba(255, 152, 0, 0.6) 0%,
+                rgba(255, 152, 0, 0.3) 20%,
+                rgba(255, 152, 0, 0.4) 40%,
+                rgba(255, 152, 0, 0.2) 60%,
+                rgba(255, 152, 0, 0.5) 80%,
+                rgba(255, 152, 0, 0.4) 100%)`
+                                  : `linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.3) 0%,
+                rgba(255, 255, 255, 0.1) 20%,
+                rgba(226, 175, 25, 0.2) 40%,
+                rgba(255, 255, 255, 0.05) 60%,
+                rgba(226, 175, 25, 0.15) 80%,
+                rgba(255, 255, 255, 0.2) 100%)`,
+                            }}
+                          />
+
+                          <button
+                            onClick={() => setGasMode("high")}
+                            className={`relative flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-[11px] transition-all ${
+                              gasMode === "high"
+                                ? "text-black"
+                                : "text-white hover:opacity-80"
+                            }`}
+                            style={{
+                              background:
+                                gasMode === "high"
+                                  ? `linear-gradient(135deg, 
+                rgba(255, 152, 0, 0.9) 0%,
+                rgba(255, 152, 0, 1) 50%,
+                rgba(255, 152, 0, 0.9) 100%)`
+                                  : `linear-gradient(135deg, 
+                rgba(25, 25, 25, 0.85) 0%,
+                rgba(40, 40, 40, 0.75) 50%,
+                rgba(25, 25, 25, 0.85) 100%)`,
+                              backdropFilter: "blur(1px)",
+                              boxShadow:
+                                gasMode === "high"
+                                  ? `0 2px 8px rgba(255, 152, 0, 0.3)`
+                                  : `
+                inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                0 2px 8px rgba(0, 0, 0, 0.3)
+              `,
+                            }}
+                          >
+                            <LightningIcon
+                              size={12}
+                              className="sm:w-[14px] sm:h-[14px]"
+                            />
+                            <span className="text-[10px] sm:text-xs font-satoshi font-medium">
+                              Fast
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Instant Button */}
+                      <div className="relative">
+                        <div className="relative p-[1px] rounded-[12px] overflow-hidden">
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              background:
+                                gasMode === "instant"
+                                  ? `linear-gradient(135deg, 
+                rgba(244, 67, 54, 0.6) 0%,
+                rgba(244, 67, 54, 0.3) 20%,
+                rgba(244, 67, 54, 0.4) 40%,
+                rgba(244, 67, 54, 0.2) 60%,
+                rgba(244, 67, 54, 0.5) 80%,
+                rgba(244, 67, 54, 0.4) 100%)`
+                                  : `linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.3) 0%,
+                rgba(255, 255, 255, 0.1) 20%,
+                rgba(226, 175, 25, 0.2) 40%,
+                rgba(255, 255, 255, 0.05) 60%,
+                rgba(226, 175, 25, 0.15) 80%,
+                rgba(255, 255, 255, 0.2) 100%)`,
+                            }}
+                          />
+
+                          <button
+                            onClick={() => setGasMode("instant")}
+                            className={`relative flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-[11px] transition-all ${
+                              gasMode === "instant"
+                                ? "text-white"
+                                : "text-white hover:opacity-80"
+                            }`}
+                            style={{
+                              background:
+                                gasMode === "instant"
+                                  ? `linear-gradient(135deg, 
+                rgba(244, 67, 54, 0.9) 0%,
+                rgba(244, 67, 54, 1) 50%,
+                rgba(244, 67, 54, 0.9) 100%)`
+                                  : `linear-gradient(135deg, 
+                rgba(25, 25, 25, 0.85) 0%,
+                rgba(40, 40, 40, 0.75) 50%,
+                rgba(25, 25, 25, 0.85) 100%)`,
+                              backdropFilter: "blur(1px)",
+                              boxShadow:
+                                gasMode === "instant"
+                                  ? `0 2px 8px rgba(244, 67, 54, 0.3)`
+                                  : `
+                inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                0 2px 8px rgba(0, 0, 0, 0.3)
+              `,
+                            }}
+                          >
+                            <LightningIcon
+                              size={12}
+                              className="sm:w-[14px] sm:h-[14px]"
+                            />
+                            <span className="text-[10px] sm:text-xs font-satoshi font-medium">
+                              Instant
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quote Info */}
+                {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
+                  <div className="px-1 py-1 bg-[#000000] rounded-lg text-xs sm:text-sm">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-gray-400">Rate:</span>
+                      <span className="text-white truncate ml-2">
+                        1 {fromToken?.symbol} = {rate} {toToken?.symbol}
+                      </span>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-gray-400">Slippage:</span>
+                      <span className="text-white">{slippage}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 whitespace-nowrap">
+                        Min Received:
+                      </span>
+                      <span className="text-white truncate ml-2">
+                        {minimumReceived} {toToken?.symbol}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Button Logic */}
+                {!isConnected ? (
+                  <WalletConnectButton />
+                ) : !bothTokensSelected ? (
+                  <SelectTokenButton onClick={handleSelectTokensClick} />
+                ) : (
+                  <div
+                    className="relative w-full h-[44px] sm:h-[50px] overflow-hidden animate-pulse-subtle"
+                    style={{
+                      borderRadius: "100px",
+                      background:
+                        "linear-gradient(90deg, rgba(110, 110, 110, 0.37) 0%, rgba(256, 175, 25, 0.25) 100%)",
+                    }}
+                    ref={containerRef}
+                  >
+                    <div className="absolute inset-0 overflow-hidden">
+                      <div className="shimmer-effect"></div>
+                    </div>
+
+                    <motion.div
+                      className="absolute left-1 top-1/2 transform -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing"
+                      style={{ x }}
+                      drag={
+                        !swapping &&
+                        fromToken &&
+                        toToken &&
+                        fromAmount &&
+                        !loading &&
+                        !insufficientBalance
+                          ? "x"
+                          : false
+                      }
+                      dragConstraints={{ left: 0, right: 250 }}
+                      dragElastic={0.1}
+                      onDragEnd={handleSwipeEnd}
+                      animate={{
+                        x: [0, 10, 0],
                       }}
-                    />
-                    <div
-                      className="relative bg-[#0F0F0F] rounded-[18px] p-3 flex flex-col"
-                      style={{
-                        boxShadow: "0 4px 4px 0 rgba(0, 0, 0, 0.25)",
-                        height: "500px",
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        repeatType: "loop",
+                        ease: "easeInOut",
                       }}
                     >
-                      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                        <h3 className="text-white font-mayeka-demi-bold-demo text-lg">
-                          Swap History
-                        </h3>
-                        {loadingHistory && (
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[#E2AF19]"></div>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center pointer-events-none select-none relative">
+                        <div className="absolute inset-0 rounded-full bg-[#E2AF19] opacity-30 blur-md animate-pulse"></div>
+
+                        {fromToken ? (
+                          <TokenImage
+                            src={fromToken.logoURI}
+                            alt={fromToken.symbol}
+                            symbol={fromToken.symbol}
+                            name={fromToken.name}
+                            className="w-8 h-8 sm:w-10 sm:h-10 pointer-events-none select-none relative z-10"
+                          />
+                        ) : (
+                          <span className="text-white text-xs font-bold pointer-events-none select-none relative z-10">
+                            E
+                          </span>
                         )}
                       </div>
+                    </motion.div>
 
-                      <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-gold-scrollbar">
-                        {dbTransactions.length === 0 && !loadingHistory ? (
-                          <div className="text-center text-gray-400 py-8">
-                            No swap history yet
-                          </div>
+                    <div className="absolute right-1 top-1/2 transform -translate-y-1/2 z-10">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center">
+                        {toToken ? (
+                          <TokenImage
+                            src={toToken.logoURI}
+                            alt={toToken.symbol}
+                            symbol={toToken.symbol}
+                            name={toToken.name}
+                            className="w-8 h-8 sm:w-10 sm:h-10"
+                          />
                         ) : (
-                          dbTransactions.slice(0, 10).map((item, index) => {
-                            const fromAmount =
-                              parseFloat(item.fromAmount) /
-                              Math.pow(10, item.fromToken.decimals);
-                            const toAmount =
-                              parseFloat(item.toAmount) /
-                              Math.pow(10, item.toToken.decimals);
-                            const displayDate = new Date(
-                              item.createdAt
-                            ).toLocaleDateString("en-US", {
-                              month: "long",
-                              day: "numeric",
-                              year: "numeric",
-                            });
-
-                            const displayToken = item.toToken;
-                            const displayAmount = `+${toAmount.toFixed(4)}`;
-                            const displaySymbol = displayToken.symbol;
-
-                            const tokenLogoUrl =
-                              displayToken.logoUrl || displayToken.logoURI;
-
-                            return (
-                              <div key={item._id}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex flex-col items-start gap-1.5">
-                                    <div className="flex items-start">
-                                      <span className="text-white text-xs font-satoshi">
-                                        Buy Token
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-row gap-1.5">
-                                      <TokenImage
-                                        src={tokenLogoUrl}
-                                        alt={displaySymbol}
-                                        symbol={displaySymbol}
-                                        name={displayToken.name}
-                                        className="w-8 h-8"
-                                      />
-
-                                      <div>
-                                        <div className="flex items-start flex-col">
-                                          <span className="text-white text-sm font-satoshi">
-                                            {displayToken.name}
-                                          </span>
-                                          <span className="text-white text-[9px] font-satoshi">
-                                            {displaySymbol}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="text-right">
-                                    <div className="text-white text-xs font-satoshi mb-1">
-                                      {displayDate}
-                                    </div>
-                                    <div className="font-satoshi text-green-400 text-xs">
-                                      {displayAmount} {displaySymbol}
-                                    </div>
-
-                                    {item.status === "success" &&
-                                      item.txHash &&
-                                      item.explorerLink && (
-                                        <a
-                                          href={item.explorerLink}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-0.5 bg-[#E2AF19] text-[#000] text-xs px-1.5 py-[2px] rounded mt-1 hover:bg-[#D4A853] transition-colors"
-                                        >
-                                          <span className="font-satoshi text-[8px] flex flex-row items-center gap-0.5">
-                                            Explorer
-                                            <ExternalLinkIcon />
-                                          </span>
-                                        </a>
-                                      )}
-
-                                    {(item.status === "failed" ||
-                                      item.status === "cancelled") && (
-                                      <div className="inline-flex items-center gap-0.5 bg-red-500/20 text-red-400 text-xs px-1.5 py-[2px] rounded mt-1 border border-red-500/50">
-                                        <X size={8} />
-                                        <span className="font-satoshi text-[8px]">
-                                          {item.status === "cancelled"
-                                            ? "Cancelled"
-                                            : "Failed"}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {item.status === "pending" && (
-                                      <div className="inline-flex items-center gap-0.5 bg-yellow-500/20 text-yellow-400 text-xs px-1.5 py-[2px] rounded mt-1 border border-yellow-500/50">
-                                        <Clock size={8} />
-                                        <span className="font-satoshi text-[8px]">
-                                          Pending
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {index <
-                                  Math.min(dbTransactions.length - 1, 9) && (
-                                  <div className="w-full h-px bg-[#2C2C2C] mt-3"></div>
-                                )}
-                              </div>
-                            );
-                          })
+                          <span className="text-white text-xs font-bold">
+                            E
+                          </span>
                         )}
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
 
-          {/* Desktop - Always Show Swap Card */}
-          <div className="hidden lg:block">
-            <div className="relative p-[3px] rounded-[30px]">
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="text-white font-mayeka-bold-demo text-sm sm:text-base px-2 text-center">
+                        {swapping ? (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+                            SWAPPING...
+                          </div>
+                        ) : insufficientBalance ? (
+                          <span className="text-xs sm:text-base">
+                            Insufficient Balance
+                          </span>
+                        ) : (
+                          "Swap >>>"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {activeTab === "history" && (
+          <motion.div
+            key="history-card"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.2 }}
+            className="w-[95%] sm:w-full max-w-[340px] sm:max-w-xl relative z-20 lg:hidden"
+          >
+            <div className="relative p-[2px] sm:p-[3px] rounded-[20px] sm:rounded-[30px]">
               <div
-                className="absolute inset-0 rounded-[30px]"
+                className="absolute inset-0 rounded-[20px] sm:rounded-[30px]"
                 style={{
                   background: `linear-gradient(135deg, 
                     #E2AF19 0%, 
@@ -1516,18 +1385,160 @@ export default function SwapPage() {
                     #E2AF19 100%)`,
                 }}
               />
-              <div className="relative bg-[#000000] rounded-[26px] overflow-hidden">
-                <SwapCardContent />
+
+              <div className="relative bg-[#000000] rounded-[18px] sm:rounded-[26px] overflow-hidden">
+                <div className="py-3 px-3 sm:py-6 sm:px-6">
+                  <div className="flex items-center justify-between mb-3 sm:mb-6">
+                    <h3 className="text-white font-mayeka-demi-bold-demo text-base sm:text-xl">
+                      Swap History
+                    </h3>
+                    {loadingHistory && (
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 border-b-2 border-[#E2AF19]"></div>
+                    )}
+                  </div>
+
+                  <div className="overflow-y-auto pr-1.5 sm:pr-2 space-y-3 sm:space-y-6 custom-gold-scrollbar max-h-[300px] sm:max-h-[450px]">
+                    {dbTransactions.length === 0 && !loadingHistory ? (
+                      <div className="text-center text-gray-400 py-6 sm:py-8 text-sm">
+                        No swap history yet
+                      </div>
+                    ) : (
+                      dbTransactions.slice(0, 10).map((item, index) => {
+                        const fromAmount =
+                          parseFloat(item.fromAmount) /
+                          Math.pow(10, item.fromToken.decimals);
+                        const toAmount =
+                          parseFloat(item.toAmount) /
+                          Math.pow(10, item.toToken.decimals);
+                        const displayDate = new Date(
+                          item.createdAt
+                        ).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        });
+
+                        const isSell =
+                          item.fromToken.symbol !== "USDC" &&
+                          item.fromToken.symbol !== "USDT" &&
+                          item.fromToken.symbol !== "DAI";
+                        const displayToken = isSell
+                          ? item.fromToken
+                          : item.toToken;
+                        const displayAmount = isSell
+                          ? `-${fromAmount.toFixed(4)}`
+                          : `+${toAmount.toFixed(4)}`;
+                        const displaySymbol = displayToken.symbol;
+
+                        const tokenLogoUrl =
+                          displayToken.logoUrl || displayToken.logoURI;
+
+                        return (
+                          <div key={item._id}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex flex-col items-start gap-1 sm:gap-2 flex-1 min-w-0">
+                                <span className="text-white text-[10px] sm:text-[14px] font-satoshi">
+                                  Buy Token
+                                </span>
+                                <div className="flex flex-row gap-1.5 sm:gap-2 items-center">
+                                  <TokenImage
+                                    src={tokenLogoUrl}
+                                    alt={displaySymbol}
+                                    symbol={displaySymbol}
+                                    name={displayToken.name}
+                                    className="w-7 h-7 sm:w-10 sm:h-10 flex-shrink-0"
+                                  />
+
+                                  <div className="min-w-0">
+                                    <div className="flex items-start flex-col">
+                                      <span className="text-white text-xs sm:text-[15px] font-satoshi truncate max-w-[100px] sm:max-w-[120px]">
+                                        {displayToken.name}
+                                      </span>
+                                      <span className="text-white text-[8px] sm:text-[10px] font-satoshi">
+                                        {displaySymbol}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-right flex-shrink-0">
+                                <div className="text-white text-[10px] sm:text-[14px] font-satoshi mb-0.5 sm:mb-1">
+                                  {displayDate}
+                                </div>
+                                <div
+                                  className={`font-satoshi text-xs sm:text-base ${
+                                    isSell ? "text-white" : "text-green-400"
+                                  }`}
+                                >
+                                  {displayAmount} {displaySymbol}
+                                </div>
+
+                                {item.status === "success" &&
+                                  item.txHash &&
+                                  item.explorerLink && (
+                                    <a
+                                      href={item.explorerLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-0.5 sm:gap-1 bg-[#E2AF19] text-[#000] text-xs px-1.5 sm:px-2 py-[2px] rounded mt-0.5 sm:mt-1 hover:bg-[#D4A853] transition-colors"
+                                    >
+                                      <span className="font-satoshi text-[7px] sm:text-[8px] flex flex-row items-center gap-0.5">
+                                        Explorer
+                                        <ExternalLinkIcon />
+                                      </span>
+                                    </a>
+                                  )}
+
+                                {(item.status === "failed" ||
+                                  item.status === "cancelled") && (
+                                  <div className="inline-flex items-center gap-0.5 sm:gap-1 bg-red-500/20 text-red-400 text-xs px-1.5 sm:px-2 py-[2px] rounded mt-0.5 sm:mt-1 border border-red-500/50">
+                                    <X
+                                      size={8}
+                                      className="sm:w-[10px] sm:h-[10px]"
+                                    />
+                                    <span className="font-satoshi text-[7px] sm:text-[8px]">
+                                      {item.status === "cancelled"
+                                        ? "Cancelled"
+                                        : "Failed"}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {item.status === "pending" && (
+                                  <div className="inline-flex items-center gap-0.5 sm:gap-1 bg-yellow-500/20 text-yellow-400 text-xs px-1.5 sm:px-2 py-[2px] rounded mt-0.5 sm:mt-1 border border-yellow-500/50">
+                                    <Clock
+                                      size={8}
+                                      className="sm:w-[10px] sm:h-[10px]"
+                                    />
+                                    <span className="font-satoshi text-[7px] sm:text-[8px]">
+                                      Pending
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {index < Math.min(dbTransactions.length - 1, 9) && (
+                              <div className="w-full h-px bg-[#2C2C2C] mt-2.5 sm:mt-4"></div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        )}
       </div>
 
-      {/* Desktop History Overlay - Only visible on desktop when history tab is active */}
+      {/* Desktop History Overlay - Only shown on large screens */}
       <AnimatePresence>
         {activeTab === "history" && (
           <>
+            {/* Overlay backdrop for desktop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -1602,7 +1613,6 @@ export default function SwapPage() {
                           item.fromToken.symbol !== "USDC" &&
                           item.fromToken.symbol !== "USDT" &&
                           item.fromToken.symbol !== "DAI";
-                        const transactionType = isSell ? "Sell" : "Buy";
                         const displayToken = isSell
                           ? item.fromToken
                           : item.toToken;
