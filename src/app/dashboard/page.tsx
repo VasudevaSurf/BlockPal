@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED: NO WELCOME MESSAGE FLASH
+// src/app/dashboard/page.tsx - FIXED: Show trending/gainers even without wallet
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -122,57 +122,43 @@ function DashboardContent() {
         )}
 
         {/* Main Dashboard Content */}
-        {hasWallets ? (
-          <div className="flex flex-col xl:flex-row gap-4 lg:gap-4 flex-1 min-h-0">
-            {/* Mobile Layout */}
-            <div className="flex xl:hidden flex-col gap-4 lg:gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        <div className="flex flex-col xl:flex-row gap-4 lg:gap-4 flex-1 min-h-0">
+          {/* LEFT COLUMN - ALWAYS SHOW BOXES (wallet dependent content inside) */}
+          {/* Mobile Layout */}
+          <div className="flex xl:hidden flex-col gap-4 lg:gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+            <div className="flex-shrink-0">
+              <WalletBalance />
+            </div>
+            <div className="flex-1 min-h-0 mb-4">
+              <TokenList />
+            </div>
+            {dashboardState.showStats && hasWallets && (
               <div className="flex-shrink-0">
-                <WalletBalance />
+                <WalletStats />
               </div>
-              <div className="flex-1 min-h-0 mb-4">
-                <TokenList />
-              </div>
-              {dashboardState.showStats && (
-                <div className="flex-shrink-0">
-                  <WalletStats />
-                </div>
-              )}
-            </div>
+            )}
+          </div>
 
-            {/* Desktop Layout */}
-            <div className="hidden xl:flex flex-1 flex-col gap-4 min-w-0 max-w-[68%]">
+          {/* Desktop Layout */}
+          <div className="hidden xl:flex flex-1 flex-col gap-4 min-w-0 max-w-[68%]">
+            <div className="flex-shrink-0">
+              <WalletBalance />
+            </div>
+            <div className="flex-1 min-h-0 -mb-4">
+              <TokenList />
+            </div>
+            {dashboardState.showStats && hasWallets && (
               <div className="flex-shrink-0">
-                <WalletBalance />
+                <WalletStats />
               </div>
-              <div className="flex-1 min-h-0 -mb-4">
-                <TokenList />
-              </div>
-              {dashboardState.showStats && (
-                <div className="flex-shrink-0">
-                  <WalletStats />
-                </div>
-              )}
-            </div>
+            )}
+          </div>
 
-            <div className="hidden xl:block w-[32%] min-w-[360px] max-w-[440px] flex-shrink-0 h-full">
-              <SwapSection />
-            </div>
+          {/* RIGHT COLUMN - SwapSection (Trending/Gainers) - ALWAYS SHOW */}
+          <div className="hidden xl:block w-[32%] min-w-[360px] max-w-[440px] flex-shrink-0 h-full">
+            <SwapSection />
           </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-[#E2AF19] rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-black text-2xl font-bold">₿</span>
-              </div>
-              <h3 className="text-white text-lg font-satoshi font-semibold mb-2">
-                Welcome to Blockpal, {user?.displayName || user?.name || "User"}
-              </h3>
-              <p className="text-gray-400 font-satoshi text-sm mb-4">
-                Connect your wallet to get started with your crypto journey
-              </p>
-            </div>
-          </div>
-        )}
+        </div>
 
         <style jsx global>{`
           .scrollbar-hide {

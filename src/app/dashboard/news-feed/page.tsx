@@ -110,7 +110,7 @@ const NewsCard = ({
   };
 
   return (
-    <div className="rounded-[24px] border border-[#2C2C2C] p-4 hover:border-[#F7B410] transition-all duration-300 cursor-pointer group">
+    <div className="rounded-[24px] border border-[#2C2C2C] p-4 hover:border-[#F7B410] transition-all duration-300 cursor-pointer group h-[180px]">
       <a
         href={url}
         target="_blank"
@@ -118,7 +118,7 @@ const NewsCard = ({
         className="flex gap-6 h-full"
       >
         {image && (
-          <div className="flex-shrink-0 w-[140px] rounded-[20px] overflow-hidden relative self-stretch">
+          <div className="flex-shrink-0 w-[140px] h-full rounded-[20px] overflow-hidden relative">
             <img
               src={image}
               alt={title}
@@ -130,30 +130,30 @@ const NewsCard = ({
           </div>
         )}
 
-        <div className="flex-1 flex flex-col justify-between min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-white text-[18px] font-saothsi leading-[1.4] line-clamp-2 group-hover:text-[#F7B410] transition-colors flex-1">
+        <div className="flex-1 flex flex-col justify-between min-w-0 h-full">
+          <div className="flex-1 flex flex-col min-h-0">
+            <h3 className="text-white text-[18px] font-saothsi leading-[1.4] line-clamp-2 group-hover:text-[#F7B410] transition-colors">
               {title}
             </h3>
+
+            <p className="text-[#F9EFD1] text-[13px] leading-[1.5] line-clamp-3 mt-2">
+              {description}
+            </p>
           </div>
 
-          <p className="text-[#F9EFD1] text-[13px] leading-[1.5] line-clamp-2 mt-2">
-            {description}
-          </p>
-
-          <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center justify-between flex-shrink-0 pt-2">
             <div className="flex items-center gap-2">
-              <span className="text-[#fff] text-[10px] font-medium">
+              <span className="text-[#fff] text-[10px] font-medium truncate">
                 By {author}
               </span>
-              <span className="text-[#F9EFD1] text-[10px]">
+              <span className="text-[#F9EFD1] text-[10px] flex-shrink-0">
                 {formatDate(date)}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               {tickers.length > 0 && (
-                <span className="text-[#999999] text-[11px]">
+                <span className="text-[#999999] text-[11px] truncate max-w-[100px]">
                   {tickers.slice(0, 3).join(", ")}
                 </span>
               )}
@@ -188,16 +188,16 @@ function NewsFeedContent() {
   // ✅ Helper function to check cached news (same logic as context)
   const checkCachedNews = useCallback(() => {
     if (typeof window === "undefined") return false;
-    
+
     try {
       const cached = sessionStorage.getItem("newsFeedCache");
       if (!cached) return false;
-      
+
       const data = JSON.parse(cached);
       const now = Date.now();
       const cacheAge = now - (data.timestamp || 0);
       const isValid = cacheAge < 5 * 60 * 1000; // 5 minutes
-      
+
       return isValid && data.news && data.news.length > 0;
     } catch (e) {
       return false;
@@ -242,7 +242,9 @@ function NewsFeedContent() {
   useEffect(() => {
     if (!hasReportedDataRef.current) {
       if (checkCachedNews()) {
-        console.log("✅ NewsFeed: Using cached data, marking ready immediately");
+        console.log(
+          "✅ NewsFeed: Using cached data, marking ready immediately"
+        );
         setDataReady();
         hasReportedDataRef.current = true;
       } else if (news.length > 0 || (!loading && news.length === 0) || error) {
