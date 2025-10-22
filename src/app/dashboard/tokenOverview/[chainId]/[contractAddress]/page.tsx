@@ -1,4 +1,4 @@
-// src/app/dashboard/tokenOverview/[chainId]/[contractAddress]/page.tsx - MOBILE RESPONSIVE
+// src/app/dashboard/tokenOverview/[chainId]/[contractAddress]/page.tsx - FIXED LAYOUT
 "use client";
 
 import { useEffect, useState } from "react";
@@ -836,8 +836,9 @@ export default function TokenOverviewPage() {
           </nav>
         </div>
 
-        {/* Desktop Layout - Unchanged */}
+        {/* Desktop Layout - FIXED HEIGHT */}
         <div className="hidden lg:flex gap-3 flex-1 min-h-0 max-h-full overflow-hidden">
+          {/* LEFT COLUMN - Chart Section */}
           <div className="flex-[0_0_70%] flex flex-col gap-3 min-w-0 max-h-full">
             {/* Main Chart Section */}
             <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex-1 flex flex-col min-h-0">
@@ -919,10 +920,10 @@ export default function TokenOverviewPage() {
             </div>
           </div>
 
-          {/* Desktop Sidebar - Unchanged */}
-          <div className="w-full flex-1 max-h-full flex flex-col gap-2 overflow-y-auto scrollbar-hide">
-            {/* Token Info Card */}
-            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex flex-col justify-between space-y-1.5 flex-shrink-0">
+          {/* RIGHT COLUMN - FIXED: Now properly fills height */}
+          <div className="w-full flex-1 max-h-full flex flex-col gap-3 min-h-0">
+            {/* Token Info Card - FIXED: flex-1 to fill available space */}
+            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-3 flex flex-col justify-between space-y-1.5 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#2C2C2C] flex-shrink-0">
                   {metadata.logo ? (
@@ -1237,8 +1238,8 @@ export default function TokenOverviewPage() {
               </div>
             </div>
 
-            {/* PAL Score Card */}
-            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-2 flex flex-col flex-shrink-0 pt-4">
+            {/* PAL Score Card - FIXED: Now has natural height */}
+            <div className="bg-black rounded-[14px] border border-[#2C2C2C] p-2 flex flex-col pt-4 flex-shrink-0">
               <div className="flex items-center justify-between mb-1.5">
                 <h3 className="text-white text-sm font-semibold font-mayeka whitespace-nowrap">
                   PAL Score

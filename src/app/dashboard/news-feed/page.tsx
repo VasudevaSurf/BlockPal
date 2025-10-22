@@ -1,4 +1,4 @@
-// src/app/dashboard/news-feed/page.tsx - WITH CACHE SUPPORT
+// src/app/dashboard/news-feed/page.tsx - FIXED: No loading text, only BlockPal loader
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -168,6 +168,30 @@ const NewsCard = ({
 
 function NewsFeedContent() {
   const [showAIChat, setShowAIChat] = useState(false);
+
+  // ✅ Load cached news immediately
+  const getCachedNews = useCallback(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = sessionStorage.getItem("newsFeedCache");
+      if (cached) {
+        const data = JSON.parse(cached);
+        const now = Date.now();
+        const cacheAge = now - (data.timestamp || 0);
+        if (cacheAge < 5 * 60 * 1000 && data.news) {
+          console.log("✅ Loading cached news:", data.news.length);
+          return data.news;
+        }
+      }
+    } catch (e) {
+      console.error("Error loading cached news:", e);
+    }
+    return [];
+  }, []);
+
+  // ✅ Initialize displayNews with cache FIRST
+  const [displayNews, setDisplayNews] = useState(() => getCachedNews());
+
   const {
     news,
     trending,
@@ -184,25 +208,6 @@ function NewsFeedContent() {
   const hasReportedDataRef = useRef(false);
 
   const newsFeedContext = useNewsFeedContext();
-
-  // ✅ Helper function to check cached news (same logic as context)
-  const checkCachedNews = useCallback(() => {
-    if (typeof window === "undefined") return false;
-
-    try {
-      const cached = sessionStorage.getItem("newsFeedCache");
-      if (!cached) return false;
-
-      const data = JSON.parse(cached);
-      const now = Date.now();
-      const cacheAge = now - (data.timestamp || 0);
-      const isValid = cacheAge < 5 * 60 * 1000; // 5 minutes
-
-      return isValid && data.news && data.news.length > 0;
-    } catch (e) {
-      return false;
-    }
-  }, []);
 
   const observerRef = useRef<IntersectionObserver>();
   const lastNewsElementRef = useCallback(
@@ -221,27 +226,45 @@ function NewsFeedContent() {
     [loading, hasMore, fetchMore]
   );
 
-  // ✅ Cache news data in sessionStorage for instant tab switching
+  // ✅ Update display news when new news arrives OR when loading completes
   useEffect(() => {
     if (news.length > 0) {
+      console.log("📰 Fresh news received, updating display:", news.length);
+      setDisplayNews(news);
+    } else if (!loading && displayNews.length === 0) {
+      // If loading finished but no news, check cache again
+      const cached = getCachedNews();
+      if (cached.length > 0) {
+        console.log("📰 Using cached news as fallback:", cached.length);
+        setDisplayNews(cached);
+      }
+    }
+  }, [news, loading, displayNews.length, getCachedNews]);
+
+  // ✅ Cache news data in sessionStorage when displayNews changes
+  useEffect(() => {
+    if (displayNews.length > 0) {
       try {
         sessionStorage.setItem(
           "newsFeedCache",
           JSON.stringify({
-            news,
+            news: displayNews,
             timestamp: Date.now(),
           })
         );
+        console.log("✅ Cache updated via displayNews");
       } catch (e) {
         console.error("Error caching news:", e);
       }
     }
-  }, [news]);
+  }, [displayNews]);
 
   // ✅ Report data ready immediately if we have cached data
   useEffect(() => {
+    const hasCachedData = displayNews.length > 0;
+
     if (!hasReportedDataRef.current) {
-      if (checkCachedNews()) {
+      if (hasCachedData) {
         console.log(
           "✅ NewsFeed: Using cached data, marking ready immediately"
         );
@@ -257,7 +280,16 @@ function NewsFeedContent() {
         hasReportedDataRef.current = true;
       }
     }
-  }, [news.length, loading, error, setDataReady, checkCachedNews]);
+  }, [displayNews.length, news.length, loading, error, setDataReady]);
+
+  // ✅ Report data ready on mount if cache exists
+  useEffect(() => {
+    if (displayNews.length > 0 && !hasReportedDataRef.current) {
+      console.log("✅ NewsFeed: Cache exists on mount, marking ready");
+      setDataReady();
+      hasReportedDataRef.current = true;
+    }
+  }, []);
 
   // Connect context handlers
   useEffect(() => {
@@ -352,7 +384,7 @@ function NewsFeedContent() {
                 )}
 
                 <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-3">
-                  {news.length === 0 && !loading && (
+                  {displayNews.length === 0 && !loading && (
                     <div className="flex items-center justify-center h-full">
                       <p className="text-[#666666] text-[14px]">
                         {searchQuery
@@ -362,11 +394,13 @@ function NewsFeedContent() {
                     </div>
                   )}
 
-                  {news.map((article, index) => (
+                  {displayNews.map((article, index) => (
                     <div
                       key={article.news_url}
                       ref={
-                        index === news.length - 1 ? lastNewsElementRef : null
+                        index === displayNews.length - 1
+                          ? lastNewsElementRef
+                          : null
                       }
                     >
                       <NewsCard
@@ -382,15 +416,8 @@ function NewsFeedContent() {
                     </div>
                   ))}
 
-                  {loading && (
-                    <div className="text-center py-5">
-                      <p className="text-[#666666] text-[14px] mt-2">
-                        Loading more news...
-                      </p>
-                    </div>
-                  )}
-
-                  {!hasMore && news.length > 0 && (
+                  {/* ✅ REMOVED: No "Loading more news..." text */}
+                  {!hasMore && displayNews.length > 0 && (
                     <div className="text-center py-5">
                       <p className="text-[#666666] text-[14px]">
                         No more news to load

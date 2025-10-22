@@ -1,4 +1,4 @@
-// src/contexts/CoinLensLoadingContext.tsx - FIXED WITH CACHE CHECK
+// src/contexts/CoinLensLoadingContext.tsx - FIXED: Cache aware loading
 "use client";
 
 import React, {
@@ -10,7 +10,8 @@ import React, {
   useRef,
 } from "react";
 import { useAccount, useChainId } from "wagmi";
-import { coinlesSocketClient } from "@/services/coinlesSocketClient";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
 
 interface CoinLensLoadingContextType {
   isLoading: boolean;
@@ -37,13 +38,26 @@ export const CoinLensLoadingProvider: React.FC<{
 }> = ({ children }) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const { user } = useSelector((state: RootState) => state.auth);
 
-  // ✅ Check if we already have cached data from WebSocket
-  const hasCachedData = coinlesSocketClient.isConnected();
+  // ✅ Check cache on mount
+  const checkCache = useCallback(() => {
+    if (typeof window === "undefined" || !user?.email) return false;
+    try {
+      const cached = sessionStorage.getItem(`coinlens_tokens_${user.email}`);
+      if (cached) {
+        const data = JSON.parse(cached);
+        return Array.isArray(data) && data.length > 0;
+      }
+    } catch (e) {
+      return false;
+    }
+    return false;
+  }, [user?.email]);
 
   // ✅ Start with isLoading=false if we have cached data
-  const [isLoading, setIsLoading] = useState(!hasCachedData);
-  const [dataReady, setDataReadyState] = useState(hasCachedData);
+  const [isLoading, setIsLoading] = useState(() => !checkCache());
+  const [dataReady, setDataReadyState] = useState(() => checkCache());
 
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevWalletRef = useRef<string | undefined>(undefined);
@@ -67,12 +81,12 @@ export const CoinLensLoadingProvider: React.FC<{
 
   // ✅ Check for cached data on mount
   useEffect(() => {
-    if (hasCachedData) {
-      console.log("✅ CoinLens: Using cached WebSocket data, skipping loader");
+    if (checkCache()) {
+      console.log("✅ CoinLens Context: Using cached data, skipping loader");
       setIsLoading(false);
       setDataReadyState(true);
     }
-  }, [hasCachedData]);
+  }, [checkCache]);
 
   // Hide loader when data is ready
   useEffect(() => {
