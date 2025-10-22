@@ -1,4 +1,4 @@
-// src/components/NewsChatPage.tsx
+// src/components/NewsChatPage.tsx - WITH SESSION STORAGE FOR CHAT HISTORY
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -14,17 +14,89 @@ interface Message {
   functionCalls?: string[];
 }
 
+interface SessionData {
+  messages: Message[];
+  conversationId: string;
+  lastActivity: string;
+}
+
+const SESSION_KEY = "news_ai_chat_session";
+
 export default function NewsChatPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Load messages from sessionStorage on mount
+  const loadSessionData = (): SessionData | null => {
+    if (typeof window === "undefined") return null;
+
+    try {
+      const stored = sessionStorage.getItem(SESSION_KEY);
+      if (stored) {
+        const data = JSON.parse(stored);
+        // Convert timestamp strings back to Date objects
+        data.messages = data.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        }));
+        console.log(
+          "📋 Loaded chat session:",
+          data.messages.length,
+          "messages"
+        );
+        return data;
+      }
+    } catch (e) {
+      console.error("Error loading session data:", e);
+    }
+    return null;
+  };
+
+  // Save messages to sessionStorage
+  const saveSessionData = (messages: Message[], conversationId: string) => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const sessionData: SessionData = {
+        messages,
+        conversationId,
+        lastActivity: new Date().toISOString(),
+      };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+      console.log("💾 Saved chat session:", messages.length, "messages");
+    } catch (e) {
+      console.error("Error saving session data:", e);
+    }
+  };
+
+  // Initialize state from session storage
+  const sessionData = loadSessionData();
+  const [messages, setMessages] = useState<Message[]>(
+    sessionData?.messages || []
+  );
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [conversationId, setConversationId] = useState<string>("");
+  const [conversationId, setConversationId] = useState<string>(
+    sessionData?.conversationId || ""
+  );
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Save to session storage whenever messages or conversationId changes
+  useEffect(() => {
+    if (messages.length > 0 || conversationId) {
+      saveSessionData(messages, conversationId);
+    }
+  }, [messages, conversationId]);
+
+  // Clear session on unmount (when component is destroyed)
+  useEffect(() => {
+    return () => {
+      // Only clear if user explicitly wants to (we'll handle this via a clear button)
+      console.log("💬 Chat component unmounted, session preserved");
+    };
+  }, []);
 
   // Suggestion chips for news-related queries
   const suggestionChips = [
@@ -208,6 +280,8 @@ export default function NewsChatPage() {
     if (currentInput.toLowerCase().trim() === "clear") {
       setMessages([]);
       setConversationId("");
+      sessionStorage.removeItem(SESSION_KEY);
+      console.log("🧹 Chat history cleared");
       setIsTyping(false);
       if (inputRef.current) {
         inputRef.current.focus();
@@ -332,6 +406,15 @@ export default function NewsChatPage() {
     }
   };
 
+  const handleClearChat = () => {
+    if (window.confirm("Are you sure you want to clear the chat history?")) {
+      setMessages([]);
+      setConversationId("");
+      sessionStorage.removeItem(SESSION_KEY);
+      console.log("🧹 Chat history cleared by user");
+    }
+  };
+
   const formatMessageContent = (content: string) => {
     let formatted = content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
@@ -390,8 +473,33 @@ export default function NewsChatPage() {
               </div>
             </div>
           ) : (
-            /* Chat Messages */
+            /* Chat Messages with Clear Button */
             <div className="py-4 space-y-4">
+              {/* Clear Chat Button */}
+              <div className="flex justify-end mb-2">
+                <button
+                  onClick={handleClearChat}
+                  className="text-xs text-[#999999] hover:text-[#E2AF19] transition-colors flex items-center gap-1"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  </svg>
+                  Clear Chat
+                </button>
+              </div>
+
               {messages.map((message) => (
                 <div key={message.id} className="flex flex-col space-y-2">
                   {message.type === "assistant" ? (

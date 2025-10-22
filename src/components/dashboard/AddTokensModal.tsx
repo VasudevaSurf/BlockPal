@@ -1,4 +1,4 @@
-// src/components/dashboard/AddTokensModal.tsx - RESPONSIVE VERSION WITH DUPLICATE DETECTION
+// src/components/dashboard/AddTokensModal.tsx - FIXED: Chain icons with proper preloading
 import { useState, useEffect, useRef } from "react";
 import {
   X,
@@ -60,7 +60,7 @@ const getChainDisplayData = () => {
       name: "Ethereum",
       color: "bg-blue-500",
       icon: "Ξ",
-      image: "/chains/ethereum.png",
+      image: "/chains/Ethereum.png",
       fallbackIcon: "Ξ",
       useBackground: true,
     },
@@ -68,7 +68,7 @@ const getChainDisplayData = () => {
       name: "Base",
       color: "bg-blue-600",
       icon: "B",
-      image: "/chains/base.png",
+      image: "/chains/Base.png",
       fallbackIcon: "B",
       useBackground: false,
     },
@@ -76,7 +76,7 @@ const getChainDisplayData = () => {
       name: "Polygon",
       color: "bg-purple-500",
       icon: "◆",
-      image: "/chains/polygon.png",
+      image: "/chains/Polygon.png",
       fallbackIcon: "◆",
       useBackground: false,
     },
@@ -84,7 +84,7 @@ const getChainDisplayData = () => {
       name: "Arbitrum",
       color: "bg-blue-400",
       icon: "◉",
-      image: "/chains/arbitrum.png",
+      image: "/chains/Arbitrum.png",
       fallbackIcon: "◉",
       useBackground: false,
     },
@@ -92,7 +92,7 @@ const getChainDisplayData = () => {
       name: "Avalanche",
       color: "bg-red-500",
       icon: "A",
-      image: "/chains/avalanche.png",
+      image: "/chains/Avalanche.png",
       fallbackIcon: "A",
       useBackground: true,
     },
@@ -100,7 +100,7 @@ const getChainDisplayData = () => {
       name: "BSC",
       color: "bg-yellow-500",
       icon: "B",
-      image: "/chains/bsc.png",
+      image: "/chains/BSC.png",
       fallbackIcon: "B",
       useBackground: true,
     },
@@ -109,7 +109,30 @@ const getChainDisplayData = () => {
   return chainDisplayData;
 };
 
-// Chain Icon Component
+// ✅ FIXED: Add image cache and preload function (same as TokenSelectorModal)
+const imageCache = new Map<string, boolean>();
+
+const preloadImage = (src: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (imageCache.has(src)) {
+      resolve(imageCache.get(src) || false);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      imageCache.set(src, true);
+      resolve(true);
+    };
+    img.onerror = () => {
+      imageCache.set(src, false);
+      resolve(false);
+    };
+    img.src = src;
+  });
+};
+
+// ✅ FIXED: Chain Icon Component with proper preloading (same as TokenSelectorModal)
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -128,8 +151,17 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   size = "md",
   className = "",
 }) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [imageState, setImageState] = useState<"loading" | "loaded" | "error">(
+    () => {
+      // Check cache on initial render
+      if (chainData.image && imageCache.has(chainData.image)) {
+        return imageCache.get(chainData.image) ? "loaded" : "error";
+      }
+      return "loading";
+    }
+  );
+
+  const mountedRef = useRef(true);
 
   const sizeClasses = {
     sm: "w-4 h-4 lg:w-5 lg:h-5",
@@ -138,42 +170,54 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   };
 
   useEffect(() => {
-    setImageLoaded(false);
-    setImageError(false);
+    mountedRef.current = true;
+
+    // Check cache first
+    if (chainData.image && imageCache.has(chainData.image)) {
+      const cached = imageCache.get(chainData.image);
+      setImageState(cached ? "loaded" : "error");
+      return;
+    }
+
+    // Preload image if not cached
+    if (chainData.image) {
+      preloadImage(chainData.image).then((success) => {
+        if (mountedRef.current) {
+          setImageState(success ? "loaded" : "error");
+        }
+      });
+    } else {
+      setImageState("error");
+    }
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, [chainData.image]);
-
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoaded(true);
-  };
-
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-  };
 
   return (
     <div
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
+      style={{
+        // Hide completely during loading to prevent flickering
+        opacity: imageState === "loading" ? 0 : 1,
+        transition: "opacity 0.15s ease-in",
+      }}
     >
-      {(!imageLoaded || imageError) && (
-        <div className="absolute inset-0 bg-[#2C2C2C] rounded-full" />
-      )}
-
-      {chainData.image && !imageError && (
+      {/* Show image when loaded */}
+      {imageState === "loaded" && chainData.image && (
         <img
           src={chainData.image}
           alt={chainData.name}
-          className={`w-full h-full object-contain transition-opacity duration-300 ${
-            imageLoaded ? "opacity-100" : "opacity-0"
-          } p-1 relative z-10`}
-          onError={handleImageError}
-          onLoad={handleImageLoad}
-          loading="lazy"
+          className="w-full h-full object-contain p-1"
+          draggable={false}
+          style={{ userSelect: "none", pointerEvents: "none" }}
         />
       )}
 
-      {imageError && (
+      {/* Show fallback only on error */}
+      {imageState === "error" && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
         >
@@ -203,19 +247,24 @@ const TokenImage = ({
   const [hasError, setHasError] = useState(false);
 
   const getFirstLetter = () => {
-    const text = symbol || name || "?";
-    return text.charAt(0).toUpperCase();
+    const text = name || symbol || "?";
+    const firstWord = text.split(/[\s\-_]+/)[0];
+    return firstWord.length > 6 ? firstWord.substring(0, 6) : firstWord;
   };
 
   if (!src || hasError) {
+    const firstWord = getFirstLetter();
     return (
       <div
-        className={`${className} rounded-full flex items-center justify-center`}
-        style={{ backgroundColor: "#4A4A4A" }}
+        className={`${className} rounded-full flex items-center justify-center bg-[#4A4A4A]`}
         title={name || symbol}
+        style={{ userSelect: "none", pointerEvents: "none" }}
       >
-        <span className="text-white font-bold text-[10px] lg:text-xs">
-          {getFirstLetter()}
+        <span
+          className="text-white font-bold text-xs text-center px-1"
+          style={{ userSelect: "none", pointerEvents: "none" }}
+        >
+          {firstWord.charAt(0)}
         </span>
       </div>
     );
@@ -228,6 +277,9 @@ const TokenImage = ({
       className={`${className} rounded-full object-cover`}
       onError={() => setHasError(true)}
       loading="lazy"
+      draggable={false}
+      style={{ userSelect: "none", pointerEvents: "none" }}
+      onDragStart={(e) => e.preventDefault()}
     />
   );
 };
@@ -263,6 +315,21 @@ export default function AddTokensModal({
   const chainDisplayData = getChainDisplayData();
 
   const { showToast } = useToast();
+
+  // ✅ FIXED: Preload all chain images on mount (same as TokenSelectorModal)
+  useEffect(() => {
+    const preloadAllChainImages = async () => {
+      const images = Object.values(chainDisplayData)
+        .map((data) => data.image)
+        .filter(Boolean) as string[];
+
+      console.log("🔄 AddTokensModal: Preloading chain images");
+      await Promise.all(images.map((src) => preloadImage(src)));
+      console.log("✅ AddTokensModal: All chain images preloaded");
+    };
+
+    preloadAllChainImages();
+  }, []);
 
   // Helper function to check if token already exists
   const isTokenAlreadyAdded = (
@@ -469,17 +536,15 @@ export default function AddTokensModal({
             coinlesSocketClient.on("search-results", handleResults);
           });
 
-          // ✅ FIXED: Search by contract address to get exact token
           coinlesSocketClient.searchTokens(
             selectedChain,
-            token.address, // Use address instead of symbol
+            token.address,
             user.email
           );
 
           const results = await searchPromise;
 
           if (results && results.length > 0) {
-            // ✅ FIXED: Find the exact matching token by address
             const foundToken =
               results.find(
                 (r) =>
