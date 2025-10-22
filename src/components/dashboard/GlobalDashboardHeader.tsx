@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED: Hide on mobile for token overview
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED: Hide wallet/icons on AI chat and news feed pages
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -362,6 +362,7 @@ export default function GlobalDashboardHeader({
   const isCoinLensPage = pathname === "/dashboard/coin-lens";
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
   const isPortfolioPage = pathname === "/dashboard";
+  const isAIChatPage = pathname === "/dashboard/ai-chat";
 
   // Hide header completely on mobile for token overview page
   if (
@@ -697,16 +698,16 @@ export default function GlobalDashboardHeader({
                   strokeLinejoin="round"
                 />
               </svg>
-              <span className="font-mayeka text-black">AI</span>
+              <span className="font-mayeka text-black">Pulse</span>
             </button>
           </form>
         )}
 
-        {/* ✅ Hide wallet/notifications on mobile for CoinLens and NewsFeed pages */}
+        {/* Hide wallet/notifications/icons on AI Chat and News Feed pages */}
         <div
           className={`flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4 ${
-            isCoinLensPage || isNewsFeedPage ? "hidden lg:flex" : ""
-          }`}
+            isCoinLensPage ? "hidden lg:flex" : ""
+          } ${isAIChatPage || isNewsFeedPage ? "hidden" : ""}`}
         >
           {/* Wallet Display */}
           {showWalletInfo && (

@@ -454,7 +454,7 @@ export default function NewsChatPage() {
             /* Welcome Screen with Suggestion Chips */
             <div className="h-full flex flex-col items-center justify-center -mt-5">
               <h1 className="text-[35px] font-mayeka-demi-bold-demo font-bold mb-10 text-center bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
-                News AI Chat
+                Chat with Pulse
               </h1>
 
               <div className="w-full max-w-2xl mx-auto mb-16">

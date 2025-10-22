@@ -457,8 +457,13 @@ function NewsFeedContent() {
                       <ArrowLeft size={20} className="text-[#E2AF19]" />
                     </button>
                     <div>
-                      <h2 className="text-white text-xl font-mayeka font-bold">
-                        News Chat
+                      <h2>
+                        <span className="text-[35px] font-mayeka-demi-bold-demo font-bold bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
+                          Pulse
+                        </span>
+                        <span className="text-[14px] font-mayeka-demi-bold-demo font-normal bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent align-text-bottom ml-2">
+                          by Lumen
+                        </span>
                       </h2>
                     </div>
                   </div>
@@ -481,7 +486,7 @@ export default function NewsFeed() {
 
   return (
     <>
-      {isLoading && <BlockPalLoader loadingText="Loading News Feed" />}
+      {isLoading && <BlockPalLoader loadingText="Loading MarketPulse" />}
 
       <div
         className={`h-full transition-opacity duration-300 ${

@@ -117,7 +117,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
 
       {toasts.length > 0 && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-[9998] pointer-events-none" />
+          <div className="fixed inset-0 z-[9998] pointer-events-none" />
           <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none">
             {toasts.map((toast) => (
               <div key={toast.id} className="pointer-events-auto">

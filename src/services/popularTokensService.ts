@@ -28,15 +28,15 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
         "https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png",
       isPopular: true,
     },
-    {
-      address: "0x6b175474e89094c44da98b954eedeac495271d0f",
-      symbol: "DAI",
-      name: "Dai Stablecoin",
-      decimals: 18,
-      logoURI:
-        "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
-      isPopular: true,
-    },
+    // {
+    //   address: "0x6b175474e89094c44da98b954eedeac495271d0f",
+    //   symbol: "DAI",
+    //   name: "Dai Stablecoin",
+    //   decimals: 18,
+    //   logoURI:
+    //     "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
+    //   isPopular: true,
+    // },
     {
       address: "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
       symbol: "WBTC",
@@ -110,15 +110,15 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
       logoURI: "https://ethereum-optimism.github.io/data/USDC/logo.png",
       isPopular: true,
     },
-    {
-      address: "0x50c5725949a6f0c72e6c4a641f24049a917db0cb",
-      symbol: "DAI",
-      name: "Dai Stablecoin",
-      decimals: 18,
-      logoURI:
-        "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
-      isPopular: true,
-    },
+    // {
+    //   address: "0x50c5725949a6f0c72e6c4a641f24049a917db0cb",
+    //   symbol: "DAI",
+    //   name: "Dai Stablecoin",
+    //   decimals: 18,
+    //   logoURI:
+    //     "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
+    //   isPopular: true,
+    // },
     {
       address: "0x4200000000000000000000000000000000000006",
       symbol: "WETH",
@@ -210,15 +210,15 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
         "https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png",
       isPopular: true,
     },
-    {
-      address: "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063",
-      symbol: "DAI",
-      name: "Dai Stablecoin",
-      decimals: 18,
-      logoURI:
-        "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
-      isPopular: true,
-    },
+    // {
+    //   address: "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063",
+    //   symbol: "DAI",
+    //   name: "Dai Stablecoin",
+    //   decimals: 18,
+    //   logoURI:
+    //     "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
+    //   isPopular: true,
+    // },
     {
       address: "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619",
       symbol: "WETH",
@@ -302,15 +302,15 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
         "https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png",
       isPopular: true,
     },
-    {
-      address: "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1",
-      symbol: "DAI",
-      name: "Dai Stablecoin",
-      decimals: 18,
-      logoURI:
-        "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
-      isPopular: true,
-    },
+    // {
+    //   address: "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1",
+    //   symbol: "DAI",
+    //   name: "Dai Stablecoin",
+    //   decimals: 18,
+    //   logoURI:
+    //     "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
+    //   isPopular: true,
+    // },
     {
       address: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
       symbol: "WETH",
@@ -394,15 +394,15 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
         "https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png",
       isPopular: true,
     },
-    {
-      address: "0xd586e7f844cea2f87f50152665bcbc2c279d8d70",
-      symbol: "DAI",
-      name: "Dai Stablecoin",
-      decimals: 18,
-      logoURI:
-        "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
-      isPopular: true,
-    },
+    // {
+    //   address: "0xd586e7f844cea2f87f50152665bcbc2c279d8d70",
+    //   symbol: "DAI",
+    //   name: "Dai Stablecoin",
+    //   decimals: 18,
+    //   logoURI:
+    //     "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
+    //   isPopular: true,
+    // },
     {
       address: "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7",
       symbol: "WAVAX",
@@ -539,15 +539,15 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
         "https://tokens.1inch.io/0x514910771af9ca656af840dff83e8264ecf986ca.png",
       isPopular: true,
     },
-    {
-      address: "0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3",
-      symbol: "DAI",
-      name: "Dai Token",
-      decimals: 18,
-      logoURI:
-        "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
-      isPopular: true,
-    },
+    // {
+    //   address: "0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3",
+    //   symbol: "DAI",
+    //   name: "Dai Token",
+    //   decimals: 18,
+    //   logoURI:
+    //     "https://tokens.1inch.io/0x6b175474e89094c44da98b954eedeac495271d0f.png",
+    //   isPopular: true,
+    // },
   ],
 };
 
