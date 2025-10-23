@@ -1,4 +1,4 @@
-// src/components/ui/BlockPalLoader.tsx - FIXED FOR MOBILE
+// src/components/ui/BlockPalLoader.tsx - FIXED: Proper spacing for mobile bottom nav
 "use client";
 
 import React from "react";
@@ -11,7 +11,7 @@ const BlockPalLoader: React.FC<BlockPalLoaderProps> = ({
   loadingText = "Loading",
 }) => {
   return (
-    <div className="absolute inset-0 lg:inset-0 bottom-20 lg:bottom-0 bg-[#000000] flex items-center justify-center z-[9999]">
+    <div className="fixed top-0 left-0 right-0 bottom-20 lg:inset-0 lg:bottom-0 bg-[#000000] flex items-center justify-center z-[9999]">
       <div className="flex flex-col items-center justify-center gap-8">
         {/* Logo */}
         <div className="relative">

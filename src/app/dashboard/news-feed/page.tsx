@@ -1,4 +1,4 @@
-// src/app/dashboard/news-feed/page.tsx - FIXED: No loading text, only BlockPal loader
+// src/app/dashboard/news-feed/page.tsx - RESPONSIVE VERSION
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -54,8 +54,7 @@ const NewsCard = ({
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="22"
-          height="22"
+          className="w-5 h-5 md:w-[22px] md:h-[22px]"
           viewBox="0 0 30 30"
           fill="none"
         >
@@ -77,8 +76,7 @@ const NewsCard = ({
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="22"
-          height="22"
+          className="w-5 h-5 md:w-[22px] md:h-[22px]"
           viewBox="0 0 30 30"
           fill="none"
         >
@@ -103,8 +101,7 @@ const NewsCard = ({
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="22"
-          height="22"
+          className="w-5 h-5 md:w-[22px] md:h-[22px]"
           viewBox="0 0 30 30"
           fill="none"
         >
@@ -126,15 +123,15 @@ const NewsCard = ({
   };
 
   return (
-    <div className="rounded-[24px] border border-[#2C2C2C] p-4 hover:border-[#F7B410] transition-all duration-300 cursor-pointer group h-[180px]">
+    <div className="rounded-[16px] md:rounded-[24px] border border-[#2C2C2C] p-3 md:p-4 hover:border-[#F7B410] transition-all duration-300 cursor-pointer group h-auto md:h-[180px]">
       <a
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex gap-6 h-full"
+        className="flex flex-col md:flex-row gap-3 md:gap-6 h-full"
       >
         {image && (
-          <div className="flex-shrink-0 w-[140px] h-full rounded-[20px] overflow-hidden relative">
+          <div className="flex-shrink-0 w-full h-[160px] md:w-[140px] md:h-full rounded-[12px] md:rounded-[20px] overflow-hidden relative">
             <img
               src={image}
               alt={title}
@@ -148,29 +145,29 @@ const NewsCard = ({
 
         <div className="flex-1 flex flex-col justify-between min-w-0 h-full">
           <div className="flex-1 flex flex-col min-h-0">
-            <h3 className="text-white text-[18px] font-saothsi leading-[1.4] line-clamp-2 group-hover:text-[#F7B410] transition-colors">
+            <h3 className="text-white text-[16px] md:text-[18px] font-saothsi leading-[1.4] line-clamp-2 md:line-clamp-2 group-hover:text-[#F7B410] transition-colors">
               {title}
             </h3>
 
-            <p className="text-[#F9EFD1] text-[13px] leading-[1.5] line-clamp-3 mt-2">
+            <p className="text-[#F9EFD1] text-[12px] md:text-[13px] leading-[1.5] line-clamp-2 md:line-clamp-3 mt-1.5 md:mt-2">
               {description}
             </p>
           </div>
 
-          <div className="flex items-center justify-between flex-shrink-0 pt-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[#fff] text-[10px] font-medium truncate">
+          <div className="flex items-center justify-between flex-shrink-0 pt-2 md:pt-2">
+            <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
+              <span className="text-[#fff] text-[9px] md:text-[10px] font-medium truncate">
                 By {author}
               </span>
-              <span className="text-[#F9EFD1] text-[10px] flex-shrink-0">
+              <span className="text-[#F9EFD1] text-[9px] md:text-[10px] flex-shrink-0">
                 {formatDate(date)}
               </span>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0 ml-2">
               {tickers.length > 0 && (
-                <span className="text-[#999999] text-[11px] truncate max-w-[100px]">
-                  {tickers.slice(0, 3).join(", ")}
+                <span className="text-[#999999] text-[10px] md:text-[11px] truncate max-w-[60px] md:max-w-[100px]">
+                  {tickers.slice(0, 2).join(", ")}
                 </span>
               )}
               {getSentimentIcon(sentiment)}
@@ -185,7 +182,6 @@ const NewsCard = ({
 function NewsFeedContent() {
   const [showAIChat, setShowAIChat] = useState(false);
 
-  // ✅ Load cached news immediately
   const getCachedNews = useCallback(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -205,7 +201,6 @@ function NewsFeedContent() {
     return [];
   }, []);
 
-  // ✅ Initialize displayNews with cache FIRST
   const [displayNews, setDisplayNews] = useState(() => getCachedNews());
 
   const {
@@ -242,13 +237,11 @@ function NewsFeedContent() {
     [loading, hasMore, fetchMore]
   );
 
-  // ✅ Update display news when new news arrives OR when loading completes
   useEffect(() => {
     if (news.length > 0) {
       console.log("📰 Fresh news received, updating display:", news.length);
       setDisplayNews(news);
     } else if (!loading && displayNews.length === 0) {
-      // If loading finished but no news, check cache again
       const cached = getCachedNews();
       if (cached.length > 0) {
         console.log("📰 Using cached news as fallback:", cached.length);
@@ -257,7 +250,6 @@ function NewsFeedContent() {
     }
   }, [news, loading, displayNews.length, getCachedNews]);
 
-  // ✅ Cache news data in sessionStorage when displayNews changes
   useEffect(() => {
     if (displayNews.length > 0) {
       try {
@@ -275,7 +267,6 @@ function NewsFeedContent() {
     }
   }, [displayNews]);
 
-  // ✅ Report data ready immediately if we have cached data
   useEffect(() => {
     const hasCachedData = displayNews.length > 0;
 
@@ -298,7 +289,6 @@ function NewsFeedContent() {
     }
   }, [displayNews.length, news.length, loading, error, setDataReady]);
 
-  // ✅ Report data ready on mount if cache exists
   useEffect(() => {
     if (displayNews.length > 0 && !hasReportedDataRef.current) {
       console.log("✅ NewsFeed: Cache exists on mount, marking ready");
@@ -307,7 +297,6 @@ function NewsFeedContent() {
     }
   }, []);
 
-  // Connect context handlers
   useEffect(() => {
     newsFeedContext.setSearchQuery(searchQuery);
   }, [searchQuery]);
@@ -318,7 +307,6 @@ function NewsFeedContent() {
     newsFeedContext.setOnAIClick(() => () => setShowAIChat(true));
   }, [search, clearSearch]);
 
-  // Notify layout about AI chat state
   useEffect(() => {
     if (showAIChat) {
       document.body.setAttribute("data-news-chat-active", "true");
@@ -379,14 +367,14 @@ function NewsFeedContent() {
         }
       `}</style>
 
-      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[14px] p-1.5 sm:p-2 lg:p-2.5 flex flex-col overflow-hidden relative">
-        <div className="flex gap-3 flex-1 min-h-0 relative">
-          <div className="flex-1 w-full flex flex-col gap-3 min-w-0 max-h-full overflow-hidden">
+      <div className="h-full bg-[#000000] rounded-[10px] md:rounded-[12px] lg:rounded-[14px] p-1 sm:p-1.5 md:p-2 lg:p-2.5 flex flex-col overflow-hidden relative">
+        <div className="flex gap-2 md:gap-3 flex-1 min-h-0 relative">
+          <div className="flex-1 w-full flex flex-col gap-2 md:gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="w-full flex-1 h-full flex flex-col relative">
-              <div className="flex-1 bg-black rounded-[14px] overflow-hidden flex flex-col">
+              <div className="flex-1 bg-black rounded-[10px] md:rounded-[14px] overflow-hidden flex flex-col">
                 {searchQuery && (
-                  <div className="px-4 pt-4">
-                    <p className="text-[#6b7280] text-[14px]">
+                  <div className="px-3 md:px-4 pt-3 md:pt-4">
+                    <p className="text-[#6b7280] text-[12px] md:text-[14px]">
                       Searching for:{" "}
                       <strong className="text-white">{searchQuery}</strong>
                     </p>
@@ -394,15 +382,15 @@ function NewsFeedContent() {
                 )}
 
                 {error && (
-                  <div className="mx-4 mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-[10px]">
-                    <p className="text-red-400 text-[14px]">{error}</p>
+                  <div className="mx-3 md:mx-4 mt-3 md:mt-4 p-2.5 md:p-3 bg-red-500/10 border border-red-500/20 rounded-[8px] md:rounded-[10px]">
+                    <p className="text-red-400 text-[12px] md:text-[14px]">{error}</p>
                   </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-3">
+                <div className="flex-1 overflow-y-auto scrollbar-hide p-1.5 md:p-2 space-y-2 md:space-y-3">
                   {displayNews.length === 0 && !loading && (
                     <div className="flex items-center justify-center h-full">
-                      <p className="text-[#666666] text-[14px]">
+                      <p className="text-[#666666] text-[12px] md:text-[14px]">
                         {searchQuery
                           ? "No news found for your search"
                           : "No news available"}
@@ -432,10 +420,9 @@ function NewsFeedContent() {
                     </div>
                   ))}
 
-                  {/* ✅ REMOVED: No "Loading more news..." text */}
                   {!hasMore && displayNews.length > 0 && (
-                    <div className="text-center py-5">
-                      <p className="text-[#666666] text-[14px]">
+                    <div className="text-center py-4 md:py-5">
+                      <p className="text-[#666666] text-[12px] md:text-[14px]">
                         No more news to load
                       </p>
                     </div>
@@ -448,20 +435,20 @@ function NewsFeedContent() {
           {showAIChat && (
             <div className="absolute inset-0 z-50 slide-in">
               <div className="h-full w-full bg-[#000000] overflow-hidden flex flex-col">
-                <div className="flex-shrink-0 bg-black p-4 border-b border-[#2C2C2C]">
-                  <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 bg-black p-3 md:p-4 border-b border-[#2C2C2C]">
+                  <div className="flex items-center gap-2 md:gap-3">
                     <button
                       onClick={() => setShowAIChat(false)}
-                      className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                      className="p-1.5 md:p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
                     >
-                      <ArrowLeft size={20} className="text-[#E2AF19]" />
+                      <ArrowLeft size={18} className="text-[#E2AF19] md:w-5 md:h-5" />
                     </button>
                     <div>
                       <h2>
-                        <span className="text-[35px] font-mayeka-demi-bold-demo font-bold bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
+                        <span className="text-[28px] md:text-[35px] font-mayeka-demi-bold-demo font-bold bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
                           Pulse
                         </span>
-                        <span className="text-[14px] font-mayeka-demi-bold-demo font-normal bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent align-text-bottom ml-2">
+                        <span className="text-[12px] md:text-[14px] font-mayeka-demi-bold-demo font-normal bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent align-text-bottom ml-1.5 md:ml-2">
                           by Lumen
                         </span>
                       </h2>

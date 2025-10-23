@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED: Show trending/gainers even without wallet
+// src/app/dashboard/page.tsx - FIXED: Content doesn't go under bottom sidebar
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -111,7 +111,7 @@ function DashboardContent() {
         </button>
       </div>
 
-      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 sm:p-5 lg:p-1 pb-10 lg:pb-1 flex flex-col overflow-hidden">
+      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 sm:p-5 lg:p-1 flex flex-col overflow-hidden">
         {/* Error Display */}
         {dashboardState.error && (
           <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-2">

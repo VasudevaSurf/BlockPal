@@ -20,6 +20,12 @@ import {
 import { RootState } from "@/store";
 import { useToast } from "@/contexts/ToastContext";
 
+interface SuggestionChip {
+  display: string;
+  query: string;
+  desktopOnly?: boolean;
+}
+
 interface Message {
   id: string;
   type: "user" | "assistant";
@@ -81,11 +87,16 @@ export default function AIChatPage() {
 
   // Suggestion chips data with display text and actual query
   const suggestionChips = [
-    { display: "Tell me about UNI", query: "Tell me about UNI" },
-    { display: "Is BONK safe to invert", query: "Is BONK safe to invert" },
     {
-      display: "Do Reploy as honey pot alert",
-      query: "Do Reploy as honey pot alert",
+      display: "Tell me about UNI",
+      query: "Tell me about UNI",
+      desktopOnly: true,
+    },
+    { display: "Is BONK safe to invest", query: "Is BONK safe to invest" },
+    {
+      display: "Is Reploy as honey pot alert",
+      query: "Is Reploy as honey pot alert",
+      desktopOnly: true, // Hide on mobile
     },
     {
       display: "Get market data of 0x51...86CA",
@@ -103,18 +114,31 @@ export default function AIChatPage() {
       display: "Is it right time to buy LINK",
       query: "Is it right time to buy LINK",
     },
-    { display: "Compare PEPE and BONK", query: "Compare PEPE and BONK" },
+    {
+      display: "Compare PEPE and BONK",
+      query: "Compare PEPE and BONK",
+      desktopOnly: true, // Hide on mobile
+    },
     {
       display: "Analyze this wallet 0xEDe....236F",
       query: "Analyze this wallet 0xEDe9937Bc032d0D403d15E844a67fd4F726B236F",
+      desktopOnly: true, // Hide on mobile
     },
     {
       display: "List the top trades on 0xEDe....236F",
       query:
         "List the top trades on 0xEDe9937Bc032d0D403d15E844a67fd4F726B236F",
     },
-    { display: "Tell me about yourself", query: "Tell me about yourself" },
-    { display: "Gas fees prediction", query: "Gas fees prediction" },
+    {
+      display: "Tell me about yourself",
+      query: "Tell me about yourself",
+      desktopOnly: true, // Hide on mobile
+    },
+    {
+      display: "Gas fees prediction",
+      query: "Gas fees prediction",
+      desktopOnly: true,
+    },
   ];
 
   // Get authenticated user from Redux
@@ -908,7 +932,7 @@ export default function AIChatPage() {
       >
         {/* Mobile Header - Only visible on mobile */}
         <div className="lg:hidden flex-shrink-0 bg-[#000000] px-4 py-3">
-          <div className="flex items-center justify-center relative mt-2">
+          <div className="flex items-center justify-center relative mt-4">
             <button
               onClick={() => setMobileHistoryOpen(!mobileHistoryOpen)}
               className="absolute right-0 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
@@ -917,44 +941,24 @@ export default function AIChatPage() {
               <div className="flex flex-col gap-[3px]">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  width="29"
-                  height="4"
-                  viewBox="0 0 29 4"
+                  width="25"
+                  height="25"
+                  viewBox="0 0 35 35"
                   fill="none"
                 >
                   <path
-                    d="M2 2H27.3521"
-                    stroke="white"
-                    strokeWidth="2.11268"
-                    strokeLinecap="round"
+                    d="M22.8506 22.0802L18.3415 19.3893C17.556 18.9238 16.916 17.8038 16.916 16.8875V10.9238"
+                    stroke="#E2AF19"
+                    stroke-width="1.81818"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
                   />
-                </svg>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="21"
-                  height="3"
-                  viewBox="0 0 21 3"
-                  fill="none"
-                >
                   <path
-                    d="M2 1.63379H19"
-                    stroke="white"
-                    strokeWidth="2.11268"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="15"
-                  height="3"
-                  viewBox="0 0 15 3"
-                  fill="none"
-                >
-                  <path
-                    d="M2 1.26758H13"
-                    stroke="white"
-                    strokeWidth="2.11268"
-                    strokeLinecap="round"
+                    d="M5.81729 8.72834C3.99911 11.1574 2.9082 14.1829 2.9082 17.4556C2.9082 25.4847 9.42457 32.0011 17.4537 32.0011C25.4827 32.0011 31.9991 25.4847 31.9991 17.4556C31.9991 9.42652 25.4827 2.91016 17.4537 2.91016C15.3737 2.91016 13.3809 3.34652 11.5918 4.14652"
+                    stroke="#E2AF19"
+                    stroke-width="1.81818"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
                   />
                 </svg>
               </div>
@@ -1022,16 +1026,18 @@ export default function AIChatPage() {
               {/* Mobile suggestion chips - right below title */}
               <div className="lg:hidden w-full px-3 mt-8">
                 <div className="flex flex-wrap justify-center gap-1.5">
-                  {suggestionChips.map((chip, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleChipClick(chip)}
-                      className="px-2 py-1 text-white text-[10px] font-satoshi rounded-[10px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
-                      disabled={isTyping || !isInitialized}
-                    >
-                      {chip.display}
-                    </button>
-                  ))}
+                  {suggestionChips
+                    .filter((chip) => !chip.desktopOnly) // Filter out desktop-only chips
+                    .map((chip, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleChipClick(chip)}
+                        className="px-2 py-1 text-white text-[10px] font-satoshi rounded-[10px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
+                        disabled={isTyping || !isInitialized}
+                      >
+                        {chip.display}
+                      </button>
+                    ))}
                 </div>
               </div>
 
@@ -1112,7 +1118,7 @@ export default function AIChatPage() {
         </div>
 
         {/* Input - FIXED ABOVE MOBILE NAV */}
-        <div className="flex-shrink-0 p-3 lg:p-4 fixed lg:relative bottom-[80px] lg:bottom-0 left-0 right-0 bg-[#000000] lg:bg-transparent z-10">
+        <div className="flex-shrink-0 p-3 lg:p-4 fixed lg:relative bottom-[80px] lg:bottom-0 left-0 right-0 bg-transparent lg:bg-transparent z-10">
           <div className="relative max-w-4xl mx-auto">
             <textarea
               ref={inputRef}
@@ -1122,15 +1128,16 @@ export default function AIChatPage() {
               placeholder={
                 isInitialized ? "Type your message" : "Initializing AI..."
               }
-              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-24 lg:pr-36 pl-3 lg:pl-4 py-2.5 lg:py-3 min-h-[44px] lg:min-h-[48px] max-h-32 text-xs lg:text-sm border border-[#71570C] focus:border-[#E2AF19] transition-colors rounded-[100px] disabled:opacity-50"
+              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-24 lg:pr-36 pl-3 lg:pl-4 py-3 lg:py-3.5 min-h-[44px] lg:min-h-[48px] max-h-32 text-xs lg:text-sm border border-[#71570C] focus:border-[#E2AF19] transition-colors rounded-[100px] disabled:opacity-50 flex items-center leading-[18px] lg:leading-[20px]"
               rows={1}
               disabled={isTyping || !isInitialized}
+              style={{ lineHeight: "1.5" }}
             />
             <div className="absolute right-2 lg:right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1 lg:gap-2">
               {/* Microphone Icon */}
               <button
                 onClick={toggleMicrophone}
-                className={`p-1 lg:p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 ${
+                className={`p-1.5 lg:p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center ${
                   isListening ? "bg-red-500/20" : ""
                 }`}
                 disabled={isTyping || !isInitialized}
@@ -1210,7 +1217,7 @@ export default function AIChatPage() {
               <button
                 onClick={() => handleSendMessage()}
                 disabled={!inputMessage.trim() || isTyping || !isInitialized}
-                className="bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 text-black rounded-full w-7 h-7 lg:w-8 lg:h-8 flex items-center justify-center transition-colors"
+                className="bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 text-black rounded-full w-8 h-8 lg:w-9 lg:h-9 flex items-center justify-center transition-colors flex-shrink-0"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
