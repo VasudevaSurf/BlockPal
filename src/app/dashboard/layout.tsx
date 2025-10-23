@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - FIXED: Content stops above bottom sidebar on mobile
+// src/app/dashboard/layout.tsx - FIXED: Content properly positioned above bottom nav
 "use client";
 
 import { useSelector } from "react-redux";
@@ -156,15 +156,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
           <Sidebar />
 
+          {/* ✅ FIXED: Main content area with proper mobile bottom spacing */}
           <main
             className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col relative ${
               isSwapPage || isNewsChatActive
-                ? "p-0 pb-20 lg:pb-0"
+                ? "p-0 pb-[88px] lg:pb-0"
                 : isAIChatPage
-                ? "p-0 lg:p-2 lg:px-4 pb-20 lg:pb-2"
+                ? "p-0 lg:p-2 lg:px-4 pb-[88px] lg:pb-2"
                 : isDashboardPage
-                ? "p-0 lg:p-2 lg:px-4 pb-20 lg:pb-2"
-                : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4 pb-20 lg:pb-2"
+                ? "p-0 lg:p-2 lg:px-4 pb-[88px] lg:pb-2"
+                : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4 pb-[88px] lg:pb-2"
             }`}
           >
             {/* Show loader only over main content area when loading */}
@@ -243,10 +244,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               display: none;
             }
 
+            /* ✅ FIXED: Prevent unwanted scrolling on mobile */
             @media (max-width: 1024px) {
               html,
               body {
-                overflow-x: hidden;
+                overflow: hidden;
+                position: fixed;
+                width: 100%;
+                height: 100%;
               }
             }
 
