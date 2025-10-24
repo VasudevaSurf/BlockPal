@@ -159,9 +159,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <main
             className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col relative ${
               isSwapPage || isNewsChatActive
-                ? "p-0 pb-20 lg:pb-0"
+                ? "p-0 pb-0 lg:pb-0"
                 : isAIChatPage
-                ? "p-0 lg:p-2 lg:px-4 pb-20 lg:pb-2"
+                ? "p-0 lg:p-2 lg:px-4 pb-0 lg:pb-2"
                 : isDashboardPage
                 ? "p-0 lg:p-2 lg:px-4 pb-0 lg:pb-2"
                 : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4 pb-0 lg:pb-2"
