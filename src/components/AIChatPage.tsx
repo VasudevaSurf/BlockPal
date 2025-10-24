@@ -1015,7 +1015,7 @@ export default function AIChatPage() {
         </div>
 
         {/* Messages or Welcome Screen - FIXED FOR MOBILE */}
-        <div className="flex-1 min-h-0 px-4 pb-4 lg:pb-4 mb-[140px] lg:mb-0 overflow-hidden">
+        <div className="flex-1 min-h-0 px-4 pb-1 lg:pb-4 mb-[75px] lg:mb-0 overflow-hidden">
           {showWelcomeScreen ? (
             /* Welcome Screen */
             <div className="h-full flex flex-col items-center justify-center overflow-y-auto scrollbar-hide">
@@ -1118,17 +1118,22 @@ export default function AIChatPage() {
         </div>
 
         {/* Input - FIXED ABOVE MOBILE NAV */}
-        <div className="flex-shrink-0 p-3 lg:p-4 fixed lg:relative bottom-[80px] lg:bottom-0 left-0 right-0 bg-transparent lg:bg-transparent z-10">
+        <div className="flex-shrink-0 p-3 lg:p-4 fixed lg:relative bottom-[82px] lg:bottom-0 left-0 right-0 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none z-10">
           <div className="relative max-w-4xl mx-auto">
             <textarea
               ref={inputRef}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = "44px"; // Reset to min-height
+                target.style.height = `${target.scrollHeight}px`; // Set to scroll height
+              }}
               onKeyPress={handleKeyPress}
               placeholder={
                 isInitialized ? "Type your message" : "Initializing AI..."
               }
-              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-24 lg:pr-36 pl-3 lg:pl-4 py-3 lg:py-3.5 min-h-[44px] lg:min-h-[48px] max-h-32 text-xs lg:text-sm border border-[#71570C] focus:border-[#E2AF19] transition-colors rounded-[100px] disabled:opacity-50 flex items-center leading-[18px] lg:leading-[20px]"
+              className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-24 lg:pr-36 pl-3 lg:pl-4 py-3 lg:py-3.5 min-h-[44px] lg:min-h-[48px] max-h-32 text-base lg:text-sm border border-[#71570C] focus:border-[#E2AF19] transition-colors rounded-[20px] disabled:opacity-50 flex items-center leading-[18px] lg:leading-[20px] font-satoshi placeholder:font-satoshi"
               rows={1}
               disabled={isTyping || !isInitialized}
               style={{ lineHeight: "1.5" }}

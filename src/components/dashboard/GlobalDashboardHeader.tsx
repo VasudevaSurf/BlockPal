@@ -19,6 +19,8 @@ import { checkAuthStatus, logoutUser } from "@/store/slices/authSlice";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { chains } from "@/components/wallet/WalletProvider";
 import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
+import { clearWalletConnection } from "@/utils/walletCleanup";
+import { useDisconnect } from "wagmi";
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -307,6 +309,7 @@ export default function GlobalDashboardHeader({
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
+  const { disconnect } = useDisconnect();
 
   const {
     switchChain,
@@ -463,6 +466,18 @@ export default function GlobalDashboardHeader({
 
   const handleLogout = async () => {
     try {
+      // Silently disconnect wallet first
+      if (isConnected && address) {
+        console.log("🔌 Silently disconnecting wallet before logout...");
+        // Import disconnect from wagmi at the top of the file
+        // Add: import { useDisconnect } from "wagmi";
+        // And add this line after other wagmi hooks:
+        // const { disconnect } = useDisconnect();
+
+        disconnect();
+        clearWalletConnection(); // Clear Wagmi localStorage
+      }
+
       if (typeof window !== "undefined") {
         localStorage.clear();
       }

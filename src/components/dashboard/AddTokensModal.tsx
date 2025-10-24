@@ -1,4 +1,4 @@
-// src/components/dashboard/AddTokensModal.tsx - FIXED: Chain icons with proper preloading
+// src/components/dashboard/AddTokensModal.tsx - OPTIMIZED MOBILE VERSION
 import { useState, useEffect, useRef } from "react";
 import {
   X,
@@ -595,15 +595,21 @@ export default function AddTokensModal({
   return (
     <>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-white/10 z-40" onClick={onClose} />
+      <div
+        className="fixed lg:absolute inset-0 bg-white/10 z-40"
+        onClick={onClose}
+      />
 
       {/* Modal Container */}
       <div
-        className="absolute inset-0 z-50 flex items-center justify-center p-2 lg:p-4"
+        className="fixed lg:absolute inset-0 z-50 flex items-center justify-center p-2 lg:p-4"
         onClick={onClose}
+        style={{
+          paddingBottom: "calc(80px + 0.5rem)", // Account for bottom nav + padding on mobile
+        }}
       >
         <div
-          className="h-[70vh] lg:h-[550px] w-full max-w-[95vw] lg:max-w-4xl"
+          className="h-[65vh] lg:h-[550px] w-full max-w-[95vw] lg:max-w-4xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Main container */}
@@ -723,13 +729,13 @@ export default function AddTokensModal({
                           #E2AF19 100%)`,
                       }}
                     />
-                    <div className="relative bg-[#000] rounded-[10px] p-3">
-                      <div className="mb-3">
-                        <h3 className="text-white font-mayeka text-sm">
+                    <div className="relative bg-[#000] rounded-[10px] p-2.5">
+                      <div className="mb-2">
+                        <h3 className="text-white font-mayeka text-xs">
                           Select Chain
                         </h3>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5 justify-between">
                         {CHAINS.map((chain) => {
                           const chainDisplay = chainDisplayData[chain.id];
                           const isSelected = selectedChain === chain.id;
@@ -739,7 +745,7 @@ export default function AddTokensModal({
                               key={chain.id}
                               onClick={() => setSelectedChain(chain.id)}
                               disabled={addingTokens}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-[10px] transition-all ${
+                              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] transition-all ${
                                 isSelected
                                   ? "bg-[#71570C]"
                                   : "bg-[#0F0F0F] hover:bg-[#1A1A1A]"
@@ -749,8 +755,8 @@ export default function AddTokensModal({
                                   : ""
                               }`}
                             >
-                              <ChainIcon chainData={chainDisplay} size="sm" />
-                              <span className="text-xs font-satoshi font-medium text-white">
+                              <ChainIcon chainData={chainDisplay} size="md" />
+                              <span className="text-[11px] font-satoshi font-medium text-white">
                                 {chainDisplay.name}
                               </span>
                             </button>
@@ -762,7 +768,7 @@ export default function AddTokensModal({
                 </div>
 
                 {/* Search Bar */}
-                <div className="relative mb-3 lg:mb-5 flex-shrink-0">
+                <div className="relative mb-2.5 lg:mb-5 flex-shrink-0">
                   <div className="absolute left-2.5 lg:left-3 top-1/2 transform -translate-y-1/2">
                     {searchLoading ? (
                       <Loader2
@@ -790,7 +796,7 @@ export default function AddTokensModal({
                 </div>
 
                 {/* Dynamic Heading */}
-                <div className="mb-3 lg:mb-4 flex-shrink-0">
+                <div className="mb-2.5 lg:mb-4 flex-shrink-0">
                   <h4 className="text-[#939393] font-satoshi font-medium text-sm lg:text-base">
                     {searchQuery
                       ? "Search Results"

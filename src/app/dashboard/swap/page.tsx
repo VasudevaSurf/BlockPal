@@ -533,8 +533,7 @@ export default function SwapPage() {
   };
 
   return (
-    <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] flex flex-col overflow-hidden relative">
-      {/* Swap Effect Image - Top Right Corner */}
+    <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] flex flex-col overflow-hidden relative isolate">
       <div className="absolute -top-0 -right-0 z-[5] pointer-events-none">
         <img
           src="/swapEffect.png"
@@ -547,7 +546,6 @@ export default function SwapPage() {
           }}
         />
       </div>
-
       {/* Centered Content Container */}
       <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 relative z-[5]">
         {/* Title */}
@@ -1535,7 +1533,6 @@ export default function SwapPage() {
           </motion.div>
         )}
       </div>
-
       {/* Desktop History Overlay - Only shown on large screens */}
       <AnimatePresence>
         {activeTab === "history" && (
@@ -1724,7 +1721,6 @@ export default function SwapPage() {
           </>
         )}
       </AnimatePresence>
-
       {/* Token Selectors */}
       <TokenSelector
         isOpen={showFromTokenSelector}
@@ -1733,7 +1729,6 @@ export default function SwapPage() {
         selectedToken={fromToken}
         showChainSelector={true}
       />
-
       <TokenSelector
         isOpen={showToTokenSelector}
         onClose={() => setShowToTokenSelector(false)}
@@ -1741,7 +1736,6 @@ export default function SwapPage() {
         selectedToken={toToken}
         showChainSelector={false}
       />
-
       {/* Chain Selector Modal */}
       <SwapChainSelector
         isOpen={showChainSelector}
@@ -1752,7 +1746,6 @@ export default function SwapPage() {
         }}
         triggerRef={chainButtonRef}
       />
-
       {/* Custom Styles */}
       <style jsx>{`
         @keyframes shimmer {

@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED: Content doesn't go under bottom sidebar
+// src/app/dashboard/page.tsx - FIXED: Bottom content visible above mobile nav
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -34,9 +34,6 @@ function DashboardContent() {
   const { address, isConnected } = useAccount();
   const { walletData } = useWalletData();
 
-  // ✅ Determine if we should show wallet content based on:
-  // 1. Wallet is connected OR
-  // 2. We have cached wallet data (prevents flash on tab switch)
   const hasWallets = useMemo(() => {
     return isConnected || walletData.cacheValid || walletData.tokens.length > 0;
   }, [isConnected, walletData.cacheValid, walletData.tokens.length]);
@@ -111,7 +108,8 @@ function DashboardContent() {
         </button>
       </div>
 
-      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 sm:p-5 lg:p-1 flex flex-col overflow-hidden">
+      {/* ✅ FIXED: Container height accounts for bottom nav - NO PAGE SCROLL */}
+      <div className="h-[calc(100%-5rem)] lg:h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 sm:p-5 lg:p-1 flex flex-col overflow-hidden">
         {/* Error Display */}
         {dashboardState.error && (
           <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-2">
@@ -122,14 +120,15 @@ function DashboardContent() {
         )}
 
         {/* Main Dashboard Content */}
-        <div className="flex flex-col xl:flex-row gap-4 lg:gap-4 flex-1 min-h-0">
+        <div className="flex flex-col xl:flex-row gap-4 lg:gap-4 flex-1 min-h-0 overflow-hidden">
           {/* LEFT COLUMN - ALWAYS SHOW BOXES (wallet dependent content inside) */}
-          {/* Mobile Layout */}
-          <div className="flex xl:hidden flex-col gap-4 lg:gap-4 flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+          {/* Mobile Layout - Everything fits above bottom nav, NO outer scroll */}
+          <div className="flex xl:hidden flex-col gap-4 lg:gap-4 flex-1 min-h-0 overflow-hidden">
             <div className="flex-shrink-0">
               <WalletBalance />
             </div>
-            <div className="flex-1 min-h-0 mb-4">
+            {/* ✅ FIXED: TokenList handles its own scroll, takes remaining space */}
+            <div className="flex-1 min-h-0 overflow-hidden">
               <TokenList />
             </div>
             {dashboardState.showStats && hasWallets && (
