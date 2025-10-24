@@ -1,14 +1,15 @@
-// src/components/dashboard/WalletBalance.tsx - UPDATED WITH CACHE SUPPORT
+// src/components/dashboard/WalletBalance.tsx - FIXED: Show only main list value
 "use client";
 
 import { useSelector } from "react-redux";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Copy,
   RefreshCw,
   AlertCircle,
   TrendingUp,
   TrendingDown,
+  Info,
 } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
 import { RootState } from "@/store";
@@ -66,6 +67,7 @@ export default function WalletBalance() {
     (state: RootState) => state.auth
   );
 
+  // ✅ FIXED: Use mainListValue instead of totalValue
   const { walletData, refresh, isRefreshing } = useWalletData();
   const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
 
@@ -82,6 +84,35 @@ export default function WalletBalance() {
     isCopied: false,
     isAnimating: false,
   });
+
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+
+  // ✅ CRITICAL: Use mainListValue for display
+  const displayValue = walletData.mainListValue || 0;
+  const displayChange = walletData.total24hrChange || 0;
+
+  // ✅ DEBUG: Log values on every render
+  useEffect(() => {
+    if (isConnected && address) {
+      console.log("💰 WalletBalance Debug Info:", {
+        mainListValue: walletData.mainListValue,
+        totalValue: walletData.totalValue,
+        total24hrChange: walletData.total24hrChange,
+        displayValue,
+        displayChange,
+        tokenCount: walletData.tokens.length,
+        presetCount: walletData.tokens.filter((t) => t.isPreset).length,
+        userAddedCount: walletData.tokens.filter((t) => t.isUserAdded).length,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [
+    walletData.mainListValue,
+    walletData.totalValue,
+    walletData.total24hrChange,
+    isConnected,
+    address,
+  ]);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -116,10 +147,18 @@ export default function WalletBalance() {
   useEffect(() => {
     if (!hasReportedDataRef.current && walletData.cacheValid) {
       console.log("✅ WalletBalance: Data ready (from cache)");
+      console.log("   ├─ Main List Value:", displayValue);
+      console.log("   ├─ Total Value (all tokens):", walletData.totalValue);
+      console.log("   └─ 24hr Change:", displayChange);
       setComponentDataReady("walletBalance");
       hasReportedDataRef.current = true;
     }
-  }, [walletData.cacheValid, setComponentDataReady]);
+  }, [
+    walletData.cacheValid,
+    displayValue,
+    displayChange,
+    setComponentDataReady,
+  ]);
 
   // Reset data reported flag when wallet/chain changes
   useEffect(() => {
@@ -164,12 +203,21 @@ export default function WalletBalance() {
             Balances
           </h2>
 
+          {/* Debug Info Button */}
+          <button
+            onClick={() => setShowDebugInfo(!showDebugInfo)}
+            className="p-1 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+            title="Toggle Debug Info"
+          >
+            <Info size={14} className="text-gray-400" />
+          </button>
+
           {isRefreshing && (
             <div className="flex items-center gap-1">
-              {/* <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
+              <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
               <span className="text-xs text-[#E2AF19] font-satoshi">
                 Updating...
-              </span> */}
+              </span>
             </div>
           )}
         </div>
@@ -197,10 +245,19 @@ export default function WalletBalance() {
 
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
-          {walletData.chainName || currentChain?.name || "Ethereum"} Token
-          Balances
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
+            {walletData.chainName || currentChain?.name || "Ethereum"} Token
+            Balances
+          </h2>
+          <button
+            onClick={() => setShowDebugInfo(!showDebugInfo)}
+            className="p-1 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+            title="Toggle Debug Info"
+          >
+            <Info size={12} className="text-gray-400" />
+          </button>
+        </div>
         {isRefreshing && (
           <div className="flex items-center gap-1">
             <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
@@ -210,6 +267,67 @@ export default function WalletBalance() {
           </div>
         )}
       </div>
+
+      {/* Debug Info Panel */}
+      {showDebugInfo && (
+        <div className="mb-3 p-3 bg-[#1A1A1A] border border-[#2C2C2C] rounded-lg">
+          <div className="text-xs font-mono text-gray-400 space-y-1">
+            <div className="flex justify-between">
+              <span>Main List Value:</span>
+              <span className="text-green-400 font-bold">
+                ${walletData.mainListValue?.toFixed(3) || "0.000"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total Value (All):</span>
+              <span className="text-yellow-400">
+                ${walletData.totalValue?.toFixed(3) || "0.000"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>24hr Change:</span>
+              <span
+                className={
+                  displayChange >= 0 ? "text-green-400" : "text-red-400"
+                }
+              >
+                {displayChange >= 0 ? "+" : ""}$
+                {Math.abs(displayChange).toFixed(3)}
+              </span>
+            </div>
+            <div className="h-px bg-[#2C2C2C] my-2"></div>
+            <div className="flex justify-between">
+              <span>Total Tokens:</span>
+              <span>{walletData.tokens.length}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Preset Tokens:</span>
+              <span className="text-blue-400">
+                {walletData.tokens.filter((t) => t.isPreset).length}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>User Added:</span>
+              <span className="text-purple-400">
+                {walletData.tokens.filter((t) => t.isUserAdded).length}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Other Tokens:</span>
+              <span className="text-gray-500">
+                {
+                  walletData.tokens.filter((t) => !t.isPreset && !t.isUserAdded)
+                    .length
+                }
+              </span>
+            </div>
+            <div className="h-px bg-[#2C2C2C] my-2"></div>
+            <div className="text-[10px] text-gray-500 italic">
+              Showing: Main List (Preset + User Added)
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Display */}
       {walletData.error && (
@@ -231,16 +349,21 @@ export default function WalletBalance() {
         </div>
       )}
 
-      {/* Balance Display */}
+      {/* Balance Display - FIXED: Using displayValue (mainListValue) */}
       <div className="space-y-2">
         <div className="flex items-end justify-between">
           <div className="w-full">
             <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 font-satoshi">
-              {tokenService.formatCurrency(walletData.mainListValue)}
+              {tokenService.formatCurrency(displayValue)}
             </div>
             <div className="flex items-center gap-2 flex-wrap mb-3 lg:mb-0">
-              {walletData.total24hrChange !== 0 && (
-                <PortfolioChange totalChange24h={walletData.total24hrChange} />
+              {displayChange !== 0 && (
+                <PortfolioChange totalChange24h={displayChange} />
+              )}
+              {showDebugInfo && (
+                <div className="text-[10px] text-gray-500 font-mono">
+                  (Main List Only)
+                </div>
               )}
             </div>
 

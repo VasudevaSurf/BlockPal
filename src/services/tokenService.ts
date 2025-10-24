@@ -51,25 +51,42 @@ class TokenService {
 
   constructor() {
     this.baseURL =
-      process.env.NEXT_PUBLIC_API_URL || "https://amusing-freedom-production-92a5.up.railway.app/api/tokens";
+      process.env.NEXT_PUBLIC_API_URL ||
+      "https://amusing-freedom-production-92a5.up.railway.app/api/tokens";
     this.debugMode = process.env.NODE_ENV === "development";
     console.log("🔗 TokenService initialized with base URL:", this.baseURL);
   }
 
   /**
-   * Enhanced token fetching with separate main list balance calculation
+   * Enhanced token fetching with email for user preferences
    */
   async getWalletTokens(
     walletAddress: string,
     chainId: number,
-    showHidden: boolean = false
+    showHidden: boolean = false,
+    userEmail?: string // ✅ ADDED: Optional user email
   ): Promise<WalletTokensResponse> {
     try {
       console.log(
-        `🪙 Fetching tokens for wallet: ${walletAddress} on chain: ${chainId}, showHidden: ${showHidden}`
+        `🪙 Fetching tokens for wallet: ${walletAddress} on chain: ${chainId}, showHidden: ${showHidden}, email: ${
+          userEmail || "not provided"
+        }`
       );
 
-      const url = `${this.baseURL}/wallet/${walletAddress}?chain=${chainId}&showHidden=${showHidden}`;
+      // ✅ CRITICAL: Include email in query parameters
+      let url = `${this.baseURL}/wallet/${walletAddress}?chain=${chainId}&showHidden=${showHidden}`;
+
+      if (userEmail) {
+        url += `&email=${encodeURIComponent(userEmail)}`;
+        console.log(
+          "📧 Including user email in request for user-added token support"
+        );
+      } else {
+        console.log(
+          "⚠️ No user email provided - user-added tokens won't be included in main list"
+        );
+      }
+
       console.log("📡 Making request to:", url);
 
       const response = await fetch(url, {

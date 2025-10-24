@@ -1,4 +1,4 @@
-// src/contexts/WalletDataContext.tsx - ENHANCED WITH CACHING
+// src/contexts/WalletDataContext.tsx - FIXED: Use correct mainListValue
 "use client";
 
 import React, {
@@ -36,6 +36,7 @@ interface TokenBalance {
 
 interface WalletData {
   mainListValue: number;
+  totalValue: number; // ✅ ADDED: For reference
   total24hrChange: number;
   chainName: string;
   tokens: TokenBalance[];
@@ -64,8 +65,8 @@ export const useWalletData = () => {
   return context;
 };
 
-const CACHE_DURATION = 5 * 60 * 1000; // ✅ UNCHANGED: 5 minutes
-const BACKGROUND_REFRESH_INTERVAL = 5 * 60 * 1000; // ✅ CHANGED: 30s → 5 minutes
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const BACKGROUND_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -76,6 +77,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const [walletData, setWalletData] = useState<WalletData>({
     mainListValue: 0,
+    totalValue: 0, // ✅ ADDED
     total24hrChange: 0,
     chainName: "",
     tokens: [],
@@ -105,6 +107,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       isBackgroundRefresh: boolean = false
     ) => {
       if (!address || !chainId || fetchInProgressRef.current) {
+        console.log("⏭️ Skipping fetch - already in progress or missing data");
         return;
       }
 
@@ -115,26 +118,116 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
           setWalletData((prev) => ({ ...prev, loading: true, error: null }));
         }
 
+        console.log("\n🔄 ═══════════════════════════════════════");
         console.log(
           `🔄 ${
             isBackgroundRefresh ? "Background" : "Active"
           } fetching wallet data...`
         );
+        console.log(`   ├─ Wallet: ${address.slice(0, 10)}...`);
+        console.log(`   ├─ Chain: ${chainId}`);
+        console.log(`   └─ Show Loading: ${showLoading}`);
 
-        // Fetch tokens
+        // ✅ TODO: Get user email from Redux/Auth
+        // For now, we'll fetch without email - you need to add this
+        // const userEmail = getUserEmail();
+
+        // Fetch tokens (TODO: Add email parameter)
         const response = await tokenService.getWalletTokens(
           address,
           chainId,
           true
+          // userEmail // ✅ Add this when available
         );
+
+        console.log("\n📦 ═══ API RESPONSE RECEIVED ═══");
+        console.log("   ├─ Total tokens in response:", response.tokens.length);
+        console.log("   ├─ Preset token count:", response.presetTokenCount);
+        console.log("   ├─ Hidden token count:", response.hiddenTokenCount);
+        console.log("   ├─ mainListValue:", response.mainListValue);
+        console.log("   ├─ totalValue:", response.totalValue);
+        console.log("   └─ total24hrChange:", response.total24hrChange);
+
+        console.log("\n📋 ═══ RAW TOKEN DATA FROM API ═══");
+        response.tokens.forEach((token, index) => {
+          console.log(`   ${index + 1}. ${token.symbol}:`);
+          console.log(`      ├─ contractAddress: ${token.contractAddress}`);
+          console.log(`      ├─ value: ${token.value.toFixed(3)}`);
+          console.log(`      ├─ isPreset (from API): ${token.isPreset}`);
+          console.log(`      ├─ isUserAdded (from API): ${token.isUserAdded}`);
+          console.log(
+            `      └─ Will be in main list: ${
+              index < response.presetTokenCount ? "YES" : "NO"
+            }`
+          );
+        });
 
         const tokensWithFlags = response.tokens.map((token, index) => ({
           ...token,
           isPreset: index < response.presetTokenCount,
         }));
 
+        console.log("\n🏷️ ═══ TOKEN FLAGS ASSIGNMENT ═══");
+        console.log(`   Processing ${tokensWithFlags.length} tokens:`);
+        tokensWithFlags.forEach((token, index) => {
+          console.log(
+            `   ${index + 1}. ${token.symbol} (${token.contractAddress.slice(
+              0,
+              10
+            )}...)`
+          );
+          console.log(`      ├─ isPreset: ${token.isPreset}`);
+          console.log(`      ├─ isUserAdded: ${token.isUserAdded || false}`);
+          console.log(`      ├─ Value: ${token.value.toFixed(3)}`);
+          console.log(
+            `      └─ Position: ${
+              index < response.presetTokenCount ? "MAIN LIST" : "HIDDEN"
+            }`
+          );
+        });
+
+        // Calculate verification values
+        const mainListTokens = tokensWithFlags.slice(
+          0,
+          response.presetTokenCount
+        );
+        const verificationMainListValue = mainListTokens.reduce(
+          (sum, t) => sum + t.value,
+          0
+        );
+
+        console.log("\n🔍 ═══ VERIFICATION BEFORE STATE UPDATE ═══");
+        console.log(
+          "   Main List Tokens (first",
+          response.presetTokenCount,
+          "):"
+        );
+        mainListTokens.forEach((token, index) => {
+          console.log(
+            `      ${index + 1}. ${token.symbol}: ${token.value.toFixed(3)}`
+          );
+        });
+        console.log("   ├─ API mainListValue:", response.mainListValue);
+        console.log(
+          "   ├─ Calculated from tokens:",
+          verificationMainListValue.toFixed(3)
+        );
+        console.log(
+          "   └─ Match:",
+          Math.abs(response.mainListValue - verificationMainListValue) < 0.01
+            ? "✅ YES"
+            : "❌ NO"
+        );
+
+        // ✅ CRITICAL FIX: Use mainListValue from response, not totalValue
+        console.log("\n💾 ═══ SETTING STATE ═══");
+        console.log("   Setting mainListValue to:", response.mainListValue);
+        console.log("   Setting totalValue to:", response.totalValue);
+        console.log("   Setting total24hrChange to:", response.total24hrChange);
+
         setWalletData({
-          mainListValue: response.totalValue,
+          mainListValue: response.mainListValue, // ✅ FIXED: Was response.totalValue
+          totalValue: response.totalValue, // ✅ ADDED: Keep for reference
           total24hrChange: response.total24hrChange,
           chainName: response.chainName,
           tokens: tokensWithFlags,
@@ -144,13 +237,31 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
           cacheValid: true,
         });
 
+        console.log("\n✅ ═══ STATE UPDATE COMPLETE ═══");
         console.log(
           `✅ Wallet data ${
             isBackgroundRefresh ? "background" : ""
           } fetched successfully`
         );
+        console.log(
+          `   ├─ Main List Value set to: ${response.mainListValue.toFixed(3)}`
+        );
+        console.log(
+          `   ├─ Total Value (all tokens): ${response.totalValue.toFixed(3)}`
+        );
+        console.log(
+          `   ├─ Difference (hidden): ${(
+            response.totalValue - response.mainListValue
+          ).toFixed(3)}`
+        );
+        console.log(`   └─ Tokens with flags: ${tokensWithFlags.length}`);
+        console.log("═══════════════════════════════════════\n");
       } catch (error: any) {
-        console.error("❌ Error fetching wallet data:", error);
+        console.error("\n❌ ═══ ERROR FETCHING WALLET DATA ═══");
+        console.error("   Error:", error.message);
+        console.error("   Stack:", error.stack);
+        console.error("═══════════════════════════════════════\n");
+
         setWalletData((prev) => ({
           ...prev,
           loading: false,
@@ -185,6 +296,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     console.log("🗑️ Clearing wallet data cache");
     setWalletData({
       mainListValue: 0,
+      totalValue: 0,
       total24hrChange: 0,
       chainName: "",
       tokens: [],
@@ -223,7 +335,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     walletData.cacheValid,
   ]);
 
-  // Background refresh - silently update data every 30 seconds
+  // Background refresh - silently update data every 5 minutes
   useEffect(() => {
     if (isConnected && address && walletData.cacheValid) {
       console.log("🔄 Starting background refresh: Every 5 minutes");
@@ -231,7 +343,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       backgroundRefreshRef.current = setInterval(() => {
         console.log("🔄 Background refresh triggered (5 min interval)");
         fetchWalletData(false, true);
-      }, BACKGROUND_REFRESH_INTERVAL); // ✅ 5 minutes
+      }, BACKGROUND_REFRESH_INTERVAL);
     }
 
     return () => {

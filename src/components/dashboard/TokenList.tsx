@@ -600,24 +600,43 @@ export default function TokenList() {
     }
   }, [allTokens, walletData.mainListValue, walletData.total24hrChange]);
 
+  useEffect(() => {
+    console.log("🔍 TokenList - Wallet Data Changed:");
+    console.log("   ├─ mainListValue:", walletData.mainListValue);
+    console.log("   ├─ totalValue:", walletData.totalValue);
+    console.log("   ├─ tokens.length:", walletData.tokens.length);
+    console.log(
+      "   ├─ preset tokens:",
+      walletData.tokens.filter((t) => t.isPreset).length
+    );
+    console.log(
+      "   ├─ user-added tokens:",
+      walletData.tokens.filter((t) => t.isUserAdded).length
+    );
+    console.log("   ├─ isRefreshing:", isRefreshing);
+    console.log("   └─ cacheValid:", walletData.cacheValid);
+  }, [walletData, isRefreshing]);
+
   // ✅ FIXED: Add token with proper user email checking
   const handleAddToMainList = async (tokenAddress: string) => {
-    console.log("🔍 DEBUG handleAddToMainList called");
-    console.log("   - address:", address);
-    console.log("   - chainId:", chainId);
-    console.log("   - userEmail:", userEmail);
-    console.log("   - addingToken:", addingToken);
+    console.log("\n🔵 ═══════════════════════════════════════");
+    console.log("🔵 ADD TOKEN TO MAIN LIST STARTED");
+    console.log("═══════════════════════════════════════");
+
+    console.log("📋 Initial State:");
+    console.log("   ├─ address:", address);
+    console.log("   ├─ chainId:", chainId);
+    console.log("   ├─ userEmail:", userEmail);
+    console.log("   ├─ addingToken:", addingToken);
+    console.log("   ├─ tokenAddress:", tokenAddress);
 
     if (!address || !chainId || !userEmail || addingToken) {
-      console.log(
-        "⚠️ Cannot add token: missing address, chainId, user email, or already adding"
-      );
-      console.log("   - Missing address?", !address);
-      console.log("   - Missing chainId?", !chainId);
-      console.log("   - Missing userEmail?", !userEmail);
-      console.log("   - Already adding?", !!addingToken);
+      console.log("⚠️ Cannot add token - validation failed:");
+      console.log("   ├─ Missing address?", !address);
+      console.log("   ├─ Missing chainId?", !chainId);
+      console.log("   ├─ Missing userEmail?", !userEmail);
+      console.log("   └─ Already adding?", !!addingToken);
 
-      // Show user-friendly error
       if (!userEmail) {
         showToast("error", "Please sign in to add tokens to your list", 4000);
       }
@@ -627,9 +646,7 @@ export default function TokenList() {
     setAddingToken(tokenAddress);
 
     try {
-      console.log(
-        `➕ Adding token ${tokenAddress} for user ${userEmail} on wallet ${address}`
-      );
+      console.log("\n📝 Preparing Preferences Update:");
 
       const currentPrefs = preferences || {
         userEmail: userEmail,
@@ -639,6 +656,16 @@ export default function TokenList() {
         lastUpdated: new Date().toISOString(),
       };
 
+      console.log("   Current Preferences:");
+      console.log("      ├─ userEmail:", currentPrefs.userEmail);
+      console.log("      ├─ walletAddress:", currentPrefs.walletAddress);
+      console.log("      ├─ chainId:", currentPrefs.chainId);
+      console.log(
+        "      ├─ existing userAddedTokens:",
+        currentPrefs.userAddedTokens
+      );
+      console.log("      └─ token to add:", tokenAddress);
+
       const updatedPrefs = {
         ...currentPrefs,
         userEmail: userEmail,
@@ -646,7 +673,14 @@ export default function TokenList() {
         lastUpdated: new Date().toISOString(),
       };
 
-      console.log("📤 Sending preferences:", updatedPrefs);
+      console.log("\n   Updated Preferences:");
+      console.log("      ├─ userAddedTokens:", updatedPrefs.userAddedTokens);
+      console.log(
+        "      └─ Total user-added tokens:",
+        updatedPrefs.userAddedTokens.length
+      );
+
+      console.log("\n📤 Sending API Request to /api/wallet/preferences");
 
       const response = await fetch(`/api/wallet/preferences`, {
         method: "POST",
@@ -654,19 +688,41 @@ export default function TokenList() {
         body: JSON.stringify(updatedPrefs),
       });
 
+      console.log("\n📥 API Response:");
+      console.log("   ├─ Status:", response.status, response.statusText);
+      console.log("   └─ OK:", response.ok);
+
       if (response.ok) {
         const data = await response.json();
-        console.log("✅ Server response:", data);
+        console.log("\n✅ Server Response Success:");
+        console.log("   ├─ success:", data.success);
+        console.log("   ├─ message:", data.message);
+        console.log("   └─ data:", data.data);
 
+        console.log("\n💾 Updating Local State:");
+        console.log("   ├─ Setting preferences to:", updatedPrefs);
         setPreferences(updatedPrefs);
+
+        console.log("\n🔄 Triggering Wallet Data Refresh:");
+        console.log("   └─ Calling refresh(true)...");
         await refresh(true);
-        showToast("success", "Token added to main list successfully!", 3000);
+
+        console.log("\n🎉 Token Added Successfully!");
+        console.log("   ├─ Token:", tokenAddress);
+        console.log("   ├─ User:", userEmail);
         console.log(
-          `✅ Token ${tokenAddress} added to main list for user ${userEmail}`
+          "   └─ New total user-added tokens:",
+          updatedPrefs.userAddedTokens.length
         );
+
+        showToast("success", "Token added to main list successfully!", 3000);
       } else {
         const errorData = await response.json();
-        console.error("❌ Server error:", errorData);
+        console.error("\n❌ Server Error Response:");
+        console.error("   ├─ Status:", response.status);
+        console.error("   ├─ Error:", errorData.error);
+        console.error("   └─ Full response:", errorData);
+
         showToast(
           "error",
           errorData.error || "Failed to add token. Please try again.",
@@ -674,19 +730,41 @@ export default function TokenList() {
         );
       }
     } catch (error: any) {
-      console.error("❌ Error adding token:", error);
+      console.error("\n❌ Exception During Add Token:");
+      console.error("   ├─ Error message:", error.message);
+      console.error("   ├─ Error type:", error.name);
+      console.error("   └─ Stack:", error.stack);
+
       showToast("error", "Failed to add token. Please try again.", 4000);
     } finally {
+      console.log("\n🏁 Add Token Process Complete");
+      console.log("   └─ Clearing addingToken state");
+      console.log("═══════════════════════════════════════\n");
       setAddingToken(null);
     }
   };
 
-  // ✅ FIXED: Remove token with proper user email checking
+  // ✅ ENHANCED handleRemoveFromMainList with debug
   const handleRemoveFromMainList = async (tokenAddress: string) => {
+    console.log("\n🔴 ═══════════════════════════════════════");
+    console.log("🔴 REMOVE TOKEN FROM MAIN LIST STARTED");
+    console.log("═══════════════════════════════════════");
+
+    console.log("📋 Initial State:");
+    console.log("   ├─ address:", address);
+    console.log("   ├─ chainId:", chainId);
+    console.log("   ├─ userEmail:", userEmail);
+    console.log("   ├─ preferences:", preferences);
+    console.log("   ├─ addingToken:", addingToken);
+    console.log("   └─ tokenAddress:", tokenAddress);
+
     if (!address || !chainId || !preferences || !userEmail || addingToken) {
-      console.log(
-        "⚠️ Cannot remove token: missing address, chainId, preferences, user email, or already processing"
-      );
+      console.log("⚠️ Cannot remove token - validation failed:");
+      console.log("   ├─ Missing address?", !address);
+      console.log("   ├─ Missing chainId?", !chainId);
+      console.log("   ├─ Missing preferences?", !preferences);
+      console.log("   ├─ Missing userEmail?", !userEmail);
+      console.log("   └─ Already processing?", !!addingToken);
 
       if (!userEmail) {
         showToast("error", "Please sign in to modify your token list", 4000);
@@ -697,9 +775,9 @@ export default function TokenList() {
     setAddingToken(tokenAddress);
 
     try {
-      console.log(
-        `➖ Removing token ${tokenAddress} for user ${userEmail} on wallet ${address}`
-      );
+      console.log("\n📝 Preparing Preferences Update:");
+      console.log("   Current userAddedTokens:", preferences.userAddedTokens);
+      console.log("   Token to remove:", tokenAddress);
 
       const updatedPrefs = {
         ...preferences,
@@ -710,22 +788,59 @@ export default function TokenList() {
         lastUpdated: new Date().toISOString(),
       };
 
+      console.log("\n   Updated Preferences:");
+      console.log("      ├─ userAddedTokens:", updatedPrefs.userAddedTokens);
+      console.log(
+        "      ├─ Removed?",
+        !updatedPrefs.userAddedTokens.includes(tokenAddress)
+      );
+      console.log(
+        "      └─ New total user-added tokens:",
+        updatedPrefs.userAddedTokens.length
+      );
+
+      console.log("\n📤 Sending API Request to /api/wallet/preferences");
+
       const response = await fetch(`/api/wallet/preferences`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedPrefs),
       });
 
+      console.log("\n📥 API Response:");
+      console.log("   ├─ Status:", response.status, response.statusText);
+      console.log("   └─ OK:", response.ok);
+
       if (response.ok) {
+        const data = await response.json();
+        console.log("\n✅ Server Response Success:");
+        console.log("   ├─ success:", data.success);
+        console.log("   ├─ message:", data.message);
+        console.log("   └─ data:", data.data);
+
+        console.log("\n💾 Updating Local State:");
         setPreferences(updatedPrefs);
+
+        console.log("\n🔄 Triggering Wallet Data Refresh:");
+        console.log("   └─ Calling refresh(true)...");
         await refresh(true);
-        showToast("success", "Token removed from main list", 3000);
+
+        console.log("\n🎉 Token Removed Successfully!");
+        console.log("   ├─ Token:", tokenAddress);
+        console.log("   ├─ User:", userEmail);
         console.log(
-          `✅ Token ${tokenAddress} removed from main list for user ${userEmail}`
+          "   └─ Remaining user-added tokens:",
+          updatedPrefs.userAddedTokens.length
         );
+
+        showToast("success", "Token removed from main list", 3000);
       } else {
         const errorData = await response.json();
-        console.error("❌ Failed to remove token:", errorData);
+        console.error("\n❌ Server Error Response:");
+        console.error("   ├─ Status:", response.status);
+        console.error("   ├─ Error:", errorData.error);
+        console.error("   └─ Full response:", errorData);
+
         showToast(
           "error",
           errorData.error || "Failed to remove token. Please try again.",
@@ -733,9 +848,16 @@ export default function TokenList() {
         );
       }
     } catch (error: any) {
-      console.error("❌ Error removing token:", error);
+      console.error("\n❌ Exception During Remove Token:");
+      console.error("   ├─ Error message:", error.message);
+      console.error("   ├─ Error type:", error.name);
+      console.error("   └─ Stack:", error.stack);
+
       showToast("error", "Failed to remove token. Please try again.", 4000);
     } finally {
+      console.log("\n🏁 Remove Token Process Complete");
+      console.log("   └─ Clearing addingToken state");
+      console.log("═══════════════════════════════════════\n");
       setAddingToken(null);
     }
   };
