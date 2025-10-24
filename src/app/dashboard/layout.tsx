@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - FIXED: Content stops above bottom sidebar on mobile
+// src/app/dashboard/layout.tsx - FIXED: Mobile bottom nav without overlay
 "use client";
 
 import { useSelector } from "react-redux";
@@ -6,6 +6,7 @@ import { useState, createContext, useContext, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { RootState } from "@/store";
 import Sidebar from "@/components/dashboard/Sidebar";
+import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import WalletSelector from "@/components/dashboard/WalletSelector";
 import NavigationLoadingIndicator from "@/components/ui/NavigationLoadingIndicator";
 import GlobalDashboardHeader from "@/components/dashboard/GlobalDashboardHeader";
@@ -151,20 +152,23 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           setOnAIClick: setNewsFeedAIHandler,
         }}
       >
+        {/* Mobile: Column layout with bottom nav | Desktop: Row layout with sidebar */}
         <div className="h-screen bg-[#000000] flex flex-col lg:flex-row overflow-hidden relative">
           <NavigationLoadingIndicator />
 
+          {/* Desktop Sidebar */}
           <Sidebar />
 
+          {/* Main content area - fills remaining space */}
           <main
             className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col relative ${
               isSwapPage || isNewsChatActive
-                ? "p-0 pb-20 lg:pb-0"
+                ? "p-0 lg:pb-0"
                 : isAIChatPage
-                ? "p-0 lg:p-2 lg:px-4 pb-20 lg:pb-2"
+                ? "p-0 lg:p-2 lg:px-4 lg:pb-2"
                 : isDashboardPage
-                ? "p-0 lg:p-2 lg:px-4 pb-20 lg:pb-2"
-                : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4 pb-20 lg:pb-2"
+                ? "p-0 lg:p-2 lg:px-4 lg:pb-2"
+                : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4 lg:pb-2"
             }`}
           >
             {/* Show loader only over main content area when loading */}
@@ -232,6 +236,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </main>
 
+          {/* Mobile Bottom Navigation - only visible on mobile */}
+          <MobileBottomNav />
+
           {walletSelectorOpen && <WalletSelector />}
 
           <style jsx global>{`
@@ -273,6 +280,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
             body.modal-open {
               overflow: hidden;
+            }
+
+            /* Safe area for iOS notches */
+            .pb-safe {
+              padding-bottom: env(safe-area-inset-bottom);
             }
           `}</style>
         </div>
