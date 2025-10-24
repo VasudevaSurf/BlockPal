@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - FIXED: Bottom content visible above mobile nav
+// src/app/dashboard/page.tsx - FIXED: Removed bottom nav spacing
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -108,8 +108,8 @@ function DashboardContent() {
         </button>
       </div>
 
-      {/* ✅ FIXED: Container height accounts for bottom nav - NO PAGE SCROLL */}
-      <div className="h-[calc(100%-5rem)] lg:h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 sm:p-5 lg:p-1 flex flex-col overflow-hidden">
+      {/* ✅ FIXED: Removed bottom nav height calculation - full height now */}
+      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 sm:p-5 lg:p-1 flex flex-col overflow-hidden">
         {/* Error Display */}
         {dashboardState.error && (
           <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-2">
@@ -121,13 +121,12 @@ function DashboardContent() {
 
         {/* Main Dashboard Content */}
         <div className="flex flex-col xl:flex-row gap-4 lg:gap-4 flex-1 min-h-0 overflow-hidden">
-          {/* LEFT COLUMN - ALWAYS SHOW BOXES (wallet dependent content inside) */}
-          {/* Mobile Layout - Everything fits above bottom nav, NO outer scroll */}
+          {/* Mobile Layout */}
           <div className="flex xl:hidden flex-col gap-4 lg:gap-4 flex-1 min-h-0 overflow-hidden">
             <div className="flex-shrink-0">
               <WalletBalance />
             </div>
-            {/* ✅ FIXED: TokenList handles its own scroll, takes remaining space */}
+            {/* ✅ TokenList takes remaining space with its own scroll */}
             <div className="flex-1 min-h-0 overflow-hidden">
               <TokenList />
             </div>

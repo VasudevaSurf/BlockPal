@@ -5,25 +5,15 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, usePathname } from "next/navigation";
 import {
-  ExternalLink,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { RootState } from "@/store";
-import { toggleTheme } from "@/store/slices/uiSlice";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import DashboardIcon from "@/components/icons/DashboardIcon";
-import ScheduleIcon from "@/components/icons/ScheduleIcon";
-import BatchIcon from "@/components/icons/BatchIcon";
 import AII1con from "@/components/icons/AII1con";
-import FriendsIcon from "@/components/icons/FriendsIcon";
-import WebsiteIcon from "@/components/icons/WebsiteIcon";
-import DarkModeIcon from "@/components/icons/DarkModeIcon";
-import LogoutIcon from "@/components/icons/LogoutIcon";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 import SwapIcon from "../icons/SwapIcon";
-import UsersIcon from "../icons/UsersIcon";
 import CoinLensIcon from "@/components/icons/CoinLensIcon";
 import NewsFeedIcon from "../icons/NewsFeedIcon";
 
@@ -65,18 +55,12 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ onItemClick }: SidebarProps) {
-  const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { wallets } = useSelector((state: RootState) => state.wallet);
   const { isLoading, startLoading } = useNavigationLoading();
 
   // State for sidebar minimization (desktop only)
   const [isMinimized, setIsMinimized] = useState(false);
-
-  // Check if user has wallets
-  const hasWallets = wallets && wallets.length > 0;
 
   const handleNavigation = (
     href: string,

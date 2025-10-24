@@ -163,8 +163,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 : isAIChatPage
                 ? "p-0 lg:p-2 lg:px-4 pb-20 lg:pb-2"
                 : isDashboardPage
-                ? "p-0 lg:p-2 lg:px-4 pb-20 lg:pb-2"
-                : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4 pb-20 lg:pb-2"
+                ? "p-0 lg:p-2 lg:px-4 pb-0 lg:pb-2"
+                : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4 pb-0 lg:pb-2"
             }`}
           >
             {/* Show loader only over main content area when loading */}
