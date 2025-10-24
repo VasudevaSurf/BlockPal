@@ -1,4 +1,4 @@
-// src/contexts/WalletDataContext.tsx - FIXED: Use correct mainListValue
+// src/contexts/WalletDataContext.tsx - COMPLETE FIXED VERSION
 "use client";
 
 import React, {
@@ -10,6 +10,8 @@ import React, {
   useRef,
 } from "react";
 import { useAccount, useChainId } from "wagmi";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
 import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
 
@@ -34,23 +36,29 @@ interface TokenBalance {
   isPreset?: boolean;
 }
 
-interface WalletData {
-  mainListValue: number;
-  totalValue: number; // ✅ ADDED: For reference
-  total24hrChange: number;
-  chainName: string;
-  tokens: TokenBalance[];
-  loading: boolean;
-  error: string | null;
-  lastUpdated: number | null;
-  cacheValid: boolean;
+interface WalletPreferences {
+  userEmail: string;
+  walletAddress: string;
+  chainId: number;
+  userAddedTokens: string[];
+  lastUpdated: string;
 }
 
 interface WalletDataContextType {
-  walletData: WalletData;
-  refresh: (force?: boolean) => Promise<void>;
+  walletData: {
+    tokens: TokenBalance[];
+    totalValue: number;
+    mainListValue: number;
+    total24hrChange: number;
+    chainName: string;
+    loading: boolean;
+    error: string | null;
+    cacheValid: boolean;
+    lastUpdated: string | null;
+  };
+  refresh: (forceRefresh?: boolean) => Promise<void>;
   isRefreshing: boolean;
-  clearCache: () => void;
+  updateTokenCategories: (preferences: WalletPreferences | null) => void;
 }
 
 const WalletDataContext = createContext<WalletDataContextType | undefined>(
@@ -65,218 +73,342 @@ export const useWalletData = () => {
   return context;
 };
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const BACKGROUND_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
-
 export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const authState = useSelector((state: RootState) => state.auth);
+
   const currentChain = chains.find((c) => c.id === chainId);
 
-  const [walletData, setWalletData] = useState<WalletData>({
+  const [walletData, setWalletData] = useState({
+    tokens: [] as TokenBalance[],
+    totalValue: 0,
     mainListValue: 0,
-    totalValue: 0, // ✅ ADDED
     total24hrChange: 0,
     chainName: "",
-    tokens: [],
-    loading: true,
-    error: null,
-    lastUpdated: null,
+    loading: false,
+    error: null as string | null,
     cacheValid: false,
+    lastUpdated: null as string | null,
   });
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const backgroundRefreshRef = useRef<NodeJS.Timeout | null>(null);
-  const fetchInProgressRef = useRef(false);
-  const prevWalletRef = useRef<string | undefined>(undefined);
-  const prevChainRef = useRef<number | undefined>(undefined);
+  const [currentPreferences, setCurrentPreferences] =
+    useState<WalletPreferences | null>(null);
 
-  // Check if cache is still valid
-  const isCacheValid = useCallback(() => {
-    if (!walletData.lastUpdated) return false;
-    const now = Date.now();
-    return now - walletData.lastUpdated < CACHE_DURATION;
-  }, [walletData.lastUpdated]);
+  const prevAddressRef = useRef<string | undefined>();
+  const prevChainRef = useRef<number | undefined>();
+  const isInitialLoadRef = useRef(true);
 
-  // Fetch wallet data
-  const fetchWalletData = useCallback(
-    async (
-      showLoading: boolean = true,
-      isBackgroundRefresh: boolean = false
-    ) => {
-      if (!address || !chainId || fetchInProgressRef.current) {
+  // Get user email helper
+  const getUserEmail = (): string | null => {
+    if (!authState?.user) return null;
+    return (
+      authState.user.gmail ||
+      authState.user.email ||
+      authState.user.emailAddress ||
+      authState.user.userEmail ||
+      null
+    );
+  };
+
+  const userEmail = getUserEmail();
+
+  // Load preferences
+  const loadPreferences = useCallback(async () => {
+    if (!address || !chainId || !userEmail) {
+      console.log("Cannot load preferences: missing required data");
+      return null;
+    }
+
+    try {
+      console.log(`Loading preferences for user: ${userEmail}`);
+      const response = await fetch(
+        `/api/wallet/preferences?wallet=${address}&chain=${chainId}&email=${encodeURIComponent(
+          userEmail
+        )}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Preferences loaded:", data.data);
+        setCurrentPreferences(data.data);
+        return data.data;
+      }
+    } catch (error) {
+      console.error("Error loading preferences:", error);
+    }
+    return null;
+  }, [address, chainId, userEmail]);
+
+  // Calculate main list value based on preferences
+  const calculateMainListValue = useCallback(
+    (tokens: TokenBalance[], preferences: WalletPreferences | null) => {
+      if (!tokens || tokens.length === 0)
+        return { mainListValue: 0, total24hrChange: 0 };
+
+      console.log("Calculating main list value with preferences:", preferences);
+      console.log("User added tokens:", preferences?.userAddedTokens);
+
+      // Identify main list tokens (preset + user-added)
+      const mainListTokens = tokens.filter((token) => {
+        const isPreset = token.isPreset === true;
+        const isUserAdded =
+          preferences?.userAddedTokens?.some(
+            (addr) => addr.toLowerCase() === token.contractAddress.toLowerCase()
+          ) || false;
+
+        if (isUserAdded) {
+          console.log(
+            `Token ${token.symbol} (${token.contractAddress}) is user-added`
+          );
+        }
+
+        return isPreset || isUserAdded;
+      });
+
+      console.log(
+        `Main list has ${mainListTokens.length} tokens (from ${tokens.length} total)`
+      );
+
+      // Calculate total value for main list tokens only
+      const mainListValue = mainListTokens.reduce(
+        (sum, token) => sum + (token.value || 0),
+        0
+      );
+
+      // Calculate 24hr change for main list tokens only
+      const total24hrChange = mainListTokens.reduce(
+        (sum, token) => sum + (token.usdChange24h || 0),
+        0
+      );
+
+      console.log(
+        `Main list value: $${mainListValue.toFixed(
+          2
+        )}, 24hr change: $${total24hrChange.toFixed(2)}`
+      );
+
+      return { mainListValue, total24hrChange };
+    },
+    []
+  );
+
+  // Update token categories based on preferences
+  const updateTokenCategories = useCallback(
+    (preferences: WalletPreferences | null) => {
+      console.log("Updating token categories with preferences:", preferences);
+      setCurrentPreferences(preferences);
+
+      // Immediately recalculate main list value with new preferences
+      setWalletData((prevData) => {
+        // Update isUserAdded flag on tokens first
+        const updatedTokens = prevData.tokens.map((token) => ({
+          ...token,
+          isUserAdded:
+            preferences?.userAddedTokens?.some(
+              (addr) =>
+                addr.toLowerCase() === token.contractAddress.toLowerCase()
+            ) || false,
+        }));
+
+        // Now calculate with updated tokens
+        const { mainListValue, total24hrChange } = calculateMainListValue(
+          updatedTokens,
+          preferences
+        );
+
+        console.log(`Updated main list value: $${mainListValue.toFixed(2)}`);
+        console.log(
+          `User added tokens: ${
+            preferences?.userAddedTokens?.join(", ") || "none"
+          }`
+        );
+
+        return {
+          ...prevData,
+          tokens: updatedTokens,
+          mainListValue,
+          total24hrChange,
+        };
+      });
+    },
+    [calculateMainListValue]
+  );
+
+  // Fetch wallet tokens
+  const fetchWalletTokens = useCallback(
+    async (forceRefresh: boolean = false) => {
+      if (!address || !chainId || !isConnected) {
+        console.log("Cannot fetch tokens - wallet not connected");
+        setWalletData((prev) => ({
+          ...prev,
+          tokens: [],
+          totalValue: 0,
+          mainListValue: 0,
+          total24hrChange: 0,
+          loading: false,
+          error: null,
+          cacheValid: false,
+        }));
         return;
       }
 
-      fetchInProgressRef.current = true;
+      console.log(`Fetching tokens for ${address} on chain ${chainId}`);
+
+      setWalletData((prev) => ({ ...prev, loading: true, error: null }));
 
       try {
-        if (showLoading) {
-          setWalletData((prev) => ({ ...prev, loading: true, error: null }));
+        // Load preferences first if not loaded
+        let preferences = currentPreferences;
+        if (!preferences && userEmail) {
+          preferences = await loadPreferences();
         }
 
-        console.log(
-          `🔄 ${
-            isBackgroundRefresh ? "Background" : "Active"
-          } fetching wallet data...`
-        );
+        // If force refresh, clear cache first
+        if (forceRefresh) {
+          console.log("Force refresh requested - clearing cache");
+          await tokenService.refreshWalletTokens(address);
+        }
 
-        // Fetch tokens
-        const response = await tokenService.getWalletTokens(
+        // Fetch tokens with showHidden=true to get all tokens
+        const result = await tokenService.getWalletTokens(
           address,
           chainId,
           true
         );
 
-        const tokensWithFlags = response.tokens.map((token, index) => ({
-          ...token,
-          isPreset: index < response.presetTokenCount,
-        }));
+        if (result) {
+          // Mark tokens as preset or user-added
+          const processedTokens = result.tokens.map(
+            (token: any, index: number) => ({
+              ...token,
+              isPreset: index < (result.presetTokenCount || 0),
+              isUserAdded:
+                preferences?.userAddedTokens?.some(
+                  (addr) =>
+                    addr.toLowerCase() === token.contractAddress.toLowerCase()
+                ) || false,
+            })
+          );
 
-        // ✅ CRITICAL FIX: Use mainListValue from response, not totalValue
-        console.log("🔍 WalletDataContext - Setting values:");
-        console.log("   ├─ mainListValue from API:", response.mainListValue);
-        console.log("   ├─ totalValue from API:", response.totalValue);
-        console.log("   └─ 24hr change from API:", response.total24hrChange);
+          // Calculate main list value with current preferences
+          const { mainListValue, total24hrChange } = calculateMainListValue(
+            processedTokens,
+            preferences
+          );
 
-        setWalletData({
-          mainListValue: response.mainListValue, // ✅ FIXED: Was response.totalValue
-          totalValue: response.totalValue, // ✅ ADDED: Keep for reference
-          total24hrChange: response.total24hrChange,
-          chainName: response.chainName,
-          tokens: tokensWithFlags,
-          loading: false,
-          error: null,
-          lastUpdated: Date.now(),
-          cacheValid: true,
-        });
+          setWalletData({
+            tokens: processedTokens,
+            totalValue: result.totalValue,
+            mainListValue,
+            total24hrChange,
+            chainName: result.chainName || currentChain?.name || "",
+            loading: false,
+            error: null,
+            cacheValid: true,
+            lastUpdated: result.lastUpdated,
+          });
 
-        console.log(
-          `✅ Wallet data ${
-            isBackgroundRefresh ? "background" : ""
-          } fetched successfully`
-        );
-        console.log(
-          `   ├─ Main List Value set to: $${response.mainListValue.toFixed(3)}`
-        );
-        console.log(
-          `   ├─ Total Value (all tokens): $${response.totalValue.toFixed(3)}`
-        );
-        console.log(
-          `   └─ Difference (hidden): $${(
-            response.totalValue - response.mainListValue
-          ).toFixed(3)}`
-        );
+          console.log(`Fetched ${processedTokens.length} tokens successfully`);
+          console.log(`Main list value: $${mainListValue.toFixed(2)}`);
+        }
       } catch (error: any) {
-        console.error("❌ Error fetching wallet data:", error);
+        console.error("Error fetching tokens:", error);
         setWalletData((prev) => ({
           ...prev,
           loading: false,
-          error: error.message || "Failed to fetch wallet data",
+          error: error.message || "Failed to fetch tokens",
           cacheValid: false,
         }));
-      } finally {
-        fetchInProgressRef.current = false;
-        if (showLoading) {
-          setIsRefreshing(false);
-        }
       }
     },
-    [address, chainId]
+    [
+      address,
+      chainId,
+      isConnected,
+      currentChain,
+      userEmail,
+      loadPreferences,
+      calculateMainListValue,
+      currentPreferences,
+    ]
   );
 
-  // Refresh function - can be called from components
+  // Refresh function
   const refresh = useCallback(
-    async (force: boolean = false) => {
-      if (force || !isCacheValid()) {
-        setIsRefreshing(true);
-        await fetchWalletData(true, false);
-      } else {
-        console.log("📦 Using cached data (still valid)");
+    async (forceRefresh: boolean = false) => {
+      if (isRefreshing) {
+        console.log("Already refreshing, skipping...");
+        return;
+      }
+
+      setIsRefreshing(true);
+
+      try {
+        // Reload preferences when refreshing
+        if (userEmail) {
+          await loadPreferences();
+        }
+        await fetchWalletTokens(forceRefresh);
+      } finally {
+        setIsRefreshing(false);
       }
     },
-    [fetchWalletData, isCacheValid]
+    [fetchWalletTokens, isRefreshing, userEmail, loadPreferences]
   );
 
-  // Clear cache
-  const clearCache = useCallback(() => {
-    console.log("🗑️ Clearing wallet data cache");
-    setWalletData({
-      mainListValue: 0,
-      totalValue: 0,
-      total24hrChange: 0,
-      chainName: "",
-      tokens: [],
-      loading: true,
-      error: null,
-      lastUpdated: null,
-      cacheValid: false,
-    });
-  }, []);
-
-  // Initial load and wallet/chain change handling
+  // Initial load and wallet/chain changes
   useEffect(() => {
-    const walletChanged = prevWalletRef.current !== address;
+    const walletChanged = prevAddressRef.current !== address;
     const chainChanged = prevChainRef.current !== chainId;
 
     if (walletChanged || chainChanged) {
-      console.log("🔄 Wallet or chain changed, clearing cache and fetching...");
-      clearCache();
+      console.log("Wallet or chain changed, fetching new data...");
+      prevAddressRef.current = address;
+      prevChainRef.current = chainId;
+      isInitialLoadRef.current = true;
+
+      // Reset preferences when wallet/chain changes
+      setCurrentPreferences(null);
 
       if (isConnected && address) {
-        fetchWalletData(true, false);
+        fetchWalletTokens(false);
+      } else {
+        setWalletData({
+          tokens: [],
+          totalValue: 0,
+          mainListValue: 0,
+          total24hrChange: 0,
+          chainName: "",
+          loading: false,
+          error: null,
+          cacheValid: false,
+          lastUpdated: null,
+        });
       }
-
-      prevWalletRef.current = address;
-      prevChainRef.current = chainId;
-    } else if (isConnected && address && !walletData.cacheValid) {
-      // Initial load
-      fetchWalletData(true, false);
     }
-  }, [
-    address,
-    chainId,
-    isConnected,
-    fetchWalletData,
-    clearCache,
-    walletData.cacheValid,
-  ]);
+  }, [address, chainId, isConnected, fetchWalletTokens]);
 
-  // Background refresh - silently update data every 5 minutes
+  // Auto-refresh every 30 seconds
   useEffect(() => {
-    if (isConnected && address && walletData.cacheValid) {
-      console.log("🔄 Starting background refresh: Every 5 minutes");
+    if (!isConnected || !address) return;
 
-      backgroundRefreshRef.current = setInterval(() => {
-        console.log("🔄 Background refresh triggered (5 min interval)");
-        fetchWalletData(false, true);
-      }, BACKGROUND_REFRESH_INTERVAL);
-    }
+    const interval = setInterval(() => {
+      console.log("Auto-refreshing wallet data...");
+      refresh(false);
+    }, 30000);
 
-    return () => {
-      if (backgroundRefreshRef.current) {
-        clearInterval(backgroundRefreshRef.current);
-      }
-    };
-  }, [isConnected, address, walletData.cacheValid, fetchWalletData]);
-
-  // Cleanup on disconnect
-  useEffect(() => {
-    if (!isConnected || !address) {
-      if (backgroundRefreshRef.current) {
-        clearInterval(backgroundRefreshRef.current);
-      }
-      clearCache();
-    }
-  }, [isConnected, address, clearCache]);
+    return () => clearInterval(interval);
+  }, [isConnected, address, refresh]);
 
   const value = {
     walletData,
     refresh,
     isRefreshing,
-    clearCache,
+    updateTokenCategories,
   };
 
   return (

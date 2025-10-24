@@ -1,4 +1,4 @@
-// src/components/dashboard/TokenList.tsx - COMPLETE WITH USER EMAIL INTEGRATION
+// src/components/dashboard/TokenList.tsx - COMPLETE FIXED VERSION
 "use client";
 
 import React, {
@@ -9,8 +9,8 @@ import React, {
   useMemo,
 } from "react";
 import { useRouter } from "next/navigation";
-import { useSelector } from "react-redux"; // ✅ ADDED
-import { RootState } from "@/store"; // ✅ ADDED
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
 import { useAccount, useChainId } from "wagmi";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import { useWalletTracking } from "@/hooks/useWalletTracking";
@@ -119,8 +119,6 @@ interface WalletPreferences {
   userAddedTokens: string[];
   lastUpdated: string;
 }
-
-// ... (keep all your component definitions: TokenImage, TrendingTokenImage, PercentageDisplay, ThreeDotMenu)
 
 const TokenImage = ({
   src,
@@ -405,25 +403,15 @@ export default function TokenList() {
   const { isLoading: isNavigating, startLoading } = useNavigationLoading();
   const { updateTrackingData, trackNow } = useWalletTracking();
 
-  // ✅ FIXED: Get user from Redux with proper type checking and debugging
   const authState = useSelector((state: RootState) => state.auth);
 
-  // ✅ DEBUG: Log the entire auth state to see its structure
-  useEffect(() => {
-    console.log("🔍 DEBUG Auth State:", authState);
-    console.log("🔍 DEBUG User:", authState?.user);
-    console.log("🔍 DEBUG User Email:", authState?.user?.email);
-    console.log("🔍 DEBUG User Gmail:", authState?.user?.gmail);
-  }, [authState]);
-
-  // ✅ FIXED: Try multiple possible email fields
+  // Get user email
   const getUserEmail = (): string | null => {
     if (!authState?.user) {
       console.warn("⚠️ No user in auth state");
       return null;
     }
 
-    // Try different possible field names
     const email =
       authState.user.gmail ||
       authState.user.email ||
@@ -443,8 +431,9 @@ export default function TokenList() {
 
   const userEmail = getUserEmail();
 
-  // USE CACHED WALLET DATA
-  const { walletData, refresh, isRefreshing } = useWalletData();
+  // ✅ Get updateTokenCategories from context
+  const { walletData, refresh, isRefreshing, updateTokenCategories } =
+    useWalletData();
   const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
 
   const { address, isConnected } = useAccount();
@@ -529,17 +518,11 @@ export default function TokenList() {
     }
   }, [walletData.cacheValid, trendingTokens.length, topGainersData.length]);
 
-  // ✅ FIXED: Load preferences with proper user email checking
+  // ✅ Load preferences and sync with context
   useEffect(() => {
     const loadPreferences = async () => {
-      if (!address || !chainId) {
-        console.log("⚠️ Cannot load preferences: missing address or chainId");
-        return;
-      }
-
-      if (!userEmail) {
-        console.log("⚠️ Cannot load preferences: user email not available");
-        console.log("   Auth state:", authState);
+      if (!address || !chainId || !userEmail) {
+        console.log("⚠️ Cannot load preferences: missing required data");
         return;
       }
 
@@ -557,6 +540,10 @@ export default function TokenList() {
         if (response.ok) {
           const data = await response.json();
           setPreferences(data.data);
+
+          // ✅ Sync with context immediately
+          updateTokenCategories(data.data);
+
           console.log(
             `✅ Preferences loaded for ${userEmail}:`,
             data.data.userAddedTokens?.length || 0,
@@ -564,6 +551,16 @@ export default function TokenList() {
           );
         } else {
           console.error("❌ Failed to load preferences:", response.status);
+          // Set empty preferences
+          const emptyPrefs = {
+            userEmail: userEmail,
+            walletAddress: address,
+            chainId: chainId,
+            userAddedTokens: [],
+            lastUpdated: new Date().toISOString(),
+          };
+          setPreferences(emptyPrefs);
+          updateTokenCategories(emptyPrefs);
         }
       } catch (error) {
         console.error("❌ Error loading preferences:", error);
@@ -573,7 +570,7 @@ export default function TokenList() {
     if (isConnected && address && userEmail) {
       loadPreferences();
     }
-  }, [address, chainId, isConnected, userEmail, authState]);
+  }, [address, chainId, isConnected, userEmail, updateTokenCategories]);
 
   useEffect(() => {
     if (allTokens.length > 0) {
@@ -600,24 +597,10 @@ export default function TokenList() {
     }
   }, [allTokens, walletData.mainListValue, walletData.total24hrChange]);
 
-  // ✅ FIXED: Add token with proper user email checking
+  // ✅ FIXED: Add token to main list with immediate update
   const handleAddToMainList = async (tokenAddress: string) => {
-    console.log("🔍 DEBUG handleAddToMainList called");
-    console.log("   - address:", address);
-    console.log("   - chainId:", chainId);
-    console.log("   - userEmail:", userEmail);
-    console.log("   - addingToken:", addingToken);
-
     if (!address || !chainId || !userEmail || addingToken) {
-      console.log(
-        "⚠️ Cannot add token: missing address, chainId, user email, or already adding"
-      );
-      console.log("   - Missing address?", !address);
-      console.log("   - Missing chainId?", !chainId);
-      console.log("   - Missing userEmail?", !userEmail);
-      console.log("   - Already adding?", !!addingToken);
-
-      // Show user-friendly error
+      console.log("⚠️ Cannot add token: missing required data");
       if (!userEmail) {
         showToast("error", "Please sign in to add tokens to your list", 4000);
       }
@@ -627,10 +610,9 @@ export default function TokenList() {
     setAddingToken(tokenAddress);
 
     try {
-      console.log(
-        `➕ Adding token ${tokenAddress} for user ${userEmail} on wallet ${address}`
-      );
+      console.log(`➕ Adding token ${tokenAddress} for user ${userEmail}`);
 
+      // Create updated preferences
       const currentPrefs = preferences || {
         userEmail: userEmail,
         walletAddress: address,
@@ -642,12 +624,22 @@ export default function TokenList() {
       const updatedPrefs = {
         ...currentPrefs,
         userEmail: userEmail,
-        userAddedTokens: [...currentPrefs.userAddedTokens, tokenAddress],
+        userAddedTokens: [
+          ...currentPrefs.userAddedTokens,
+          tokenAddress.toLowerCase(),
+        ],
         lastUpdated: new Date().toISOString(),
       };
 
-      console.log("📤 Sending preferences:", updatedPrefs);
+      // ✅ FIX 1: Update local state immediately (optimistic update)
+      setPreferences(updatedPrefs);
 
+      // ✅ FIX 2: Update context immediately BEFORE any async calls
+      updateTokenCategories(updatedPrefs);
+
+      console.log("📤 Sending preferences to server:", updatedPrefs);
+
+      // ✅ FIX 3: Save to server (but don't wait for refresh)
       const response = await fetch(`/api/wallet/preferences`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -658,15 +650,22 @@ export default function TokenList() {
         const data = await response.json();
         console.log("✅ Server response:", data);
 
-        setPreferences(updatedPrefs);
-        await refresh(true);
         showToast("success", "Token added to main list successfully!", 3000);
         console.log(
           `✅ Token ${tokenAddress} added to main list for user ${userEmail}`
         );
+
+        // ✅ FIX 4: Don't call refresh() here - the context already updated
+        // The wallet balance is already updated via updateTokenCategories
       } else {
+        // Rollback on error
         const errorData = await response.json();
         console.error("❌ Server error:", errorData);
+
+        // Revert the optimistic update
+        setPreferences(currentPrefs);
+        updateTokenCategories(currentPrefs);
+
         showToast(
           "error",
           errorData.error || "Failed to add token. Please try again.",
@@ -675,19 +674,23 @@ export default function TokenList() {
       }
     } catch (error: any) {
       console.error("❌ Error adding token:", error);
+
+      // Revert on error
+      if (preferences) {
+        setPreferences(preferences);
+        updateTokenCategories(preferences);
+      }
+
       showToast("error", "Failed to add token. Please try again.", 4000);
     } finally {
       setAddingToken(null);
     }
   };
 
-  // ✅ FIXED: Remove token with proper user email checking
+  // ✅ FIXED: Remove token from main list with immediate update
   const handleRemoveFromMainList = async (tokenAddress: string) => {
     if (!address || !chainId || !preferences || !userEmail || addingToken) {
-      console.log(
-        "⚠️ Cannot remove token: missing address, chainId, preferences, user email, or already processing"
-      );
-
+      console.log("⚠️ Cannot remove token: missing required data");
       if (!userEmail) {
         showToast("error", "Please sign in to modify your token list", 4000);
       }
@@ -697,19 +700,28 @@ export default function TokenList() {
     setAddingToken(tokenAddress);
 
     try {
-      console.log(
-        `➖ Removing token ${tokenAddress} for user ${userEmail} on wallet ${address}`
-      );
+      console.log(`➖ Removing token ${tokenAddress} for user ${userEmail}`);
 
+      // Store original for rollback
+      const originalPrefs = preferences;
+
+      // Create updated preferences
       const updatedPrefs = {
         ...preferences,
         userEmail: userEmail,
         userAddedTokens: preferences.userAddedTokens.filter(
-          (addr) => addr !== tokenAddress
+          (addr) => addr.toLowerCase() !== tokenAddress.toLowerCase()
         ),
         lastUpdated: new Date().toISOString(),
       };
 
+      // ✅ FIX 1: Update local state immediately (optimistic update)
+      setPreferences(updatedPrefs);
+
+      // ✅ FIX 2: Update context immediately BEFORE any async calls
+      updateTokenCategories(updatedPrefs);
+
+      // ✅ FIX 3: Save to server (but don't wait for refresh)
       const response = await fetch(`/api/wallet/preferences`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -717,15 +729,21 @@ export default function TokenList() {
       });
 
       if (response.ok) {
-        setPreferences(updatedPrefs);
-        await refresh(true);
         showToast("success", "Token removed from main list", 3000);
         console.log(
           `✅ Token ${tokenAddress} removed from main list for user ${userEmail}`
         );
+
+        // ✅ FIX 4: Don't call refresh() here - the context already updated
       } else {
+        // Rollback on error
         const errorData = await response.json();
         console.error("❌ Failed to remove token:", errorData);
+
+        // Revert the optimistic update
+        setPreferences(originalPrefs);
+        updateTokenCategories(originalPrefs);
+
         showToast(
           "error",
           errorData.error || "Failed to remove token. Please try again.",
@@ -734,6 +752,13 @@ export default function TokenList() {
       }
     } catch (error: any) {
       console.error("❌ Error removing token:", error);
+
+      // Revert on error
+      if (preferences) {
+        setPreferences(preferences);
+        updateTokenCategories(preferences);
+      }
+
       showToast("error", "Failed to remove token. Please try again.", 4000);
     } finally {
       setAddingToken(null);
@@ -758,14 +783,18 @@ export default function TokenList() {
     const mainTokens = allTokens.filter((token) => {
       const isInPresetList = token.isPreset;
       const isUserAdded =
-        preferences?.userAddedTokens?.includes(token.contractAddress) || false;
+        preferences?.userAddedTokens?.some(
+          (addr) => addr.toLowerCase() === token.contractAddress.toLowerCase()
+        ) || false;
       return isInPresetList || isUserAdded;
     });
 
     const additionalTokens = allTokens.filter((token) => {
       const isInPresetList = token.isPreset;
       const isUserAdded =
-        preferences?.userAddedTokens?.includes(token.contractAddress) || false;
+        preferences?.userAddedTokens?.some(
+          (addr) => addr.toLowerCase() === token.contractAddress.toLowerCase()
+        ) || false;
       return !isInPresetList && !isUserAdded;
     });
 
@@ -957,8 +986,10 @@ export default function TokenList() {
                     <div className="space-y-2 pr-1">
                       {mainTokens.map((token, index) => {
                         const isUserAddedInMain =
-                          preferences?.userAddedTokens?.includes(
-                            token.contractAddress
+                          preferences?.userAddedTokens?.some(
+                            (addr) =>
+                              addr.toLowerCase() ===
+                              token.contractAddress.toLowerCase()
                           ) && !token.isPreset;
 
                         return (
