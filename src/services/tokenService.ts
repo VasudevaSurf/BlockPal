@@ -64,7 +64,7 @@ class TokenService {
     walletAddress: string,
     chainId: number,
     showHidden: boolean = false,
-    userEmail?: string // ✅ ADDED: Optional user email
+    userEmail?: string // ✅ Already has parameter
   ): Promise<WalletTokensResponse> {
     try {
       console.log(

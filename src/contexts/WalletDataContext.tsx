@@ -9,6 +9,8 @@ import React, {
   useCallback,
   useRef,
 } from "react";
+import { useSelector } from "react-redux"; // ✅ ADD
+import { RootState } from "@/store"; // ✅ ADD
 import { useAccount, useChainId } from "wagmi";
 import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
@@ -75,9 +77,20 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
 
+  const user = useSelector((state: RootState) => state.auth.user);
+  const userEmail = user?.email || user?.gmail || null;
+
+  useEffect(() => {
+    console.log("📧 WalletDataContext - User Email Check:", {
+      hasUser: !!user,
+      email: userEmail,
+      userObject: user,
+    });
+  }, [user, userEmail]);
+
   const [walletData, setWalletData] = useState<WalletData>({
     mainListValue: 0,
-    totalValue: 0, // ✅ ADDED
+    totalValue: 0,
     total24hrChange: 0,
     chainName: "",
     tokens: [],
@@ -126,18 +139,15 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
         );
         console.log(`   ├─ Wallet: ${address.slice(0, 10)}...`);
         console.log(`   ├─ Chain: ${chainId}`);
+        console.log(`   ├─ User Email: ${userEmail || "❌ NOT AVAILABLE"}`);
         console.log(`   └─ Show Loading: ${showLoading}`);
 
-        // ✅ TODO: Get user email from Redux/Auth
-        // For now, we'll fetch without email - you need to add this
-        // const userEmail = getUserEmail();
-
-        // Fetch tokens (TODO: Add email parameter)
+        // ✅ CRITICAL FIX: Pass userEmail to tokenService
         const response = await tokenService.getWalletTokens(
           address,
           chainId,
-          true
-          // userEmail // ✅ Add this when available
+          true,
+          userEmail || undefined
         );
 
         console.log("\n📦 ═══ API RESPONSE RECEIVED ═══");
@@ -186,7 +196,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
           );
         });
 
-        // Calculate verification values
         const mainListTokens = tokensWithFlags.slice(
           0,
           response.presetTokenCount
@@ -219,15 +228,14 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
             : "❌ NO"
         );
 
-        // ✅ CRITICAL FIX: Use mainListValue from response, not totalValue
         console.log("\n💾 ═══ SETTING STATE ═══");
         console.log("   Setting mainListValue to:", response.mainListValue);
         console.log("   Setting totalValue to:", response.totalValue);
         console.log("   Setting total24hrChange to:", response.total24hrChange);
 
         setWalletData({
-          mainListValue: response.mainListValue, // ✅ FIXED: Was response.totalValue
-          totalValue: response.totalValue, // ✅ ADDED: Keep for reference
+          mainListValue: response.mainListValue,
+          totalValue: response.totalValue,
           total24hrChange: response.total24hrChange,
           chainName: response.chainName,
           tokens: tokensWithFlags,
@@ -275,7 +283,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
     },
-    [address, chainId]
+    [address, chainId, userEmail] // ✅ CRITICAL: Add userEmail to dependencies
   );
 
   // Refresh function - can be called from components
