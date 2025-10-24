@@ -1,4 +1,4 @@
-// src/contexts/WalletDataContext.tsx - ENHANCED WITH CACHING
+// src/contexts/WalletDataContext.tsx - FIXED: Use correct mainListValue
 "use client";
 
 import React, {
@@ -36,6 +36,7 @@ interface TokenBalance {
 
 interface WalletData {
   mainListValue: number;
+  totalValue: number; // ✅ ADDED: For reference
   total24hrChange: number;
   chainName: string;
   tokens: TokenBalance[];
@@ -64,8 +65,8 @@ export const useWalletData = () => {
   return context;
 };
 
-const CACHE_DURATION = 5 * 60 * 1000; // ✅ UNCHANGED: 5 minutes
-const BACKGROUND_REFRESH_INTERVAL = 5 * 60 * 1000; // ✅ CHANGED: 30s → 5 minutes
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const BACKGROUND_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -76,6 +77,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const [walletData, setWalletData] = useState<WalletData>({
     mainListValue: 0,
+    totalValue: 0, // ✅ ADDED
     total24hrChange: 0,
     chainName: "",
     tokens: [],
@@ -133,8 +135,15 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
           isPreset: index < response.presetTokenCount,
         }));
 
+        // ✅ CRITICAL FIX: Use mainListValue from response, not totalValue
+        console.log("🔍 WalletDataContext - Setting values:");
+        console.log("   ├─ mainListValue from API:", response.mainListValue);
+        console.log("   ├─ totalValue from API:", response.totalValue);
+        console.log("   └─ 24hr change from API:", response.total24hrChange);
+
         setWalletData({
-          mainListValue: response.totalValue,
+          mainListValue: response.mainListValue, // ✅ FIXED: Was response.totalValue
+          totalValue: response.totalValue, // ✅ ADDED: Keep for reference
           total24hrChange: response.total24hrChange,
           chainName: response.chainName,
           tokens: tokensWithFlags,
@@ -148,6 +157,17 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
           `✅ Wallet data ${
             isBackgroundRefresh ? "background" : ""
           } fetched successfully`
+        );
+        console.log(
+          `   ├─ Main List Value set to: $${response.mainListValue.toFixed(3)}`
+        );
+        console.log(
+          `   ├─ Total Value (all tokens): $${response.totalValue.toFixed(3)}`
+        );
+        console.log(
+          `   └─ Difference (hidden): $${(
+            response.totalValue - response.mainListValue
+          ).toFixed(3)}`
         );
       } catch (error: any) {
         console.error("❌ Error fetching wallet data:", error);
@@ -185,6 +205,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     console.log("🗑️ Clearing wallet data cache");
     setWalletData({
       mainListValue: 0,
+      totalValue: 0,
       total24hrChange: 0,
       chainName: "",
       tokens: [],
@@ -223,7 +244,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     walletData.cacheValid,
   ]);
 
-  // Background refresh - silently update data every 30 seconds
+  // Background refresh - silently update data every 5 minutes
   useEffect(() => {
     if (isConnected && address && walletData.cacheValid) {
       console.log("🔄 Starting background refresh: Every 5 minutes");
@@ -231,7 +252,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       backgroundRefreshRef.current = setInterval(() => {
         console.log("🔄 Background refresh triggered (5 min interval)");
         fetchWalletData(false, true);
-      }, BACKGROUND_REFRESH_INTERVAL); // ✅ 5 minutes
+      }, BACKGROUND_REFRESH_INTERVAL);
     }
 
     return () => {

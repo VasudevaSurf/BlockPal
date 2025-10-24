@@ -24,7 +24,7 @@ class CoinlesSocketClient {
     const socketUrl =
       process.env.NEXT_PUBLIC_API_URL_COIN ||
       process.env.NEXT_PUBLIC_WALLET_SERVICE_URL ||
-      "https://amusing-freedom-production-92a5.up.railway.app";
+      "http://localhost:5002";
 
     console.log("🔌 Connecting to WebSocket:", socketUrl);
 
