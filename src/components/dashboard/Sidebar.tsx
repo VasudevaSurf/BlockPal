@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - Responsive with mobile bottom nav
+// src/components/dashboard/Sidebar.tsx - Desktop Only Sidebar
 "use client";
 
 import { useState } from "react";
@@ -41,13 +41,13 @@ const menuItems = [
     comingSoon: false,
   },
   {
-    icon: CoinLensIcon, // ✅ Updated
+    icon: CoinLensIcon,
     label: "CoinLens",
     href: "/dashboard/coin-lens",
     comingSoon: false,
   },
   {
-    icon: AII1con, // ✅ This should now use the new AI icon
+    icon: AII1con,
     label: "Lumen",
     href: "/dashboard/ai-chat",
     comingSoon: false,
@@ -58,12 +58,6 @@ const menuItems = [
     href: "/dashboard/news-feed",
     comingSoon: false,
   },
-  // {
-  //   icon: UsersIcon,
-  //   label: "Connect",
-  //   href: "/dashboard/connect",
-  //   comingSoon: true,
-  // },
 ];
 
 interface SidebarProps {
@@ -71,11 +65,6 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ onItemClick }: SidebarProps) {
-  // Add padding bottom for mobile content to avoid bottom nav overlap
-  if (typeof window !== "undefined") {
-    const root = document.documentElement;
-    root.style.setProperty("--mobile-bottom-nav-height", "80px");
-  }
   const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
@@ -133,7 +122,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
   return (
     <>
-      {/* Desktop Sidebar - Hidden on mobile */}
+      {/* Sidebar - Always visible on desktop only */}
       <div
         className={`hidden lg:flex relative flex-col bg-[#0F0F0F] border-r border-[#FFFFFF40] h-full overflow-hidden transition-all duration-300 ease-in-out ${
           isMinimized ? "w-16 lg:w-20" : "w-full lg:w-64"
@@ -249,51 +238,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0F0F0F] border-t border-[#FFFFFF40] safe-area-bottom">
-        <nav className="flex items-center justify-around px-2 py-3">
-          {menuItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.comingSoon && pathname === "/dashboard/coming-soon");
-
-            return (
-              <button
-                key={item.label}
-                onClick={(e) => handleNavigation(item.href, item.comingSoon, e)}
-                disabled={isLoading}
-                className={`flex flex-col items-center justify-center min-w-[60px] py-2 px-3 rounded-lg transition-all duration-200 ${
-                  isLoading ? "pointer-events-none opacity-50" : ""
-                }`}
-              >
-                <item.icon
-                  size={20}
-                  className={`mb-1 ${
-                    isActive && !item.comingSoon
-                      ? "text-[#E2AF19]"
-                      : item.comingSoon
-                      ? "text-gray-400"
-                      : "text-[#EDEDED]"
-                  }`}
-                  filled={isActive && !item.comingSoon}
-                />
-                <span
-                  className={`text-[10px] font-satoshi ${
-                    isActive && !item.comingSoon
-                      ? "text-[#E2AF19] font-medium"
-                      : item.comingSoon
-                      ? "text-gray-400"
-                      : "text-[#EDEDED]"
-                  }`}
-                >
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-
       <style jsx>{`
         .scrollbar-hide {
           -ms-overflow-style: none;
@@ -301,11 +245,6 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         }
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
-        }
-
-        /* Safe area for notched devices */
-        .safe-area-bottom {
-          padding-bottom: env(safe-area-inset-bottom);
         }
 
         /* Optional: Add a subtle pulse animation to the arrow when minimized */
