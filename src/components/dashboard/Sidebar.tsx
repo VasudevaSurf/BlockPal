@@ -5,7 +5,8 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { RootState } from "@/store";
+import { RootState, AppDispatch } from "@/store";
+import { logoutUser } from "@/store/slices/authSlice";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import DashboardIcon from "@/components/icons/DashboardIcon";
 import AII1con from "@/components/icons/AII1con";
@@ -13,6 +14,8 @@ import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 import SwapIcon from "../icons/SwapIcon";
 import CoinLensIcon from "@/components/icons/CoinLensIcon";
 import NewsFeedIcon from "../icons/NewsFeedIcon";
+import { useAccount, useDisconnect } from "wagmi";
+import { clearWalletConnection } from "@/utils/walletCleanup";
 
 const menuItems = [
   {
@@ -58,10 +61,14 @@ export default function Sidebar({
 }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const dispatch = useDispatch<AppDispatch>();
   const { isLoading, startLoading } = useNavigationLoading();
+  const { address } = useAccount();
+  const { disconnect } = useDisconnect();
 
   // State for sidebar minimization (desktop only)
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleNavigation = (
     href: string,
@@ -105,8 +112,56 @@ export default function Sidebar({
     setIsMinimized(!isMinimized);
   };
 
+  const handleProfileClick = () => {
+    router.push("/dashboard/profile");
+    onItemClick?.();
+  };
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+
+      if (address) {
+        console.log("🔌 Silently disconnecting wallet before logout...");
+        disconnect();
+        clearWalletConnection();
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.clear();
+      }
+
+      // Dispatch the logout action from Redux
+      await dispatch(logoutUser());
+
+      router.push("/auth");
+      onItemClick?.();
+    } catch (error) {
+      console.error("Logout error:", error);
+      router.push("/auth");
+      onItemClick?.();
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <>
+      {/* Full Screen Loading Overlay */}
+      {isLoggingOut && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-[#0F0F0F] border border-[#2C2C2C] rounded-2xl p-8 sm:p-10 flex flex-col items-center max-w-sm w-full">
+            <div className="w-12 h-12 border-3 border-[#E2AF19] border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-white text-base sm:text-lg font-satoshi font-medium">
+              Logging out...
+            </p>
+            <p className="text-gray-400 text-xs sm:text-sm font-satoshi mt-2">
+              Please wait
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <div
         className={`flex flex-col bg-[#0F0F0F] border-r border-[#FFFFFF40] h-full overflow-hidden transition-all duration-300 ease-in-out ${
@@ -243,6 +298,66 @@ export default function Sidebar({
         {!isMobile && (
           <div className="p-2 lg:p-4 flex-shrink-0 relative z-20">
             <WalletConnectButton isMinimized={isMinimized} />
+          </div>
+        )}
+
+        {/* Mobile Only - Profile & Logout Section */}
+        {isMobile && (
+          <div className="p-4 flex-shrink-0 relative z-20 border-t border-[#FFFFFF40]">
+            <div className="space-y-2">
+              {/* Profile Button */}
+              <button
+                onClick={handleProfileClick}
+                disabled={isLoggingOut}
+                className={`w-full flex items-center px-4 py-3 text-sm rounded-lg text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi ${
+                  isLoggingOut ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mr-3 flex-shrink-0"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span>Profile</span>
+              </button>
+
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className={`w-full flex items-center px-4 py-3 text-sm rounded-lg text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200 font-satoshi ${
+                  isLoggingOut ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mr-3 flex-shrink-0"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
