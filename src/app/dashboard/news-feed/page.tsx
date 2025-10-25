@@ -367,7 +367,7 @@ function NewsFeedContent() {
         }
       `}</style>
 
-      <div className="h-full bg-[#000000] rounded-[10px] md:rounded-[12px] lg:rounded-[14px] p-1 sm:p-1.5 md:p-2 lg:p-2.5 flex flex-col overflow-hidden relative">
+      <div className="h-full bg-[#000000] rounded-[10px] md:rounded-[12px] lg:rounded-[14px] p-1 sm:p-1.5 md:p-2 lg:p-2.5 flex flex-col overflow-hidden relative pb-0 lg:pb-auto">
         <div className="flex gap-2 md:gap-3 flex-1 min-h-0 relative">
           <div className="flex-1 w-full flex flex-col gap-2 md:gap-3 min-w-0 max-h-full overflow-hidden">
             <div className="w-full flex-1 h-full flex flex-col relative">
@@ -383,7 +383,9 @@ function NewsFeedContent() {
 
                 {error && (
                   <div className="mx-3 md:mx-4 mt-3 md:mt-4 p-2.5 md:p-3 bg-red-500/10 border border-red-500/20 rounded-[8px] md:rounded-[10px]">
-                    <p className="text-red-400 text-[12px] md:text-[14px]">{error}</p>
+                    <p className="text-red-400 text-[12px] md:text-[14px]">
+                      {error}
+                    </p>
                   </div>
                 )}
 
@@ -441,7 +443,10 @@ function NewsFeedContent() {
                       onClick={() => setShowAIChat(false)}
                       className="p-1.5 md:p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
                     >
-                      <ArrowLeft size={18} className="text-[#E2AF19] md:w-5 md:h-5" />
+                      <ArrowLeft
+                        size={18}
+                        className="text-[#E2AF19] md:w-5 md:h-5"
+                      />
                     </button>
                     <div>
                       <h2>

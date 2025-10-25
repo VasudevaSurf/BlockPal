@@ -1015,7 +1015,7 @@ export default function AIChatPage() {
         </div>
 
         {/* Messages or Welcome Screen - FIXED FOR MOBILE */}
-        <div className="flex-1 min-h-0 px-4 pb-1 lg:pb-4 mb-[75px] lg:mb-0 overflow-hidden">
+        <div className="flex-1 min-h-0 px-4 pb-0 lg:pb-4 mb-[75px] lg:mb-0 overflow-hidden">
           {showWelcomeScreen ? (
             /* Welcome Screen */
             <div className="h-full flex flex-col items-center justify-center overflow-y-auto scrollbar-hide">
@@ -1118,7 +1118,7 @@ export default function AIChatPage() {
         </div>
 
         {/* Input - FIXED ABOVE MOBILE NAV */}
-        <div className="flex-shrink-0 p-3 lg:p-4 fixed lg:relative bottom-[82px] lg:bottom-0 left-0 right-0 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none z-10">
+        <div className="flex-shrink-0 p-3 lg:p-4 fixed lg:relative bottom-[10px] lg:bottom-0 left-0 right-0 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none z-10 pb-0 lg:pb-auto">
           <div className="relative max-w-4xl mx-auto">
             <textarea
               ref={inputRef}
@@ -1492,7 +1492,7 @@ export default function AIChatPage() {
           </div>
 
           {/* New Chat Button - Fixed at bottom above bottom nav */}
-          <div className="flex-shrink-0 p-4 border-t border-[#2C2C2C] bg-black/95 pb-24">
+          <div className="flex-shrink-0 p-4 border-t border-[#2C2C2C] bg-black/95">
             <button
               onClick={handleNewChat}
               className="w-full text-[#E2AF19] px-3 py-1.5 rounded-[300px] border border-[#71570C] text-[18px] font-satoshi font-medium transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"

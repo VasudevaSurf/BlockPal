@@ -122,7 +122,7 @@ function DashboardContent() {
     <>
       <RightHamburgerButton />
 
-      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 sm:p-5 lg:p-1 flex flex-col overflow-hidden">
+      <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] p-4 sm:p-5 lg:p-1 flex flex-col overflow-hidden pb-0 lg:pb-auto">
         {/* Error Display */}
         {dashboardState.error && (
           <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-2 mb-2">
@@ -133,9 +133,9 @@ function DashboardContent() {
         )}
 
         {/* Main Dashboard Content */}
-        <div className="flex flex-col xl:flex-row gap-4 lg:gap-4 flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col xl:flex-row gap-4 lg:gap-4 flex-1 min-h-0 overflow-hidden pb-0 lg:pb-auto">
           {/* Mobile Layout */}
-          <div className="flex xl:hidden flex-col gap-4 lg:gap-4 flex-1 min-h-0 overflow-hidden">
+          <div className="flex xl:hidden flex-col gap-4 lg:gap-4 flex-1 min-h-0 overflow-hidden pb-0">
             <div className="flex-shrink-0">
               <WalletBalance />
             </div>
@@ -154,7 +154,7 @@ function DashboardContent() {
             <div className="flex-shrink-0">
               <WalletBalance />
             </div>
-            <div className="flex-1 min-h-0 -mb-4">
+            <div className="flex-1 min-h-0 -mb-0 lg:-mb-4">
               <TokenList />
             </div>
             {dashboardState.showStats && hasWallets && (

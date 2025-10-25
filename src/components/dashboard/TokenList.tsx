@@ -807,7 +807,7 @@ export default function TokenList() {
   return (
     <>
       <style jsx>{tokenRowStyles}</style>
-      <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden">
+      <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden pb-0 lg:pb-auto">
         {/* Header with Tabs */}
         <div className="flex items-center justify-between mb-3 px-2">
           {/* Mobile Tabs - ALWAYS SHOW */}

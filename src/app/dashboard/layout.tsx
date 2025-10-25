@@ -180,8 +180,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
               {/* Mobile Sidebar */}
               <div className="fixed inset-y-0 left-0 w-64 z-50 lg:hidden">
-                <Sidebar 
-                  isMobile={true} 
+                <Sidebar
+                  isMobile={true}
                   onItemClick={handleMobileSidebarClose}
                 />
               </div>
@@ -195,7 +195,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 : isAIChatPage
                 ? "p-0 lg:p-2 lg:px-4 pb-0 lg:pb-2"
                 : isDashboardPage
-                ? "p-0 lg:p-2 lg:px-4 pb-0 lg:pb-2"
+                ? "p-0 lg:p-2 lg:px-4 pb-0 lg:pb-0"
                 : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4 pb-0 lg:pb-2"
             }`}
           >
@@ -257,7 +257,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       Dashboard
                     </h1>
                   </div>
-                  
+
                   {/* RIGHT Hamburger - Opens Mobile Wallet Menu (passed from dashboard page) */}
                   <div id="mobile-wallet-menu-trigger"></div>
                 </div>
