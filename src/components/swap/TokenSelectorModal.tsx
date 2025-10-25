@@ -621,6 +621,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
         className="fixed lg:absolute inset-0 z-50 flex items-center justify-center p-2 lg:p-4"
         onClick={onClose}
         style={{
+          paddingTop: "calc(80px + 0.5rem)", // Account for fixed header on mobile
           paddingBottom: "calc(80px + 0.5rem)", // Account for bottom nav + padding on mobile
         }}
       >

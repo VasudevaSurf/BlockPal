@@ -204,7 +204,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 : isDashboardPage
                 ? "p-0 lg:p-2 lg:px-4 pb-0 lg:pb-0"
                 : "p-2 sm:p-3 lg:p-2 px-2 sm:px-3 lg:px-4 pb-0 lg:pb-2"
-            }`}
+            } ${isSwapPage ? "lg:overflow-auto" : ""}`}
           >
             {/* Show loader only over main content area when loading */}
             {isLoading && isDashboardPage && (
@@ -343,9 +343,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               )}
 
-              {/* Swap page mobile header */}
+              {/* Swap page mobile header - Fixed and overlay */}
               {isSwapPage && (
-                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] flex-shrink-0">
+                <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-[#000000]/95 backdrop-blur-md flex-shrink-0 border-b border-[#2C2C2C]/50">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleMobileMenuToggle}

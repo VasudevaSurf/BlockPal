@@ -341,7 +341,22 @@ export default function SwapPage() {
   const [swipeCompleted, setSwipeCompleted] = useState(false);
   const [showSlippageSettings, setShowSlippageSettings] = useState(false);
 
+  // Prevent scrolling on mobile for swap page
+  useEffect(() => {
+    const isMobile = window.innerWidth < 1024;
+    if (isMobile) {
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    };
+  }, []);
+
   const { isConnected, address } = useAccount();
+
   const chainId = useChainId();
   const currentChain = chains.find((c) => c.id === chainId);
 
