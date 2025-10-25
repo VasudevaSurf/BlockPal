@@ -1,11 +1,11 @@
-// src/app/dashboard/coin-lens/page.tsx - FIXED: No flash on reload
+// src/app/dashboard/coin-lens/page.tsx - COMPLETE UPDATED CODE
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { MoreVertical, Copy, Minus, X } from "lucide-react";
+import { MoreVertical, Copy, Minus, X, Search, Plus } from "lucide-react";
 import AddTokensModal from "@/components/dashboard/AddTokensModal";
 import { coinlesSocketClient } from "@/services/coinlesSocketClient";
 import { useCodeLensContext } from "../layout";
@@ -477,6 +477,25 @@ function CoinLensContent() {
 
   return (
     <div className="h-full bg-[#000000] rounded-[16px] p-2 sm:p-4 flex flex-col overflow-hidden relative">
+      {/* Mobile Search Bar - Only visible on mobile */}
+      <div className="lg:hidden mb-3 relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+        <input
+          type="text"
+          placeholder="Search tokens or paste address"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-black border border-[#2C2C2C] rounded-xl pl-12 pr-14 py-3 text-gray-300 text-sm font-satoshi placeholder-gray-600 focus:outline-none focus:border-[#E2AF19] transition-colors"
+        />
+        <button
+          onClick={() => setAddTokensModalOpen(true)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] p-2 rounded-lg transition-colors"
+          title="Add Tokens"
+        >
+          <Plus className="w-4 h-4 text-black" />
+        </button>
+      </div>
+
       {/* Token List Table */}
       <div className="flex-1 bg-[#000000] rounded-2xl border border-[#2C2C2C] overflow-hidden flex flex-col">
         {/* Table Header - Desktop Only */}

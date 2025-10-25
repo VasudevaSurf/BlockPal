@@ -120,7 +120,7 @@ export default function Sidebar({
         {/* Logo Section */}
         <div
           className={`flex-shrink-0 relative z-20 ${
-            isMobile ? "p-6" : "p-3 lg:p-6"
+            isMobile ? "p-6 mt-4" : "p-3 lg:p-6"
           }`}
         >
           <div className="flex items-center justify-between">
@@ -179,7 +179,7 @@ export default function Sidebar({
         <div className="flex-1 overflow-y-auto relative z-20 scrollbar-hide">
           <nav
             className={`space-y-2 mb-6 ${
-              isMobile ? "px-4 mt-8" : isMinimized ? "px-2" : "px-2 lg:px-4"
+              isMobile ? "px-4 mt-4" : isMinimized ? "px-2" : "px-2 lg:px-4"
             }`}
           >
             {menuItems.map((item) => {
@@ -192,7 +192,7 @@ export default function Sidebar({
                   key={item.label}
                   className={
                     isMobile
-                      ? "nav-item-wrapper"
+                      ? "nav-item-wrapper -mr-4"
                       : "nav-item-wrapper -mr-2 lg:-mr-4"
                   }
                 >
@@ -203,7 +203,7 @@ export default function Sidebar({
                     disabled={isLoading}
                     className={`w-full flex items-center text-left transition-all duration-200 font-satoshi ${
                       isMobile
-                        ? "px-4 py-3 text-sm rounded-lg" // Mobile: Fixed sizing, regular rounded corners
+                        ? "px-4 py-3 text-sm rounded-l-lg" // Mobile: rounded-l-lg for left-side border radius only
                         : isMinimized
                         ? "pl-[18px] lg:pl-[22px] pr-4 lg:pr-6 py-2 lg:py-3 text-xs lg:text-sm rounded-l-lg"
                         : "px-3 lg:px-4 py-2 lg:py-3 text-xs lg:text-sm rounded-l-lg"
