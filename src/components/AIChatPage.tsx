@@ -873,20 +873,6 @@ export default function AIChatPage() {
     };
   }, []);
 
-  // Prevent scrolling on mobile for AI chat page
-  useEffect(() => {
-    const isMobile = window.innerWidth < 1024;
-    if (isMobile) {
-      document.body.style.overflow = "hidden";
-      document.documentElement.style.overflow = "hidden";
-    }
-
-    return () => {
-      document.body.style.overflow = "";
-      document.documentElement.style.overflow = "";
-    };
-  }, []);
-
   return (
     <div className="h-full relative bg-[#000000] flex">
       {/* Overlay Background */}
@@ -916,7 +902,7 @@ export default function AIChatPage() {
 
       {/* Main Chat Area */}
       <div
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 pt-[70px] lg:pt-0 ${
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
           sidebarOpen ? "lg:mr-80" : ""
         }`}
       >
@@ -1192,7 +1178,7 @@ export default function AIChatPage() {
 
       {/* Mobile History Sidebar */}
       <div
-        className={`lg:hidden fixed right-0 top-0 h-full z-[60] transform transition-all duration-300 ease-in-out ${
+        className={`lg:hidden fixed right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out ${
           mobileHistoryOpen
             ? "translate-x-0 w-80 opacity-100"
             : "translate-x-full w-80 opacity-0"
