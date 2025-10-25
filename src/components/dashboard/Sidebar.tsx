@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - UPDATED: Added mobile support
+// src/components/dashboard/Sidebar.tsx - COMPLETE UPDATED CODE
 "use client";
 
 import { useState } from "react";
@@ -118,14 +118,18 @@ export default function Sidebar({
         }`}
       >
         {/* Logo Section */}
-        <div className="p-3 lg:p-6 flex-shrink-0 relative z-20">
+        <div
+          className={`flex-shrink-0 relative z-20 ${
+            isMobile ? "p-6" : "p-3 lg:p-6"
+          }`}
+        >
           <div className="flex items-center justify-between">
             {isMobile ? (
               /* Mobile: Only show full logo, no minimize button */
               <img
                 src="/blockName.png"
                 alt="Blockpal"
-                className="brightness-110 h-5 lg:h-6"
+                className="brightness-110 h-6"
                 style={{
                   width: "auto",
                 }}
@@ -174,8 +178,8 @@ export default function Sidebar({
         {/* Navigation Menu */}
         <div className="flex-1 overflow-y-auto relative z-20 scrollbar-hide">
           <nav
-            className={`space-y-1 lg:space-y-2 mb-4 lg:mb-6 ${
-              isMobile || !isMinimized ? "px-2 lg:px-4" : "px-2"
+            className={`space-y-2 mb-6 ${
+              isMobile ? "px-4 mt-8" : isMinimized ? "px-2" : "px-2 lg:px-4"
             }`}
           >
             {menuItems.map((item) => {
@@ -186,17 +190,23 @@ export default function Sidebar({
               return (
                 <div
                   key={item.label}
-                  className="nav-item-wrapper -mr-2 lg:-mr-4"
+                  className={
+                    isMobile
+                      ? "nav-item-wrapper"
+                      : "nav-item-wrapper -mr-2 lg:-mr-4"
+                  }
                 >
                   <button
                     onClick={(e) =>
                       handleNavigation(item.href, item.comingSoon, e)
                     }
                     disabled={isLoading}
-                    className={`w-full flex items-center text-left transition-all duration-200 font-satoshi text-xs lg:text-sm ${
-                      isMobile || !isMinimized
-                        ? "px-3 lg:px-4 py-2 lg:py-3 rounded-l-lg"
-                        : "pl-[18px] lg:pl-[22px] pr-4 lg:pr-6 py-2 lg:py-3 rounded-l-lg"
+                    className={`w-full flex items-center text-left transition-all duration-200 font-satoshi ${
+                      isMobile
+                        ? "px-4 py-3 text-sm rounded-lg" // Mobile: Fixed sizing, regular rounded corners
+                        : isMinimized
+                        ? "pl-[18px] lg:pl-[22px] pr-4 lg:pr-6 py-2 lg:py-3 text-xs lg:text-sm rounded-l-lg"
+                        : "px-3 lg:px-4 py-2 lg:py-3 text-xs lg:text-sm rounded-l-lg"
                     } ${
                       isActive && !item.comingSoon
                         ? "bg-[#E2AF19] text-black font-medium"
@@ -207,7 +217,7 @@ export default function Sidebar({
                     title={isMobile || !isMinimized ? undefined : item.label}
                   >
                     <item.icon
-                      size={16}
+                      size={isMobile ? 20 : 16}
                       className={`${
                         isMobile || !isMinimized ? "mr-3" : ""
                       } flex-shrink-0 lg:w-5 lg:h-5`}
@@ -229,7 +239,7 @@ export default function Sidebar({
           </nav>
         </div>
 
-        {/* Bottom Section - RainbowKit Connect Wallet Button (Desktop Only) */}
+        {/* Bottom Section - Wallet Connect Button (Desktop Only) */}
         {!isMobile && (
           <div className="p-2 lg:p-4 flex-shrink-0 relative z-20">
             <WalletConnectButton isMinimized={isMinimized} />
