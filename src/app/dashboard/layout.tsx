@@ -270,9 +270,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               )}
 
-              {/* Mobile-only header for AI Chat - hamburger on LEFT, history icon on RIGHT */}
+              {/* Mobile-only header for AI Chat - hamburger on LEFT, history icon on RIGHT - Fixed and overlay */}
               {isAIChatPage && (
-                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] flex-shrink-0">
+                <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-[#000000]/95 backdrop-blur-md flex-shrink-0 border-b border-[#2C2C2C]/50">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleMobileMenuToggle}
