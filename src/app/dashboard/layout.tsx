@@ -181,12 +181,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             <>
               {/* Backdrop */}
               <div
-                className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+                className="fixed inset-0 bg-black/60 z-[60] lg:hidden"
                 onClick={handleMobileSidebarClose}
               />
 
               {/* Mobile Sidebar */}
-              <div className="fixed inset-y-0 left-0 w-64 z-50 lg:hidden">
+              <div className="fixed inset-y-0 left-0 w-64 z-[70] lg:hidden">
                 <Sidebar
                   isMobile={true}
                   onItemClick={handleMobileSidebarClose}
