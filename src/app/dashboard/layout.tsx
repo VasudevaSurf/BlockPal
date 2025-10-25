@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED: Added mobile sidebar support
+// src/app/dashboard/layout.tsx - UPDATED: Added history icon for AI Chat mobile header
 "use client";
 
 import { useSelector } from "react-redux";
@@ -140,6 +140,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     setIsMobileSidebarOpen(false);
   };
 
+  // Function to open AI Chat history
+  const handleAIChatHistoryClick = () => {
+    if (typeof window !== "undefined" && (window as any).openAIChatHistory) {
+      (window as any).openAIChatHistory();
+    }
+  };
+
   return (
     <CodeLensContext.Provider
       value={{
@@ -263,7 +270,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               )}
 
-              {/* Mobile-only header for AI Chat - hamburger on LEFT */}
+              {/* Mobile-only header for AI Chat - hamburger on LEFT, history icon on RIGHT */}
               {isAIChatPage && (
                 <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] flex-shrink-0">
                   <div className="flex items-center gap-3">
@@ -303,6 +310,36 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       Lumen AI
                     </h1>
                   </div>
+
+                  {/* History Icon - Right side */}
+                  <button
+                    onClick={handleAIChatHistoryClick}
+                    className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                    title="Chat history"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="25"
+                      height="25"
+                      viewBox="0 0 35 35"
+                      fill="none"
+                    >
+                      <path
+                        d="M22.8506 22.0802L18.3415 19.3893C17.556 18.9238 16.916 17.8038 16.916 16.8875V10.9238"
+                        stroke="#E2AF19"
+                        strokeWidth="1.81818"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M5.81729 8.72834C3.99911 11.1574 2.9082 14.1829 2.9082 17.4556C2.9082 25.4847 9.42457 32.0011 17.4537 32.0011C25.4827 32.0011 31.9991 25.4847 31.9991 17.4556C31.9991 9.42652 25.4827 2.91016 17.4537 2.91016C15.3737 2.91016 13.3809 3.34652 11.5918 4.14652"
+                        stroke="#E2AF19"
+                        strokeWidth="1.81818"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
                 </div>
               )}
 

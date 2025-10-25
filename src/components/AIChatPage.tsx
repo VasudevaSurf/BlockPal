@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx - FIXED MOBILE LAYOUT
+// src/components/AIChatPage.tsx - UPDATED: Removed mobile history icon from chat page
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -96,7 +96,7 @@ export default function AIChatPage() {
     {
       display: "Is Reploy as honey pot alert",
       query: "Is Reploy as honey pot alert",
-      desktopOnly: true, // Hide on mobile
+      desktopOnly: true,
     },
     {
       display: "Get market data of 0x51...86CA",
@@ -117,12 +117,12 @@ export default function AIChatPage() {
     {
       display: "Compare PEPE and BONK",
       query: "Compare PEPE and BONK",
-      desktopOnly: true, // Hide on mobile
+      desktopOnly: true,
     },
     {
       display: "Analyze this wallet 0xEDe....236F",
       query: "Analyze this wallet 0xEDe9937Bc032d0D403d15E844a67fd4F726B236F",
-      desktopOnly: true, // Hide on mobile
+      desktopOnly: true,
     },
     {
       display: "List the top trades on 0xEDe....236F",
@@ -132,7 +132,7 @@ export default function AIChatPage() {
     {
       display: "Tell me about yourself",
       query: "Tell me about yourself",
-      desktopOnly: true, // Hide on mobile
+      desktopOnly: true,
     },
     {
       display: "Gas fees prediction",
@@ -167,7 +167,6 @@ export default function AIChatPage() {
         recognitionInstance.onresult = (event: any) => {
           let finalTranscript = "";
 
-          // Only get the final results to avoid duplicates
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
@@ -175,7 +174,6 @@ export default function AIChatPage() {
             }
           }
 
-          // Only update if we have final transcript
           if (finalTranscript) {
             setInputMessage((prev) => prev + finalTranscript);
           }
@@ -200,7 +198,6 @@ export default function AIChatPage() {
         recognitionInstance.onend = () => {
           setIsListening(false);
           console.log("🎤 Voice recognition ended");
-          // Focus input after speech recognition ends
           if (inputRef.current) {
             inputRef.current.focus();
           }
@@ -217,7 +214,6 @@ export default function AIChatPage() {
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement;
-      // Check if click is outside all menus
       if (!target.closest(".conversation-menu")) {
         setOpenMenuId(null);
       }
@@ -244,7 +240,6 @@ export default function AIChatPage() {
       try {
         console.log("🤖 Initializing Lumen AI for user:", user.id);
 
-        // Load user's conversations
         const response = await fetch("/api/ai/user", {
           credentials: "include",
         });
@@ -406,13 +401,11 @@ export default function AIChatPage() {
     setInputMessage("");
     setIsTyping(true);
 
-    // Handle clear command
     if (currentInput.toLowerCase().trim() === "clear") {
       setMessages([]);
       setConversationId("");
       setCurrentConversationLoaded(false);
       setIsTyping(false);
-      // Focus input after clearing
       if (inputRef.current) {
         inputRef.current.focus();
       }
@@ -454,13 +447,11 @@ export default function AIChatPage() {
       const data = await response.json();
       console.log("📦 AI Response received:", data);
 
-      // FIXED: Only set conversation ID once per conversation
       if (data.conversationId && !conversationId) {
         console.log("📝 Setting conversation ID:", data.conversationId);
         setConversationId(data.conversationId);
         setCurrentConversationLoaded(true);
 
-        // Add to conversations list only if not already there
         setConversations((prev) => {
           const exists = prev.some((c) => c.id === data.conversationId);
           if (!exists) {
@@ -539,7 +530,6 @@ export default function AIChatPage() {
       await typeMessage(errorMessage, errorId);
     } finally {
       setIsTyping(false);
-      // Focus input after response is complete
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();
@@ -633,10 +623,8 @@ export default function AIChatPage() {
     );
   };
 
-  // Menu action handlers with real API calls
   const toggleStar = async (conversationId: string) => {
     try {
-      // Optimistically update UI
       const conversation = conversations.find((c) => c.id === conversationId);
       const newStarredState = !conversation?.isStarred;
 
@@ -648,7 +636,6 @@ export default function AIChatPage() {
         )
       );
 
-      // Make API call to update star status
       const response = await fetch(`/api/ai/conversation/star`, {
         method: "PATCH",
         headers: {
@@ -680,7 +667,6 @@ export default function AIChatPage() {
     } catch (error) {
       console.error("Failed to toggle star:", error);
 
-      // Revert optimistic update on error
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === conversationId
@@ -689,7 +675,6 @@ export default function AIChatPage() {
         )
       );
 
-      // Show error to user
       setError("Failed to update star status");
       setTimeout(() => setError(null), 3000);
       showToast("error", "Failed to update star status");
@@ -716,18 +701,15 @@ export default function AIChatPage() {
       (c) => c.id === conversationId
     )?.title;
 
-    // Set loading state
     setRenamingId(conversationId);
 
     try {
-      // Optimistically update UI
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === conversationId ? { ...conv, title: newTitle } : conv
         )
       );
 
-      // Make API call to update title
       const response = await fetch(`/api/ai/conversation/rename`, {
         method: "PATCH",
         headers: {
@@ -749,7 +731,6 @@ export default function AIChatPage() {
     } catch (error) {
       console.error("Failed to rename conversation:", error);
 
-      // Revert optimistic update on error
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === conversationId
@@ -758,7 +739,6 @@ export default function AIChatPage() {
         )
       );
 
-      // Show error to user
       setError("Failed to rename conversation");
       setTimeout(() => setError(null), 3000);
       showToast("error", "Failed to rename conversation");
@@ -771,7 +751,6 @@ export default function AIChatPage() {
 
   const deleteConversation = async (conversationIdToDelete: string) => {
     try {
-      // Optimistically update UI
       const conversationToDelete = conversations.find(
         (c) => c.id === conversationIdToDelete
       );
@@ -779,12 +758,10 @@ export default function AIChatPage() {
         prev.filter((conv) => conv.id !== conversationIdToDelete)
       );
 
-      // If deleting current conversation, start new chat
       if (conversationIdToDelete === conversationId) {
         handleNewChat();
       }
 
-      // Make API call to delete conversation
       const response = await fetch(`/api/ai/conversation/delete`, {
         method: "DELETE",
         headers: {
@@ -805,12 +782,10 @@ export default function AIChatPage() {
     } catch (error) {
       console.error("Failed to delete conversation:", error);
 
-      // Revert optimistic update on error - add the conversation back
       if (conversationToDelete) {
         setConversations((prev) => [conversationToDelete, ...prev]);
       }
 
-      // Show error to user
       setError("Failed to delete conversation");
       setTimeout(() => setError(null), 3000);
       showToast("error", "Failed to delete conversation");
@@ -820,43 +795,34 @@ export default function AIChatPage() {
   };
 
   const formatMessage = (content: string) => {
-    // First apply basic markdown formatting
     let formatted = content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
       .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>');
 
-    // Remove markdown link syntax [text](url) and replace with just the URL
-    // This will be processed by the URL button logic below
     formatted = formatted.replace(
       /\[([^\]]+)\]\(([^)]+)\)/g,
       (match, text, url) => {
-        // Add protocol if missing
         const fullUrl = url.startsWith("http") ? url : `https://${url}`;
         return ` ${fullUrl} `;
       }
     );
 
-    // Transform URLs into clickable buttons
-    // More strict: Must have protocol OR be a clear domain with TLD
     formatted = formatted.replace(
       /(?:^|\s)((?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)(?=\s|$|<br>)/g,
       (match, url, offset) => {
         const leadingSpace = match[0] === " " ? " " : "";
 
-        // Skip if it's part of an email address
         if (formatted[offset - 1] === "@") {
           return match;
         }
 
-        // Add protocol if missing
         const fullUrl = url.startsWith("http") ? url : `https://${url}`;
 
         try {
           const urlObj = new URL(fullUrl);
           let buttonText = "";
 
-          // Special handling for social media
           if (
             urlObj.hostname.includes("twitter.com") ||
             urlObj.hostname.includes("x.com")
@@ -880,7 +846,6 @@ export default function AIChatPage() {
       }
     );
 
-    // Apply line breaks last
     formatted = formatted.replace(/\n/g, "<br>");
 
     return formatted;
@@ -888,7 +853,6 @@ export default function AIChatPage() {
 
   const handleChipClick = (chip: { display: string; query: string }) => {
     setInputMessage(chip.query);
-    // Focus the input after setting the message
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -896,6 +860,18 @@ export default function AIChatPage() {
 
   const showWelcomeScreen = messages.length === 0;
   const sidebarOpen = activeTab === "history";
+
+  // Export function to open mobile history - will be called from GlobalDashboardHeader
+  useEffect(() => {
+    // Attach function to window for GlobalDashboardHeader to call
+    (window as any).openAIChatHistory = () => {
+      setMobileHistoryOpen(true);
+    };
+
+    return () => {
+      delete (window as any).openAIChatHistory;
+    };
+  }, []);
 
   return (
     <div className="h-full relative bg-[#000000] flex">
@@ -930,52 +906,6 @@ export default function AIChatPage() {
           sidebarOpen ? "lg:mr-80" : ""
         }`}
       >
-        {/* Mobile Header - Only visible on mobile */}
-        <div className="lg:hidden flex-shrink-0 bg-[#000000] px-4 py-3">
-          <div className="flex items-center justify-center relative mt-4">
-            <button
-              onClick={() => setMobileHistoryOpen(!mobileHistoryOpen)}
-              className="absolute right-0 p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
-              aria-label="Open chat history"
-            >
-              <div className="flex flex-col gap-[3px]">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="25"
-                  height="25"
-                  viewBox="0 0 35 35"
-                  fill="none"
-                >
-                  <path
-                    d="M22.8506 22.0802L18.3415 19.3893C17.556 18.9238 16.916 17.8038 16.916 16.8875V10.9238"
-                    stroke="#E2AF19"
-                    stroke-width="1.81818"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                  <path
-                    d="M5.81729 8.72834C3.99911 11.1574 2.9082 14.1829 2.9082 17.4556C2.9082 25.4847 9.42457 32.0011 17.4537 32.0011C25.4827 32.0011 31.9991 25.4847 31.9991 17.4556C31.9991 9.42652 25.4827 2.91016 17.4537 2.91016C15.3737 2.91016 13.3809 3.34652 11.5918 4.14652"
-                    stroke="#E2AF19"
-                    stroke-width="1.81818"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </div>
-            </button>
-          </div>
-
-          {/* Error Display - Mobile */}
-          {error && (
-            <div className="mt-2 bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-2 text-center">
-              <div className="flex items-center justify-center gap-2">
-                <AlertTriangle size={16} className="text-yellow-400" />
-                <p className="text-yellow-400 text-xs font-satoshi">{error}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Desktop Top Navigation Tabs */}
         <div className="hidden lg:block flex-shrink-0 bg-[#000000] px-4 py-3">
           <div className="flex justify-center">
@@ -1014,7 +944,7 @@ export default function AIChatPage() {
           )}
         </div>
 
-        {/* Messages or Welcome Screen - FIXED FOR MOBILE */}
+        {/* Messages or Welcome Screen */}
         <div className="flex-1 min-h-0 px-4 pb-0 lg:pb-4 mb-[75px] lg:mb-0 overflow-hidden">
           {showWelcomeScreen ? (
             /* Welcome Screen */
@@ -1023,11 +953,11 @@ export default function AIChatPage() {
                 Chat with Lumen
               </h1>
 
-              {/* Mobile suggestion chips - right below title */}
+              {/* Mobile suggestion chips */}
               <div className="lg:hidden w-full px-3 mt-8">
                 <div className="flex flex-wrap justify-center gap-1.5">
                   {suggestionChips
-                    .filter((chip) => !chip.desktopOnly) // Filter out desktop-only chips
+                    .filter((chip) => !chip.desktopOnly)
                     .map((chip, index) => (
                       <button
                         key={index}
@@ -1041,7 +971,7 @@ export default function AIChatPage() {
                 </div>
               </div>
 
-              {/* Desktop suggestion chips - only visible on desktop */}
+              {/* Desktop suggestion chips */}
               <div className="hidden lg:block w-full max-w-2xl mx-auto mb-10 lg:mb-16">
                 <div className="flex flex-wrap justify-center gap-1.5 lg:gap-2 px-2 lg:px-4">
                   {suggestionChips.map((chip, index) => (
@@ -1117,7 +1047,7 @@ export default function AIChatPage() {
           )}
         </div>
 
-        {/* Input - FIXED ABOVE MOBILE NAV */}
+        {/* Input */}
         <div className="flex-shrink-0 p-3 lg:p-4 fixed lg:relative bottom-[10px] lg:bottom-0 left-0 right-0 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none z-10 pb-0 lg:pb-auto">
           <div className="relative max-w-4xl mx-auto">
             <textarea
@@ -1126,8 +1056,8 @@ export default function AIChatPage() {
               onChange={(e) => setInputMessage(e.target.value)}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
-                target.style.height = "44px"; // Reset to min-height
-                target.style.height = `${target.scrollHeight}px`; // Set to scroll height
+                target.style.height = "44px";
+                target.style.height = `${target.scrollHeight}px`;
               }}
               onKeyPress={handleKeyPress}
               placeholder={
@@ -1179,7 +1109,6 @@ export default function AIChatPage() {
                         fill="#EF4444"
                       />
                     </svg>
-                    {/* Pulsing animation indicator */}
                     <span className="absolute -top-1 -right-1 flex h-2 w-2 lg:h-3 lg:w-3">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 lg:h-3 lg:w-3 bg-red-500"></span>
@@ -1247,7 +1176,7 @@ export default function AIChatPage() {
         </div>
       </div>
 
-      {/* Mobile History Sidebar - Keeping as is */}
+      {/* Mobile History Sidebar */}
       <div
         className={`lg:hidden fixed right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out ${
           mobileHistoryOpen
@@ -1272,12 +1201,6 @@ export default function AIChatPage() {
 
           {/* Scrollable Chat History */}
           <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-4 min-h-0">
-            {/* <div className="mb-4">
-              <span className="text-gray-300 text-sm font-satoshi font-medium">
-                Recent
-              </span>
-            </div> */}
-
             <div className="space-y-2">
               {/* Current Session */}
               {messages.length > 0 &&
@@ -1532,14 +1455,8 @@ export default function AIChatPage() {
 
           {/* Scrollable Chat History */}
           <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-20">
-            {/* <div className="mb-4">
-              <span className="text-gray-300 text-sm font-satoshi font-medium">
-                Recent
-              </span>
-            </div> */}
-
             <div className="space-y-2">
-              {/* Current Session - only show if we have messages AND a conversation ID */}
+              {/* Current Session */}
               {messages.length > 0 &&
                 conversationId &&
                 currentConversationLoaded && (
@@ -1569,14 +1486,12 @@ export default function AIChatPage() {
                   </div>
                 )}
 
-              {/* Saved Conversations - filter out current conversation */}
+              {/* Saved Conversations */}
               {conversations
                 .filter((conv) => conv.id !== conversationId)
                 .sort((a, b) => {
-                  // Starred conversations come first
                   if (a.isStarred && !b.isStarred) return -1;
                   if (!a.isStarred && b.isStarred) return 1;
-                  // If both starred or both not starred, sort by timestamp (most recent first)
                   return (
                     new Date(b.timestamp).getTime() -
                     new Date(a.timestamp).getTime()
