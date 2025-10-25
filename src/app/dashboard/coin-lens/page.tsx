@@ -479,7 +479,7 @@ function CoinLensContent() {
     <div className="h-full bg-[#000000] rounded-[16px] p-2 sm:p-4 flex flex-col overflow-hidden relative">
       {/* Mobile Search Bar - Only visible on mobile */}
       <div className="lg:hidden mb-3 relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5 pointer-events-none" />
         <input
           type="text"
           placeholder="Search tokens or paste address"
@@ -488,11 +488,16 @@ function CoinLensContent() {
           className="w-full bg-black border border-[#2C2C2C] rounded-xl pl-12 pr-14 py-3 text-gray-300 text-sm font-satoshi placeholder-gray-600 focus:outline-none focus:border-[#E2AF19] transition-colors"
         />
         <button
-          onClick={() => setAddTokensModalOpen(true)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] p-2 rounded-lg transition-colors"
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setAddTokensModalOpen(true);
+          }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] p-2 rounded-lg transition-colors z-10"
           title="Add Tokens"
         >
-          <Plus className="w-4 h-4 text-black" />
+          <Plus className="w-4 h-4 text-black pointer-events-none" />
         </button>
       </div>
 

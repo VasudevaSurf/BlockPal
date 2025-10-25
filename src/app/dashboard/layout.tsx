@@ -218,7 +218,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             >
               {/* Mobile-only header for Dashboard - TWO hamburgers (left for sidebar, right for wallet menu) */}
               {isDashboardPage && (
-                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] border-b border-[#2C2C2C] flex-shrink-0">
+                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] flex-shrink-0">
                   <div className="flex items-center gap-3">
                     {/* LEFT Hamburger - Opens Sidebar */}
                     <button
@@ -265,7 +265,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
               {/* Mobile-only header for AI Chat - hamburger on LEFT */}
               {isAIChatPage && (
-                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] border-b border-[#2C2C2C] flex-shrink-0">
+                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] flex-shrink-0">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleMobileMenuToggle}
@@ -308,7 +308,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
               {/* Swap page mobile header */}
               {isSwapPage && (
-                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] border-b border-[#2C2C2C] flex-shrink-0">
+                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] flex-shrink-0">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleMobileMenuToggle}
