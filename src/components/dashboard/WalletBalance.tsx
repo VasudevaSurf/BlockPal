@@ -203,10 +203,10 @@ export default function WalletBalance() {
         </h2>
         {isRefreshing && (
           <div className="flex items-center gap-1">
-            <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
+            {/* <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
             <span className="text-xs text-[#E2AF19] font-satoshi">
               Updating...
-            </span>
+            </span> */}
           </div>
         )}
       </div>
