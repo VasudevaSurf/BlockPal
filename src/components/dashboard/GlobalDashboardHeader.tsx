@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED: Hide wallet/icons on AI chat and news feed pages
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED: Added mobile hamburger menu
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -21,20 +21,20 @@ import { chains } from "@/components/wallet/WalletProvider";
 import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 import { clearWalletConnection } from "@/utils/walletCleanup";
 import { useDisconnect } from "wagmi";
+import StylishMenuIcon from "@/components/icons/StylishMenuIcon";
 
 interface GlobalDashboardHeaderProps {
   title: string;
   subtitle?: string;
   children?: React.ReactNode;
-  // CoinLens specific props
   onSearchChange?: (query: string) => void;
   onAddTokenClick?: () => void;
   searchQuery?: string;
-  // News Feed specific props
   onNewsSearch?: (query: string) => void;
   onNewsClearSearch?: () => void;
   onNewsAIClick?: () => void;
   newsSearchQuery?: string;
+  onMobileMenuToggle?: () => void; // Added prop for mobile menu toggle
 }
 
 // Page title mapping based on pathname
@@ -293,6 +293,7 @@ export default function GlobalDashboardHeader({
   onNewsClearSearch,
   onNewsAIClick,
   newsSearchQuery = "",
+  onMobileMenuToggle, // Added prop
 }: GlobalDashboardHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -466,16 +467,10 @@ export default function GlobalDashboardHeader({
 
   const handleLogout = async () => {
     try {
-      // Silently disconnect wallet first
       if (isConnected && address) {
         console.log("🔌 Silently disconnecting wallet before logout...");
-        // Import disconnect from wagmi at the top of the file
-        // Add: import { useDisconnect } from "wagmi";
-        // And add this line after other wagmi hooks:
-        // const { disconnect } = useDisconnect();
-
         disconnect();
-        clearWalletConnection(); // Clear Wagmi localStorage
+        clearWalletConnection();
       }
 
       if (typeof window !== "undefined") {
@@ -597,10 +592,21 @@ export default function GlobalDashboardHeader({
         {/* Left section - conditional rendering based on page */}
         <div
           className={`${
-            isCoinLensPage || isNewsFeedPage ? "hidden" : "flex-1"
+            isCoinLensPage || isNewsFeedPage
+              ? "hidden lg:flex lg:flex-1"
+              : "flex-1"
           }`}
         >
           <div className="flex items-center gap-3">
+            {/* Mobile Hamburger Icon - Shows on all pages on mobile */}
+            <button
+              onClick={onMobileMenuToggle}
+              className="lg:hidden p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors flex-shrink-0"
+              title="Open menu"
+            >
+              <StylishMenuIcon size={20} className="text-white" />
+            </button>
+
             {/* Back button - shows on token overview page */}
             {isTokenOverviewPage && (
               <button
@@ -612,110 +618,128 @@ export default function GlobalDashboardHeader({
               </button>
             )}
 
-            {/* Portfolio Title - Only show on Portfolio page */}
+            {/* Portfolio Title - Only show on Portfolio page on desktop */}
             {isPortfolioPage && (
-              <h1 className="text-white text-lg lg:text-[25px] font-mayeka font-semibold">
+              <h1 className="hidden lg:block text-white text-lg lg:text-[25px] font-mayeka font-semibold">
                 {displayTitle}
               </h1>
-            )}
-
-            {!isCoinLensPage && !isNewsFeedPage && !isPortfolioPage && (
-              <div></div>
             )}
           </div>
         </div>
 
         {/* CoinLens Search Bar - Centered on mobile, starts from left on desktop */}
         {isCoinLensPage && (
-          <div className="flex-1 relative lg:mr-4 mx-2 sm:mx-0">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search tokens or paste address"
-              value={searchQuery}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              className="w-full bg-black border border-[#2C2C2C] rounded-xl pl-12 pr-14 py-3 text-gray-300 text-sm font-satoshi placeholder-gray-600 focus:outline-none focus:border-[#E2AF19] transition-colors"
-            />
+          <>
+            {/* Mobile Hamburger for CoinLens */}
             <button
-              onClick={onAddTokenClick}
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] p-2 rounded-lg transition-colors"
-              title="Add Tokens"
+              onClick={onMobileMenuToggle}
+              className="lg:hidden p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors flex-shrink-0 absolute left-2"
+              title="Open menu"
             >
-              <Plus className="w-4 h-4 text-black" />
+              <StylishMenuIcon size={20} className="text-white" />
             </button>
-          </div>
+
+            <div className="flex-1 relative lg:mr-4 mx-2 sm:mx-0 lg:ml-0 ml-12">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search tokens or paste address"
+                value={searchQuery}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+                className="w-full bg-black border border-[#2C2C2C] rounded-xl pl-12 pr-14 py-3 text-gray-300 text-sm font-satoshi placeholder-gray-600 focus:outline-none focus:border-[#E2AF19] transition-colors"
+              />
+              <button
+                onClick={onAddTokenClick}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#E2AF19] hover:bg-[#D4A853] p-2 rounded-lg transition-colors"
+                title="Add Tokens"
+              >
+                <Plus className="w-4 h-4 text-black" />
+              </button>
+            </div>
+          </>
         )}
 
         {/* News Feed Search Bar - Centered on mobile, starts from left on desktop */}
         {isNewsFeedPage && (
-          <form
-            onSubmit={handleNewsSearchSubmit}
-            className="flex-1 flex gap-2 lg:mr-4 mx-2.5 sm:mx-0"
-          >
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="Search crypto news..."
-                value={localNewsSearch}
-                onChange={(e) => setLocalNewsSearch(e.target.value)}
-                className="w-full border border-[#2C2C2C] rounded-[10px] px-4 py-3 pl-10 pr-10 text-white text-[14px] placeholder:text-[#666666] focus:outline-none focus:border-[#F7B410] transition-colors bg-black"
-              />
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#666666]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-
-              {newsSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLocalNewsSearch("");
-                    onNewsClearSearch?.();
-                  }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-[#2C2C2C] rounded-full transition-colors"
-                  title="Clear search"
-                >
-                  <X
-                    size={16}
-                    className="text-[#666666] hover:text-[#F7B410]"
-                  />
-                </button>
-              )}
-            </div>
-
-            {/* AI Button */}
+          <>
+            {/* Mobile Hamburger for NewsFeed */}
             <button
-              type="button"
-              onClick={onNewsAIClick}
-              className="px-6 py-3 border border-[#2C2C2C] rounded-[10px] text-white text-[14px] font-medium bg-[#F7B410] hover:from-[#D4A853] hover:to-[#E2AF19] transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl flex-shrink-0"
+              onClick={onMobileMenuToggle}
+              className="lg:hidden p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors flex-shrink-0 absolute left-2"
+              title="Open menu"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 29 29"
-                fill="none"
-              >
-                <path
-                  d="M8.04157 4.81315C7.3544 4.81295 6.67954 4.99549 6.08616 5.34206C5.49279 5.68862 5.00224 6.18674 4.66481 6.78536C4.32738 7.38398 4.15521 8.06156 4.16594 8.74865C4.17667 9.43573 4.36991 10.1076 4.72587 10.6954C3.84177 10.8662 3.04473 11.3395 2.47159 12.034C1.89844 12.7285 1.58496 13.6009 1.58496 14.5013C1.58496 15.4017 1.89844 16.2741 2.47159 16.9686C3.04473 17.6631 3.84177 18.1364 4.72587 18.3072M8.04157 4.81315C8.04157 3.95672 8.38179 3.13537 8.98737 2.52979C9.59296 1.9242 10.4143 1.58398 11.2707 1.58398C12.1272 1.58398 12.9485 1.9242 13.5541 2.52979C14.1597 3.13537 14.4999 3.95672 14.4999 4.81315M8.04157 4.81315C8.04157 5.86973 8.5492 6.80748 9.33324 7.39648M4.72587 18.3072C4.37024 18.895 4.17726 19.5667 4.16671 20.2536C4.15615 20.9405 4.32838 21.6178 4.66577 22.2163C5.00316 22.8147 5.49358 23.3126 6.08677 23.6591C6.67996 24.0056 7.3546 24.1882 8.04157 24.1882C8.04157 25.0446 8.38179 25.8659 8.98737 26.4715C9.59296 27.0771 10.4143 27.4173 11.2707 27.4173C12.1272 27.4173 12.9485 27.0771 13.5541 26.4715C14.1597 25.8659 14.4999 25.0446 14.4999 24.1882M4.72587 18.3072C5.18942 17.5398 5.90473 16.9569 6.74991 16.6577M14.4999 4.81315V24.1882M14.4999 4.81315C14.4999 3.95672 14.8401 3.13537 15.4457 2.52979C16.0513 1.9242 16.8726 1.58398 17.7291 1.58398C18.5855 1.58398 19.4069 1.9242 20.0124 2.52979C20.618 3.13537 20.9582 3.95672 20.9582 4.81315C21.6452 4.81309 22.3199 4.99567 22.913 5.34216C23.5062 5.68866 23.9966 6.18663 24.334 6.78505C24.6714 7.38346 24.8437 8.06082 24.8331 8.74771C24.8226 9.43461 24.6296 10.1063 24.2739 10.6941M14.4999 24.1882C14.4999 25.0446 14.8401 25.8659 15.4457 26.4715C16.0513 27.0771 16.8726 27.4173 17.7291 27.4173C18.5855 27.4173 19.4069 27.0771 20.0124 26.4715C20.618 25.8659 20.9582 25.0446 20.9582 24.1882M20.9582 24.1882C21.6454 24.1883 22.3203 24.0058 22.9136 23.6592C23.507 23.3127 23.9976 22.8146 24.335 22.2159C24.6724 21.6173 24.8446 20.9397 24.8339 20.2527C24.8231 19.5656 24.6299 18.8937 24.2739 18.3059C25.158 18.1351 25.9551 17.6618 26.5282 16.9673C27.1014 16.2728 27.4149 15.4005 27.4149 14.5C27.4149 13.5996 27.1014 12.7272 26.5282 12.0327C25.9551 11.3382 25.158 10.8649 24.2739 10.6941M20.9582 24.1882C20.9582 23.1316 20.4506 22.1938 19.6666 21.6048M24.2739 10.6941C23.8104 11.4615 23.0951 12.0445 22.2499 12.3436"
-                  stroke="black"
-                  strokeWidth="1.9375"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span className="font-mayeka text-black">Pulse</span>
+              <StylishMenuIcon size={20} className="text-white" />
             </button>
-          </form>
+
+            <form
+              onSubmit={handleNewsSearchSubmit}
+              className="flex-1 flex gap-2 lg:mr-4 mx-2.5 sm:mx-0 lg:ml-0 ml-12"
+            >
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Search crypto news..."
+                  value={localNewsSearch}
+                  onChange={(e) => setLocalNewsSearch(e.target.value)}
+                  className="w-full border border-[#2C2C2C] rounded-[10px] px-4 py-3 pl-10 pr-10 text-white text-[14px] placeholder:text-[#666666] focus:outline-none focus:border-[#F7B410] transition-colors bg-black"
+                />
+                <svg
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#666666]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+
+                {newsSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocalNewsSearch("");
+                      onNewsClearSearch?.();
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-[#2C2C2C] rounded-full transition-colors"
+                    title="Clear search"
+                  >
+                    <X
+                      size={16}
+                      className="text-[#666666] hover:text-[#F7B410]"
+                    />
+                  </button>
+                )}
+              </div>
+
+              {/* AI Button */}
+              <button
+                type="button"
+                onClick={onNewsAIClick}
+                className="px-6 py-3 border border-[#2C2C2C] rounded-[10px] text-white text-[14px] font-medium bg-[#F7B410] hover:from-[#D4A853] hover:to-[#E2AF19] transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl flex-shrink-0"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 29 29"
+                  fill="none"
+                >
+                  <path
+                    d="M8.04157 4.81315C7.3544 4.81295 6.67954 4.99549 6.08616 5.34206C5.49279 5.68862 5.00224 6.18674 4.66481 6.78536C4.32738 7.38398 4.15521 8.06156 4.16594 8.74865C4.17667 9.43573 4.36991 10.1076 4.72587 10.6954C3.84177 10.8662 3.04473 11.3395 2.47159 12.034C1.89844 12.7285 1.58496 13.6009 1.58496 14.5013C1.58496 15.4017 1.89844 16.2741 2.47159 16.9686C3.04473 17.6631 3.84177 18.1364 4.72587 18.3072M8.04157 4.81315C8.04157 3.95672 8.38179 3.13537 8.98737 2.52979C9.59296 1.9242 10.4143 1.58398 11.2707 1.58398C12.1272 1.58398 12.9485 1.9242 13.5541 2.52979C14.1597 3.13537 14.4999 3.95672 14.4999 4.81315M8.04157 4.81315C8.04157 5.86973 8.5492 6.80748 9.33324 7.39648M4.72587 18.3072C4.37024 18.895 4.17726 19.5667 4.16671 20.2536C4.15615 20.9405 4.32838 21.6178 4.66577 22.2163C5.00316 22.8147 5.49358 23.3126 6.08677 23.6591C6.67996 24.0056 7.3546 24.1882 8.04157 24.1882C8.04157 25.0446 8.38179 25.8659 8.98737 26.4715C9.59296 27.0771 10.4143 27.4173 11.2707 27.4173C12.1272 27.4173 12.9485 27.0771 13.5541 26.4715C14.1597 25.8659 14.4999 25.0446 14.4999 24.1882M4.72587 18.3072C5.18942 17.5398 5.90473 16.9569 6.74991 16.6577M14.4999 4.81315V24.1882M14.4999 4.81315C14.4999 3.95672 14.8401 3.13537 15.4457 2.52979C16.0513 1.9242 16.8726 1.58398 17.7291 1.58398C18.5855 1.58398 19.4069 1.9242 20.0124 2.52979C20.618 3.13537 20.9582 3.95672 20.9582 4.81315C21.6452 4.81309 22.3199 4.99567 22.913 5.34216C23.5062 5.68866 23.9966 6.18663 24.334 6.78505C24.6714 7.38346 24.8437 8.06082 24.8331 8.74771C24.8226 9.43461 24.6296 10.1063 24.2739 10.6941M14.4999 24.1882C14.4999 25.0446 14.8401 25.8659 15.4457 26.4715C16.0513 27.0771 16.8726 27.4173 17.7291 27.4173C18.5855 27.4173 19.4069 27.0771 20.0124 26.4715C20.618 25.8659 20.9582 25.0446 20.9582 24.1882M20.9582 24.1882C21.6454 24.1883 22.3203 24.0058 22.9136 23.6592C23.507 23.3127 23.9976 22.8146 24.335 22.2159C24.6724 21.6173 24.8446 20.9397 24.8339 20.2527C24.8231 19.5656 24.6299 18.8937 24.2739 18.3059C25.158 18.1351 25.9551 17.6618 26.5282 16.9673C27.1014 16.2728 27.4149 15.4005 27.4149 14.5C27.4149 13.5996 27.1014 12.7272 26.5282 12.0327C25.9551 11.3382 25.158 10.8649 24.2739 10.6941M20.9582 24.1882C20.9582 23.1316 20.4506 22.1938 19.6666 21.6048M24.2739 10.6941C23.8104 11.4615 23.0951 12.0445 22.2499 12.3436"
+                    stroke="black"
+                    strokeWidth="1.9375"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="font-mayeka text-black">Pulse</span>
+              </button>
+            </form>
+          </>
         )}
 
         {/* Hide wallet/notifications/icons on AI Chat and News Feed pages */}

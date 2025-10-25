@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - FIXED: Content stops above bottom sidebar on mobile
+// src/app/dashboard/layout.tsx - UPDATED: Added mobile sidebar support
 "use client";
 
 import { useSelector } from "react-redux";
@@ -19,6 +19,7 @@ import { WalletDataProvider } from "@/contexts/WalletDataContext";
 import { CoinLensLoadingProvider } from "@/contexts/CoinLensLoadingContext";
 import { NewsFeedLoadingProvider } from "@/contexts/NewsFeedLoadingContext";
 import BlockPalLoader from "@/components/ui/BlockPalLoader";
+import StylishMenuIcon from "@/components/icons/StylishMenuIcon";
 
 // CodeLens Context
 interface CodeLensContextType {
@@ -69,6 +70,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { isLoading, allComponentsLoaded } = useUnifiedDashboard();
 
   const [isNewsChatActive, setIsNewsChatActive] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [codeLensSearchQuery, setCodeLensSearchQuery] = useState("");
   const [codeLensAddTokenHandler, setCodeLensAddTokenHandler] = useState<
@@ -130,6 +132,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     newsFeedAIHandler();
   };
 
+  const handleMobileMenuToggle = () => {
+    setIsMobileSidebarOpen(!isMobileSidebarOpen);
+  };
+
+  const handleMobileSidebarClose = () => {
+    setIsMobileSidebarOpen(false);
+  };
+
   return (
     <CodeLensContext.Provider
       value={{
@@ -154,7 +164,29 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <div className="h-screen bg-[#000000] flex flex-col lg:flex-row overflow-hidden relative">
           <NavigationLoadingIndicator />
 
-          <Sidebar />
+          {/* Desktop Sidebar - Always visible on desktop */}
+          <div className="hidden lg:block">
+            <Sidebar />
+          </div>
+
+          {/* Mobile Sidebar Overlay */}
+          {isMobileSidebarOpen && (
+            <>
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+                onClick={handleMobileSidebarClose}
+              />
+
+              {/* Mobile Sidebar */}
+              <div className="fixed inset-y-0 left-0 w-64 z-50 lg:hidden">
+                <Sidebar 
+                  isMobile={true} 
+                  onItemClick={handleMobileSidebarClose}
+                />
+              </div>
+            </>
+          )}
 
           <main
             className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col relative ${
@@ -184,6 +216,139 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   : "opacity-100"
               }`}
             >
+              {/* Mobile-only header for Dashboard - TWO hamburgers (left for sidebar, right for wallet menu) */}
+              {isDashboardPage && (
+                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] border-b border-[#2C2C2C] flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    {/* LEFT Hamburger - Opens Sidebar */}
+                    <button
+                      onClick={handleMobileMenuToggle}
+                      className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                      title="Open menu"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="20"
+                        viewBox="0 0 29 20"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 2H27.3521"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 10H19"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 18H13"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                    <h1 className="text-white text-lg font-mayeka font-semibold">
+                      Dashboard
+                    </h1>
+                  </div>
+                  
+                  {/* RIGHT Hamburger - Opens Mobile Wallet Menu (passed from dashboard page) */}
+                  <div id="mobile-wallet-menu-trigger"></div>
+                </div>
+              )}
+
+              {/* Mobile-only header for AI Chat - hamburger on LEFT */}
+              {isAIChatPage && (
+                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] border-b border-[#2C2C2C] flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleMobileMenuToggle}
+                      className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                      title="Open menu"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="20"
+                        viewBox="0 0 29 20"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 2H27.3521"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 10H19"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 18H13"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                    <h1 className="text-white text-lg font-mayeka font-semibold">
+                      Lumen AI
+                    </h1>
+                  </div>
+                </div>
+              )}
+
+              {/* Swap page mobile header */}
+              {isSwapPage && (
+                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] border-b border-[#2C2C2C] flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleMobileMenuToggle}
+                      className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                      title="Open menu"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="20"
+                        viewBox="0 0 29 20"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 2H27.3521"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 10H19"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 18H13"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                    <h1 className="text-white text-lg font-mayeka font-semibold">
+                      Swap
+                    </h1>
+                  </div>
+                </div>
+              )}
+
               {!isSwapPage && !isNewsChatActive && (
                 <div
                   className={`flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2 ${
@@ -218,6 +383,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     newsSearchQuery={
                       isNewsFeedPage ? newsFeedSearchQuery : undefined
                     }
+                    onMobileMenuToggle={handleMobileMenuToggle}
                   />
                 </div>
               )}
