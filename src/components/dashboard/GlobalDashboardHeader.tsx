@@ -1,4 +1,4 @@
-// src/components/dashboard/GlobalDashboardHeader.tsx - COMPLETE UPDATED CODE
+// src/components/dashboard/GlobalDashboardHeader.tsx - UPDATED with Logout Modal
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -21,6 +21,7 @@ import { chains } from "@/components/wallet/WalletProvider";
 import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 import { clearWalletConnection } from "@/utils/walletCleanup";
 import { useDisconnect } from "wagmi";
+import LogoutModal from "@/components/modals/LogoutModal";
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -357,6 +358,8 @@ export default function GlobalDashboardHeader({
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [localNewsSearch, setLocalNewsSearch] = useState("");
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const authChecked = useRef(false);
   const chainSelectorRef = useRef<HTMLDivElement>(null);
@@ -464,8 +467,18 @@ export default function GlobalDashboardHeader({
     router.push("/dashboard/profile");
   };
 
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
+    setLogoutModalOpen(true);
+  };
+
+  const handleLogoutConfirm = async () => {
     try {
+      // Close modal immediately and prevent reopening
+      setLogoutModalOpen(false);
+      
+      // Small delay to let modal close animation complete
+      await new Promise(resolve => setTimeout(resolve, 250));
+      
       if (isConnected && address) {
         console.log("🔌 Silently disconnecting wallet before logout...");
         disconnect();
@@ -479,6 +492,7 @@ export default function GlobalDashboardHeader({
       router.push("/auth");
     } catch (error) {
       console.error("Logout error:", error);
+      setLogoutModalOpen(false);
       router.push("/auth");
     }
   };
@@ -1011,7 +1025,7 @@ export default function GlobalDashboardHeader({
               <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
 
               <button
-                onClick={handleLogout}
+                onClick={handleLogoutClick}
                 className="p-1 lg:p-1.5 transition-colors hover:bg-red-900/20 rounded-full"
                 title="Logout"
               >
@@ -1026,6 +1040,13 @@ export default function GlobalDashboardHeader({
       </div>
 
       {children}
+
+      {/* Logout Modal */}
+      <LogoutModal
+        isOpen={logoutModalOpen}
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={handleLogoutConfirm}
+      />
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {

@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - COMPLETE UPDATED CODE
+// src/components/dashboard/Sidebar.tsx - COMPLETE UPDATED CODE with Logout Modal
 "use client";
 
 import { useState } from "react";
@@ -16,6 +16,7 @@ import CoinLensIcon from "@/components/icons/CoinLensIcon";
 import NewsFeedIcon from "../icons/NewsFeedIcon";
 import { useAccount, useDisconnect } from "wagmi";
 import { clearWalletConnection } from "@/utils/walletCleanup";
+import LogoutModal from "@/components/modals/LogoutModal";
 
 const menuItems = [
   {
@@ -68,6 +69,7 @@ export default function Sidebar({
 
   // State for sidebar minimization (desktop only)
   const [isMinimized, setIsMinimized] = useState(false);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleNavigation = (
@@ -117,9 +119,17 @@ export default function Sidebar({
     onItemClick?.();
   };
 
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
+    setLogoutModalOpen(true);
+  };
+
+  const handleLogoutConfirm = async () => {
     try {
-      setIsLoggingOut(true);
+      // Close modal immediately and prevent reopening
+      setLogoutModalOpen(false);
+
+      // Small delay to let modal close animation complete
+      await new Promise((resolve) => setTimeout(resolve, 250));
 
       if (address) {
         console.log("🔌 Silently disconnecting wallet before logout...");
@@ -138,30 +148,14 @@ export default function Sidebar({
       onItemClick?.();
     } catch (error) {
       console.error("Logout error:", error);
+      setLogoutModalOpen(false);
       router.push("/auth");
       onItemClick?.();
-    } finally {
-      setIsLoggingOut(false);
     }
   };
 
   return (
     <>
-      {/* Full Screen Loading Overlay */}
-      {isLoggingOut && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-[#0F0F0F] border border-[#2C2C2C] rounded-2xl p-8 sm:p-10 flex flex-col items-center max-w-sm w-full">
-            <div className="w-12 h-12 border-3 border-[#E2AF19] border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-white text-base sm:text-lg font-satoshi font-medium">
-              Logging out...
-            </p>
-            <p className="text-gray-400 text-xs sm:text-sm font-satoshi mt-2">
-              Please wait
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Sidebar */}
       <div
         className={`flex flex-col bg-[#0F0F0F] border-r border-[#FFFFFF40] h-full overflow-hidden transition-all duration-300 ease-in-out ${
@@ -308,10 +302,7 @@ export default function Sidebar({
               {/* Profile Button */}
               <button
                 onClick={handleProfileClick}
-                disabled={isLoggingOut}
-                className={`w-full flex items-center px-4 py-3 text-sm rounded-lg text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi ${
-                  isLoggingOut ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className="w-full flex items-center px-4 py-3 text-sm rounded-lg text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -333,11 +324,8 @@ export default function Sidebar({
 
               {/* Logout Button */}
               <button
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className={`w-full flex items-center px-4 py-3 text-sm rounded-lg text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200 font-satoshi ${
-                  isLoggingOut ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                onClick={handleLogoutClick}
+                className="w-full flex items-center px-4 py-3 text-sm rounded-lg text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200 font-satoshi"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -361,6 +349,13 @@ export default function Sidebar({
           </div>
         )}
       </div>
+
+      {/* Logout Modal */}
+      <LogoutModal
+        isOpen={logoutModalOpen}
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={handleLogoutConfirm}
+      />
 
       <style jsx>{`
         .scrollbar-hide {
