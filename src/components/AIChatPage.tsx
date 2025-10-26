@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx - UPDATED: Removed mobile history icon from chat page
+// src/components/AIChatPage.tsx - UPDATED: Fixed mobile height to account for header
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -874,7 +874,7 @@ export default function AIChatPage() {
   }, []);
 
   return (
-    <div className="h-full relative bg-[#000000] flex">
+    <div className="h-full relative bg-[#000000] flex lg:h-full mobile-ai-container">
       {/* Overlay Background */}
       <div
         className="fixed bottom-0 right-0 w-[1600px] h-[1600px] bg-no-repeat bg-contain bg-bottom-right pointer-events-none z-0"
@@ -904,7 +904,7 @@ export default function AIChatPage() {
       <div
         className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
           sidebarOpen ? "lg:mr-80" : ""
-        }`}
+        } h-full`}
       >
         {/* Desktop Top Navigation Tabs */}
         <div className="hidden lg:block flex-shrink-0 bg-[#000000] px-4 py-3">
@@ -945,7 +945,7 @@ export default function AIChatPage() {
         </div>
 
         {/* Messages or Welcome Screen */}
-        <div className="flex-1 min-h-0 px-4 pb-0 lg:pb-4 mb-[75px] lg:mb-0 overflow-hidden">
+        <div className="flex-1 min-h-0 px-4 pb-24 lg:pb-4 overflow-hidden mobile-messages-container">
           {showWelcomeScreen ? (
             /* Welcome Screen */
             <div className="h-full flex flex-col items-center justify-center overflow-y-auto scrollbar-hide">
@@ -989,7 +989,7 @@ export default function AIChatPage() {
             </div>
           ) : (
             /* Chat Messages */
-            <div className="h-full overflow-y-auto scrollbar-hide">
+            <div className="h-full overflow-y-auto scrollbar-hide pb-16 lg:pb-0">
               <div className="py-4 space-y-4">
                 {messages.map((message) => (
                   <div key={message.id} className="flex flex-col space-y-2">
@@ -1048,7 +1048,7 @@ export default function AIChatPage() {
         </div>
 
         {/* Input */}
-        <div className="flex-shrink-0 p-3 lg:p-4 fixed lg:relative bottom-[10px] lg:bottom-0 left-0 right-0 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none z-10 pb-0 lg:pb-auto">
+        <div className="flex-shrink-0 p-3 lg:p-4 mobile-input-container lg:relative lg:bg-transparent lg:backdrop-blur-none z-10 lg:bottom-0">
           <div className="relative max-w-4xl mx-auto">
             <textarea
               ref={inputRef}
@@ -1185,7 +1185,7 @@ export default function AIChatPage() {
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="h-full flex flex-col bg-black/95 backdrop-blur-md border-l border-[#2C2C2C]">
+        <div className="h-full flex flex-col bg-black/95 backdrop-blur-md border-l border-[#2C2C2C] pb-24">
           {/* Close button for mobile */}
           <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C] flex-shrink-0">
             <h2 className="text-white text-lg font-satoshi font-medium">
@@ -1200,7 +1200,7 @@ export default function AIChatPage() {
           </div>
 
           {/* Scrollable Chat History */}
-          <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-4 min-h-0">
+          <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-20 min-h-0">
             <div className="space-y-2">
               {/* Current Session */}
               {messages.length > 0 &&
@@ -1415,7 +1415,7 @@ export default function AIChatPage() {
           </div>
 
           {/* New Chat Button - Fixed at bottom above bottom nav */}
-          <div className="flex-shrink-0 p-4 border-t border-[#2C2C2C] bg-black/95">
+          <div className="absolute bottom-20 left-0 right-0 flex-shrink-0 p-4 border-t border-[#2C2C2C] bg-black/95">
             <button
               onClick={handleNewChat}
               className="w-full text-[#E2AF19] px-3 py-1.5 rounded-[300px] border border-[#71570C] text-[18px] font-satoshi font-medium transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"
@@ -1692,6 +1692,61 @@ export default function AIChatPage() {
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
         }
+
+        /* Update the mobile-specific CSS section */
+
+        @media (max-width: 1024px) {
+          /* Account for the mobile header height (60px) */
+          .mobile-ai-container {
+            height: calc(100vh - 60px) !important;
+            max-height: calc(100vh - 60px) !important;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+          }
+
+          /* Messages container takes remaining space */
+          .mobile-messages-container {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          /* Input container - FIXED AT BOTTOM */
+          .mobile-input-container {
+            position: fixed !important;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            flex-shrink: 0;
+            background: #000000;
+            padding-bottom: env(safe-area-inset-bottom, 10px);
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            margin-bottom: 10px;
+          }
+        }
+
+        /* Rest of your styles remain the same... */
+        .line-clamp-1 {
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        /* Ensure no scrolling on the body when in AI chat */
+        @media (max-width: 1024px) {
+          body:has(.mobile-ai-container) {
+            overflow: hidden;
+            height: 100vh;
+            position: fixed;
+            width: 100%;
+          }
+        }
+
         .line-clamp-1 {
           display: -webkit-box;
           -webkit-line-clamp: 1;
@@ -1719,19 +1774,6 @@ export default function AIChatPage() {
           border-radius: 4px;
           font-family: monospace;
           font-size: 0.9em;
-        }
-        ::-webkit-scrollbar {
-          width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-          background: #0f0f0f;
-        }
-        ::-webkit-scrollbar-thumb {
-          background: #2c2c2c;
-          border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: #404040;
         }
         .message-content .url-button {
           display: inline-flex;
