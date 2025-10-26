@@ -602,10 +602,13 @@ export default function AddTokensModal({
 
       {/* Modal Container */}
       <div
-        className="fixed lg:absolute inset-0 z-50 flex items-center justify-center p-2 lg:p-4"
+        className="fixed lg:absolute inset-0 z-50 flex items-center justify-center lg:p-4"
         onClick={onClose}
         style={{
-          paddingBottom: "calc(80px + 0.5rem)", // Account for bottom nav + padding on mobile
+          paddingTop: "6rem", // Add top space on mobile
+          paddingBottom: "calc(80px + 1rem)", // Account for bottom nav + padding on mobile
+          paddingLeft: "0.5rem",
+          paddingRight: "0.5rem",
         }}
       >
         <div
@@ -789,9 +792,10 @@ export default function AddTokensModal({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     disabled={addingTokens}
-                    className={`w-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[15px] pl-8 lg:pl-10 pr-3 lg:pr-4 py-2 lg:py-3 text-sm lg:text-base text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka ${
+                    className={`w-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[15px] pl-8 lg:pl-10 pr-3 lg:pr-4 py-2 lg:py-3 text-[16px] lg:text-base text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka ${
                       addingTokens ? "opacity-50 cursor-not-allowed" : ""
                     }`}
+                    style={{ fontSize: "16px" }}
                   />
                 </div>
 
