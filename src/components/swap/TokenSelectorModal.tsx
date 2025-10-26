@@ -802,7 +802,10 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                     placeholder="Search name, symbol, or paste address"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[15px] pl-8 lg:pl-10 pr-3 lg:pr-4 py-2 lg:py-3 text-sm lg:text-base text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
+                    className="w-full bg-[#0F0F0F] rounded-[12px] lg:rounded-[15px] pl-8 lg:pl-10 pr-3 lg:pr-4 py-2 lg:py-3 text-base text-white placeholder-gray-400 focus:outline-none focus:border-[#E2AF19] font-mayeka"
+                    style={{
+                      fontSize: "16px", // Prevents zoom on iOS
+                    }}
                   />
                 </div>
 

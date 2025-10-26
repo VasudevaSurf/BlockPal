@@ -879,16 +879,16 @@ export default function TokenList() {
           )}
 
           {/* Trending 24h label */}
-          {activeTab === "trending" && (
+          {/* {activeTab === "trending" && (
             <div className="flex lg:hidden items-center gap-1 border border-[#2C2C2C] rounded-lg px-2 py-1">
               <span className="text-gray-400 text-[10px] font-satoshi">
                 24h Change
               </span>
             </div>
-          )}
+          )} */}
 
           {/* Gainers timeframe */}
-          {activeTab === "gainers" && (
+          {/* {activeTab === "gainers" && (
             <div className="flex lg:hidden items-center bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-1">
               {["1hr", "24h", "7d"].map((timeframe) => (
                 <button
@@ -904,7 +904,7 @@ export default function TokenList() {
                 </button>
               ))}
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Error state - only for wallet errors */}

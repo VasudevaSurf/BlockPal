@@ -317,6 +317,12 @@ export default function MobileWalletMenu({
 
   return (
     <>
+      {/* Backdrop */}
+      <div
+        className="fixed lg:absolute inset-0 bg-white/10 z-40"
+        onClick={onClose}
+      />
+
       {/* Dropdown Menu Modal */}
       <div
         ref={menuRef}

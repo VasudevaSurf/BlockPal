@@ -609,7 +609,7 @@ export default function AddTokensModal({
         }}
       >
         <div
-          className="h-[65vh] lg:h-[550px] w-full max-w-[95vw] lg:max-w-4xl"
+          className="h-[75vh] lg:h-[550px] w-full max-w-[95vw] lg:max-w-4xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Main container */}
@@ -686,12 +686,12 @@ export default function AddTokensModal({
             {/* Mobile & Desktop Right Side - Content */}
             <div className="flex flex-col bg-[#000] flex-1 min-h-0">
               {/* Mobile Header */}
-              <div className="lg:hidden flex items-center justify-between p-3 border-b border-[#2C2C2C] flex-shrink-0">
-                <h2 className="text-white font-mayeka text-lg">Add Tokens</h2>
+              <div className="lg:hidden flex items-center justify-between p-2.5 border-b border-[#2C2C2C] flex-shrink-0">
+                <h2 className="text-white font-mayeka text-base">Add Tokens</h2>
                 <button
                   onClick={onClose}
                   disabled={addingTokens}
-                  className={`text-gray-400 hover:text-white transition-colors p-1.5 ${
+                  className={`text-gray-400 hover:text-white transition-colors p-1 ${
                     addingTokens ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
@@ -713,9 +713,9 @@ export default function AddTokensModal({
               </div>
 
               {/* Content */}
-              <div className="flex-1 flex flex-col p-3 lg:p-5 lg:pt-0 min-h-0">
+              <div className="flex-1 flex flex-col p-2.5 lg:p-5 lg:pt-0 min-h-0">
                 {/* Mobile Chain Selector */}
-                <div className="lg:hidden mb-4 flex-shrink-0">
+                <div className="lg:hidden mb-3 flex-shrink-0">
                   <div className="relative p-[2px] rounded-[12px]">
                     <div
                       className="absolute inset-0 rounded-[12px]"
@@ -729,13 +729,13 @@ export default function AddTokensModal({
                           #E2AF19 100%)`,
                       }}
                     />
-                    <div className="relative bg-[#000] rounded-[10px] p-2.5">
+                    <div className="relative bg-[#000] rounded-[10px] p-2">
                       <div className="mb-2">
                         <h3 className="text-white font-mayeka text-xs">
                           Select Chain
                         </h3>
                       </div>
-                      <div className="flex flex-wrap gap-1.5 justify-between">
+                      <div className="grid grid-cols-3 gap-1.5">
                         {CHAINS.map((chain) => {
                           const chainDisplay = chainDisplayData[chain.id];
                           const isSelected = selectedChain === chain.id;
@@ -745,7 +745,7 @@ export default function AddTokensModal({
                               key={chain.id}
                               onClick={() => setSelectedChain(chain.id)}
                               disabled={addingTokens}
-                              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] transition-all ${
+                              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-[10px] transition-all ${
                                 isSelected
                                   ? "bg-[#71570C]"
                                   : "bg-[#0F0F0F] hover:bg-[#1A1A1A]"
@@ -755,8 +755,8 @@ export default function AddTokensModal({
                                   : ""
                               }`}
                             >
-                              <ChainIcon chainData={chainDisplay} size="md" />
-                              <span className="text-[11px] font-satoshi font-medium text-white">
+                              <ChainIcon chainData={chainDisplay} size="sm" />
+                              <span className="text-[10px] font-satoshi font-medium text-white truncate">
                                 {chainDisplay.name}
                               </span>
                             </button>
@@ -768,7 +768,7 @@ export default function AddTokensModal({
                 </div>
 
                 {/* Search Bar */}
-                <div className="relative mb-2.5 lg:mb-5 flex-shrink-0">
+                <div className="relative mb-2 lg:mb-5 flex-shrink-0">
                   <div className="absolute left-2.5 lg:left-3 top-1/2 transform -translate-y-1/2">
                     {searchLoading ? (
                       <Loader2
@@ -796,8 +796,8 @@ export default function AddTokensModal({
                 </div>
 
                 {/* Dynamic Heading */}
-                <div className="mb-2.5 lg:mb-4 flex-shrink-0">
-                  <h4 className="text-[#939393] font-satoshi font-medium text-sm lg:text-base">
+                <div className="mb-2 lg:mb-4 flex-shrink-0">
+                  <h4 className="text-[#939393] font-satoshi font-medium text-xs lg:text-base">
                     {searchQuery
                       ? "Search Results"
                       : `Popular ${
@@ -998,7 +998,7 @@ export default function AddTokensModal({
                 </div>
 
                 {/* Add Tokens Button */}
-                <div className="mt-3 flex-shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
+                <div className="mt-2.5 lg:mt-3 flex-shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
                   <div className="sm:flex-1 text-center sm:text-left">
                     <div className="text-gray-400 font-satoshi text-[10px] lg:text-xs">
                       {selectedTokens.size}{" "}
