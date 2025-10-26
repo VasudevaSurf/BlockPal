@@ -11,7 +11,7 @@ class SwapService {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+    this.baseURL = process.env.NEXT_PUBLIC_API_URL || "https://creative-amazement-production-7acf.up.railway.app";
   }
 
   /**
