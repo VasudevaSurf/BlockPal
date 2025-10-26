@@ -1,4 +1,4 @@
-// src/components/NewsChatPage.tsx - MOBILE OPTIMIZED LIKE AIChatPage
+// src/components/NewsChatPage.tsx - UPDATED: Fixed mobile scroll structure matching AIChatPage
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -398,15 +398,6 @@ export default function NewsChatPage() {
     }
   };
 
-  const handleClearChat = () => {
-    if (window.confirm("Are you sure you want to clear the chat history?")) {
-      setMessages([]);
-      setConversationId("");
-      sessionStorage.removeItem(SESSION_KEY);
-      console.log("🧹 Chat history cleared by user");
-    }
-  };
-
   const formatMessageContent = (content: string) => {
     let formatted = content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
@@ -426,22 +417,20 @@ export default function NewsChatPage() {
   const showWelcomeScreen = messages.length === 0;
 
   return (
-    <div className="h-full relative bg-[#000000] flex overflow-hidden">
+    <div className="h-full relative bg-[#000000] flex lg:h-full mobile-news-chat-container">
       {/* Background positioned to actual viewport edge using fixed positioning */}
       <div
-        className="fixed bottom-0 right-0 w-[1600px] h-[1600px] pointer-events-none z-0"
+        className="fixed bottom-0 right-0 w-[1600px] h-[1600px] bg-no-repeat bg-contain bg-bottom-right pointer-events-none z-0"
         style={{
           backgroundImage: "url(/aiChatGrade.png)",
-          backgroundRepeat: "no-repeat",
-          backgroundSize: "contain",
-          backgroundPosition: "100% 100%",
+          backgroundPosition: "bottom right",
         }}
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 relative z-10">
-        {/* Messages Area - FIXED FOR MOBILE */}
-        <div className="flex-1 min-h-0 px-3 lg:px-4 pb-1 lg:pb-4 mb-[75px] lg:mb-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-full">
+        {/* Messages or Welcome Screen */}
+        <div className="flex-1 min-h-0 px-4 pb-24 lg:pb-4 overflow-hidden mobile-messages-container">
           {showWelcomeScreen ? (
             /* Welcome Screen with Suggestion Chips */
             <div className="h-full flex flex-col items-center justify-center overflow-y-auto scrollbar-hide">
@@ -449,7 +438,7 @@ export default function NewsChatPage() {
                 Chat with Pulse
               </h1>
 
-              {/* Mobile suggestion chips - right below title */}
+              {/* Mobile suggestion chips */}
               <div className="lg:hidden w-full px-3 mt-8">
                 <div className="flex flex-wrap justify-center gap-1.5">
                   {suggestionChips
@@ -468,13 +457,13 @@ export default function NewsChatPage() {
               </div>
 
               {/* Desktop suggestion chips */}
-              <div className="hidden lg:block w-full max-w-2xl mx-auto mb-16">
-                <div className="flex flex-wrap justify-center gap-2 px-4">
+              <div className="hidden lg:block w-full max-w-2xl mx-auto mb-10 lg:mb-16">
+                <div className="flex flex-wrap justify-center gap-1.5 lg:gap-2 px-2 lg:px-4">
                   {suggestionChips.map((chip, index) => (
                     <button
                       key={index}
                       onClick={() => handleChipClick(chip)}
-                      className="px-3 py-1.5 text-white text-xs font-satoshi rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
+                      className="px-2 lg:px-3 py-1 lg:py-1.5 text-white text-[10px] lg:text-xs font-satoshi rounded-[10px] lg:rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
                       disabled={isTyping}
                     >
                       {chip.display}
@@ -484,40 +473,15 @@ export default function NewsChatPage() {
               </div>
             </div>
           ) : (
-            /* Chat Messages with Clear Button */
-            <div className="h-full overflow-y-auto scrollbar-hide">
-              <div className="py-3 lg:py-4 space-y-3 lg:space-y-4">
-                {/* Clear Chat Button */}
-                {/* <div className="flex justify-end mb-2">
-                  <button
-                    onClick={handleClearChat}
-                    className="text-xs text-[#999999] hover:text-[#E2AF19] transition-colors flex items-center gap-1"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 6h18" />
-                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                    </svg>
-                    Clear Chat
-                  </button>
-                </div> */}
-
+            /* Chat Messages */
+            <div className="h-full overflow-y-auto scrollbar-hide pb-16 lg:pb-0">
+              <div className="py-4 space-y-4">
                 {messages.map((message) => (
                   <div key={message.id} className="flex flex-col space-y-2">
                     {message.type === "assistant" ? (
                       <div className="flex flex-col items-start space-y-2">
-                        <div className="max-w-4xl bg-black/40 backdrop-blur-md p-3 lg:p-4 rounded-xl border border-[#F9EFD1]/30">
-                          {message.processing && !message.content ? (
+                        {message.processing && !message.content ? (
+                          <div className="max-w-4xl bg-black/40 backdrop-blur-md p-3 lg:p-4 rounded-xl">
                             <div className="flex items-center space-x-2">
                               <div className="flex space-x-1">
                                 <div
@@ -534,7 +498,9 @@ export default function NewsChatPage() {
                                 ></div>
                               </div>
                             </div>
-                          ) : (
+                          </div>
+                        ) : (
+                          <div className="max-w-4xl bg-black/40 backdrop-blur-md p-3 lg:p-4 rounded-xl border border-[#F9EFD1]/30">
                             <div className="text-[#F9EFD1] text-xs lg:text-sm leading-relaxed font-satoshi">
                               <div
                                 className="message-content"
@@ -546,8 +512,8 @@ export default function NewsChatPage() {
                                 <span className="inline-block w-2 h-4 bg-[#E2AF19] animate-pulse ml-1" />
                               )}
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex justify-end">
@@ -566,8 +532,8 @@ export default function NewsChatPage() {
           )}
         </div>
 
-        {/* Input - FIXED ABOVE MOBILE NAV */}
-        <div className="flex-shrink-0 p-2 lg:p-4 fixed lg:relative bottom-[0px] lg:bottom-0 left-0 right-0 bg-black/90 lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none z-10">
+        {/* Input - FIXED FOR MOBILE */}
+        <div className="flex-shrink-0 p-3 lg:p-4 mobile-input-container lg:relative lg:bg-transparent lg:backdrop-blur-none z-10 lg:bottom-0">
           <div className="relative max-w-4xl mx-auto">
             <textarea
               ref={inputRef}
@@ -701,6 +667,50 @@ export default function NewsChatPage() {
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
         }
+
+        /* Mobile-specific styles for News Chat - MATCHING AIChatPage */
+        @media (max-width: 1024px) {
+          /* Account for the mobile header height (60px) */
+          .mobile-news-chat-container {
+            height: calc(100vh - 60px) !important;
+            max-height: calc(100vh - 60px) !important;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+          }
+
+          /* Messages container takes remaining space */
+          .mobile-messages-container {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          /* Input container - FIXED AT BOTTOM */
+          .mobile-input-container {
+            position: fixed !important;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            flex-shrink: 0;
+            background: #000000;
+            padding-bottom: env(safe-area-inset-bottom, 10px);
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            margin-bottom: 10px;
+          }
+
+          /* Ensure no scrolling on the body when in News chat */
+          body:has(.mobile-news-chat-container) {
+            overflow: hidden;
+            height: 100vh;
+            position: fixed;
+            width: 100%;
+          }
+        }
+
         .message-content strong {
           font-weight: 700;
           color: #ffffff;

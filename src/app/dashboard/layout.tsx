@@ -1,9 +1,9 @@
-// src/app/dashboard/layout.tsx - UPDATED: Added history icon for AI Chat mobile header
+// src/app/dashboard/layout.tsx - UPDATED: Added back button and Pulse by Lumen title for News Chat
 "use client";
 
 import { useSelector } from "react-redux";
 import { useState, createContext, useContext, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { RootState } from "@/store";
 import Sidebar from "@/components/dashboard/Sidebar";
 import WalletSelector from "@/components/dashboard/WalletSelector";
@@ -19,7 +19,7 @@ import { WalletDataProvider } from "@/contexts/WalletDataContext";
 import { CoinLensLoadingProvider } from "@/contexts/CoinLensLoadingContext";
 import { NewsFeedLoadingProvider } from "@/contexts/NewsFeedLoadingContext";
 import BlockPalLoader from "@/components/ui/BlockPalLoader";
-import StylishMenuIcon from "@/components/icons/StylishMenuIcon";
+import { ArrowLeft } from "lucide-react";
 
 // CodeLens Context
 interface CodeLensContextType {
@@ -66,10 +66,10 @@ export const useNewsFeedContext = () => useContext(NewsFeedContext);
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { walletSelectorOpen } = useSelector((state: RootState) => state.ui);
   const pathname = usePathname();
+  const router = useRouter();
 
   const { isLoading, allComponentsLoaded } = useUnifiedDashboard();
 
-  const [isNewsChatActive, setIsNewsChatActive] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const [codeLensSearchQuery, setCodeLensSearchQuery] = useState("");
@@ -89,28 +89,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   );
 
   const isAIChatPage = pathname === "/dashboard/ai-chat";
+  const isNewsChatPage = pathname === "/dashboard/news-chat";
   const isSwapPage = pathname === "/dashboard/swap";
   const isCodeLensPage = pathname === "/dashboard/coin-lens";
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
   const isDashboardPage = pathname === "/dashboard";
-
-  useEffect(() => {
-    const checkNewsChatState = () => {
-      const isActive =
-        document.body.getAttribute("data-news-chat-active") === "true";
-      setIsNewsChatActive(isActive);
-    };
-
-    checkNewsChatState();
-
-    const observer = new MutationObserver(checkNewsChatState);
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ["data-news-chat-active"],
-    });
-
-    return () => observer.disconnect();
-  }, []);
 
   const handleCodeLensSearchChange = (query: string) => {
     setCodeLensSearchQuery(query);
@@ -145,6 +128,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined" && (window as any).openAIChatHistory) {
       (window as any).openAIChatHistory();
     }
+  };
+
+  // Handle back navigation for News Chat
+  const handleNewsChatBack = () => {
+    router.back();
   };
 
   return (
@@ -197,9 +185,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
           <main
             className={`flex-1 overflow-hidden min-w-0 min-h-0 flex flex-col relative ${
-              isSwapPage || isNewsChatActive
+              isSwapPage
                 ? "p-0 pb-0 lg:pb-0"
-                : isAIChatPage
+                : isAIChatPage || isNewsChatPage
                 ? "p-0 lg:p-2 lg:px-4 pb-0 lg:pb-2"
                 : isDashboardPage
                 ? "p-0 lg:p-2 lg:px-4 pb-0 lg:pb-0"
@@ -223,11 +211,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   : "opacity-100"
               }`}
             >
-              {/* Mobile-only header for Dashboard - TWO hamburgers (left for sidebar, right for wallet menu) */}
+              {/* Mobile-only header for Dashboard */}
               {isDashboardPage && (
                 <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] flex-shrink-0">
                   <div className="flex items-center gap-3">
-                    {/* LEFT Hamburger - Opens Sidebar */}
                     <button
                       onClick={handleMobileMenuToggle}
                       className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
@@ -265,12 +252,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     </h1>
                   </div>
 
-                  {/* RIGHT Hamburger - Opens Mobile Wallet Menu (passed from dashboard page) */}
                   <div id="mobile-wallet-menu-trigger"></div>
                 </div>
               )}
 
-              {/* Mobile-only header for AI Chat - hamburger on LEFT, history icon on RIGHT */}
+              {/* Mobile-only header for AI Chat */}
               {isAIChatPage && (
                 <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] flex-shrink-0">
                   <div className="flex items-center gap-3">
@@ -311,7 +297,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     </h1>
                   </div>
 
-                  {/* History Icon - Right side */}
                   <button
                     onClick={handleAIChatHistoryClick}
                     className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
@@ -340,6 +325,56 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                       />
                     </svg>
                   </button>
+                </div>
+              )}
+
+              {/* Mobile-only header for News Chat - WITH BACK BUTTON */}
+              {isNewsChatPage && (
+                <div className="lg:hidden flex items-center justify-between p-4 bg-[#000000] flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleNewsChatBack}
+                      className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                      title="Go back"
+                    >
+                      <ArrowLeft size={20} className="text-[#E2AF19]" />
+                    </button>
+                    <div>
+                      <h2>
+                        <span className="text-[28px] font-mayeka-demi-bold-demo font-bold bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
+                          Pulse
+                        </span>
+                        <span className="text-[12px] font-mayeka-demi-bold-demo font-normal bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent align-text-bottom ml-1.5">
+                          by Lumen
+                        </span>
+                      </h2>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Desktop-only header for News Chat - WITH BACK BUTTON */}
+              {isNewsChatPage && (
+                <div className="hidden lg:flex items-center justify-between p-4 bg-[#000000] flex-shrink-0 rounded-[16px] lg:rounded-[20px]">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleNewsChatBack}
+                      className="p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                      title="Go back"
+                    >
+                      <ArrowLeft size={20} className="text-[#E2AF19]" />
+                    </button>
+                    <div>
+                      <h2>
+                        <span className="text-[35px] font-mayeka-demi-bold-demo font-bold bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent">
+                          Pulse
+                        </span>
+                        <span className="text-[14px] font-mayeka-demi-bold-demo font-normal bg-gradient-to-r from-[#F5E4B2] to-[#E2AF19] bg-clip-text text-transparent align-text-bottom ml-2">
+                          by Lumen
+                        </span>
+                      </h2>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -386,7 +421,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               )}
 
-              {!isSwapPage && !isNewsChatActive && (
+              {/* GlobalDashboardHeader - HIDE on News Chat page */}
+              {!isSwapPage && !isNewsChatPage && (
                 <div
                   className={`flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2 ${
                     isAIChatPage || isDashboardPage ? "hidden lg:block" : ""
@@ -427,7 +463,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
               <div
                 className={`flex-1 min-h-0 overflow-hidden ${
-                  isAIChatPage || isDashboardPage ? "p-0 mt-0" : ""
+                  isAIChatPage || isNewsChatPage || isDashboardPage
+                    ? "p-0 mt-0"
+                    : ""
                 }`}
               >
                 {children}
