@@ -1,4 +1,4 @@
-// src/app/dashboard/tokenOverview/[chainId]/[contractAddress]/page.tsx - MOBILE OPTIMIZED
+// src/app/dashboard/tokenOverview/[chainId]/[contractAddress]/page.tsx - MOBILE SCROLLING FIXED
 "use client";
 
 import { useEffect, useState } from "react";
@@ -190,11 +190,87 @@ export default function TokenOverviewPage() {
           display: none;
         }
 
-        /* Hide global header on mobile for token overview */
+        /* Mobile-specific styles */
         @media (max-width: 1024px) {
-          .token-overview-page + * {
-            padding-top: 0 !important;
+          /* Ensure proper scrolling container */
+          .mobile-token-content {
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
+            height: 100%;
+            position: relative;
           }
+
+          /* Add padding at bottom for tabs */
+          .mobile-token-content > div {
+            padding-bottom: 100px !important;
+            min-height: calc(100vh - 120px);
+          }
+
+          /* Ensure the mobile header is fixed */
+          .token-overview-page {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+          }
+
+          /* Prevent body scroll when in token overview */
+          body:has(.token-overview-page) {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100vh;
+          }
+        }
+
+        .line-clamp-1 {
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .message-content strong {
+          font-weight: 700;
+          color: #ffffff;
+        }
+        .message-content em {
+          font-style: italic;
+          color: #e2af19;
+        }
+        .message-content .inline-code {
+          background: #2c2c2c;
+          color: #e2af19;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: monospace;
+          font-size: 0.9em;
+        }
+        .message-content .url-button {
+          display: inline-flex;
+          align-items: center;
+          background: #e2af19;
+          color: #000000;
+          padding: 4px 12px;
+          border-radius: 6px;
+          font-size: 0.85em;
+          font-weight: 500;
+          text-decoration: none;
+          transition: all 0.2s ease;
+          margin: 2px 4px;
+        }
+        .message-content .url-button:hover {
+          background: #d4a853;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(226, 175, 25, 0.3);
+        }
+        .message-content .url-button:active {
+          transform: translateY(0);
         }
       `}</style>
 
@@ -220,10 +296,10 @@ export default function TokenOverviewPage() {
         </div>
 
         {/* Mobile Content - Tab Based */}
-        <div className="lg:hidden flex-1 overflow-y-auto pb-20">
+        <div className="lg:hidden flex-1 overflow-y-auto pb-24 mobile-token-content">
           {/* Info Tab */}
           {activeTab === "info" && (
-            <div className="p-3 space-y-3">
+            <div className="p-3 space-y-3 pb-6">
               {/* Token Header */}
               <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5">
                 <div className="flex items-center justify-between mb-2">
@@ -486,7 +562,7 @@ export default function TokenOverviewPage() {
 
           {/* Chart Tab */}
           {activeTab === "chart" && (
-            <div className="p-3 space-y-3">
+            <div className="p-3 space-y-3 pb-6">
               {/* Token Header - Mobile Chart Tab Only */}
               <div className="flex items-center gap-2 bg-black rounded-[11px] p-2.5">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#2C2C2C] border-2 border-[#00D9B3]/20">
@@ -513,7 +589,7 @@ export default function TokenOverviewPage() {
               </div>
 
               {/* Chart Container */}
-              <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 h-[400px]">
+              <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-2.5 h-[350px] mb-4">
                 {poolAddress ? (
                   <ChartUI poolAddress={poolAddress} network={chainId} />
                 ) : (
@@ -722,206 +798,9 @@ export default function TokenOverviewPage() {
               </div>
             </div>
           )}
-
-          {/* PAL Score Tab */}
-          {activeTab === "pal" && (
-            <div className="p-3">
-              <div className="bg-black rounded-[11px] border border-[#2C2C2C] p-3">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-white text-base font-semibold font-mayeka">
-                    PAL Score
-                  </h3>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[#F39C12] text-xl font-bold font-mayeka">
-                      {Math.round(metadata.palScore || 0)}
-                    </span>
-                    <span className="text-[#4CAF50] text-xl font-bold font-mayeka">
-                      /100
-                    </span>
-                  </div>
-                </div>
-
-                {/* Gauge */}
-                <div className="flex flex-col items-center mb-4">
-                  <div className="relative mb-3">
-                    <svg width="180" height="180" viewBox="0 0 100 100">
-                      {[...Array(12)].map((_, i) => {
-                        const angle = (i * 30 - 90) * (Math.PI / 180);
-                        const x1 = 50 + 38 * Math.cos(angle);
-                        const y1 = 50 + 38 * Math.sin(angle);
-                        const x2 = 50 + 42 * Math.cos(angle);
-                        const y2 = 50 + 42 * Math.sin(angle);
-                        return (
-                          <line
-                            key={i}
-                            x1={x1}
-                            y1={y1}
-                            x2={x2}
-                            y2={y2}
-                            stroke={
-                              i < Math.floor((metadata.palScore || 0) / 8.33)
-                                ? "#2ECC71"
-                                : "#2a2a2a"
-                            }
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                          />
-                        );
-                      })}
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke="url(#gradientRing)"
-                        strokeWidth="1"
-                        opacity="0.3"
-                      />
-                      <defs>
-                        <linearGradient
-                          id="gradientRing"
-                          x1="0%"
-                          y1="0%"
-                          x2="100%"
-                          y2="100%"
-                        >
-                          <stop offset="0%" stopColor="#2ECC71" />
-                          <stop offset="50%" stopColor="#F39C12" />
-                          <stop offset="100%" stopColor="#E74C3C" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-
-                    <svg
-                      width="180"
-                      height="180"
-                      viewBox="0 0 100 100"
-                      className="absolute inset-0 transform -rotate-90"
-                    >
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="35"
-                        fill="none"
-                        stroke="#1a1a1a"
-                        strokeWidth="6"
-                      />
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="35"
-                        fill="none"
-                        stroke={
-                          (metadata.palScore || 0) < 30
-                            ? "#E74C3C"
-                            : (metadata.palScore || 0) < 60
-                            ? "#F39C12"
-                            : "#2ECC71"
-                        }
-                        strokeWidth="6"
-                        strokeDasharray={`${2 * Math.PI * 35}`}
-                        strokeDashoffset={`${
-                          2 *
-                          Math.PI *
-                          35 *
-                          (1 - (metadata.palScore || 0) / 100)
-                        }`}
-                        strokeLinecap="round"
-                        style={{
-                          transition:
-                            "stroke-dashoffset 0.8s ease, stroke 0.3s ease",
-                          filter: "drop-shadow(0 0 4px currentColor)",
-                        }}
-                      />
-                    </svg>
-
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <div
-                        className={`text-3xl font-bold font-satoshi ${
-                          (metadata.palScore || 0) < 30
-                            ? "text-[#E74C3C]"
-                            : (metadata.palScore || 0) < 60
-                            ? "text-[#F39C12]"
-                            : "text-[#2ECC71]"
-                        }`}
-                      >
-                        {Math.round(metadata.palScore || 0)}
-                      </div>
-                      <div className="text-gray-400 text-[10px] font-satoshi text-center">
-                        {(metadata.palScore || 0) < 30
-                          ? "HIGH RISK"
-                          : (metadata.palScore || 0) < 60
-                          ? "MEDIUM"
-                          : "LOW RISK"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="w-full px-4 mb-2">
-                    <div className="relative h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-                      <div
-                        className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${metadata.palScore || 0}%`,
-                          background: `linear-gradient(90deg, #E74C3C 0%, #F39C12 50%, #2ECC71 100%)`,
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Scores */}
-                <div className="space-y-2 mb-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white text-sm font-satoshi">
-                      Pool Score
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[#F39C12] text-lg font-bold font-satoshi">
-                        {Math.round(metadata.poolScore || 0)}
-                      </span>
-                      <span className="text-[#4CAF50] text-xs font-satoshi">
-                        / 100
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-white text-sm font-satoshi">
-                      Token Score
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[#F39C12] text-lg font-bold font-satoshi">
-                        {Math.round(metadata.tokenScore || 0)}
-                      </span>
-                      <span className="text-[#4CAF50] text-xs font-satoshi">
-                        /100
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Warning */}
-                <div className="rounded-lg border border-[#2C2C2C] p-2.5 flex items-center justify-between">
-                  <div>
-                    <div className="text-[#F39C12] text-sm font-semibold font-satoshi">
-                      {metadata.riskLevel || "Unknown"}
-                    </div>
-                    <div className="text-white text-xs font-satoshi mt-1">
-                      {metadata.isHoneypot
-                        ? "Honeypot Detected"
-                        : metadata.cautionNotes?.[0] || "No warnings"}
-                    </div>
-                  </div>
-                  <div className="scale-75">
-                    <WarningIcon />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Mobile Bottom Navigation - FIXED: Removed background on active */}
+        {/* Mobile Bottom Navigation - FIXED */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0F0F0F] border-t border-[#2C2C2C] z-50 safe-area-bottom">
           <nav className="flex items-center justify-around px-4 py-3">
             <button
@@ -989,37 +868,6 @@ export default function TokenOverviewPage() {
                 Chart
               </span>
             </button>
-
-            {/* <button
-              onClick={() => setActiveTab("pal")}
-              className="flex flex-col items-center justify-center min-w-[80px] py-2 px-3 rounded-lg transition-all"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`mb-1 ${
-                  activeTab === "pal" ? "text-[#E2AF19]" : "text-white"
-                }`}
-              >
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-              <span
-                className={`text-xs font-satoshi ${
-                  activeTab === "pal"
-                    ? "text-[#E2AF19] font-medium"
-                    : "text-white"
-                }`}
-              >
-                PAL Score
-              </span>
-            </button> */}
           </nav>
         </div>
 

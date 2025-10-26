@@ -148,7 +148,7 @@ const ChartUI: React.FC<ChartUIProps> = ({
 
       const response = await fetch(url, {
         headers: {
-          "x-cg-demo-api-key": "CG-oTmQJV3kLe92KcQ2753cxy6j",
+          "x-cg-demo-api-key": "CG-VPV4bwHApXkdum7KgB5AejuJ",
           Accept: "application/json",
         },
       });
