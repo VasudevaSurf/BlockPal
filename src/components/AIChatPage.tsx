@@ -1178,14 +1178,14 @@ export default function AIChatPage() {
 
       {/* Mobile History Sidebar */}
       <div
-        className={`lg:hidden fixed right-0 top-0 h-full z-40 transform transition-all duration-300 ease-in-out ${
+        className={`lg:hidden fixed inset-0 z-50 transform transition-all duration-300 ease-in-out ${
           mobileHistoryOpen
-            ? "translate-x-0 w-80 opacity-100"
-            : "translate-x-full w-80 opacity-0"
+            ? "translate-x-0 opacity-100"
+            : "translate-x-full opacity-0 pointer-events-none"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="h-full flex flex-col bg-black/95 backdrop-blur-md border-l border-[#2C2C2C] pb-24">
+        <div className="absolute right-0 top-0 bottom-0 w-80 flex flex-col bg-black/95 backdrop-blur-md border-l border-[#2C2C2C]">
           {/* Close button for mobile */}
           <div className="flex items-center justify-between p-4 border-b border-[#2C2C2C] flex-shrink-0">
             <h2 className="text-white text-lg font-satoshi font-medium">
@@ -1200,8 +1200,8 @@ export default function AIChatPage() {
           </div>
 
           {/* Scrollable Chat History */}
-          <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide pb-20 min-h-0">
-            <div className="space-y-2">
+          <div className="flex-1 px-6 pt-4 overflow-y-auto scrollbar-hide min-h-0">
+            <div className="space-y-2 pb-4">
               {/* Current Session */}
               {messages.length > 0 &&
                 conversationId &&
@@ -1399,7 +1399,7 @@ export default function AIChatPage() {
 
               {/* Empty State */}
               {conversations.length === 0 && messages.length === 0 && (
-                <div className="flex items-center justify-center h-full">
+                <div className="flex items-center justify-center py-20">
                   <div className="text-center">
                     <Brain className="text-gray-500 mx-auto mb-3" size={32} />
                     <p className="text-gray-500 text-sm">
@@ -1414,8 +1414,8 @@ export default function AIChatPage() {
             </div>
           </div>
 
-          {/* New Chat Button - Fixed at bottom above bottom nav */}
-          <div className="absolute bottom-20 left-0 right-0 flex-shrink-0 p-4 border-t border-[#2C2C2C] bg-black/95">
+          {/* New Chat Button - Fixed at bottom */}
+          <div className="flex-shrink-0 p-4 border-t border-[#2C2C2C] bg-black/95">
             <button
               onClick={handleNewChat}
               className="w-full text-[#E2AF19] px-3 py-1.5 rounded-[300px] border border-[#71570C] text-[18px] font-satoshi font-medium transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"
@@ -1669,10 +1669,10 @@ export default function AIChatPage() {
           </div>
 
           {/* New Chat Button - Fixed at bottom */}
-          <div className="flex-shrink-0 p-4">
+          <div className="flex-shrink-0 p-4 border-t border-[#2C2C2C] bg-black/95">
             <button
               onClick={handleNewChat}
-              className="mx-auto text-[#E2AF19] px-3 py-1.5 rounded-[300px] border border-[#71570C] text-[18px] font-satoshi font-medium transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"
+              className="w-full text-[#E2AF19] px-3 py-1.5 rounded-[300px] border border-[#71570C] text-[18px] font-satoshi font-medium transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"
               disabled={isTyping}
             >
               <div className="p-1 bg-[#E2AF19] rounded-[100px]">
