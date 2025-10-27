@@ -1,4 +1,4 @@
-// src/components/dashboard/MobileWalletMenu.tsx - UPDATED with unified border for chain selector
+// src/components/dashboard/MobileWalletMenu.tsx - UPDATED with DisconnectModal
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -6,6 +6,9 @@ import { X, ChevronDown, ChevronUp, Copy, LogOut, Check } from "lucide-react";
 import { useAccount, useChainId, useSwitchChain, useDisconnect } from "wagmi";
 import { chains } from "@/components/wallet/WalletProvider";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
+import DisconnectModal from "@/components/modals/DisconnectModal";
+import { clearWalletConnection } from "@/utils/walletCleanup";
+import { useToast } from "@/contexts/ToastContext";
 
 // Chain data with proper image paths
 const getChainDisplayData = () => {
@@ -164,6 +167,7 @@ export default function MobileWalletMenu({
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { disconnect } = useDisconnect();
+  const { showToast } = useToast();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain({
     mutation: {
       onSuccess: (data) => {
@@ -204,11 +208,11 @@ export default function MobileWalletMenu({
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const chainDisplayData = getChainDisplayData();
-  const currentChain =
-    mounted && isConnected ? chains.find((c) => c.id === chainId) : null;
+  const currentChain = chains.find((c) => c.id === chainId);
 
   useEffect(() => {
     setMounted(true);
@@ -219,6 +223,7 @@ export default function MobileWalletMenu({
       setSwitchError(null);
       setSwitchingChain(null);
       setChainSelectorExpanded(false);
+      setShowDisconnectModal(false); // Close disconnect modal if wallet disconnects
     }
   }, [isConnected]);
 
@@ -231,9 +236,12 @@ export default function MobileWalletMenu({
     }
   }, [chainId, switchingChain]);
 
-  // Close main menu when clicking outside
+  // Close main menu when clicking outside - BUT NOT when disconnect modal is open
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Don't close if disconnect modal is open
+      if (showDisconnectModal) return;
+
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose();
         setChainSelectorExpanded(false);
@@ -246,7 +254,7 @@ export default function MobileWalletMenu({
         document.removeEventListener("mousedown", handleClickOutside);
       };
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, showDisconnectModal]);
 
   const getCurrentChainDisplay = () => {
     if (mounted && isConnected && chainId && chainDisplayData[chainId]) {
@@ -298,19 +306,38 @@ export default function MobileWalletMenu({
     if (address) {
       navigator.clipboard.writeText(address);
       setCopied(true);
+      showToast("success", "Wallet address copied to clipboard!", 2000);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const handleDisconnect = () => {
-    console.log("🔌 Disconnecting wallet...");
-    try {
-      disconnect();
-      onClose();
-      console.log("✅ Wallet disconnected successfully");
-    } catch (error) {
-      console.error("❌ Error disconnecting wallet:", error);
-    }
+  // Show disconnect modal instead of direct disconnect
+  const handleDisconnectClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent menu from closing
+    setShowDisconnectModal(true);
+  };
+
+  // Actual disconnect handler
+  const confirmDisconnect = () => {
+    console.log("🔌 Confirming wallet disconnect...");
+
+    // Disconnect from Wagmi
+    disconnect();
+
+    // Clear Wagmi localStorage
+    clearWalletConnection();
+
+    // Close both modals
+    setShowDisconnectModal(false);
+    onClose(); // Close the mobile wallet menu
+
+    showToast("success", "Wallet disconnected successfully", 3000);
+  };
+
+  // Handle disconnect modal close
+  const handleDisconnectModalClose = () => {
+    setShowDisconnectModal(false);
+    // Don't close the wallet menu, just the disconnect modal
   };
 
   if (!isOpen) return null;
@@ -494,7 +521,7 @@ export default function MobileWalletMenu({
                     )}
                   </button>
                   <button
-                    onClick={handleDisconnect}
+                    onClick={handleDisconnectClick}
                     className="flex-1 bg-[#F9EFD1] hover:bg-[#F5E8C4] text-black text-xs font-satoshi py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5"
                   >
                     <LogOut size={12} className="text-black" />
@@ -523,6 +550,16 @@ export default function MobileWalletMenu({
           }
         `}</style>
       </div>
+
+      {/* Disconnect Modal - Render only when connected */}
+      {isConnected && (
+        <DisconnectModal
+          isOpen={showDisconnectModal}
+          onClose={handleDisconnectModalClose}
+          onConfirm={confirmDisconnect}
+          walletAddress={address}
+        />
+      )}
     </>
   );
 }
