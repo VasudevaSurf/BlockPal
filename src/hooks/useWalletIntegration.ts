@@ -13,7 +13,8 @@ import {
 import { chains } from "@/components/wallet/WalletProvider";
 
 export function useWalletIntegration() {
-  const { address, isConnected, isConnecting, isDisconnected } = useAccount();
+  const { address, isConnected, isConnecting, isDisconnected, isReconnecting } =
+    useAccount(); // Add isReconnecting here
   const chainId = useChainId(); // UPDATED: useChainId instead of useNetwork
 
   // Get current chain data from configured chains
@@ -170,6 +171,7 @@ export function useWalletIntegration() {
   return {
     isConnected: mounted ? isConnected : false,
     isConnecting: mounted ? isConnecting : false,
+    isReconnecting: mounted ? isReconnecting : false, // Add this line
     address: mounted ? address : undefined,
     chain: mounted ? currentChain : undefined,
     chainId: mounted ? chainId : undefined,

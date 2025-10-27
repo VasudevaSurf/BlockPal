@@ -93,15 +93,15 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
     },
   ],
   base: [
-    {
-      address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      symbol: "ETH",
-      name: "Ethereum",
-      decimals: 18,
-      logoURI:
-        "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
-      isPopular: true,
-    },
+    // {
+    //   address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    //   symbol: "ETH",
+    //   name: "Ethereum",
+    //   decimals: 18,
+    //   logoURI:
+    //     "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+    //   isPopular: true,
+    // },
     {
       address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
       symbol: "USDC",
@@ -275,15 +275,15 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
     },
   ],
   arbitrum: [
-    {
-      address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      symbol: "ETH",
-      name: "Ethereum",
-      decimals: 18,
-      logoURI:
-        "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
-      isPopular: true,
-    },
+    // {
+    //   address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    //   symbol: "ETH",
+    //   name: "Ethereum",
+    //   decimals: 18,
+    //   logoURI:
+    //     "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+    //   isPopular: true,
+    // },
     {
       address: "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
       symbol: "USDC",
@@ -503,15 +503,15 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
         "https://tokens.1inch.io/0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c.png",
       isPopular: true,
     },
-    {
-      address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
-      symbol: "ETH",
-      name: "Ethereum Token",
-      decimals: 18,
-      logoURI:
-        "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
-      isPopular: true,
-    },
+    // {
+    //   address: "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
+    //   symbol: "ETH",
+    //   name: "Ethereum Token",
+    //   decimals: 18,
+    //   logoURI:
+    //     "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+    //   isPopular: true,
+    // },
     {
       address: "0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c",
       symbol: "BTCB",
