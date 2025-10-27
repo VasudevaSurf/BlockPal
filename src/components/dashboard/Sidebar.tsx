@@ -273,16 +273,18 @@ export default function Sidebar({
                     disabled={isLoading}
                     className={`w-full flex items-center text-left transition-all duration-200 font-satoshi ${
                       isMobile
-                        ? "px-4 py-3 text-sm rounded-l-lg" // Mobile: rounded-l-lg for left-side border radius only
+                        ? "px-4 py-3 text-sm rounded-l-lg"
                         : isMinimized
                         ? "pl-[18px] lg:pl-[22px] pr-4 lg:pr-6 py-2 lg:py-3 text-xs lg:text-sm rounded-l-lg"
                         : "px-3 lg:px-4 py-2 lg:py-3 text-xs lg:text-sm rounded-l-lg"
                     } ${
-                      isActive && !item.comingSoon && !item.dimmed
-                        ? "bg-[#E2AF19] text-black font-medium"
-                        : item.comingSoon || item.dimmed
+                      isActive && !item.comingSoon
+                        ? "bg-[#E2AF19] text-black font-medium" // Remove !item.dimmed condition
+                        : item.comingSoon
                         ? "text-gray-400 hover:bg-[#1C1C1C] cursor-pointer"
-                        : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
+                        : item.dimmed
+                        ? "text-gray-400 hover:bg-[#1C1C1C] hover:text-gray-300" // Dimmed but not active
+                        : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white" // Normal items
                     } ${isLoading ? "pointer-events-none" : ""}`}
                     title={isMobile || !isMinimized ? undefined : item.label}
                   >
@@ -291,14 +293,12 @@ export default function Sidebar({
                       className={`${
                         isMobile || !isMinimized ? "mr-3" : ""
                       } flex-shrink-0 lg:w-5 lg:h-5`}
-                      filled={isActive && !item.comingSoon && !item.dimmed}
+                      filled={isActive && !item.comingSoon} // Remove !item.dimmed condition
                     />
                     {(isMobile || !isMinimized) && (
                       <span
                         className={
-                          isActive && !item.comingSoon && !item.dimmed
-                            ? "font-medium"
-                            : ""
+                          isActive && !item.comingSoon ? "font-medium" : ""
                         }
                       >
                         {item.label}

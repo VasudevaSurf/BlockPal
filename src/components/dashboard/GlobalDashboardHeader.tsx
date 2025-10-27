@@ -1024,12 +1024,12 @@ export default function GlobalDashboardHeader({
               )}
 
               {/* Divider after Profile */}
-              {(isPortfolioPage || isCoinLensPage) && (
+              {isCoinLensPage && (
                 <div className="hidden lg:block w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
               )}
 
               {/* Notifications Icon - Show on desktop for Dashboard and CoinLens */}
-              {(isPortfolioPage || isCoinLensPage) && (
+              {isCoinLensPage && (
                 <button className="hidden lg:block p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full">
                   <Bell size={14} className="text-gray-400 lg:w-4 lg:h-4" />
                 </button>
