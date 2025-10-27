@@ -72,7 +72,7 @@ const getChainDisplayData = () => {
       fallbackIcon: "B",
       useBackground: false,
     },
-    polygon: {
+    polygon_pos: {
       name: "Polygon",
       color: "bg-purple-500",
       icon: "◆",
@@ -287,7 +287,7 @@ const TokenImage = ({
 const CHAINS = [
   { id: "eth", label: "Ethereum" },
   { id: "base", label: "Base" },
-  { id: "polygon", label: "Polygon" },
+  { id: "polygon_pos", label: "Polygon" },
   { id: "arbitrum", label: "Arbitrum" },
   { id: "avalanche", label: "Avalanche" },
   { id: "bsc", label: "BSC" },

@@ -182,7 +182,7 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
       isPopular: true,
     },
   ],
-  polygon: [
+  polygon_pos: [
     {
       address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       symbol: "MATIC",

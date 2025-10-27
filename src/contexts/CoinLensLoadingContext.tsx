@@ -1,4 +1,4 @@
-// src/contexts/CoinLensLoadingContext.tsx - FIXED: Cache aware loading
+// src/contexts/CoinLensLoadingContext.tsx - FIXED: Never show loader on tab switch
 "use client";
 
 import React, {
@@ -33,14 +33,17 @@ export const useCoinLensLoading = () => {
   return context;
 };
 
+// ✅ CRITICAL: Track if we've ever loaded data in this session (persists across tab switches)
+let hasLoadedOnceInSession = false;
+
 export const CoinLensLoadingProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
-  const { address, isConnected } = useAccount();
+  const { address } = useAccount();
   const chainId = useChainId();
   const { user } = useSelector((state: RootState) => state.auth);
 
-  // ✅ Check cache on mount
+  // ✅ Check cache helper
   const checkCache = useCallback(() => {
     if (typeof window === "undefined" || !user?.email) return false;
     try {
@@ -55,73 +58,103 @@ export const CoinLensLoadingProvider: React.FC<{
     return false;
   }, [user?.email]);
 
-  // ✅ Start with isLoading=false if we have cached data
-  const [isLoading, setIsLoading] = useState(() => !checkCache());
-  const [dataReady, setDataReadyState] = useState(() => checkCache());
+  // ✅ FIXED: Only show loader if we've NEVER loaded AND no cache exists
+  const [isLoading, setIsLoading] = useState(() => {
+    const hasCache = checkCache();
+    // If we have cache OR we've loaded before in this session, don't show loader
+    if (hasCache || hasLoadedOnceInSession) {
+      console.log(
+        "⚡ CoinLens: Skipping loader - cache or previous load exists"
+      );
+      return false;
+    }
+    console.log("🔄 CoinLens: First load with no cache - showing loader");
+    return true;
+  });
+
+  const [dataReady, setDataReadyState] = useState(() => {
+    return checkCache() || hasLoadedOnceInSession;
+  });
 
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevWalletRef = useRef<string | undefined>(undefined);
   const prevChainRef = useRef<number | undefined>(undefined);
+  const prevUserRef = useRef<string | undefined>(undefined);
 
   const setDataReady = useCallback(() => {
-    console.log("✅ CoinLens: Data ready");
+    console.log("✅ CoinLens: Real data ready signal received");
     setDataReadyState(true);
+    // Mark that we've loaded successfully at least once
+    hasLoadedOnceInSession = true;
   }, []);
 
   const resetLoading = useCallback(() => {
-    console.log("🔄 CoinLens: Resetting loading state...");
-    setIsLoading(true);
-    setDataReadyState(false);
+    console.log("🔄 CoinLens: Reset loading");
+    const hasCache = checkCache();
+
+    // Only show loader if no cache exists
+    if (!hasCache) {
+      setIsLoading(true);
+      setDataReadyState(false);
+    } else {
+      console.log("⚡ Cache exists, skipping loader on reset");
+      setIsLoading(false);
+      setDataReadyState(true);
+    }
 
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
       loadingTimeoutRef.current = null;
     }
-  }, []);
-
-  // ✅ Check for cached data on mount
-  useEffect(() => {
-    if (checkCache()) {
-      console.log("✅ CoinLens Context: Using cached data, skipping loader");
-      setIsLoading(false);
-      setDataReadyState(true);
-    }
   }, [checkCache]);
 
-  // Hide loader when data is ready
+  // ✅ Hide loader when real data is ready
   useEffect(() => {
     if (dataReady && isLoading) {
-      console.log("✅ CoinLens: Hiding loader...");
+      console.log("✅ CoinLens: Real data received, hiding loader");
       setTimeout(() => {
         setIsLoading(false);
-      }, 300);
+      }, 200);
     }
   }, [dataReady, isLoading]);
 
-  // Handle wallet/chain changes - ONLY reset if actually changed
+  // ✅ Handle wallet/chain/user changes
   useEffect(() => {
+    const userChanged = prevUserRef.current !== user?.email;
     const walletChanged = prevWalletRef.current !== address;
     const chainChanged = prevChainRef.current !== chainId;
 
-    // Only reset if wallet or chain actually changed (not just initial mount)
+    // Reset on any change (except initial mount)
     if (
-      (walletChanged || chainChanged) &&
-      prevWalletRef.current !== undefined
+      prevUserRef.current !== undefined &&
+      (userChanged || walletChanged || chainChanged)
     ) {
-      console.log("🔄 CoinLens: Wallet or chain changed, resetting...");
+      console.log("🔄 CoinLens: Context changed", {
+        userChanged,
+        walletChanged,
+        chainChanged,
+      });
+
+      // Reset the session flag on user change
+      if (userChanged) {
+        hasLoadedOnceInSession = false;
+      }
+
       resetLoading();
     }
 
+    prevUserRef.current = user?.email;
     prevWalletRef.current = address;
     prevChainRef.current = chainId;
-  }, [address, chainId, resetLoading]);
+  }, [user?.email, address, chainId, resetLoading]);
 
-  // Safety timeout - force hide loader after 10 seconds
+  // ✅ Safety timeout - force hide loader after 10 seconds
   useEffect(() => {
     if (isLoading) {
       loadingTimeoutRef.current = setTimeout(() => {
         console.warn("⚠️ CoinLens: Loading timeout reached, forcing show");
         setIsLoading(false);
+        hasLoadedOnceInSession = true;
       }, 10000);
     }
 

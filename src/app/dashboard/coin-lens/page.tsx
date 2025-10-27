@@ -1,4 +1,4 @@
-// src/app/dashboard/coin-lens/page.tsx - COMPLETE UPDATED CODE
+// src/app/dashboard/coin-lens/page.tsx - SIMPLIFIED: Just use cache always
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -37,14 +37,14 @@ function CoinLensContent() {
     useCodeLensContext();
   const { setDataReady, resetLoading } = useCoinLensLoading();
 
-  // ✅ Load cached data immediately on mount
+  // ✅ Helper to get cached tokens
   const getCachedTokens = () => {
-    if (typeof window === "undefined") return [];
+    if (typeof window === "undefined" || !user?.email) return [];
     try {
-      const cached = sessionStorage.getItem(`coinlens_tokens_${user?.email}`);
+      const cached = sessionStorage.getItem(`coinlens_tokens_${user.email}`);
       if (cached) {
         const data = JSON.parse(cached);
-        console.log("✅ Loading cached tokens:", data.length);
+        console.log("📦 Loading cached tokens:", data.length);
         return data;
       }
     } catch (e) {
@@ -53,18 +53,23 @@ function CoinLensContent() {
     return [];
   };
 
+  // ✅ ALWAYS load cache immediately if available
   const [tokens, setTokens] = useState<Token[]>(() => getCachedTokens());
   const [filteredTokens, setFilteredTokens] = useState<Token[]>(() =>
     getCachedTokens()
   );
+
   const [activeMenuTokenId, setActiveMenuTokenId] = useState<string | null>(
     null
   );
   const [addTokensModalOpen, setAddTokensModalOpen] = useState(false);
   const [connected, setConnected] = useState(false);
 
-  // ✅ NEW: Track if we've received watchlist data from WebSocket
-  const [hasReceivedWatchlist, setHasReceivedWatchlist] = useState(false);
+  // ✅ Track if we've received watchlist data from WebSocket
+  const [hasReceivedWatchlist, setHasReceivedWatchlist] = useState(() => {
+    // If we have cache, mark as received immediately
+    return getCachedTokens().length > 0;
+  });
 
   const watchlistReceivedRef = useRef(false);
   const hasReportedDataRef = useRef(false);
@@ -104,7 +109,7 @@ function CoinLensContent() {
     setOnAddTokenClick(() => () => setAddTokensModalOpen(true));
   }, [setOnAddTokenClick]);
 
-  // ✅ Report data ready ONLY when we receive watchlist from WebSocket
+  // ✅ Report data ready when we have watchlist (either from cache or WebSocket)
   useEffect(() => {
     if (!hasReportedDataRef.current && hasReceivedWatchlist) {
       const timeSinceMount = Date.now() - mountTimeRef.current;
@@ -119,31 +124,30 @@ function CoinLensContent() {
     }
   }, [hasReceivedWatchlist, tokens.length, connected, setDataReady]);
 
-  // ✅ Reset loading state ONLY on user change, not on every mount
+  // ✅ On mount, load cache and set up WebSocket
   useEffect(() => {
-    console.log("🔄 CoinLens: Component mounted/user changed");
+    console.log("🔄 CoinLens: Component mounted");
 
-    // Check if we have cached data
-    const cachedTokens = getCachedTokens();
-    const hasCachedData = cachedTokens.length > 0;
+    if (user?.email) {
+      const cached = getCachedTokens();
 
-    if (hasCachedData) {
-      console.log("✅ Found cached data, skipping loading state");
-      setDataReady();
-      hasReportedDataRef.current = true;
-      // DON'T call resetLoading() here!
-    } else {
-      // Only reset loading if no cache AND this is a user change
-      if (user?.email) {
+      if (cached.length > 0) {
+        console.log("⚡ Loading cached data immediately");
+        setTokens(cached);
+        setFilteredTokens(cached);
+        setHasReceivedWatchlist(true);
+        watchlistReceivedRef.current = true;
+        hasReportedDataRef.current = false;
+      } else {
+        console.log("📭 No cache, waiting for WebSocket");
         setHasReceivedWatchlist(false);
         watchlistReceivedRef.current = false;
         hasReportedDataRef.current = false;
-        resetLoading();
       }
     }
 
     mountTimeRef.current = Date.now();
-  }, [user?.email, resetLoading, setDataReady]);
+  }, [user?.email]);
 
   useEffect(() => {
     if (!user?.email) {
@@ -169,20 +173,23 @@ function CoinLensContent() {
     }
 
     const handleWatchlist = (data: any[]) => {
-      console.log("📋 Received watchlist:", data.length, "tokens");
+      console.log("📋 Received REAL watchlist data:", data.length, "tokens");
       const transformedTokens = transformWatchlistData(data);
       setTokens(transformedTokens);
       setFilteredTokens(transformedTokens);
       setConnected(true);
-      watchlistReceivedRef.current = true;
-      setHasReceivedWatchlist(true); // ✅ NEW: Mark that we received watchlist
 
-      // Cache tokens
+      // ✅ Mark that we received real data
+      watchlistReceivedRef.current = true;
+      setHasReceivedWatchlist(true);
+
+      // Cache for tab switches
       try {
         sessionStorage.setItem(
           `coinlens_tokens_${user.email}`,
           JSON.stringify(transformedTokens)
         );
+        console.log("💾 Cached real data");
       } catch (e) {
         console.error("Error caching tokens:", e);
       }
@@ -194,8 +201,8 @@ function CoinLensContent() {
         update.chainId,
         update.contractAddress
       );
-      setTokens((prev) =>
-        prev.map((token) => {
+      setTokens((prev) => {
+        const updated = prev.map((token) => {
           if (
             token.chainId === update.chainId &&
             token.contractAddress === update.contractAddress
@@ -203,15 +210,45 @@ function CoinLensContent() {
             return transformSingleToken(update.data);
           }
           return token;
-        })
-      );
+        });
+
+        // Update cache
+        if (user?.email) {
+          try {
+            sessionStorage.setItem(
+              `coinlens_tokens_${user.email}`,
+              JSON.stringify(updated)
+            );
+          } catch (e) {
+            console.error("Error updating cache:", e);
+          }
+        }
+
+        return updated;
+      });
     };
 
     const handleTokenAdded = (response: any) => {
       console.log("✅ Token added:", response);
       if (response.success && response.tokenData) {
         const newToken = transformSingleToken(response.tokenData);
-        setTokens((prev) => [...prev, newToken]);
+        setTokens((prev) => {
+          const updated = [...prev, newToken];
+
+          // Update cache
+          if (user?.email) {
+            try {
+              sessionStorage.setItem(
+                `coinlens_tokens_${user.email}`,
+                JSON.stringify(updated)
+              );
+            } catch (e) {
+              console.error("Error updating cache:", e);
+            }
+          }
+
+          return updated;
+        });
         setFilteredTokens((prev) => [...prev, newToken]);
       }
     };
@@ -238,10 +275,6 @@ function CoinLensContent() {
     const handleDisconnect = () => {
       console.log("❌ WebSocket disconnected");
       setConnected(false);
-
-      setHasReceivedWatchlist(false);
-      watchlistReceivedRef.current = false;
-      hasReportedDataRef.current = false;
     };
 
     coinlesSocketClient.on("watchlist", handleWatchlist);
@@ -417,6 +450,16 @@ function CoinLensContent() {
         );
         setFilteredTokens(newFilteredTokens);
 
+        // Update cache
+        try {
+          sessionStorage.setItem(
+            `coinlens_tokens_${user.email}`,
+            JSON.stringify(newTokens)
+          );
+        } catch (e) {
+          console.error("Error updating cache:", e);
+        }
+
         console.log("Removed token:", token.name);
         showToast("success", `${token.symbol} removed from watchlist`, 3000);
       } catch (error) {
@@ -471,7 +514,7 @@ function CoinLensContent() {
     );
   };
 
-  // ✅ FIXED: Only show empty message when we have received watchlist and it's empty
+  // ✅ Only show empty message when we have received watchlist and it's empty
   const showEmptyMessage =
     hasReceivedWatchlist && filteredTokens.length === 0 && tokens.length === 0;
 
@@ -518,7 +561,7 @@ function CoinLensContent() {
 
         {/* Table Body */}
         <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-3">
-          {/* ✅ FIXED: Only show empty message when we've received watchlist data */}
+          {/* ✅ Only show empty message when we've received watchlist data */}
           {showEmptyMessage ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-gray-500 font-satoshi text-xs sm:text-sm">
