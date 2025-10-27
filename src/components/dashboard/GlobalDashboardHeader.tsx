@@ -1014,7 +1014,7 @@ export default function GlobalDashboardHeader({
           {/* Action Icons Container */}
           <div className="flex items-center space-x-2 relative">
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-1.5 lg:px-2 py-1.5 lg:py-2">
-              <button
+              {/* <button
                 onClick={handleProfileClick}
                 className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full"
                 title="User Profile"
@@ -1022,7 +1022,7 @@ export default function GlobalDashboardHeader({
                 <User size={14} className="text-gray-400 lg:w-4 lg:h-4" />
               </button>
 
-              <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
+              <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div> */}
 
               <button
                 onClick={handleLogoutClick}

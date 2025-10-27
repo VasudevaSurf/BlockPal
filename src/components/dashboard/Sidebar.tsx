@@ -1,4 +1,4 @@
-// src/components/dashboard/Sidebar.tsx - COMPLETE UPDATED CODE with Logout Modal
+// src/components/dashboard/Sidebar.tsx - UPDATED with dimmed Connect & Districts
 "use client";
 
 import { useState } from "react";
@@ -26,40 +26,49 @@ const menuItems = [
     label: "Portfolio",
     href: "/dashboard",
     comingSoon: false,
+    dimmed: false,
   },
   {
     icon: SwapIcon,
     label: "Swap",
     href: "/dashboard/swap",
     comingSoon: false,
+    dimmed: false,
   },
   {
     icon: CoinLensIcon,
     label: "CoinLens",
     href: "/dashboard/coin-lens",
     comingSoon: false,
+    dimmed: false,
   },
   {
     icon: AII1con,
     label: "Lumen",
     href: "/dashboard/ai-chat",
     comingSoon: false,
+    dimmed: false,
   },
   {
     icon: NewsFeedIcon,
     label: "MarketPulse",
     href: "/dashboard/news-feed",
     comingSoon: false,
+    dimmed: false,
   },
   {
     icon: MessageCircleIcon,
     href: "/dashboard/connect",
     label: "Connect",
+    comingSoon: false,
+    dimmed: true, // Dimmed but not coming soon
   },
   {
     icon: UsersIcon,
     label: "Districts",
     href: "/dashboard/districts",
+    comingSoon: false,
+    dimmed: true, // Dimmed but not coming soon
   },
 ];
 
@@ -269,9 +278,9 @@ export default function Sidebar({
                         ? "pl-[18px] lg:pl-[22px] pr-4 lg:pr-6 py-2 lg:py-3 text-xs lg:text-sm rounded-l-lg"
                         : "px-3 lg:px-4 py-2 lg:py-3 text-xs lg:text-sm rounded-l-lg"
                     } ${
-                      isActive && !item.comingSoon
+                      isActive && !item.comingSoon && !item.dimmed
                         ? "bg-[#E2AF19] text-black font-medium"
-                        : item.comingSoon
+                        : item.comingSoon || item.dimmed
                         ? "text-gray-400 hover:bg-[#1C1C1C] cursor-pointer"
                         : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
                     } ${isLoading ? "pointer-events-none" : ""}`}
@@ -282,12 +291,14 @@ export default function Sidebar({
                       className={`${
                         isMobile || !isMinimized ? "mr-3" : ""
                       } flex-shrink-0 lg:w-5 lg:h-5`}
-                      filled={isActive && !item.comingSoon}
+                      filled={isActive && !item.comingSoon && !item.dimmed}
                     />
                     {(isMobile || !isMinimized) && (
                       <span
                         className={
-                          isActive && !item.comingSoon ? "font-medium" : ""
+                          isActive && !item.comingSoon && !item.dimmed
+                            ? "font-medium"
+                            : ""
                         }
                       >
                         {item.label}
@@ -309,31 +320,8 @@ export default function Sidebar({
 
         {/* Mobile Only - Profile & Logout Section */}
         {isMobile && (
-          <div className="p-4 flex-shrink-0 relative z-20 border-t border-[#FFFFFF40]">
+          <div className="p-4 flex-shrink-0 relative z-20">
             <div className="space-y-2">
-              {/* Profile Button */}
-              <button
-                onClick={handleProfileClick}
-                className="w-full flex items-center px-4 py-3 text-sm rounded-lg text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="mr-3 flex-shrink-0"
-                >
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <span>Profile</span>
-              </button>
-
               {/* Logout Button */}
               <button
                 onClick={handleLogoutClick}
