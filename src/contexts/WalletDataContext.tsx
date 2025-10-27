@@ -1,4 +1,4 @@
-// src/contexts/WalletDataContext.tsx - COMPLETE FIXED VERSION
+// src/contexts/WalletDataContext.tsx - FIXED: 5 minute refresh interval
 "use client";
 
 import React, {
@@ -256,7 +256,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      console.log(`Fetching tokens for ${address} on chain ${chainId}`);
+      console.log(`🔍 Fetching tokens for ${address} on chain ${chainId}`);
 
       setWalletData((prev) => ({ ...prev, loading: true, error: null }));
 
@@ -269,7 +269,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
 
         // If force refresh, clear cache first
         if (forceRefresh) {
-          console.log("Force refresh requested - clearing cache");
+          console.log("🔄 Force refresh - clearing cache");
           await tokenService.refreshWalletTokens(address);
         }
 
@@ -312,11 +312,13 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
             lastUpdated: result.lastUpdated,
           });
 
-          console.log(`Fetched ${processedTokens.length} tokens successfully`);
-          console.log(`Main list value: $${mainListValue.toFixed(2)}`);
+          console.log(
+            `✅ Fetched ${processedTokens.length} tokens successfully`
+          );
+          console.log(`💰 Main list value: $${mainListValue.toFixed(2)}`);
         }
       } catch (error: any) {
-        console.error("Error fetching tokens:", error);
+        console.error("❌ Error fetching tokens:", error);
         setWalletData((prev) => ({
           ...prev,
           loading: false,
@@ -341,7 +343,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   const refresh = useCallback(
     async (forceRefresh: boolean = false) => {
       if (isRefreshing) {
-        console.log("Already refreshing, skipping...");
+        console.log("⏭️ Already refreshing, skipping...");
         return;
       }
 
@@ -366,7 +368,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     const chainChanged = prevChainRef.current !== chainId;
 
     if (walletChanged || chainChanged) {
-      console.log("Wallet or chain changed, fetching new data...");
+      console.log("🔄 Wallet or chain changed, fetching new data...");
       prevAddressRef.current = address;
       prevChainRef.current = chainId;
       isInitialLoadRef.current = true;
@@ -392,16 +394,21 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [address, chainId, isConnected, fetchWalletTokens]);
 
-  // Auto-refresh every 30 seconds
+  // ✅ FIXED: Auto-refresh every 5 MINUTES instead of 30 seconds
   useEffect(() => {
     if (!isConnected || !address) return;
 
-    const interval = setInterval(() => {
-      console.log("Auto-refreshing wallet data...");
-      refresh(false);
-    }, 30000);
+    console.log("⏰ Setting up auto-refresh: Every 5 minutes");
 
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      console.log("🔄 Auto-refreshing wallet data (5 minute interval)...");
+      refresh(false);
+    }, 5 * 60 * 1000); // ✅ CHANGED: 30000 → 300000 (5 minutes)
+
+    return () => {
+      console.log("🛑 Clearing auto-refresh interval");
+      clearInterval(interval);
+    };
   }, [isConnected, address, refresh]);
 
   const value = {
