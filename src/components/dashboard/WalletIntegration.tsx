@@ -1,4 +1,4 @@
-// src/components/dashboard/WalletIntegration.tsx - UPDATED with tracking
+// src/components/dashboard/WalletIntegration.tsx - FIXED: Remove unnecessary loading states
 "use client";
 
 import { useEffect, useState } from "react";
@@ -120,27 +120,7 @@ export default function WalletIntegration({
     return `${diffInMonths} month${diffInMonths > 1 ? "s" : ""} ago`;
   };
 
-  // Return children immediately after mounting - no loading states during hydration
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
-  // Show connecting state only after hydration
-  if (mounted && isConnecting) {
-    return (
-      <div className="h-screen bg-[#0F0F0F] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-4"></div>
-          <p className="text-white font-satoshi">Loading</p>
-          {hasTracked && (
-            <p className="text-gray-400 font-satoshi text-sm mt-2">
-              Syncing your preferences...
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
+  // ✅ FIXED: Never show loading state - just render children immediately
+  // The UnifiedDashboardContext handles all loading states now
   return <>{children}</>;
 }
