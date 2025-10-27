@@ -322,6 +322,29 @@ export default function Sidebar({
         {isMobile && (
           <div className="p-4 flex-shrink-0 relative z-20">
             <div className="space-y-2">
+              {/* Profile Button */}
+              <button
+                // onClick={handleProfileClick}
+                className="w-full flex items-center px-4 py-3 text-sm rounded-lg text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white transition-all duration-200 font-satoshi"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mr-3 flex-shrink-0"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span>Profile</span>
+              </button>
+
               {/* Logout Button */}
               <button
                 onClick={handleLogoutClick}

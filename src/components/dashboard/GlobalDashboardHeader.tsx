@@ -841,11 +841,13 @@ export default function GlobalDashboardHeader({
         {/* Hide wallet/notifications/icons on AI Chat page (all screens), and on CoinLens/NewsFeed pages (desktop only) */}
         <div
           className={`flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4 ${
-            isCoinLensPage || isNewsFeedPage ? "hidden lg:hidden" : ""
-          } ${isAIChatPage ? "hidden" : ""}`}
+            isNewsFeedPage ? "hidden lg:hidden" : ""
+          } ${isAIChatPage ? "hidden" : ""} ${
+            isCoinLensPage ? "hidden lg:flex" : ""
+          }`}
         >
           {/* Wallet Display */}
-          {showWalletInfo && (
+          {showWalletInfo && !isCoinLensPage && (
             <div className="relative" ref={chainSelectorRef}>
               <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-2.5 lg:px-3 py-1.5 lg:py-2 w-full sm:w-auto sm:min-w-[180px] lg:min-w-[200px] gap-1.5">
                 <div className="flex items-center flex-1 min-w-0 bg-[#0F0F0F] rounded-[100px] p-[4px] mr-2">
@@ -1014,26 +1016,44 @@ export default function GlobalDashboardHeader({
           {/* Action Icons Container */}
           <div className="flex items-center space-x-2 relative">
             <div className="flex items-center bg-black border border-[#2C2C2C] rounded-full px-1.5 lg:px-2 py-1.5 lg:py-2">
-              {/* <button
-                onClick={handleProfileClick}
-                className="p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full"
-                title="User Profile"
-              >
-                <User size={14} className="text-gray-400 lg:w-4 lg:h-4" />
-              </button>
+              {/* Profile Icon - Show on desktop for Dashboard and CoinLens */}
+              {(isPortfolioPage || isCoinLensPage) && (
+                <button className="hidden lg:block p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full">
+                  <User size={14} className="text-gray-400 lg:w-4 lg:h-4" />
+                </button>
+              )}
 
-              <div className="w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div> */}
+              {/* Divider after Profile */}
+              {(isPortfolioPage || isCoinLensPage) && (
+                <div className="hidden lg:block w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
+              )}
 
-              <button
-                onClick={handleLogoutClick}
-                className="p-1 lg:p-1.5 transition-colors hover:bg-red-900/20 rounded-full"
-                title="Logout"
-              >
-                <LogOut
-                  size={14}
-                  className="text-gray-400 hover:text-red-400 lg:w-4 lg:h-4 transition-colors"
-                />
-              </button>
+              {/* Notifications Icon - Show on desktop for Dashboard and CoinLens */}
+              {(isPortfolioPage || isCoinLensPage) && (
+                <button className="hidden lg:block p-1 lg:p-1.5 transition-colors hover:bg-[#2C2C2C] rounded-full">
+                  <Bell size={14} className="text-gray-400 lg:w-4 lg:h-4" />
+                </button>
+              )}
+
+              {/* Divider before Logout - Show on desktop for Dashboard only */}
+              {isPortfolioPage && (
+                <div className="hidden lg:block w-px h-2.5 lg:h-3 bg-[#2C2C2C] mx-1 lg:mx-1.5"></div>
+              )}
+
+              {/* Logout Icon - Show on mobile for all pages, desktop only for Dashboard */}
+              {(isPortfolioPage || !isCoinLensPage) && (
+                <button
+                  onClick={handleLogoutClick}
+                  className={`p-1 lg:p-1.5 transition-colors hover:bg-red-900/20 rounded-full ${
+                    isCoinLensPage ? "lg:hidden" : ""
+                  }`}
+                >
+                  <LogOut
+                    size={14}
+                    className="text-gray-400 hover:text-red-400 lg:w-4 lg:h-4"
+                  />
+                </button>
+              )}
             </div>
           </div>
         </div>
