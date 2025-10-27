@@ -15,7 +15,9 @@ import {
   SwapTransaction,
 } from "@/services/swapHistoryService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5002";
 
 export interface SwapToken {
   address: string;
@@ -157,9 +159,8 @@ export function useSwap() {
       // Calculate amountWei properly
       const decimals = fromToken.decimals || 18;
       const amount = parseFloat(fromAmount);
-      const factor = Math.pow(10, decimals);
-      const amountInWei = Math.floor(amount * factor);
-      const amountWei = amountInWei.toString();
+      // Use parseUnits from viem for proper BigInt handling
+      const amountWei = parseUnits(fromAmount, decimals).toString();
 
       console.log("Creating DB transaction with:", {
         fromAmount,
@@ -492,8 +493,10 @@ export function useSwap() {
       // Use a small test amount to get gas estimate
       const testAmount = 0.01;
       const decimals = fromToken?.decimals || 18;
-      const factor = Math.pow(10, decimals);
-      const amountInWei = Math.floor(testAmount * factor).toString();
+      const amountInWei = parseUnits(
+        testAmount.toString(),
+        decimals
+      ).toString();
 
       const response = await fetch(
         `${API_BASE_URL}/api/swap/quote/${chainId}?` +
@@ -621,14 +624,17 @@ export function useSwap() {
 
     try {
       const decimals = fromToken?.decimals || 18;
-      const factor = Math.pow(10, decimals);
-      const amountInWei = Math.floor(amount * factor);
+      let amountWei: string;
 
-      if (amountInWei <= 0) {
-        throw new Error("Amount too small");
+      try {
+        amountWei = parseUnits(fromAmount, decimals).toString();
+
+        if (BigInt(amountWei) <= 0n) {
+          throw new Error("Amount too small");
+        }
+      } catch (error) {
+        throw new Error("Invalid amount format");
       }
-
-      const amountWei = amountInWei.toString();
 
       const response = await fetch(
         `${API_BASE_URL}/api/swap/quote/${chainId}?` +
@@ -882,10 +888,17 @@ export function useSwap() {
     try {
       // Calculate amounts
       const decimals = fromToken.decimals || 18;
-      const amount = parseFloat(fromAmount);
-      const factor = Math.pow(10, decimals);
-      const amountInWei = Math.floor(amount * factor);
-      const amountWei = amountInWei.toString();
+      let amountWei: string;
+
+      try {
+        amountWei = parseUnits(fromAmount, decimals).toString();
+
+        if (BigInt(amountWei) <= 0n) {
+          throw new Error("Amount too small");
+        }
+      } catch (error) {
+        throw new Error("Invalid amount format");
+      }
 
       console.log("Starting swap execution:", {
         fromToken: fromToken.symbol,
