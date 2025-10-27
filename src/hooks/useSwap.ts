@@ -15,7 +15,7 @@ import {
   SwapTransaction,
 } from "@/services/swapHistoryService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://creative-amazement-production-7acf.up.railway.app";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
 
 export interface SwapToken {
   address: string;

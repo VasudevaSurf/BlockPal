@@ -1,4 +1,4 @@
-// src/contexts/WalletDataContext.tsx - FIXED: 5 minute refresh interval
+// src/contexts/WalletDataContext.tsx - OPTIMIZED: 5-minute auto-refresh + smart cache
 "use client";
 
 import React, {
@@ -119,12 +119,12 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   // Load preferences
   const loadPreferences = useCallback(async () => {
     if (!address || !chainId || !userEmail) {
-      console.log("Cannot load preferences: missing required data");
+      console.log("⚠️ Cannot load preferences: missing required data");
       return null;
     }
 
     try {
-      console.log(`Loading preferences for user: ${userEmail}`);
+      console.log(`📥 Loading preferences for user: ${userEmail}`);
       const response = await fetch(
         `/api/wallet/preferences?wallet=${address}&chain=${chainId}&email=${encodeURIComponent(
           userEmail
@@ -133,12 +133,16 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Preferences loaded:", data.data);
+        console.log(
+          "✅ Preferences loaded:",
+          data.data.userAddedTokens?.length || 0,
+          "user-added tokens"
+        );
         setCurrentPreferences(data.data);
         return data.data;
       }
     } catch (error) {
-      console.error("Error loading preferences:", error);
+      console.error("❌ Error loading preferences:", error);
     }
     return null;
   }, [address, chainId, userEmail]);
@@ -149,10 +153,13 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!tokens || tokens.length === 0)
         return { mainListValue: 0, total24hrChange: 0 };
 
-      console.log("Calculating main list value with preferences:", preferences);
-      console.log("User added tokens:", preferences?.userAddedTokens);
+      console.log(
+        "💰 Calculating main list value with preferences:",
+        preferences?.userAddedTokens?.length || 0,
+        "user-added"
+      );
 
-      // Identify main list tokens (preset + user-added)
+      // Main list tokens = preset + user-added
       const mainListTokens = tokens.filter((token) => {
         const isPreset = token.isPreset === true;
         const isUserAdded =
@@ -160,33 +167,26 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
             (addr) => addr.toLowerCase() === token.contractAddress.toLowerCase()
           ) || false;
 
-        if (isUserAdded) {
-          console.log(
-            `Token ${token.symbol} (${token.contractAddress}) is user-added`
-          );
-        }
-
         return isPreset || isUserAdded;
       });
 
       console.log(
-        `Main list has ${mainListTokens.length} tokens (from ${tokens.length} total)`
+        `📊 Main list: ${mainListTokens.length} tokens (from ${tokens.length} total)`
       );
 
-      // Calculate total value for main list tokens only
+      // Calculate values
       const mainListValue = mainListTokens.reduce(
         (sum, token) => sum + (token.value || 0),
         0
       );
 
-      // Calculate 24hr change for main list tokens only
       const total24hrChange = mainListTokens.reduce(
         (sum, token) => sum + (token.usdChange24h || 0),
         0
       );
 
       console.log(
-        `Main list value: $${mainListValue.toFixed(
+        `💵 Main list value: $${mainListValue.toFixed(
           2
         )}, 24hr change: $${total24hrChange.toFixed(2)}`
       );
@@ -199,7 +199,10 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   // Update token categories based on preferences
   const updateTokenCategories = useCallback(
     (preferences: WalletPreferences | null) => {
-      console.log("Updating token categories with preferences:", preferences);
+      console.log(
+        "🔄 Updating token categories with preferences:",
+        preferences?.userAddedTokens?.length || 0
+      );
       setCurrentPreferences(preferences);
 
       // Immediately recalculate main list value with new preferences
@@ -214,18 +217,13 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
             ) || false,
         }));
 
-        // Now calculate with updated tokens
+        // Calculate with updated tokens
         const { mainListValue, total24hrChange } = calculateMainListValue(
           updatedTokens,
           preferences
         );
 
-        console.log(`Updated main list value: $${mainListValue.toFixed(2)}`);
-        console.log(
-          `User added tokens: ${
-            preferences?.userAddedTokens?.join(", ") || "none"
-          }`
-        );
+        console.log(`✅ Updated main list value: $${mainListValue.toFixed(2)}`);
 
         return {
           ...prevData,
@@ -242,7 +240,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   const fetchWalletTokens = useCallback(
     async (forceRefresh: boolean = false) => {
       if (!address || !chainId || !isConnected) {
-        console.log("Cannot fetch tokens - wallet not connected");
+        console.log("⚠️ Cannot fetch tokens - wallet not connected");
         setWalletData((prev) => ({
           ...prev,
           tokens: [],
@@ -256,20 +254,21 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      console.log(`🔍 Fetching tokens for ${address} on chain ${chainId}`);
+      console.log(
+        `🔄 Fetching tokens for ${address} on chain ${chainId}${
+          forceRefresh ? " (FORCE REFRESH)" : ""
+        }`
+      );
 
       setWalletData((prev) => ({ ...prev, loading: true, error: null }));
 
       try {
         // Load preferences first if not loaded
-        let preferences = currentPreferences;
-        if (!preferences && userEmail) {
-          preferences = await loadPreferences();
-        }
+        const preferences = currentPreferences;
 
         // If force refresh, clear cache first
         if (forceRefresh) {
-          console.log("🔄 Force refresh - clearing cache");
+          console.log("🧹 Force refresh - clearing cache");
           await tokenService.refreshWalletTokens(address);
         }
 
@@ -312,9 +311,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
             lastUpdated: result.lastUpdated,
           });
 
-          console.log(
-            `✅ Fetched ${processedTokens.length} tokens successfully`
-          );
+          console.log(`✅ Fetched ${processedTokens.length} tokens`);
           console.log(`💰 Main list value: $${mainListValue.toFixed(2)}`);
         }
       } catch (error: any) {
@@ -343,7 +340,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   const refresh = useCallback(
     async (forceRefresh: boolean = false) => {
       if (isRefreshing) {
-        console.log("⏭️ Already refreshing, skipping...");
+        console.log("⏳ Already refreshing, skipping...");
         return;
       }
 
@@ -376,34 +373,53 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       // Reset preferences when wallet/chain changes
       setCurrentPreferences(null);
 
-      if (isConnected && address) {
-        fetchWalletTokens(false);
-      } else {
-        setWalletData({
-          tokens: [],
-          totalValue: 0,
-          mainListValue: 0,
-          total24hrChange: 0,
-          chainName: "",
-          loading: false,
-          error: null,
-          cacheValid: false,
-          lastUpdated: null,
+      // Load preferences first, then fetch tokens
+      if (isConnected && address && userEmail) {
+        loadPreferences().then(() => {
+          fetchWalletTokens(false);
         });
       }
     }
-  }, [address, chainId, isConnected, fetchWalletTokens]);
+  }, [
+    address,
+    chainId,
+    isConnected,
+    userEmail,
+    loadPreferences,
+    fetchWalletTokens,
+  ]);
 
-  // ✅ FIXED: Auto-refresh every 5 MINUTES instead of 30 seconds
+  // Fetch tokens when preferences are loaded (for initial mount)
+  useEffect(() => {
+    if (
+      isConnected &&
+      address &&
+      currentPreferences !== null &&
+      walletData.tokens.length === 0 &&
+      !walletData.loading
+    ) {
+      console.log("📥 Preferences loaded, now fetching tokens...");
+      fetchWalletTokens(false);
+    }
+  }, [
+    currentPreferences,
+    isConnected,
+    address,
+    walletData.tokens.length,
+    walletData.loading,
+    fetchWalletTokens,
+  ]);
+
+  // ✅ CHANGED: Auto-refresh every 5 MINUTES (was 30 seconds)
   useEffect(() => {
     if (!isConnected || !address) return;
 
     console.log("⏰ Setting up auto-refresh: Every 5 minutes");
 
     const interval = setInterval(() => {
-      console.log("🔄 Auto-refreshing wallet data (5 minute interval)...");
-      refresh(false);
-    }, 5 * 60 * 1000); // ✅ CHANGED: 30000 → 300000 (5 minutes)
+      console.log("🔄 Auto-refresh triggered (5 minute interval)");
+      refresh(false); // Background refresh, not force
+    }, 5 * 60 * 1000); // ✅ CHANGED: 300,000ms = 5 minutes (was 30,000ms)
 
     return () => {
       console.log("🛑 Clearing auto-refresh interval");
