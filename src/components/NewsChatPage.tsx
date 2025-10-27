@@ -1,4 +1,4 @@
-// src/components/NewsChatPage.tsx - UPDATED: Fixed mobile scroll structure matching AIChatPage
+// src/components/NewsChatPage.tsx - COMPLETE UPDATED CODE WITH BLACK INPUT & IMPROVED MOBILE LAYOUT
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -186,7 +186,13 @@ export default function NewsChatPage() {
 
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+          inline: "nearest",
+        });
+      }, 50);
     }
   }, [messages]);
 
@@ -430,7 +436,7 @@ export default function NewsChatPage() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Messages or Welcome Screen */}
-        <div className="flex-1 min-h-0 px-4 pb-24 lg:pb-4 overflow-hidden mobile-messages-container">
+        <div className="flex-1 min-h-0 px-4 pb-4 overflow-hidden mobile-messages-container">
           {showWelcomeScreen ? (
             /* Welcome Screen with Suggestion Chips */
             <div className="h-full flex flex-col items-center justify-center overflow-y-auto scrollbar-hide">
@@ -474,8 +480,11 @@ export default function NewsChatPage() {
             </div>
           ) : (
             /* Chat Messages */
-            <div className="h-full overflow-y-auto scrollbar-hide pb-16 lg:pb-0">
-              <div className="py-4 space-y-4">
+            <div
+              className="h-full overflow-y-auto scrollbar-hide"
+              style={{ scrollPaddingBottom: "120px" }}
+            >
+              <div className="py-4 space-y-4 mb-32 lg:mb-0">
                 {messages.map((message) => (
                   <div key={message.id} className="flex flex-col space-y-2">
                     {message.type === "assistant" ? (
@@ -532,7 +541,7 @@ export default function NewsChatPage() {
           )}
         </div>
 
-        {/* Input - FIXED FOR MOBILE */}
+        {/* Input - FIXED FOR MOBILE WITH BLACK BACKGROUND */}
         <div className="flex-shrink-0 p-3 lg:p-4 mobile-input-container lg:relative lg:bg-transparent lg:backdrop-blur-none z-10 lg:bottom-0">
           <div className="relative max-w-4xl mx-auto">
             <textarea
@@ -680,15 +689,16 @@ export default function NewsChatPage() {
             position: relative;
           }
 
-          /* Messages container takes remaining space */
+          /* Messages container takes remaining space minus input height */
           .mobile-messages-container {
             flex: 1;
             min-height: 0;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+            margin-bottom: 80px; /* Space for fixed input */
           }
 
-          /* Input container - FIXED AT BOTTOM */
+          /* Input container - FIXED AT BOTTOM WITH BLACK BACKGROUND */
           .mobile-input-container {
             position: fixed !important;
             bottom: 0;
@@ -696,13 +706,16 @@ export default function NewsChatPage() {
             right: 0;
             flex-shrink: 0;
             background: #000000;
-            padding-bottom: env(safe-area-inset-bottom, 10px);
+            padding-bottom: 20px; /* Extended padding to cover gap */
             box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
             z-index: 50;
-            margin-bottom: 10px;
+            margin-bottom: 0;
           }
+        }
 
-          /* Ensure no scrolling on the body when in News chat */
+        /* Rest of your styles remain the same... */
+        /* Ensure no scrolling on the body when in News chat */
+        @media (max-width: 1024px) {
           body:has(.mobile-news-chat-container) {
             overflow: hidden;
             height: 100vh;

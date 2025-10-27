@@ -286,7 +286,13 @@ export default function AIChatPage() {
   // Auto scroll
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+          inline: "nearest",
+        });
+      }, 50);
     }
   }, [messages]);
 
@@ -967,8 +973,11 @@ export default function AIChatPage() {
             </div>
           ) : (
             /* Chat Messages */
-            <div className="h-full overflow-y-auto scrollbar-hide">
-              <div className="py-4 space-y-4 mb-28 lg:mb-0">
+            <div
+              className="h-full overflow-y-auto scrollbar-hide"
+              style={{ scrollPaddingBottom: "120px" }}
+            >
+              <div className="py-4 space-y-4 mb-32 lg:mb-0">
                 {messages.map((message) => (
                   <div key={message.id} className="flex flex-col space-y-2">
                     {message.type === "assistant" ? (
