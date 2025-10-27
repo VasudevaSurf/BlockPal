@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
 import { RootState, AppDispatch } from "@/store";
 import { logoutUser } from "@/store/slices/authSlice";
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
@@ -17,6 +17,8 @@ import NewsFeedIcon from "../icons/NewsFeedIcon";
 import { useAccount, useDisconnect } from "wagmi";
 import { clearWalletConnection } from "@/utils/walletCleanup";
 import LogoutModal from "@/components/modals/LogoutModal";
+import UsersIcon from "../icons/UsersIcon";
+import MessageCircleIcon from "../icons/MessageCircleIcon";
 
 const menuItems = [
   {
@@ -48,6 +50,16 @@ const menuItems = [
     label: "MarketPulse",
     href: "/dashboard/news-feed",
     comingSoon: false,
+  },
+  {
+    icon: MessageCircleIcon,
+    label: "Connect",
+    comingSoon: true,
+  },
+  {
+    icon: UsersIcon,
+    label: "Districts",
+    comingSoon: true,
   },
 ];
 
