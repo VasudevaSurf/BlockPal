@@ -838,10 +838,10 @@ export default function GlobalDashboardHeader({
           </form>
         )}
 
-        {/* Hide wallet/notifications/icons on AI Chat, News Feed, and CoinLens (mobile only) pages */}
+        {/* Hide wallet/notifications/icons on AI Chat page (all screens), and on CoinLens/NewsFeed pages (desktop only) */}
         <div
           className={`flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 lg:space-x-4 ${
-            isCoinLensPage || isNewsFeedPage ? "hidden lg:flex" : ""
+            isCoinLensPage || isNewsFeedPage ? "hidden lg:hidden" : ""
           } ${isAIChatPage ? "hidden" : ""}`}
         >
           {/* Wallet Display */}
