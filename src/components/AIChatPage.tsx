@@ -1,4 +1,4 @@
-// src/components/AIChatPage.tsx - UPDATED: Fixed mobile height to account for header
+// src/components/AIChatPage.tsx - COMPLETE UPDATED CODE
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -10,7 +10,6 @@ import {
   Check,
   Brain,
   Plus,
-  AlertTriangle,
   X,
   MoreHorizontal,
   Trash2,
@@ -61,8 +60,6 @@ export default function AIChatPage() {
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeTab, setActiveTab] = useState<"chat" | "history">("chat");
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [currentConversationLoaded, setCurrentConversationLoaded] =
     useState(false);
 
@@ -227,18 +224,17 @@ export default function AIChatPage() {
     }
   }, [openMenuId]);
 
-  // Initialize AI chat - ONLY ONCE
+  // Load conversation history when component mounts
   useEffect(() => {
     let isMounted = true;
 
-    const initializeAI = async () => {
+    const loadConversations = async () => {
       if (!isAuthenticated || !user) {
-        setError("Please log in to use Lumen AI");
         return;
       }
 
       try {
-        console.log("🤖 Initializing Lumen AI for user:", user.id);
+        console.log("📚 Loading conversation history for user:", user.id);
 
         const response = await fetch("/api/ai/user", {
           credentials: "include",
@@ -250,40 +246,37 @@ export default function AIChatPage() {
 
         const userData = await response.json();
 
-        if (isMounted) {
-          if (userData.conversations && userData.conversations.length > 0) {
-            const formattedConversations = userData.conversations.map(
-              (conv: any) => ({
-                id: conv.conversation_id,
-                title: conv.title || "New Conversation",
-                messages: [],
-                lastMessage: conv.title || "",
-                timestamp: conv.last_updated || new Date().toISOString(),
-                messageCount: conv.message_count || 0,
-                createdAt: conv.created_at || new Date().toISOString(),
-                isStarred: conv.isStarred || false,
-              })
-            );
-            setConversations(formattedConversations);
-            console.log(
-              "📚 Loaded",
-              formattedConversations.length,
-              "conversations"
-            );
-          }
-
-          setIsInitialized(true);
-          console.log("✅ Lumen AI initialized for user:", user.id);
+        if (
+          isMounted &&
+          userData.conversations &&
+          userData.conversations.length > 0
+        ) {
+          const formattedConversations = userData.conversations.map(
+            (conv: any) => ({
+              id: conv.conversation_id,
+              title: conv.title || "New Conversation",
+              messages: [],
+              lastMessage: conv.title || "",
+              timestamp: conv.last_updated || new Date().toISOString(),
+              messageCount: conv.message_count || 0,
+              createdAt: conv.created_at || new Date().toISOString(),
+              isStarred: conv.isStarred || false,
+            })
+          );
+          setConversations(formattedConversations);
+          console.log(
+            "✅ Loaded",
+            formattedConversations.length,
+            "conversations"
+          );
         }
       } catch (error: any) {
-        console.error("❌ Failed to initialize AI chat:", error);
-        if (isMounted) {
-          setError("Failed to initialize Lumen AI");
-        }
+        console.error("❌ Failed to load conversations:", error);
+        // Don't show error to user, just log it
       }
     };
 
-    initializeAI();
+    loadConversations();
 
     return () => {
       isMounted = false;
@@ -299,8 +292,7 @@ export default function AIChatPage() {
 
   const toggleMicrophone = () => {
     if (!recognition) {
-      setError("Voice recognition is not supported in your browser");
-      setTimeout(() => setError(null), 3000);
+      showToast("error", "Voice recognition is not supported in your browser");
       return;
     }
 
@@ -312,8 +304,7 @@ export default function AIChatPage() {
         recognition.start();
       } catch (error) {
         console.error("Error starting recognition:", error);
-        setError("Failed to start voice recognition");
-        setTimeout(() => setError(null), 3000);
+        showToast("error", "Failed to start voice recognition");
       }
     }
   };
@@ -605,8 +596,7 @@ export default function AIChatPage() {
       }
     } catch (error) {
       console.error("Failed to load conversation:", error);
-      setError("Failed to load conversation");
-      setTimeout(() => setError(null), 3000);
+      showToast("error", "Failed to load conversation");
     } finally {
       setLoadingConversationId(null);
     }
@@ -675,8 +665,6 @@ export default function AIChatPage() {
         )
       );
 
-      setError("Failed to update star status");
-      setTimeout(() => setError(null), 3000);
       showToast("error", "Failed to update star status");
     } finally {
       setOpenMenuId(null);
@@ -739,8 +727,6 @@ export default function AIChatPage() {
         )
       );
 
-      setError("Failed to rename conversation");
-      setTimeout(() => setError(null), 3000);
       showToast("error", "Failed to rename conversation");
     } finally {
       setRenamingId(null);
@@ -786,8 +772,6 @@ export default function AIChatPage() {
         setConversations((prev) => [conversationToDelete, ...prev]);
       }
 
-      setError("Failed to delete conversation");
-      setTimeout(() => setError(null), 3000);
       showToast("error", "Failed to delete conversation");
     } finally {
       setOpenMenuId(null);
@@ -873,6 +857,10 @@ export default function AIChatPage() {
     };
   }, []);
 
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="h-full relative bg-[#000000] flex lg:h-full mobile-ai-container">
       {/* Overlay Background */}
@@ -932,16 +920,6 @@ export default function AIChatPage() {
               </button>
             </div>
           </div>
-
-          {/* Error Display - Desktop */}
-          {error && (
-            <div className="mt-2 bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-2 text-center">
-              <div className="flex items-center justify-center gap-2">
-                <AlertTriangle size={16} className="text-yellow-400" />
-                <p className="text-yellow-400 text-xs font-satoshi">{error}</p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Messages or Welcome Screen */}
@@ -963,7 +941,7 @@ export default function AIChatPage() {
                         key={index}
                         onClick={() => handleChipClick(chip)}
                         className="px-2 py-1 text-white text-[10px] font-satoshi rounded-[10px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
-                        disabled={isTyping || !isInitialized}
+                        disabled={isTyping}
                       >
                         {chip.display}
                       </button>
@@ -979,7 +957,7 @@ export default function AIChatPage() {
                       key={index}
                       onClick={() => handleChipClick(chip)}
                       className="px-2 lg:px-3 py-1 lg:py-1.5 text-white text-[10px] lg:text-xs font-satoshi rounded-[10px] lg:rounded-[12px] border border-[#4B3A08] hover:border-[#E2AF19] transition-all duration-200 hover:scale-105 disabled:opacity-50"
-                      disabled={isTyping || !isInitialized}
+                      disabled={isTyping}
                     >
                       {chip.display}
                     </button>
@@ -1060,12 +1038,10 @@ export default function AIChatPage() {
                 target.style.height = `${target.scrollHeight}px`;
               }}
               onKeyPress={handleKeyPress}
-              placeholder={
-                isInitialized ? "Type your message" : "Initializing AI..."
-              }
+              placeholder="Type your message"
               className="w-full bg-black text-white placeholder-gray-400 resize-none focus:outline-none pr-24 lg:pr-36 pl-3 lg:pl-4 py-3 lg:py-3.5 min-h-[44px] lg:min-h-[48px] max-h-32 text-base lg:text-sm border border-[#71570C] focus:border-[#E2AF19] transition-colors rounded-[20px] disabled:opacity-50 flex items-center leading-[18px] lg:leading-[20px] font-satoshi placeholder:font-satoshi"
               rows={1}
-              disabled={isTyping || !isInitialized}
+              disabled={isTyping}
               style={{ lineHeight: "1.5" }}
             />
             <div className="absolute right-2 lg:right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-1 lg:gap-2">
@@ -1075,7 +1051,7 @@ export default function AIChatPage() {
                 className={`p-1.5 lg:p-2 hover:bg-[#2C2C2C] rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center ${
                   isListening ? "bg-red-500/20" : ""
                 }`}
-                disabled={isTyping || !isInitialized}
+                disabled={isTyping}
                 title={isListening ? "Stop recording" : "Start voice input"}
               >
                 {isListening ? (
@@ -1150,7 +1126,7 @@ export default function AIChatPage() {
               {/* Send Button */}
               <button
                 onClick={() => handleSendMessage()}
-                disabled={!inputMessage.trim() || isTyping || !isInitialized}
+                disabled={!inputMessage.trim() || isTyping}
                 className="bg-[#E2AF19] hover:bg-[#D4A853] disabled:opacity-50 text-black rounded-full w-8 h-8 lg:w-9 lg:h-9 flex items-center justify-center transition-colors flex-shrink-0"
               >
                 <svg
