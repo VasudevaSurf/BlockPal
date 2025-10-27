@@ -131,7 +131,7 @@ export default function WalletIntegration({
       <div className="h-screen bg-[#0F0F0F] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E2AF19] mx-auto mb-4"></div>
-          <p className="text-white font-satoshi">Connecting to wallet...</p>
+          <p className="text-white font-satoshi">Loading</p>
           {hasTracked && (
             <p className="text-gray-400 font-satoshi text-sm mt-2">
               Syncing your preferences...

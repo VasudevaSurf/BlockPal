@@ -1,4 +1,4 @@
-// src/components/ui/BlockPalLoader.tsx - FIXED: Desktop sidebar visible, Mobile bottom nav visible
+// src/components/ui/BlockPalLoader.tsx - FIXED: Desktop sidebar visible, Mobile bottom nav visible + Wave animation
 "use client";
 
 import React from "react";
@@ -15,23 +15,23 @@ const BlockPalLoader: React.FC<BlockPalLoaderProps> = ({
     // Desktop: Absolute positioning to respect main content area (sidebar visible)
     <div className="fixed lg:absolute inset-0 bottom-20 lg:bottom-0 bg-[#000000] flex items-center justify-center z-[9999]">
       <div className="flex flex-col items-center justify-center gap-8">
-        {/* Logo */}
+        {/* Logo with Wave Animation */}
         <div className="relative">
           <img
             src="/BlockPal.png"
             alt="BlockPal"
-            className="h-16 w-auto object-contain brightness-110"
+            className="h-16 w-auto object-contain brightness-110 animate-wave"
             style={{ width: "auto" }}
           />
         </div>
 
         {/* Sliding Line Loader */}
-        <div className="relative w-64 h-1 bg-[#2C2C2C] rounded-full overflow-hidden">
+        {/* <div className="relative w-64 h-1 bg-[#2C2C2C] rounded-full overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#E2AF19] to-transparent w-1/3 animate-slide rounded-full"></div>
-        </div>
+        </div> */}
 
         {/* Loading Text */}
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           <span className="text-white text-lg font-mayeka">{loadingText}</span>
           <div className="flex gap-1">
             <span
@@ -53,10 +53,30 @@ const BlockPalLoader: React.FC<BlockPalLoaderProps> = ({
               .
             </span>
           </div>
-        </div>
+        </div> */}
       </div>
 
       <style jsx>{`
+        @keyframes wave {
+          0%,
+          100% {
+            transform: translateY(0) rotate(0deg);
+          }
+          25% {
+            transform: translateY(-10px) rotate(-2deg);
+          }
+          50% {
+            transform: translateY(0) rotate(0deg);
+          }
+          75% {
+            transform: translateY(-10px) rotate(2deg);
+          }
+        }
+
+        .animate-wave {
+          animation: wave 2s ease-in-out infinite;
+        }
+
         @keyframes slide {
           0% {
             transform: translateX(-100%);
