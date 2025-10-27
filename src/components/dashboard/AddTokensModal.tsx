@@ -594,21 +594,19 @@ export default function AddTokensModal({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed lg:absolute inset-0 bg-white/10 z-40"
-        onClick={onClose}
-      />
+      {/* Backdrop - FIXED: Make it cover entire viewport on all screen sizes */}
+      <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
 
-      {/* Modal Container */}
+      {/* Modal Container - FIXED: Changed positioning */}
       <div
-        className="fixed lg:absolute inset-0 z-50 flex items-center justify-center lg:p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center px-2 lg:pl-56"
         onClick={onClose}
         style={{
-          paddingTop: "6rem", // Add top space on mobile
-          paddingBottom: "calc(80px + 1rem)", // Account for bottom nav + padding on mobile
-          paddingLeft: "0.5rem",
-          paddingRight: "0.5rem",
+          paddingTop:
+            window.innerWidth >= 1024
+              ? "10rem"
+              : "max(1rem, env(safe-area-inset-top))",
+          paddingBottom: "max(calc(80px + 1rem), env(safe-area-inset-bottom))",
         }}
       >
         <div
