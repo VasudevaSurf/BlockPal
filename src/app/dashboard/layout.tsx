@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - UPDATED: Added back button and Pulse by Lumen title for News Chat
+// src/app/dashboard/layout.tsx - UPDATED: Hide GlobalDashboardHeader on mobile for Connect and Districts pages
 "use client";
 
 import { useSelector } from "react-redux";
@@ -94,6 +94,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const isCodeLensPage = pathname === "/dashboard/coin-lens";
   const isNewsFeedPage = pathname === "/dashboard/news-feed";
   const isDashboardPage = pathname === "/dashboard";
+  const isConnect = pathname === "/dashboard/connect";
+  const isDistricts = pathname === "/dashboard/districts";
 
   const handleCodeLensSearchChange = (query: string) => {
     setCodeLensSearchQuery(query);
@@ -421,8 +423,94 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
               )}
 
-              {/* GlobalDashboardHeader - HIDE on News Chat page */}
-              {!isSwapPage && !isNewsChatPage && (
+              {/* Connect page mobile header - Fixed and overlay */}
+              {isConnect && (
+                <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-[#000000]/95 backdrop-blur-md flex-shrink-0 border-b border-[#2C2C2C]/50">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleMobileMenuToggle}
+                      className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                      title="Open menu"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="20"
+                        viewBox="0 0 29 20"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 2H27.3521"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 10H19"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 18H13"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                    <h1 className="text-white text-lg font-mayeka font-semibold">
+                      Connect
+                    </h1>
+                  </div>
+                </div>
+              )}
+
+              {/* Districts page mobile header - Fixed and overlay */}
+              {isDistricts && (
+                <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-[#000000]/95 backdrop-blur-md flex-shrink-0 border-b border-[#2C2C2C]/50">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleMobileMenuToggle}
+                      className="p-1.5 hover:bg-[#2C2C2C] rounded-lg transition-colors"
+                      title="Open menu"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="20"
+                        viewBox="0 0 29 20"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 2H27.3521"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 10H19"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 18H13"
+                          stroke="white"
+                          strokeWidth="2.11268"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                    <h1 className="text-white text-lg font-mayeka font-semibold">
+                      Districts
+                    </h1>
+                  </div>
+                </div>
+              )}
+
+              {/* GlobalDashboardHeader - HIDE on News Chat, Connect, and Districts pages on mobile */}
+              {!isSwapPage && !isNewsChatPage && !isConnect && !isDistricts && (
                 <div
                   className={`flex-shrink-0 bg-[#000000] rounded-[16px] lg:rounded-[20px] sm:px-4 lg:px-5 sm:py-1 lg:py-2 ${
                     isAIChatPage || isDashboardPage ? "hidden lg:block" : ""

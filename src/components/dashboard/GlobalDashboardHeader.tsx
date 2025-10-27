@@ -475,10 +475,10 @@ export default function GlobalDashboardHeader({
     try {
       // Close modal immediately and prevent reopening
       setLogoutModalOpen(false);
-      
+
       // Small delay to let modal close animation complete
-      await new Promise(resolve => setTimeout(resolve, 250));
-      
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
       if (isConnected && address) {
         console.log("🔌 Silently disconnecting wallet before logout...");
         disconnect();

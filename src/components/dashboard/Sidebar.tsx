@@ -53,13 +53,13 @@ const menuItems = [
   },
   {
     icon: MessageCircleIcon,
+    href: "/dashboard/connect",
     label: "Connect",
-    comingSoon: true,
   },
   {
     icon: UsersIcon,
     label: "Districts",
-    comingSoon: true,
+    href: "/dashboard/districts",
   },
 ];
 
