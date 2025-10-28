@@ -1,7 +1,7 @@
-// src/components/dashboard/Sidebar.tsx - UPDATED with dimmed Connect & Districts
+// src/components/dashboard/Sidebar.tsx - FIXED: Persistent minimize state
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter, usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
@@ -61,14 +61,14 @@ const menuItems = [
     href: "/dashboard/connect",
     label: "Connect",
     comingSoon: false,
-    dimmed: true, // Dimmed but not coming soon
+    dimmed: true,
   },
   {
     icon: UsersIcon,
     label: "Districts",
     href: "/dashboard/districts",
     comingSoon: false,
-    dimmed: true, // Dimmed but not coming soon
+    dimmed: true,
   },
 ];
 
@@ -76,6 +76,9 @@ interface SidebarProps {
   onItemClick?: () => void;
   isMobile?: boolean;
 }
+
+// ✅ STORAGE KEY for persisting minimize state
+const SIDEBAR_MINIMIZE_KEY = "sidebar-minimized";
 
 export default function Sidebar({
   onItemClick,
@@ -88,10 +91,25 @@ export default function Sidebar({
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
 
-  // State for sidebar minimization (desktop only)
-  const [isMinimized, setIsMinimized] = useState(false);
+  // ✅ FIXED: Load minimize state from localStorage on mount
+  const [isMinimized, setIsMinimized] = useState(() => {
+    if (typeof window !== "undefined" && !isMobile) {
+      const stored = localStorage.getItem(SIDEBAR_MINIMIZE_KEY);
+      return stored === "true";
+    }
+    return false;
+  });
+
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // ✅ FIXED: Persist minimize state to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined" && !isMobile) {
+      localStorage.setItem(SIDEBAR_MINIMIZE_KEY, isMinimized.toString());
+      console.log("💾 Sidebar minimize state saved:", isMinimized);
+    }
+  }, [isMinimized, isMobile]);
 
   const handleNavigation = (
     href: string,
@@ -279,12 +297,12 @@ export default function Sidebar({
                         : "px-3 lg:px-4 py-2 lg:py-3 text-xs lg:text-sm rounded-l-lg"
                     } ${
                       isActive && !item.comingSoon
-                        ? "bg-[#E2AF19] text-black font-medium" // Remove !item.dimmed condition
+                        ? "bg-[#E2AF19] text-black font-medium"
                         : item.comingSoon
                         ? "text-gray-400 hover:bg-[#1C1C1C] cursor-pointer"
                         : item.dimmed
-                        ? "text-gray-400 hover:bg-[#1C1C1C] hover:text-gray-300" // Dimmed but not active
-                        : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white" // Normal items
+                        ? "text-gray-400 hover:bg-[#1C1C1C] hover:text-gray-300"
+                        : "text-[#EDEDED] hover:bg-[#2C2C2C] hover:text-white"
                     } ${isLoading ? "pointer-events-none" : ""}`}
                     title={isMobile || !isMinimized ? undefined : item.label}
                   >
@@ -293,7 +311,7 @@ export default function Sidebar({
                       className={`${
                         isMobile || !isMinimized ? "mr-3" : ""
                       } flex-shrink-0 lg:w-5 lg:h-5`}
-                      filled={isActive && !item.comingSoon} // Remove !item.dimmed condition
+                      filled={isActive && !item.comingSoon}
                     />
                     {(isMobile || !isMinimized) && (
                       <span
