@@ -1,4 +1,4 @@
-// src/components/dashboard/AddTokensModal.tsx - OPTIMIZED MOBILE VERSION
+// src/components/dashboard/AddTokensModal.tsx - UPDATED WITH SOLANA
 import { useState, useEffect, useRef } from "react";
 import {
   X,
@@ -44,7 +44,7 @@ interface SearchResult {
   displayName: string;
 }
 
-// Chain data configuration
+// ✅ UPDATED: Added Solana chain configuration
 const getChainDisplayData = () => {
   const chainDisplayData: {
     [key: string]: {
@@ -104,12 +104,21 @@ const getChainDisplayData = () => {
       fallbackIcon: "B",
       useBackground: true,
     },
+    // ✅ NEW: Solana chain
+    solana: {
+      name: "Solana",
+      color: "bg-gradient-to-r from-purple-500 to-pink-500",
+      icon: "◎",
+      image: "/chains/Solana.png",
+      fallbackIcon: "◎",
+      useBackground: true,
+    },
   };
 
   return chainDisplayData;
 };
 
-// ✅ FIXED: Add image cache and preload function (same as TokenSelectorModal)
+// Image cache and preload functions remain the same...
 const imageCache = new Map<string, boolean>();
 
 const preloadImage = (src: string): Promise<boolean> => {
@@ -132,7 +141,6 @@ const preloadImage = (src: string): Promise<boolean> => {
   });
 };
 
-// ✅ FIXED: Chain Icon Component with proper preloading (same as TokenSelectorModal)
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -153,7 +161,6 @@ const ChainIcon: React.FC<ChainIconProps> = ({
 }) => {
   const [imageState, setImageState] = useState<"loading" | "loaded" | "error">(
     () => {
-      // Check cache on initial render
       if (chainData.image && imageCache.has(chainData.image)) {
         return imageCache.get(chainData.image) ? "loaded" : "error";
       }
@@ -172,14 +179,12 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   useEffect(() => {
     mountedRef.current = true;
 
-    // Check cache first
     if (chainData.image && imageCache.has(chainData.image)) {
       const cached = imageCache.get(chainData.image);
       setImageState(cached ? "loaded" : "error");
       return;
     }
 
-    // Preload image if not cached
     if (chainData.image) {
       preloadImage(chainData.image).then((success) => {
         if (mountedRef.current) {
@@ -200,12 +205,10 @@ const ChainIcon: React.FC<ChainIconProps> = ({
       className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden ${className}`}
       title={chainData.name}
       style={{
-        // Hide completely during loading to prevent flickering
         opacity: imageState === "loading" ? 0 : 1,
         transition: "opacity 0.15s ease-in",
       }}
     >
-      {/* Show image when loaded */}
       {imageState === "loaded" && chainData.image && (
         <img
           src={chainData.image}
@@ -216,7 +219,6 @@ const ChainIcon: React.FC<ChainIconProps> = ({
         />
       )}
 
-      {/* Show fallback only on error */}
       {imageState === "error" && (
         <div
           className={`${chainData.color} w-full h-full flex items-center justify-center absolute inset-0`}
@@ -230,7 +232,6 @@ const ChainIcon: React.FC<ChainIconProps> = ({
   );
 };
 
-// Token Image Component
 const TokenImage = ({
   src,
   alt,
@@ -284,6 +285,7 @@ const TokenImage = ({
   );
 };
 
+// ✅ UPDATED: Added Solana to chains list
 const CHAINS = [
   { id: "eth", label: "Ethereum" },
   { id: "base", label: "Base" },
@@ -291,6 +293,7 @@ const CHAINS = [
   { id: "arbitrum", label: "Arbitrum" },
   { id: "avalanche", label: "Avalanche" },
   { id: "bsc", label: "BSC" },
+  { id: "solana", label: "Solana" }, // ✅ NEW
 ];
 
 export default function AddTokensModal({
@@ -316,7 +319,7 @@ export default function AddTokensModal({
 
   const { showToast } = useToast();
 
-  // ✅ FIXED: Preload all chain images on mount (same as TokenSelectorModal)
+  // Preload all chain images on mount
   useEffect(() => {
     const preloadAllChainImages = async () => {
       const images = Object.values(chainDisplayData)
@@ -331,7 +334,6 @@ export default function AddTokensModal({
     preloadAllChainImages();
   }, []);
 
-  // Helper function to check if token already exists
   const isTokenAlreadyAdded = (
     contractAddress: string,
     chainId: string
@@ -343,7 +345,6 @@ export default function AddTokensModal({
     );
   };
 
-  // Set up WebSocket listener for search results
   useEffect(() => {
     const handleSearchResults = (results: SearchResult[]) => {
       console.log("🔍 WebSocket search results received:", results.length);
@@ -358,7 +359,6 @@ export default function AddTokensModal({
     };
   }, []);
 
-  // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery("");
@@ -370,7 +370,6 @@ export default function AddTokensModal({
     }
   }, [isOpen]);
 
-  // Handle ESC key
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && isOpen && !addingTokens) {
@@ -382,7 +381,6 @@ export default function AddTokensModal({
     return () => document.removeEventListener("keydown", handleEscKey);
   }, [isOpen, onClose, addingTokens]);
 
-  // Focus search input when modal opens
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       setTimeout(() => {
@@ -391,7 +389,6 @@ export default function AddTokensModal({
     }
   }, [isOpen]);
 
-  // Load popular tokens when chain changes
   useEffect(() => {
     if (isOpen && !searchQuery) {
       const tokens = getPopularTokensForChain(selectedChain);
@@ -402,7 +399,6 @@ export default function AddTokensModal({
     }
   }, [selectedChain, isOpen, searchQuery]);
 
-  // Clear search when chain changes
   useEffect(() => {
     if (isOpen) {
       console.log(`🔄 Chain changed to: ${selectedChain}`);
@@ -425,7 +421,6 @@ export default function AddTokensModal({
     }
   }, [selectedChain, isOpen]);
 
-  // Debounced search with WebSocket
   useEffect(() => {
     if (searchDebounceTimer) {
       clearTimeout(searchDebounceTimer);
@@ -594,10 +589,8 @@ export default function AddTokensModal({
 
   return (
     <>
-      {/* Backdrop - FIXED: Make it cover entire viewport on all screen sizes */}
       <div className="fixed inset-0 bg-white/10 z-40" onClick={onClose} />
 
-      {/* Modal Container - FIXED: Changed positioning */}
       <div
         className="fixed inset-0 z-50 flex items-center justify-center px-2 lg:pl-56"
         onClick={onClose}
@@ -613,15 +606,14 @@ export default function AddTokensModal({
           className="h-[75vh] lg:h-[550px] w-full max-w-[95vw] lg:max-w-4xl"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Main container */}
           <div className="bg-[#000] rounded-[16px] lg:rounded-[20px] h-full flex flex-col lg:flex-row overflow-hidden border border-[#2C2C2C]">
             {/* Desktop Left Side - Chains */}
-            <div className="hidden lg:block lg:w-1/3 p-5">
-              <div className="mb-8">
+            <div className="hidden lg:block lg:w-1/3 p-5 flex flex-col">
+              <div className="mb-6">
                 <h2 className="text-white font-mayeka text-xl">Add Tokens</h2>
               </div>
 
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex-1 flex items-start">
                 <div className="relative p-[2px] rounded-[12px] w-full">
                   <div
                     className="absolute inset-0 rounded-[12px]"
@@ -636,7 +628,7 @@ export default function AddTokensModal({
                     }}
                   />
                   <div className="relative bg-[#000] rounded-[10px] p-4">
-                    <div className="mb-4">
+                    <div className="mb-3">
                       <div className="bg-[#0F0F0F] p-2 px-3 rounded-[14px] inline-block">
                         <h3 className="text-white font-mayeka text-[16px]">
                           Select Chain
@@ -661,7 +653,7 @@ export default function AddTokensModal({
                             key={chain.id}
                             onClick={() => setSelectedChain(chain.id)}
                             disabled={addingTokens}
-                            className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
+                            className={`w-full p-2.5 rounded-[10px] transition-all duration-200 text-left ${
                               isSelected ? "bg-[#71570C]" : "hover:bg-[#1A1A1A]"
                             } ${
                               addingTokens

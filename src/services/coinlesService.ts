@@ -109,7 +109,7 @@ class CoinLesService {
     const apiUrl =
       process.env.NEXT_PUBLIC_API_URL_COIN ||
       process.env.NEXT_PUBLIC_WALLET_SERVICE_URL ||
-      "https://creative-amazement-production-7acf.up.railway.app";
+      "http://localhost:5002";
 
     this.baseURL = apiUrl.replace(/\/api$/, "");
 

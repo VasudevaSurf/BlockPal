@@ -549,6 +549,96 @@ export const POPULAR_TOKENS: { [chainId: string]: PopularToken[] } = {
     //   isPopular: true,
     // },
   ],
+  solana: [
+    {
+      address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      symbol: "USDC",
+      name: "USD Coin",
+      decimals: 6,
+      logoURI:
+        "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png",
+      isPopular: true,
+    },
+    {
+      address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+      symbol: "USDT",
+      name: "Tether USD",
+      decimals: 6,
+      logoURI:
+        "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg",
+      isPopular: true,
+    },
+    {
+      address: "So11111111111111111111111111111111111111112",
+      symbol: "SOL",
+      name: "Wrapped SOL",
+      decimals: 9,
+      logoURI:
+        "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+      isPopular: true,
+    },
+    {
+      address: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+      symbol: "RAY",
+      name: "Raydium",
+      decimals: 6,
+      logoURI:
+        "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R/logo.png",
+      isPopular: true,
+    },
+    {
+      address: "SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt",
+      symbol: "SRM",
+      name: "Serum",
+      decimals: 6,
+      logoURI:
+        "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt/logo.png",
+      isPopular: true,
+    },
+    {
+      address: "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE",
+      symbol: "ORCA",
+      name: "Orca",
+      decimals: 6,
+      logoURI:
+        "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE/logo.png",
+      isPopular: true,
+    },
+    {
+      address: "MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac",
+      symbol: "MNGO",
+      name: "Mango Markets",
+      decimals: 6,
+      logoURI:
+        "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac/logo.svg",
+      isPopular: true,
+    },
+    {
+      address: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      symbol: "JUP",
+      name: "Jupiter",
+      decimals: 6,
+      logoURI: "https://static.jup.ag/jup/icon.png",
+      isPopular: true,
+    },
+    {
+      address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      symbol: "BONK",
+      name: "Bonk",
+      decimals: 5,
+      logoURI:
+        "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I",
+      isPopular: true,
+    },
+    {
+      address: "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL",
+      symbol: "JTO",
+      name: "Jito",
+      decimals: 9,
+      logoURI: "https://metadata.jito.network/token/jto/image",
+      isPopular: true,
+    },
+  ],
 };
 
 export function getPopularTokensForChain(chainId: string): PopularToken[] {
