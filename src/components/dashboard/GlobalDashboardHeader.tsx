@@ -332,12 +332,11 @@ export default function GlobalDashboardHeader({
 
   const { address, isConnected } = useAccount();
   const { caipNetwork, chainId: appKitChainId } = useAppKitNetwork();
-  const currentChain = chains.find((c) => c.id === chainId);
   const { disconnect } = useDisconnect();
 
-  // ✅ FIXED: Get chain ID properly
+  // ✅ FIXED: Get chain ID properly - MUST be declared BEFORE currentChain
   const chainId = caipNetwork?.id || appKitChainId;
-
+  const currentChain = chains.find((c) => c.id === chainId);
   const {
     switchChain,
     isPending: isSwitchingChain,

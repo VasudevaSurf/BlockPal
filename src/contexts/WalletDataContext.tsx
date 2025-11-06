@@ -1,4 +1,4 @@
-// src/contexts/WalletDataContext.tsx - OPTIMIZED: 5-minute auto-refresh + smart cache
+// src/contexts/WalletDataContext.tsx - FIXED: Full Solana Support
 "use client";
 
 import React, {
@@ -9,7 +9,8 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { tokenService } from "@/services/tokenService";
@@ -39,7 +40,7 @@ interface TokenBalance {
 interface WalletPreferences {
   userEmail: string;
   walletAddress: string;
-  chainId: number;
+  chainId: number | string; // ✅ Allow string for Solana
   userAddedTokens: string[];
   lastUpdated: string;
 }
@@ -76,8 +77,89 @@ export const useWalletData = () => {
 export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  // ✅ FIXED: Get wallet state from multiple sources
+  const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount();
+  const {
+    address: appKitAddress,
+    isConnected: appKitConnected,
+    caipAddress,
+    status,
+  } = useAppKitAccount();
+  const { caipNetwork, chainId: appKitChainId } = useAppKitNetwork();
+
+  // ✅ Parse caipAddress if available (format: "eip155:1:0x..." or "solana:5eykt...:address")
+  let parsedAddress = appKitAddress || wagmiAddress;
+  let parsedIsConnected = appKitConnected || wagmiConnected;
+
+  // ✅ If we have caipAddress but no regular address, parse it
+  if (caipAddress && !parsedAddress) {
+    const parts = caipAddress.split(":");
+    if (parts.length >= 3) {
+      parsedAddress = parts[2]; // The address is the third part
+      parsedIsConnected = true;
+      console.log("✅ Parsed address from caipAddress:", parsedAddress);
+    }
+  }
+
+  // ✅ Final values
+  const address = parsedAddress;
+  const isConnected = parsedIsConnected || status === "connected";
+
+  // ✅ CRITICAL DEBUG: Log everything on mount and when values change
+  useEffect(() => {
+    console.log("🔍 WalletDataProvider DEBUG:", {
+      wagmiAddress,
+      wagmiConnected,
+      appKitAddress,
+      appKitConnected,
+      caipAddress,
+      status,
+      parsedAddress,
+      finalAddress: address,
+      finalIsConnected: isConnected,
+      caipNetwork: caipNetwork
+        ? {
+            id: caipNetwork.id,
+            name: caipNetwork.name,
+            chainId: caipNetwork.chainId,
+          }
+        : null,
+      appKitChainId,
+    });
+  }, [
+    wagmiAddress,
+    wagmiConnected,
+    appKitAddress,
+    appKitConnected,
+    caipAddress,
+    status,
+    address,
+    isConnected,
+    caipNetwork,
+    appKitChainId,
+  ]);
+
+  // ✅ Determine if Solana or EVM
+  const isSolana =
+    caipNetwork?.name?.toLowerCase() === "solana" ||
+    caipNetwork?.id === "solana" ||
+    caipNetwork?.id === "solana:mainnet" ||
+    String(caipNetwork?.id).includes("5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp");
+
+  // ✅ Get chain ID (string for Solana, number for EVM)
+  const chainId = isSolana ? "solana" : caipNetwork?.id || appKitChainId;
+
+  // ✅ CRITICAL DEBUG: Log computed values
+  useEffect(() => {
+    console.log("💡 WalletDataProvider COMPUTED VALUES:", {
+      address,
+      isConnected,
+      chainId,
+      isSolana,
+      willFetchTokens: !!(address && chainId && isConnected),
+    });
+  }, [address, isConnected, chainId, isSolana]);
+
   const authState = useSelector((state: RootState) => state.auth);
 
   const currentChain = chains.find((c) => c.id === chainId);
@@ -99,10 +181,9 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     useState<WalletPreferences | null>(null);
 
   const prevAddressRef = useRef<string | undefined>();
-  const prevChainRef = useRef<number | undefined>();
+  const prevChainRef = useRef<number | string | undefined>();
   const isInitialLoadRef = useRef(true);
 
-  // Get user email helper
   const getUserEmail = (): string | null => {
     if (!authState?.user) return null;
     return (
@@ -116,7 +197,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const userEmail = getUserEmail();
 
-  // Load preferences
   const loadPreferences = useCallback(async () => {
     if (!address || !chainId || !userEmail) {
       console.log("⚠️ Cannot load preferences: missing required data");
@@ -124,7 +204,11 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     try {
-      console.log(`📥 Loading preferences for user: ${userEmail}`);
+      console.log(
+        `📥 Loading preferences for user: ${userEmail}, chain: ${chainId}`
+      );
+
+      // ✅ FIXED: Send chainId as string for Solana
       const response = await fetch(
         `/api/wallet/preferences?wallet=${address}&chain=${chainId}&email=${encodeURIComponent(
           userEmail
@@ -147,7 +231,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     return null;
   }, [address, chainId, userEmail]);
 
-  // Calculate main list value based on preferences
   const calculateMainListValue = useCallback(
     (tokens: TokenBalance[], preferences: WalletPreferences | null) => {
       if (!tokens || tokens.length === 0)
@@ -159,7 +242,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
         "user-added"
       );
 
-      // Main list tokens = preset + user-added
       const mainListTokens = tokens.filter((token) => {
         const isPreset = token.isPreset === true;
         const isUserAdded =
@@ -174,7 +256,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
         `📊 Main list: ${mainListTokens.length} tokens (from ${tokens.length} total)`
       );
 
-      // Calculate values
       const mainListValue = mainListTokens.reduce(
         (sum, token) => sum + (token.value || 0),
         0
@@ -196,7 +277,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     []
   );
 
-  // Update token categories based on preferences
   const updateTokenCategories = useCallback(
     (preferences: WalletPreferences | null) => {
       console.log(
@@ -205,9 +285,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       );
       setCurrentPreferences(preferences);
 
-      // Immediately recalculate main list value with new preferences
       setWalletData((prevData) => {
-        // Update isUserAdded flag on tokens first
         const updatedTokens = prevData.tokens.map((token) => ({
           ...token,
           isUserAdded:
@@ -217,7 +295,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
             ) || false,
         }));
 
-        // Calculate with updated tokens
         const { mainListValue, total24hrChange } = calculateMainListValue(
           updatedTokens,
           preferences
@@ -236,11 +313,24 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     [calculateMainListValue]
   );
 
-  // Fetch wallet tokens
   const fetchWalletTokens = useCallback(
     async (forceRefresh: boolean = false) => {
+      console.log("🎯 fetchWalletTokens CALLED with:", {
+        address,
+        chainId,
+        isConnected,
+        isSolana,
+        forceRefresh,
+      });
+
       if (!address || !chainId || !isConnected) {
         console.log("⚠️ Cannot fetch tokens - wallet not connected");
+        console.log("⚠️ Missing values:", {
+          hasAddress: !!address,
+          hasChainId: !!chainId,
+          isConnected,
+          isSolana,
+        });
         setWalletData((prev) => ({
           ...prev,
           tokens: [],
@@ -255,7 +345,10 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       console.log(
-        `🔄 Fetching tokens for ${address} on chain ${chainId}${
+        `🔄 Fetching tokens for ${address.substring(
+          0,
+          10
+        )}... on chain ${chainId} (Solana: ${isSolana})${
           forceRefresh ? " (FORCE REFRESH)" : ""
         }`
       );
@@ -263,24 +356,29 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       setWalletData((prev) => ({ ...prev, loading: true, error: null }));
 
       try {
-        // Load preferences first if not loaded
         const preferences = currentPreferences;
 
-        // If force refresh, clear cache first
         if (forceRefresh) {
           console.log("🧹 Force refresh - clearing cache");
           await tokenService.refreshWalletTokens(address);
         }
 
-        // Fetch tokens with showHidden=true to get all tokens
+        console.log("📡 Calling tokenService.getWalletTokens...");
+
+        // ✅ FIXED: Pass chainId as-is (string for Solana, number for EVM)
         const result = await tokenService.getWalletTokens(
           address,
-          chainId,
+          chainId as any, // Allow both number and string
           true
         );
 
+        console.log("✅ tokenService returned:", {
+          tokenCount: result?.tokens?.length || 0,
+          totalValue: result?.totalValue,
+          chainName: result?.chainName,
+        });
+
         if (result) {
-          // Mark tokens as preset or user-added
           const processedTokens = result.tokens.map(
             (token: any, index: number) => ({
               ...token,
@@ -293,7 +391,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
             })
           );
 
-          // Calculate main list value with current preferences
           const { mainListValue, total24hrChange } = calculateMainListValue(
             processedTokens,
             preferences
@@ -304,7 +401,10 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
             totalValue: result.totalValue,
             mainListValue,
             total24hrChange,
-            chainName: result.chainName || currentChain?.name || "",
+            chainName:
+              result.chainName ||
+              currentChain?.name ||
+              (isSolana ? "Solana" : ""),
             loading: false,
             error: null,
             cacheValid: true,
@@ -312,7 +412,9 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
           });
 
           console.log(`✅ Fetched ${processedTokens.length} tokens`);
-          console.log(`💰 Main list value: $${mainListValue.toFixed(2)}`);
+          console.log(`💰 Main list value: ${mainListValue.toFixed(2)}`);
+        } else {
+          console.error("❌ No result from tokenService");
         }
       } catch (error: any) {
         console.error("❌ Error fetching tokens:", error);
@@ -328,6 +430,7 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       address,
       chainId,
       isConnected,
+      isSolana,
       currentChain,
       userEmail,
       loadPreferences,
@@ -336,7 +439,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     ]
   );
 
-  // Refresh function
   const refresh = useCallback(
     async (forceRefresh: boolean = false) => {
       if (isRefreshing) {
@@ -347,7 +449,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsRefreshing(true);
 
       try {
-        // Reload preferences when refreshing
         if (userEmail) {
           await loadPreferences();
         }
@@ -359,24 +460,45 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     [fetchWalletTokens, isRefreshing, userEmail, loadPreferences]
   );
 
-  // Initial load and wallet/chain changes
   useEffect(() => {
+    console.log("🔄 WALLET CHANGE DETECTION:", {
+      currentAddress: address,
+      prevAddress: prevAddressRef.current,
+      currentChain: chainId,
+      prevChain: prevChainRef.current,
+      walletChanged: prevAddressRef.current !== address,
+      chainChanged: prevChainRef.current !== chainId,
+    });
+
     const walletChanged = prevAddressRef.current !== address;
     const chainChanged = prevChainRef.current !== chainId;
 
     if (walletChanged || chainChanged) {
-      console.log("🔄 Wallet or chain changed, fetching new data...");
+      console.log("✅ Wallet or chain changed, fetching new data...");
+      console.log("Chain details:", {
+        chainId,
+        isSolana,
+        chainName: currentChain?.name,
+      });
       prevAddressRef.current = address;
       prevChainRef.current = chainId;
       isInitialLoadRef.current = true;
 
-      // Reset preferences when wallet/chain changes
       setCurrentPreferences(null);
 
-      // Load preferences first, then fetch tokens
       if (isConnected && address && userEmail) {
+        console.log("📥 Loading preferences then fetching tokens...");
         loadPreferences().then(() => {
+          console.log(
+            "📥 Preferences loaded, now calling fetchWalletTokens..."
+          );
           fetchWalletTokens(false);
+        });
+      } else {
+        console.log("⚠️ Not fetching - missing requirements:", {
+          isConnected,
+          hasAddress: !!address,
+          hasUserEmail: !!userEmail,
         });
       }
     }
@@ -389,7 +511,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     fetchWalletTokens,
   ]);
 
-  // Fetch tokens when preferences are loaded (for initial mount)
   useEffect(() => {
     if (
       isConnected &&
@@ -410,7 +531,6 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
     fetchWalletTokens,
   ]);
 
-  // ✅ CHANGED: Auto-refresh every 5 MINUTES (was 30 seconds)
   useEffect(() => {
     if (!isConnected || !address) return;
 
@@ -418,8 +538,8 @@ export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const interval = setInterval(() => {
       console.log("🔄 Auto-refresh triggered (5 minute interval)");
-      refresh(false); // Background refresh, not force
-    }, 5 * 60 * 1000); // ✅ CHANGED: 300,000ms = 5 minutes (was 30,000ms)
+      refresh(false);
+    }, 5 * 60 * 1000);
 
     return () => {
       console.log("🛑 Clearing auto-refresh interval");

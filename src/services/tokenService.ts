@@ -1,4 +1,4 @@
-// src/services/tokenService.ts - Enhanced version with separate main list balance
+// src/services/tokenService.ts - WITH FULL DEBUG LOGGING
 interface TokenBalance {
   id: string;
   symbol: string;
@@ -8,8 +8,8 @@ interface TokenBalance {
   balance: number;
   balanceWei: string;
   value: number;
-  change24h: number; // Percentage change
-  usdChange24h?: number; // USD change amount
+  change24h: number;
+  usdChange24h?: number;
   price: number;
   isNative: boolean;
   logoUrl?: string;
@@ -20,28 +20,17 @@ interface TokenBalance {
 
 interface WalletTokensResponse {
   wallet: string;
-  chainId: number;
+  chainId: number | string;
   chainName: string;
   tokens: TokenBalance[];
-  totalValue: number; // ALL tokens total value
-  mainListValue: number; // NEW: Only main list (preset + user-added) tokens value
-  total24hrChange: number; // NEW: 24hr portfolio change in USD for main list only
+  totalValue: number;
+  mainListValue: number;
+  total24hrChange: number;
   tokenCount: number;
-  presetTokenCount: number; // NEW: Count of preset tokens
-  hiddenTokenCount: number; // NEW: Count of hidden tokens
-  showingHidden: boolean; // NEW: Whether hidden tokens are shown
-  hasHiddenTokens: boolean; // NEW: Whether there are hidden tokens
-  lastUpdated: string;
-}
-
-interface NativeBalanceResponse {
-  wallet: string;
-  chainId: number;
-  nativeBalance: {
-    balance: number;
-    balanceWei: string;
-    symbol?: string;
-  };
+  presetTokenCount: number;
+  hiddenTokenCount: number;
+  showingHidden: boolean;
+  hasHiddenTokens: boolean;
   lastUpdated: string;
 }
 
@@ -51,26 +40,29 @@ class TokenService {
 
   constructor() {
     this.baseURL =
-      process.env.NEXT_PUBLIC_API_URL || "https://creative-amazement-production-7acf.up.railway.app/api/tokens";
-    this.debugMode = process.env.NODE_ENV === "development";
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api/tokens";
+    this.debugMode = true; // Force debug mode
     console.log("🔗 TokenService initialized with base URL:", this.baseURL);
   }
 
-  /**
-   * Enhanced token fetching with separate main list balance calculation
-   */
   async getWalletTokens(
     walletAddress: string,
-    chainId: number,
+    chainId: number | string,
     showHidden: boolean = false
   ): Promise<WalletTokensResponse> {
-    try {
-      console.log(
-        `🪙 Fetching tokens for wallet: ${walletAddress} on chain: ${chainId}, showHidden: ${showHidden}`
-      );
+    console.log("\n🟢🟢🟢 TOKEN SERVICE: getWalletTokens START 🟢🟢🟢");
+    console.log("📥 Request Parameters:");
+    console.log({
+      walletAddress,
+      chainId,
+      chainIdType: typeof chainId,
+      showHidden,
+      baseURL: this.baseURL,
+    });
 
+    try {
       const url = `${this.baseURL}/wallet/${walletAddress}?chain=${chainId}&showHidden=${showHidden}`;
-      console.log("📡 Making request to:", url);
+      console.log("\n📡 Making API request to:", url);
 
       const response = await fetch(url, {
         method: "GET",
@@ -81,22 +73,27 @@ class TokenService {
         signal: AbortSignal.timeout(45000),
       });
 
-      console.log("📡 Response status:", response.status, response.statusText);
+      console.log("\n📡 Response received:");
+      console.log({
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
 
       if (!response.ok) {
+        console.error("❌ Response not OK");
         let errorData;
         try {
           errorData = await response.json();
+          console.error("Error data:", errorData);
         } catch {
           errorData = {
             message: `HTTP ${response.status}: ${response.statusText}`,
           };
         }
 
-        console.error("❌ API Error Response:", errorData);
-
-        // Return empty result for better UX
-        console.warn("🔄 API error, returning empty result for UX");
+        console.warn("🔄 Returning empty result for UX");
         return {
           wallet: walletAddress,
           chainId,
@@ -114,12 +111,14 @@ class TokenService {
         };
       }
 
+      console.log("\n📦 Parsing response...");
       let data;
       try {
         const responseText = await response.text();
+        console.log("Raw response length:", responseText.length);
         console.log(
-          "📦 Raw response text:",
-          responseText.substring(0, 500) + "..."
+          "Raw response preview:",
+          responseText.substring(0, 200) + "..."
         );
 
         if (!responseText.trim()) {
@@ -127,9 +126,14 @@ class TokenService {
         }
 
         data = JSON.parse(responseText);
-        console.log("📦 Parsed API Response:", data);
+        console.log("\n✅ Parsed response structure:");
+        console.log({
+          success: data.success,
+          hasData: !!data.data,
+          dataKeys: data.data ? Object.keys(data.data) : [],
+        });
       } catch (parseError) {
-        console.error("❌ Error parsing response:", parseError);
+        console.error("❌ Parse error:", parseError);
         throw new Error("Invalid response format from server");
       }
 
@@ -157,18 +161,33 @@ class TokenService {
         ? responseData.tokens
         : [];
 
-      // CALCULATE SEPARATE VALUES FOR MAIN LIST VS ALL TOKENS
+      console.log("\n📊 Response Data Summary:");
+      console.log({
+        tokenCount: tokens.length,
+        totalValue: responseData.totalValue,
+        chainName: responseData.chainName,
+        presetTokenCount: responseData.presetTokenCount,
+        hiddenTokenCount: responseData.hiddenTokenCount,
+      });
+
+      if (tokens.length > 0) {
+        console.log("\n🪙 First 3 tokens:");
+        tokens.slice(0, 3).forEach((token, i) => {
+          console.log(`  ${i + 1}. ${token.symbol}:`, {
+            balance: token.balance,
+            value: token.value,
+            price: token.price,
+          });
+        });
+      }
+
       const presetTokenCount = responseData.presetTokenCount || 0;
+      const mainListTokens = tokens.slice(0, presetTokenCount);
 
-      // Main list tokens = preset tokens + user-added tokens (first presetTokenCount + user-added)
-      const mainListTokens = tokens.slice(0, presetTokenCount); // Assuming API returns preset tokens first
-
-      // Calculate main list value (only preset + user-added tokens)
       const mainListValue = mainListTokens.reduce((sum, token) => {
         return sum + (typeof token.value === "number" ? token.value : 0);
       }, 0);
 
-      // Calculate main list 24hr change (only preset + user-added tokens)
       const mainList24hrChange = mainListTokens.reduce((sum, token) => {
         return (
           sum +
@@ -176,18 +195,16 @@ class TokenService {
         );
       }, 0);
 
-      // Total value includes all tokens (for reference)
       const totalValue = responseData.totalValue || 0;
 
-      // Extract enhanced metadata
       const result = {
         wallet: walletAddress,
         chainId,
         chainName: responseData.chainName || "Unknown",
         tokens,
-        totalValue, // All tokens value
-        mainListValue, // NEW: Only main list tokens value
-        total24hrChange: mainList24hrChange, // NEW: Only main list 24hr change
+        totalValue,
+        mainListValue,
+        total24hrChange: mainList24hrChange,
         tokenCount:
           typeof responseData.tokenCount === "number"
             ? responseData.tokenCount
@@ -202,63 +219,34 @@ class TokenService {
         lastUpdated: responseData.lastUpdated || new Date().toISOString(),
       };
 
-      console.log(
-        `✅ Fetched ${result.tokenCount} tokens (${result.presetTokenCount} in main list, ${result.hiddenTokenCount} hidden)`
-      );
+      console.log("\n✅ Final Result:");
+      console.log({
+        tokenCount: result.tokenCount,
+        presetCount: result.presetTokenCount,
+        hiddenCount: result.hiddenTokenCount,
+        totalValue: `$${result.totalValue.toFixed(2)}`,
+        mainListValue: `$${result.mainListValue.toFixed(2)}`,
+        total24hrChange: `$${result.total24hrChange.toFixed(2)}`,
+        chainName: result.chainName,
+      });
 
-      console.log(
-        `💰 Main List Value: ${this.formatCurrency(
-          result.mainListValue
-        )} (showing in wallet balance)`
-      );
-
-      console.log(
-        `📊 Total Value: ${this.formatCurrency(result.totalValue)} (all tokens)`
-      );
-
-      console.log(
-        `📈 24hr Main List Change: ${this.format24hrChange(
-          result.total24hrChange
-        )}`
-      );
-
-      // Log token details for debugging
-      if (this.debugMode && tokens.length > 0) {
-        console.log("🔍 Main list tokens (first %d):", presetTokenCount);
-        mainListTokens.slice(0, 3).forEach((token, index) => {
-          console.log(
-            `  ${index + 1}. ${token.symbol}: ${this.formatTokenAmount(
-              token.balance,
-              4
-            )} (${this.formatCurrency(token.value)}) ${this.formatPercentage(
-              token.change24h
-            )}`
-          );
-        });
-        if (mainListTokens.length > 3) {
-          console.log(
-            `  ... and ${mainListTokens.length - 3} more main list tokens`
-          );
-        }
-      }
-
+      console.log("🟢🟢🟢 TOKEN SERVICE: getWalletTokens END 🟢🟢🟢\n");
       return result;
     } catch (error: any) {
-      console.error("❌ Error fetching wallet tokens:", error);
+      console.error("\n❌❌❌ TOKEN SERVICE ERROR ❌❌❌");
+      console.error({
+        errorName: error.name,
+        errorMessage: error.message,
+        errorStack: error.stack,
+      });
 
-      // Handle different error types
       if (error.name === "TypeError" && error.message.includes("fetch")) {
         console.error("🌐 Network error - server might be down");
       } else if (error.name === "AbortError") {
-        console.error("⏰ Request timeout - server took too long to respond");
-      } else {
-        console.error("🔧 Unexpected error:", error.message);
+        console.error("⏰ Request timeout - server took too long");
       }
 
-      // Always return a valid response instead of throwing
-      console.warn(
-        "🔄 Returning empty result due to error (graceful degradation)"
-      );
+      console.warn("🔄 Returning empty result (graceful degradation)");
       return {
         wallet: walletAddress,
         chainId,
@@ -277,67 +265,6 @@ class TokenService {
     }
   }
 
-  /**
-   * Get native balance (unchanged)
-   */
-  async getNativeBalance(
-    walletAddress: string,
-    chainId: number
-  ): Promise<NativeBalanceResponse> {
-    try {
-      console.log(
-        `💎 Fetching native balance for wallet: ${walletAddress} on chain: ${chainId}`
-      );
-
-      const url = `${this.baseURL}/native/${walletAddress}?chain=${chainId}`;
-      console.log("📡 Making request to:", url);
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(15000),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || `HTTP ${response.status}: ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message || "Failed to fetch native balance");
-      }
-
-      console.log(
-        `✅ Fetched native balance: ${data.data.nativeBalance.balance} for wallet ${walletAddress}`
-      );
-
-      return data.data;
-    } catch (error: any) {
-      console.error("❌ Error fetching native balance:", error);
-      // Return zero balance instead of throwing
-      return {
-        wallet: walletAddress,
-        chainId,
-        nativeBalance: {
-          balance: 0,
-          balanceWei: "0",
-          symbol: "ETH",
-        },
-        lastUpdated: new Date().toISOString(),
-      };
-    }
-  }
-
-  /**
-   * Refresh token data for a wallet (clears cache)
-   */
   async refreshWalletTokens(walletAddress: string): Promise<void> {
     try {
       console.log(`🔄 Refreshing token data for wallet: ${walletAddress}`);
@@ -370,48 +297,6 @@ class TokenService {
     }
   }
 
-  /**
-   * Get service health status
-   */
-  async getHealthStatus(): Promise<any> {
-    try {
-      const response = await fetch(`${this.baseURL}/health`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(5000),
-      });
-
-      const data = await response.json();
-      console.log("🏥 Health status:", data);
-      return data;
-    } catch (error: any) {
-      console.error("❌ Error fetching health status:", error);
-      return { status: "unhealthy", error: error.message };
-    }
-  }
-
-  /**
-   * Check if the service is available
-   */
-  async ping(): Promise<boolean> {
-    try {
-      const health = await this.getHealthStatus();
-      const isHealthy = health.status === "healthy";
-      console.log(
-        `🔔 Service ping result: ${isHealthy ? "healthy" : "unhealthy"}`
-      );
-      return isHealthy;
-    } catch (error: any) {
-      console.warn("🔴 Service ping failed:", error.message);
-      return false;
-    }
-  }
-
-  /**
-   * Format currency value - Following wallet-balance.js format
-   */
   formatCurrency(value: number): string {
     if (value === 0) return "$0.000";
     if (value < 0.001) return "< $0.001";
@@ -421,12 +306,9 @@ class TokenService {
     if (value >= 1000) {
       return `$${(value / 1000).toFixed(2)}K`;
     }
-    return `$${value.toFixed(3)}`; // Show 3 decimals like wallet-balance.js
+    return `$${value.toFixed(3)}`;
   }
 
-  /**
-   * Format token amount - Following wallet-balance.js format
-   */
   formatTokenAmount(amount: number, decimals: number = 6): string {
     if (amount === 0) return "0";
     if (amount < 0.000001) return amount.toExponential(2);
@@ -441,11 +323,7 @@ class TokenService {
     return amount.toFixed(Math.min(decimals, 8));
   }
 
-  /**
-   * Format percentage - Following wallet-balance.js format
-   */
   formatPercentage(value: number): string {
-    // Handle invalid or missing values
     if (typeof value !== "number" || isNaN(value)) {
       return "+0.00%";
     }
@@ -454,9 +332,6 @@ class TokenService {
     return `${sign}${value.toFixed(2)}%`;
   }
 
-  /**
-   * Format 24hr change - Following wallet-balance.js format
-   */
   format24hrChange(value: number): string {
     if (typeof value !== "number" || isNaN(value) || Math.abs(value) < 0.001) {
       return "+$0.000";
@@ -465,90 +340,7 @@ class TokenService {
     const sign = value >= 0 ? "+" : "";
     return `${sign}$${Math.abs(value).toFixed(3)}`;
   }
-
-  /**
-   * Validate wallet address
-   */
-  isValidAddress(address: string): boolean {
-    return /^0x[a-fA-F0-9]{40}$/.test(address);
-  }
-
-  /**
-   * Validate chain ID
-   */
-  isValidChainId(chainId: number): boolean {
-    return Number.isInteger(chainId) && chainId > 0;
-  }
-
-  /**
-   * Get supported chains
-   */
-  async getSupportedChains(): Promise<any> {
-    try {
-      const response = await fetch(`${this.baseURL}/chains`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message || "Failed to fetch supported chains");
-      }
-
-      console.log("⛓️ Supported chains:", data.data.chains.length);
-      return data.data.chains;
-    } catch (error: any) {
-      console.error("❌ Error fetching supported chains:", error);
-      return [];
-    }
-  }
-
-  /**
-   * Debug helpers
-   */
-  logTokenSummary(
-    tokens: TokenBalance[],
-    mainListValue: number,
-    total24hrChange: number
-  ) {
-    if (!this.debugMode) return;
-
-    console.log("📊 WALLET SUMMARY (Main List Only):");
-    console.log("═".repeat(80));
-    console.log(`Main List Portfolio Value: $${mainListValue.toFixed(3)}`);
-    console.log(
-      `24hr Main List Change: ${this.format24hrChange(total24hrChange)}`
-    );
-    console.log(`Main List Holdings: ${tokens.length} tokens`);
-    console.log("─".repeat(80));
-
-    tokens.forEach((token, index) => {
-      const isNative = token.isNative ? " - Native Token" : "";
-      console.log(`${index + 1}. ${token.symbol} (${token.name})${isNative}`);
-      console.log(`   Balance: ${this.formatTokenAmount(token.balance, 6)}`);
-      console.log(`   USD Value: ${this.formatCurrency(token.value)}`);
-      if (token.usdChange24h !== undefined) {
-        console.log(
-          `   24hr Change: ${this.format24hrChange(token.usdChange24h)}`
-        );
-      }
-      if (token.logoUrl) {
-        console.log(`   Logo: ${token.logoUrl}`);
-      }
-      console.log("");
-    });
-    console.log("═".repeat(80));
-  }
 }
 
-// Export singleton instance
 export const tokenService = new TokenService();
-export type { TokenBalance, WalletTokensResponse, NativeBalanceResponse };
+export type { TokenBalance, WalletTokensResponse };
