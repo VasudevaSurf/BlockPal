@@ -1,24 +1,22 @@
-// src/components/wallet/WalletConnectButton.tsx - UPDATED with Wagmi cleanup
+// src/components/wallet/WalletConnectButton.tsx - REOWN APPKIT VERSION
 "use client";
 
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useChainId, useDisconnect } from "wagmi";
+import {
+  useAppKitAccount,
+  useAppKitNetwork,
+  useDisconnect,
+} from "@reown/appkit/react";
 import { useState, useEffect, useRef } from "react";
 import { Copy, LogOut, Check, Wallet } from "lucide-react";
 import { chains } from "./WalletProvider";
 import { useToast } from "@/contexts/ToastContext";
-import { clearWalletConnection } from "@/utils/walletCleanup"; // ✅ UPDATED
+import { clearWalletConnection } from "@/utils/walletCleanup";
 import DisconnectModal from "@/components/modals/DisconnectModal";
-
-interface WalletConnectButtonProps {
-  isMinimized?: boolean;
-  height?: string;
-}
 
 // Chain display data with image paths
 const getChainDisplayData = () => {
   const chainDisplayData: {
-    [key: number]: {
+    [key: number | string]: {
       name: string;
       color: string;
       icon: string;
@@ -74,6 +72,14 @@ const getChainDisplayData = () => {
       image: "/chains/BSC.png",
       fallbackIcon: "B",
       useBackground: true,
+    },
+    solana: {
+      name: "Solana",
+      color: "bg-purple-600",
+      icon: "◎",
+      image: "/chains/Solana.png",
+      fallbackIcon: "◎",
+      useBackground: false,
     },
   };
 
@@ -203,12 +209,17 @@ const ChainIcon = ({
   );
 };
 
+interface WalletConnectButtonProps {
+  isMinimized?: boolean;
+  height?: string;
+}
+
 export default function WalletConnectButton({
   isMinimized = false,
   height = "h-10",
 }: WalletConnectButtonProps) {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected } = useAppKitAccount();
+  const { caipNetwork, chainId: appKitChainId } = useAppKitNetwork();
   const { disconnect } = useDisconnect();
   const { showToast } = useToast();
 
@@ -217,9 +228,10 @@ export default function WalletConnectButton({
   const [copied, setCopied] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
+  const chainId = caipNetwork?.id || appKitChainId;
+
   const chainDisplayData = getChainDisplayData();
   const currentChain = chains.find((c) => c.id === chainId);
-
   const getCurrentChainDisplay = () => {
     if (mounted && isConnected && chainId && chainDisplayData[chainId]) {
       return chainDisplayData[chainId];
@@ -286,19 +298,14 @@ export default function WalletConnectButton({
     }
   };
 
-  // Show modal instead of direct disconnect
   const handleDisconnectClick = () => {
     setShowDisconnectModal(true);
   };
 
-  // ✅ UPDATED: Actual disconnect handler with Wagmi cleanup
-  const confirmDisconnect = () => {
+  const confirmDisconnect = async () => {
     console.log("🔌 Confirming wallet disconnect...");
 
-    // Disconnect from Wagmi
-    disconnect();
-
-    // ✅ UPDATED: Clear Wagmi localStorage
+    await disconnect();
     clearWalletConnection();
 
     setConnectionError(null);
@@ -335,190 +342,106 @@ export default function WalletConnectButton({
           </div>
         )}
 
-        <ConnectButton.Custom>
-          {({
-            account,
-            chain,
-            openAccountModal,
-            openChainModal,
-            openConnectModal,
-            authenticationStatus,
-            mounted: rainbowKitMounted,
-          }) => {
-            const ready =
-              rainbowKitMounted && authenticationStatus !== "loading";
-            const connected =
-              ready &&
-              account &&
-              chain &&
-              (!authenticationStatus ||
-                authenticationStatus === "authenticated");
+        {!isConnected ? (
+          // Show AppKit button when not connected
+          <appkit-button />
+        ) : (
+          // Show custom UI when connected
+          <>
+            {isMinimized ? (
+              // Minimized view (icons only)
+              <div className="flex flex-col gap-2">
+                <div
+                  className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] flex items-center justify-center relative group cursor-pointer hover:bg-[#D4A118] transition-colors`}
+                  title={`Connected: ${address?.slice(0, 6)}...${address?.slice(
+                    -4
+                  )}`}
+                >
+                  <ChainIcon chainData={currentChainDisplay} size="sm" />
+                </div>
 
-            return (
-              <div
-                {...(!ready && {
-                  "aria-hidden": true,
-                  style: {
-                    opacity: 0,
-                    pointerEvents: "none",
-                    userSelect: "none",
-                  },
-                })}
-              >
-                {(() => {
-                  if (!connected) {
-                    return (
-                      <button
-                        onClick={() => {
-                          setConnectionError(null);
-                          openConnectModal();
-                        }}
-                        type="button"
-                        className={`flex items-center rounded-[12px] bg-[#E2AF19] text-black font-medium font-satoshi text-xs transition-all duration-200 hover:bg-[#D4A118] active:bg-[#C69516] disabled:opacity-50 disabled:cursor-not-allowed ${
-                          isMinimized
-                            ? `w-10 ${height} justify-center`
-                            : `w-full px-3 py-1.5 ${height} justify-center`
-                        }`}
-                        title={isMinimized ? "Connect Wallet" : undefined}
-                      >
-                        <Wallet
-                          size={16}
-                          className={isMinimized ? "" : "mr-2"}
-                        />
-                        {!isMinimized && "Connect Wallet"}
-                      </button>
-                    );
-                  }
+                <button
+                  onClick={handleCopyAddress}
+                  className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] hover:bg-[#D4A118] transition-colors flex items-center justify-center group relative`}
+                  title="Copy Address"
+                >
+                  {copied ? (
+                    <Check size={14} className="text-black" />
+                  ) : (
+                    <Copy size={14} className="text-black" />
+                  )}
+                </button>
 
-                  if (chain.unsupported) {
-                    return (
-                      <button
-                        onClick={() => {
-                          setConnectionError(null);
-                          openChainModal();
-                        }}
-                        type="button"
-                        className={`bg-red-500 hover:bg-red-600 text-white rounded-[12px] font-satoshi text-xs flex items-center justify-center ${
-                          isMinimized
-                            ? `w-10 ${height}`
-                            : `w-full py-2 px-4 ${height}`
-                        }`}
-                        title={isMinimized ? "Wrong Network" : undefined}
-                      >
-                        {isMinimized ? "⚠️" : "Wrong network"}
-                      </button>
-                    );
-                  }
-
-                  // Connected wallet - minimized view (icons only)
-                  if (isMinimized) {
-                    return (
-                      <div className="flex flex-col gap-2">
-                        <div
-                          className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] flex items-center justify-center relative group cursor-pointer hover:bg-[#D4A118] transition-colors`}
-                          title={`Connected: ${account.displayName}`}
-                        >
-                          <ChainIcon
-                            chainData={currentChainDisplay}
-                            size="sm"
-                          />
-                        </div>
-
-                        <button
-                          onClick={handleCopyAddress}
-                          className={`w-10 ${height} bg-[#E2AF19] border border-[#E2AF19] rounded-[12px] hover:bg-[#D4A118] transition-colors flex items-center justify-center group relative`}
-                          title="Copy Address"
-                        >
-                          {copied ? (
-                            <Check size={14} className="text-black" />
-                          ) : (
-                            <Copy size={14} className="text-black" />
-                          )}
-                        </button>
-
-                        <button
-                          onClick={handleDisconnectClick}
-                          className={`w-10 ${height} bg-[#F9EFD1] border border-[#F9EFD1] rounded-[12px] hover:bg-[#F5E8C4] transition-colors flex items-center justify-center group relative`}
-                          title="Disconnect"
-                        >
-                          <LogOut size={14} className="text-black" />
-                        </button>
-                      </div>
-                    );
-                  }
-
-                  // Connected wallet - full view
-                  return (
-                    <div className="w-full space-y-2">
-                      <div className="bg-[#E2AF19] rounded-[12px] p-3">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[#0F0F0F] text-xs font-satoshi font-medium">
-                              Connected Wallet
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <ChainIcon
-                              chainData={currentChainDisplay}
-                              size="sm"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mb-2">
-                          <span className="text-[#000] text-sm font-satoshi text-[16px]">
-                            {account.address
-                              ? `${account.address.slice(
-                                  0,
-                                  6
-                                )}...${account.address.slice(-6)}`
-                              : account.displayName}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={handleCopyAddress}
-                          className="bg-[#E2AF19] rounded-[12px] px-3 py-2 flex items-center justify-center gap-2"
-                        >
-                          {copied ? (
-                            <>
-                              <Check size={12} className="[#000]" />
-                              <span className="[#000] text-xs font-satoshi">
-                                Copied
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={12} className="[#000]" />
-                              <span className="[#000] text-xs font-satoshi">
-                                Copy
-                              </span>
-                            </>
-                          )}
-                        </button>
-
-                        <button
-                          onClick={handleDisconnectClick}
-                          className="bg-[#F9EFD1] border rounded-[12px] px-3 py-2 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <LogOut size={12} className="[#E74C3C]" />
-                          <span className="[#E74C3C] text-xs font-satoshi">
-                            Disconnect
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()}
+                <button
+                  onClick={handleDisconnectClick}
+                  className={`w-10 ${height} bg-[#F9EFD1] border border-[#F9EFD1] rounded-[12px] hover:bg-[#F5E8C4] transition-colors flex items-center justify-center group relative`}
+                  title="Disconnect"
+                >
+                  <LogOut size={14} className="text-black" />
+                </button>
               </div>
-            );
-          }}
-        </ConnectButton.Custom>
+            ) : (
+              // Full view
+              <div className="w-full space-y-2">
+                <div className="bg-[#E2AF19] rounded-[12px] p-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#0F0F0F] text-xs font-satoshi font-medium">
+                        Connected Wallet
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <ChainIcon chainData={currentChainDisplay} size="sm" />
+                    </div>
+                  </div>
+
+                  <div className="mb-2">
+                    <span className="text-[#000] text-sm font-satoshi text-[16px]">
+                      {address
+                        ? `${address.slice(0, 6)}...${address.slice(-6)}`
+                        : "Connected"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleCopyAddress}
+                    className="bg-[#E2AF19] rounded-[12px] px-3 py-2 flex items-center justify-center gap-2"
+                  >
+                    {copied ? (
+                      <>
+                        <Check size={12} className="text-[#000]" />
+                        <span className="text-[#000] text-xs font-satoshi">
+                          Copied
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={12} className="text-[#000]" />
+                        <span className="text-[#000] text-xs font-satoshi">
+                          Copy
+                        </span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleDisconnectClick}
+                    className="bg-[#F9EFD1] border rounded-[12px] px-3 py-2 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <LogOut size={12} className="text-[#E74C3C]" />
+                    <span className="text-[#E74C3C] text-xs font-satoshi">
+                      Disconnect
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Disconnect Modal - Only shows when explicitly opened AND wallet is connected */}
       {isConnected && (
         <DisconnectModal
           isOpen={showDisconnectModal}

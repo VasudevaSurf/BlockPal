@@ -9,6 +9,7 @@ import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 import DisconnectModal from "@/components/modals/DisconnectModal";
 import { clearWalletConnection } from "@/utils/walletCleanup";
 import { useToast } from "@/contexts/ToastContext";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 
 // Chain data with proper image paths
 const getChainDisplayData = () => {
@@ -69,6 +70,14 @@ const getChainDisplayData = () => {
       image: "/chains/BSC.png",
       fallbackIcon: "B",
       useBackground: true,
+    },
+    solana: {
+      name: "Solana",
+      color: "bg-purple-600",
+      icon: "◎",
+      image: "/chains/Solana.png",
+      fallbackIcon: "◎",
+      useBackground: false,
     },
   };
 
@@ -164,10 +173,13 @@ export default function MobileWalletMenu({
   isOpen,
   onClose,
 }: MobileWalletMenuProps) {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected } = useAppKitAccount();
+  const { caipNetwork, chainId: appKitChainId } = useAppKitNetwork();
   const { disconnect } = useDisconnect();
   const { showToast } = useToast();
+
+  // ✅ FIXED: Get chain ID properly
+  const chainId = caipNetwork?.id || appKitChainId;
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain({
     mutation: {
       onSuccess: (data) => {

@@ -1,7 +1,7 @@
-// src/hooks/useWalletIntegration.ts - UPDATED FOR WAGMI V2
+// src/hooks/useWalletIntegration.ts - REOWN APPKIT VERSION
 "use client";
 
-import { useAccount, useBalance, useChainId } from "wagmi"; // UPDATED: useChainId instead of useNetwork
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import {
@@ -13,61 +13,23 @@ import {
 import { chains } from "@/components/wallet/WalletProvider";
 
 export function useWalletIntegration() {
-  const { address, isConnected, isConnecting, isDisconnected, isReconnecting } =
-    useAccount(); // Add isReconnecting here
-  const chainId = useChainId(); // UPDATED: useChainId instead of useNetwork
-
-  // Get current chain data from configured chains
-  const currentChain = chains.find((c) => c.id === chainId);
-
-  // More conservative balance fetching with extensive error handling
-  const {
-    data: balance,
-    error: balanceError,
-    isLoading: balanceLoading,
-  } = useBalance({
-    address,
-    enabled: false, // Start disabled to prevent immediate RPC calls
-    query: {
-      retry: false,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
-      staleTime: 60 * 1000, // 1 minute
-    },
-  });
+  const { address, isConnected, caipAddress } = useAppKitAccount();
+  const { caipNetwork, chainId: appKitChainId } = useAppKitNetwork();
 
   const dispatch = useDispatch();
   const [isInitialized, setIsInitialized] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [balanceFetchEnabled, setBalanceFetchEnabled] = useState(false);
+
+  // ✅ FIXED: Get chain ID properly from caipNetwork
+  // caipNetwork.id is a number for EVM chains and 'solana:mainnet' for Solana
+  const chainId = caipNetwork?.id || appKitChainId;
+
+  const currentChain = chains.find((c) => c.id === chainId);
 
   // Ensure we're mounted before doing anything
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  // Handle balance errors with detailed logging but no user-facing errors
-  useEffect(() => {
-    if (balanceError) {
-      const errorMessage = balanceError.message.toLowerCase();
-
-      // Log different types of errors differently
-      if (errorMessage.includes("internal error")) {
-        console.warn("🔇 RPC Internal Error (ignored):", balanceError.message);
-      } else if (
-        errorMessage.includes("reverse") ||
-        errorMessage.includes("ens")
-      ) {
-        console.warn(
-          "🔇 ENS Resolution Error (ignored):",
-          balanceError.message
-        );
-      } else {
-        console.warn("⚠️ Balance fetch error:", balanceError.message);
-      }
-    }
-  }, [balanceError]);
 
   // Handle wallet connection/disconnection only after mounting
   useEffect(() => {
@@ -75,10 +37,8 @@ export function useWalletIntegration() {
 
     console.log("🔄 Wallet state changed:", {
       isConnected,
-      isConnecting,
-      isDisconnected,
       address: address?.slice(0, 10) + "...",
-      chainName: currentChain?.name,
+      chainName: currentChain?.name || caipNetwork?.name,
       chainId,
       mounted,
     });
@@ -89,7 +49,7 @@ export function useWalletIntegration() {
       // Create a wallet object from connected wallet
       const connectedWallet = {
         id: "connected-wallet",
-        name: `${currentChain?.name || "Ethereum"} Wallet`,
+        name: `${currentChain?.name || caipNetwork?.name || "Wallet"}`,
         address: address,
         balance: 0, // Start with 0, will update when balance loads
         isActive: true,
@@ -102,85 +62,48 @@ export function useWalletIntegration() {
       dispatch(setActiveWallet("connected-wallet"));
 
       setIsInitialized(true);
-
-      // Enable balance fetching after a delay to prevent immediate RPC calls
-      setTimeout(() => {
-        setBalanceFetchEnabled(true);
-      }, 2000);
-    } else if (isDisconnected && isInitialized) {
+    } else if (!isConnected && isInitialized) {
       console.log("🚪 Wallet disconnected, clearing wallet state");
 
       // Clear wallet state when disconnected
       dispatch(clearWalletState());
       setIsInitialized(false);
-      setBalanceFetchEnabled(false);
     }
   }, [
     mounted,
     isConnected,
-    isDisconnected,
     address,
     currentChain,
+    caipNetwork,
     chainId,
     dispatch,
     isInitialized,
   ]);
 
-  // Update balance when it changes (with extensive error handling)
   useEffect(() => {
-    if (
-      mounted &&
-      isConnected &&
-      address &&
-      balance &&
-      isInitialized &&
-      !balanceError &&
-      balanceFetchEnabled
-    ) {
-      console.log("💰 Balance updated:", balance.formatted, balance.symbol);
-
-      try {
-        const balanceValue = parseFloat(balance.formatted);
-        if (!isNaN(balanceValue)) {
-          dispatch(
-            updateWalletBalances([
-              {
-                walletId: "connected-wallet",
-                balance: balanceValue,
-                tokenCount: 1,
-              },
-            ])
-          );
-        }
-      } catch (error) {
-        console.warn("⚠️ Error processing balance update:", error);
-      }
+    if (caipNetwork) {
+      console.log("🔍 Debug - caipNetwork:", {
+        id: caipNetwork.id,
+        idType: typeof caipNetwork.id,
+        name: caipNetwork.name,
+        fullNetwork: caipNetwork,
+      });
     }
-  }, [
-    mounted,
-    balance,
-    isConnected,
-    address,
-    dispatch,
-    isInitialized,
-    balanceError,
-    balanceFetchEnabled,
-  ]);
+  }, [caipNetwork]);
 
   // Return safe values, ensuring no hydration mismatches
   return {
     isConnected: mounted ? isConnected : false,
-    isConnecting: mounted ? isConnecting : false,
-    isReconnecting: mounted ? isReconnecting : false, // Add this line
     address: mounted ? address : undefined,
     chain: mounted ? currentChain : undefined,
     chainId: mounted ? chainId : undefined,
-    balance:
-      mounted && balance && !balanceError ? parseFloat(balance.formatted) : 0,
-    balanceSymbol: mounted && balance?.symbol ? balance.symbol : "ETH",
+    chainName: mounted ? currentChain?.name || caipNetwork?.name : undefined,
+    balance: 0, // Will be updated by token service
+    balanceSymbol:
+      currentChain?.name === "Ethereum"
+        ? "ETH"
+        : currentChain?.name?.substring(0, 4).toUpperCase() || "TOKEN",
     isInitialized: mounted ? isInitialized : false,
-    hasBalanceError: mounted ? !!balanceError : false,
-    balanceLoading: mounted ? balanceLoading : false,
     mounted,
   };
 }

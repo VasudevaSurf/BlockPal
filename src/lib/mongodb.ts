@@ -42,7 +42,7 @@ async function setupCollections(db: Db) {
     // Wallet Connections Collection
     const walletConnections = db.collection("walletConnections");
     await walletConnections.createIndex(
-      { walletAddress: 1, chainId: 1 },
+      { walletAddress: 1, chainId: 1 }, // chainId can be number (EVM) or string (Solana)
       { unique: true, background: true }
     );
     await walletConnections.createIndex(
@@ -51,6 +51,10 @@ async function setupCollections(db: Db) {
     );
     await walletConnections.createIndex(
       { lastConnected: -1 },
+      { background: true }
+    );
+    await walletConnections.createIndex(
+      { chainType: 1 }, // 'evm' or 'solana'
       { background: true }
     );
     await walletConnections.createIndex({ chainId: 1 }, { background: true });

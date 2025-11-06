@@ -4,63 +4,52 @@
 /**
  * Clears all wallet connection data from browser storage
  */
-export function clearWalletConnection() {
+// src/utils/walletCleanup.ts - UPDATED FOR REOWN APPKIT
+export const clearWalletConnection = () => {
   if (typeof window === "undefined") return;
 
-  console.log("🧹 Clearing wallet connection data");
-
-  const wagmiKeys = [
-    "wagmi.store",
-    "wagmi.connected",
-    "wagmi.wallet",
-    "wagmi.recentConnectorId",
-    "wagmi.injected.shimDisconnect",
-    "wagmi.cache",
-    "wagmi.connectedRdns",
-  ];
-
-  wagmiKeys.forEach((key) => {
-    try {
-      localStorage.removeItem(key);
-      sessionStorage.removeItem(key);
-    } catch (error) {
-      console.warn(`Failed to remove ${key}:`, error);
-    }
-  });
-
   try {
-    const allLocalStorageKeys = Object.keys(localStorage);
-    allLocalStorageKeys.forEach((key) => {
+    // Clear Reown AppKit storage
+    localStorage.removeItem("wagmi.store");
+    localStorage.removeItem("wagmi.cache");
+    localStorage.removeItem("wagmi.recentConnectorId");
+    localStorage.removeItem("reown.wallet");
+    localStorage.removeItem("@w3m/connected_wallet_image_url");
+    localStorage.removeItem("@w3m/connected_connector");
+
+    // Clear Solana adapter storage
+    localStorage.removeItem("solana.wallet");
+    localStorage.removeItem("solanaAdapter.cache");
+
+    // Clear any AppKit-specific keys
+    const keys = Object.keys(localStorage);
+    keys.forEach((key) => {
       if (
-        key.startsWith("wagmi.") ||
-        key.startsWith("walletconnect") ||
-        key.startsWith("WALLETCONNECT_") ||
-        key.startsWith("wc@2:") ||
-        key.startsWith("wc@1:") ||
-        key.toLowerCase().includes("rainbow")
+        key.startsWith("@appkit") ||
+        key.startsWith("@w3m") ||
+        key.startsWith("wc@2")
       ) {
         localStorage.removeItem(key);
       }
     });
 
-    const allSessionStorageKeys = Object.keys(sessionStorage);
-    allSessionStorageKeys.forEach((key) => {
-      if (
-        key.startsWith("wagmi.") ||
-        key.startsWith("walletconnect") ||
-        key.startsWith("WALLETCONNECT_") ||
-        key.startsWith("wc@2:") ||
-        key.startsWith("wc@1:")
-      ) {
-        sessionStorage.removeItem(key);
-      }
-    });
+    console.log("✅ Cleared Reown AppKit wallet storage");
   } catch (error) {
-    console.warn("Failed to clear wallet connection keys:", error);
+    console.error("❌ Error clearing wallet storage:", error);
   }
+};
 
-  console.log("✅ Wallet connection data cleared");
-}
+export const performCompleteCleanup = () => {
+  clearWalletConnection();
+
+  // Additional cleanup if needed
+  if (typeof window !== "undefined") {
+    // Clear any session storage
+    sessionStorage.clear();
+
+    console.log("✅ Complete wallet cleanup performed");
+  }
+};
 
 /**
  * Clears all Blockpal-specific data
@@ -144,15 +133,4 @@ export function clearAuthCookie() {
     window.location.hostname;
 
   console.log("🍪 Auth cookie cleared");
-}
-
-/**
- * Complete cleanup - clears everything including cookies
- */
-export function performCompleteCleanup() {
-  console.log("🧹 Performing complete cleanup");
-  clearWalletConnection();
-  clearBlockpalData();
-  clearAuthCookie(); // ✅ NEW
-  console.log("✅ Complete cleanup finished");
 }

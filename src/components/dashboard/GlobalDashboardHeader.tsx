@@ -22,6 +22,7 @@ import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 import { clearWalletConnection } from "@/utils/walletCleanup";
 import { useDisconnect } from "wagmi";
 import LogoutModal from "@/components/modals/LogoutModal";
+import { useAppKitNetwork } from "@reown/appkit/react";
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -103,9 +104,12 @@ const getPageTitle = (
 };
 
 // Chain data with proper image paths
+// In GlobalDashboardHeader.tsx, update getChainDisplayData:
+
+// Update getChainDisplayData to handle Solana's chain ID
 const getChainDisplayData = () => {
   const chainDisplayData: {
-    [key: number]: {
+    [key: string | number]: {
       name: string;
       color: string;
       icon: string;
@@ -114,6 +118,7 @@ const getChainDisplayData = () => {
       useBackground: boolean;
     };
   } = {
+    // EVM chains (number IDs)
     1: {
       name: "Ethereum",
       color: "bg-blue-500",
@@ -161,6 +166,24 @@ const getChainDisplayData = () => {
       image: "/chains/BSC.png",
       fallbackIcon: "B",
       useBackground: true,
+    },
+    // ✅ Solana (check what ID format AppKit uses - might be "solana:mainnet" or just a number)
+    "solana:mainnet": {
+      name: "Solana",
+      color: "bg-purple-600",
+      icon: "◎",
+      image: "/chains/Solana.png",
+      fallbackIcon: "◎",
+      useBackground: false,
+    },
+    // Also add fallback for any other Solana format
+    solana: {
+      name: "Solana",
+      color: "bg-purple-600",
+      icon: "◎",
+      image: "/chains/Solana.png",
+      fallbackIcon: "◎",
+      useBackground: false,
     },
   };
 
@@ -308,9 +331,12 @@ export default function GlobalDashboardHeader({
   const hasReportedRef = useRef(false);
 
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { caipNetwork, chainId: appKitChainId } = useAppKitNetwork();
   const currentChain = chains.find((c) => c.id === chainId);
   const { disconnect } = useDisconnect();
+
+  // ✅ FIXED: Get chain ID properly
+  const chainId = caipNetwork?.id || appKitChainId;
 
   const {
     switchChain,

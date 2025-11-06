@@ -17,7 +17,7 @@ import {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5002";
+  "https://creative-amazement-production-7acf.up.railway.app";
 
 export interface SwapToken {
   address: string;
