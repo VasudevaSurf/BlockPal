@@ -39,7 +39,8 @@ interface TokenBalance {
 interface WalletPreferences {
   userEmail: string;
   walletAddress: string;
-  chainId: number;
+  chainId: number | string; // Can be number (EVM) or 'solana'
+  chainType: "evm" | "solana";
   userAddedTokens: string[];
   lastUpdated: string;
 }

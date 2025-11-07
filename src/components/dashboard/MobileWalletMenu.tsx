@@ -1,25 +1,27 @@
-// src/components/dashboard/MobileWalletMenu.tsx - UPDATED with DisconnectModal
+// src/components/dashboard/MobileWalletMenu.tsx - UPDATED WITH SOLANA SUPPORT
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import { X, ChevronDown, ChevronUp, Copy, LogOut, Check } from "lucide-react";
-import { useAccount, useChainId, useSwitchChain, useDisconnect } from "wagmi";
-import { chains } from "@/components/wallet/WalletProvider";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
+import { useDisconnect, useSwitchChain } from "wagmi";
+import { chains, solana } from "@/components/wallet/WalletProvider";
 import WalletConnectButton from "@/components/wallet/WalletConnectButton";
 import DisconnectModal from "@/components/modals/DisconnectModal";
 import { clearWalletConnection } from "@/utils/walletCleanup";
 import { useToast } from "@/contexts/ToastContext";
 
-// Chain data with proper image paths
+// Chain data with Solana
 const getChainDisplayData = () => {
   const chainDisplayData: {
-    [key: number]: {
+    [key: string]: {
       name: string;
       color: string;
       icon: string;
       image?: string;
       fallbackIcon: string;
       useBackground: boolean;
+      isSolana?: boolean;
     };
   } = {
     1: {
@@ -70,12 +72,21 @@ const getChainDisplayData = () => {
       fallbackIcon: "B",
       useBackground: true,
     },
+    solana: {
+      name: "Solana",
+      color: "bg-gradient-to-r from-purple-500 to-blue-500",
+      icon: "◎",
+      image: "/chains/Solana.png",
+      fallbackIcon: "◎",
+      useBackground: false,
+      isSolana: true,
+    },
   };
 
   return chainDisplayData;
 };
 
-// Chain Icon Component
+// Chain Icon Component (same as before)
 interface ChainIconProps {
   chainData: {
     name: string;
@@ -164,17 +175,17 @@ export default function MobileWalletMenu({
   isOpen,
   onClose,
 }: MobileWalletMenuProps) {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected } = useAppKitAccount();
+  const { caipNetwork } = useAppKitNetwork();
   const { disconnect } = useDisconnect();
   const { showToast } = useToast();
+
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain({
     mutation: {
       onSuccess: (data) => {
         console.log("✅ Chain switched successfully to:", data.name);
         setSwitchingChain(null);
         setSwitchError(null);
-        // Close the chain selector after successful switch
         setTimeout(() => {
           setChainSelectorExpanded(false);
         }, 500);
@@ -204,7 +215,9 @@ export default function MobileWalletMenu({
   });
 
   const [chainSelectorExpanded, setChainSelectorExpanded] = useState(false);
-  const [switchingChain, setSwitchingChain] = useState<number | null>(null);
+  const [switchingChain, setSwitchingChain] = useState<number | string | null>(
+    null
+  );
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -212,7 +225,24 @@ export default function MobileWalletMenu({
   const menuRef = useRef<HTMLDivElement>(null);
 
   const chainDisplayData = getChainDisplayData();
-  const currentChain = chains.find((c) => c.id === chainId);
+
+  // Get current chain ID (handles both EVM and Solana)
+  const getCurrentChainId = (): string => {
+    if (!caipNetwork) return "1";
+
+    if (
+      caipNetwork.name?.toLowerCase() === "solana" ||
+      caipNetwork.id?.toString().includes("solana") ||
+      caipNetwork.chainNamespace === "solana"
+    ) {
+      return "solana";
+    }
+
+    return caipNetwork.id?.toString() || "1";
+  };
+
+  const currentChainId = getCurrentChainId();
+  const isSolana = currentChainId === "solana";
 
   useEffect(() => {
     setMounted(true);
@@ -223,23 +253,24 @@ export default function MobileWalletMenu({
       setSwitchError(null);
       setSwitchingChain(null);
       setChainSelectorExpanded(false);
-      setShowDisconnectModal(false); // Close disconnect modal if wallet disconnects
+      setShowDisconnectModal(false);
     }
   }, [isConnected]);
 
-  // Clear switching state when chainId changes (successful switch)
   useEffect(() => {
-    if (chainId && switchingChain && chainId === switchingChain) {
+    if (
+      currentChainId &&
+      switchingChain &&
+      currentChainId === switchingChain.toString()
+    ) {
       console.log("✅ Chain switch completed, clearing switching state");
       setSwitchingChain(null);
       setSwitchError(null);
     }
-  }, [chainId, switchingChain]);
+  }, [currentChainId, switchingChain]);
 
-  // Close main menu when clicking outside - BUT NOT when disconnect modal is open
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Don't close if disconnect modal is open
       if (showDisconnectModal) return;
 
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -257,12 +288,17 @@ export default function MobileWalletMenu({
   }, [isOpen, onClose, showDisconnectModal]);
 
   const getCurrentChainDisplay = () => {
-    if (mounted && isConnected && chainId && chainDisplayData[chainId]) {
-      return chainDisplayData[chainId];
+    if (
+      mounted &&
+      isConnected &&
+      currentChainId &&
+      chainDisplayData[currentChainId]
+    ) {
+      return chainDisplayData[currentChainId];
     }
 
     return (
-      chainDisplayData[1] || {
+      chainDisplayData["1"] || {
         name: "Ethereum",
         color: "bg-blue-500",
         icon: "Ξ",
@@ -275,13 +311,34 @@ export default function MobileWalletMenu({
 
   const currentChainDisplay = getCurrentChainDisplay();
 
-  const handleChainSwitch = async (targetChainId: number) => {
-    if (!mounted || !switchChain || !isConnected || !address) {
+  const handleChainSwitch = async (targetChainId: number | string) => {
+    if (!mounted || !isConnected || !address) {
       setSwitchError("Please connect your wallet first");
       return;
     }
 
-    if (chainId === targetChainId) {
+    // If switching to Solana, use AppKit's network switcher
+    if (targetChainId === "solana") {
+      console.log("🔄 Switching to Solana network via AppKit");
+      // AppKit will handle Solana network switching automatically
+      // through the wallet connection
+      showToast("info", "Please switch to Solana network in your wallet", 3000);
+      setChainSelectorExpanded(false);
+      return;
+    }
+
+    // If currently on Solana and switching to EVM, inform user
+    if (isSolana && typeof targetChainId === "number") {
+      showToast(
+        "info",
+        "Please switch to an EVM network in your wallet first",
+        3000
+      );
+      setChainSelectorExpanded(false);
+      return;
+    }
+
+    if (currentChainId === targetChainId.toString()) {
       setChainSelectorExpanded(false);
       return;
     }
@@ -291,14 +348,17 @@ export default function MobileWalletMenu({
       return;
     }
 
-    console.log(`🔄 Initiating chain switch to ${targetChainId}`);
+    // Only use switchChain for EVM chains
+    if (typeof targetChainId === "number") {
+      console.log(`🔄 Initiating EVM chain switch to ${targetChainId}`);
 
-    try {
-      switchChain({ chainId: targetChainId });
-    } catch (error: any) {
-      console.error("❌ Error calling switchChain:", error);
-      setSwitchError(error.message || "Failed to switch chain");
-      setSwitchingChain(null);
+      try {
+        switchChain({ chainId: targetChainId });
+      } catch (error: any) {
+        console.error("❌ Error calling switchChain:", error);
+        setSwitchError(error.message || "Failed to switch chain");
+        setSwitchingChain(null);
+      }
     }
   };
 
@@ -311,53 +371,54 @@ export default function MobileWalletMenu({
     }
   };
 
-  // Show disconnect modal instead of direct disconnect
   const handleDisconnectClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent menu from closing
+    e.stopPropagation();
     setShowDisconnectModal(true);
   };
 
-  // Actual disconnect handler
   const confirmDisconnect = () => {
     console.log("🔌 Confirming wallet disconnect...");
-
-    // Disconnect from Wagmi
     disconnect();
-
-    // Clear Wagmi localStorage
     clearWalletConnection();
-
-    // Close both modals
     setShowDisconnectModal(false);
-    onClose(); // Close the mobile wallet menu
-
+    onClose();
     showToast("success", "Wallet disconnected successfully", 3000);
   };
 
-  // Handle disconnect modal close
   const handleDisconnectModalClose = () => {
     setShowDisconnectModal(false);
-    // Don't close the wallet menu, just the disconnect modal
   };
 
   if (!isOpen) return null;
 
+  // Create combined chain list with Solana
+  const allChains = [
+    ...chains.map((chain) => ({
+      id: chain.id,
+      name: chainDisplayData[chain.id]?.name || chain.name,
+      isEVM: true,
+    })),
+    {
+      id: "solana",
+      name: "Solana",
+      isEVM: false,
+    },
+  ];
+
   return (
     <>
-      {/* Backdrop */}
       <div
         className="fixed lg:absolute inset-0 bg-white/10 z-40"
         onClick={onClose}
       />
 
-      {/* Dropdown Menu Modal */}
       <div
         ref={menuRef}
         className="fixed top-16 right-4 w-72 bg-[#000000] border border-[#2C2C2C] rounded-2xl shadow-2xl z-50 lg:hidden overflow-hidden max-h-[calc(100vh-5rem)]"
       >
         <div className="overflow-y-auto max-h-full scrollbar-hide">
           <div className="p-3">
-            {/* Chain Selection - At Top */}
+            {/* Chain Selection */}
             {mounted && isConnected && (
               <div className="mb-3">
                 <div className="bg-[#000000] border border-[#2C2C2C] rounded-xl overflow-hidden">
@@ -372,6 +433,11 @@ export default function MobileWalletMenu({
                       <ChainIcon chainData={currentChainDisplay} size="sm" />
                       <span className="text-white text-sm font-satoshi">
                         {currentChainDisplay.name}
+                        {isSolana && (
+                          <span className="ml-2 text-xs text-purple-400">
+                            (Non-EVM)
+                          </span>
+                        )}
                       </span>
                     </div>
                     {chainSelectorExpanded ? (
@@ -381,11 +447,10 @@ export default function MobileWalletMenu({
                     )}
                   </button>
 
-                  {/* Expanded Chain List */}
                   {chainSelectorExpanded && (
                     <div className="bg-[#000000] border-t border-[#2C2C2C]">
                       <div className="max-h-64 overflow-y-auto scrollbar-hide">
-                        {chains.map((chain) => {
+                        {allChains.map((chain) => {
                           const chainDisplay = chainDisplayData[chain.id] || {
                             name: chain.name,
                             color: "bg-gray-500",
@@ -394,7 +459,8 @@ export default function MobileWalletMenu({
                             useBackground: true,
                           };
 
-                          const isCurrentChain = chainId === chain.id;
+                          const isCurrentChain =
+                            currentChainId === chain.id.toString();
                           const isSwitching = switchingChain === chain.id;
 
                           return (
@@ -415,20 +481,27 @@ export default function MobileWalletMenu({
                             >
                               <div className="flex items-center gap-2">
                                 <ChainIcon chainData={chainDisplay} size="sm" />
-                                <span
-                                  className={`text-sm font-satoshi ${
-                                    isCurrentChain
-                                      ? "text-[#E2AF19]"
-                                      : "text-white"
-                                  }`}
-                                >
-                                  {chainDisplay.name}
-                                  {isSwitching && (
-                                    <span className="ml-2 text-xs">
-                                      (Switching...)
+                                <div className="flex flex-col items-start">
+                                  <span
+                                    className={`text-sm font-satoshi ${
+                                      isCurrentChain
+                                        ? "text-[#E2AF19]"
+                                        : "text-white"
+                                    }`}
+                                  >
+                                    {chainDisplay.name}
+                                    {isSwitching && (
+                                      <span className="ml-2 text-xs">
+                                        (Switching...)
+                                      </span>
+                                    )}
+                                  </span>
+                                  {!chain.isEVM && (
+                                    <span className="text-xs text-purple-400">
+                                      Non-EVM Chain
                                     </span>
                                   )}
-                                </span>
+                                </div>
                               </div>
 
                               <div
@@ -502,7 +575,6 @@ export default function MobileWalletMenu({
                   </div>
                 )}
 
-                {/* Copy and Disconnect Buttons */}
                 <div className="flex gap-2">
                   <button
                     onClick={handleCopyAddress}
@@ -551,7 +623,6 @@ export default function MobileWalletMenu({
         `}</style>
       </div>
 
-      {/* Disconnect Modal - Render only when connected */}
       {isConnected && (
         <DisconnectModal
           isOpen={showDisconnectModal}

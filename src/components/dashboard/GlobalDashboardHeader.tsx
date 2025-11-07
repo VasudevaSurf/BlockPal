@@ -162,6 +162,14 @@ const getChainDisplayData = () => {
       fallbackIcon: "B",
       useBackground: true,
     },
+    solana: {
+      name: "Solana",
+      color: "bg-gradient-to-r from-purple-500 to-blue-500",
+      icon: "◎",
+      image: "/chains/Solana.png",
+      fallbackIcon: "◎",
+      useBackground: false,
+    },
   };
 
   return chainDisplayData;

@@ -1,7 +1,8 @@
-// src/hooks/useWalletIntegration.ts - UPDATED FOR WAGMI V2
+// src/hooks/useWalletIntegration.ts - UPDATED FOR SOLANA SUPPORT
 "use client";
 
-import { useAccount, useBalance, useChainId } from "wagmi"; // UPDATED: useChainId instead of useNetwork
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
+import { useBalance } from "wagmi";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import {
@@ -10,30 +11,66 @@ import {
   initializeMockData,
   clearWalletState,
 } from "@/store/slices/walletSlice";
-import { chains } from "@/components/wallet/WalletProvider";
+import { chains, solana } from "@/components/wallet/WalletProvider";
+import { getChainType, isSolanaAddress } from "@/utils/walletHelpers";
 
 export function useWalletIntegration() {
   const { address, isConnected, isConnecting, isDisconnected, isReconnecting } =
-    useAccount(); // Add isReconnecting here
-  const chainId = useChainId(); // UPDATED: useChainId instead of useNetwork
+    useAppKitAccount();
+  const { caipNetwork } = useAppKitNetwork();
 
-  // Get current chain data from configured chains
-  const currentChain = chains.find((c) => c.id === chainId);
+  // Get chain identifier
+  const getChainId = (): number | string => {
+    if (!caipNetwork) return 1;
 
-  // More conservative balance fetching with extensive error handling
+    if (
+      caipNetwork.name?.toLowerCase() === "solana" ||
+      caipNetwork.id?.toString().includes("solana") ||
+      caipNetwork.chainNamespace === "solana"
+    ) {
+      return "solana";
+    }
+
+    return Number(caipNetwork.id) || 1;
+  };
+
+  const chainId = getChainId();
+  const chainType = getChainType(chainId);
+  const isSolana = chainType === "solana";
+
+  // Get current chain data
+  const getCurrentChain = () => {
+    if (isSolana) {
+      return {
+        id: "solana",
+        name: "Solana",
+        nativeCurrency: {
+          name: "SOL",
+          symbol: "SOL",
+          decimals: 9,
+        },
+      };
+    }
+
+    return chains.find((c) => c.id === Number(chainId)) || chains[0];
+  };
+
+  const currentChain = getCurrentChain();
+
+  // Only fetch balance for EVM chains
   const {
     data: balance,
     error: balanceError,
     isLoading: balanceLoading,
   } = useBalance({
-    address,
-    enabled: false, // Start disabled to prevent immediate RPC calls
+    address: (isSolana ? undefined : address) as `0x${string}` | undefined,
+    enabled: !isSolana && isConnected && !!address,
     query: {
       retry: false,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       refetchOnReconnect: false,
-      staleTime: 60 * 1000, // 1 minute
+      staleTime: 60 * 1000,
     },
   });
 
@@ -42,17 +79,14 @@ export function useWalletIntegration() {
   const [mounted, setMounted] = useState(false);
   const [balanceFetchEnabled, setBalanceFetchEnabled] = useState(false);
 
-  // Ensure we're mounted before doing anything
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Handle balance errors with detailed logging but no user-facing errors
   useEffect(() => {
     if (balanceError) {
       const errorMessage = balanceError.message.toLowerCase();
 
-      // Log different types of errors differently
       if (errorMessage.includes("internal error")) {
         console.warn("🔇 RPC Internal Error (ignored):", balanceError.message);
       } else if (
@@ -69,7 +103,6 @@ export function useWalletIntegration() {
     }
   }, [balanceError]);
 
-  // Handle wallet connection/disconnection only after mounting
   useEffect(() => {
     if (!mounted) return;
 
@@ -80,37 +113,36 @@ export function useWalletIntegration() {
       address: address?.slice(0, 10) + "...",
       chainName: currentChain?.name,
       chainId,
+      chainType,
+      isSolana,
       mounted,
     });
 
     if (isConnected && address && !isInitialized) {
-      console.log("✅ Wallet connected, setting up integration");
+      console.log(
+        `✅ Wallet connected (${chainType.toUpperCase()}), setting up integration`
+      );
 
-      // Create a wallet object from connected wallet
       const connectedWallet = {
         id: "connected-wallet",
-        name: `${currentChain?.name || "Ethereum"} Wallet`,
+        name: `${currentChain?.name || "Unknown"} Wallet`,
         address: address,
-        balance: 0, // Start with 0, will update when balance loads
+        balance: 0,
         isActive: true,
       };
 
-      // Initialize with connected wallet data
       dispatch(initializeMockData());
-
-      // Set the connected wallet as active
       dispatch(setActiveWallet("connected-wallet"));
-
       setIsInitialized(true);
 
-      // Enable balance fetching after a delay to prevent immediate RPC calls
-      setTimeout(() => {
-        setBalanceFetchEnabled(true);
-      }, 2000);
+      // Only enable balance fetching for EVM chains
+      if (!isSolana) {
+        setTimeout(() => {
+          setBalanceFetchEnabled(true);
+        }, 2000);
+      }
     } else if (isDisconnected && isInitialized) {
       console.log("🚪 Wallet disconnected, clearing wallet state");
-
-      // Clear wallet state when disconnected
       dispatch(clearWalletState());
       setIsInitialized(false);
       setBalanceFetchEnabled(false);
@@ -122,11 +154,13 @@ export function useWalletIntegration() {
     address,
     currentChain,
     chainId,
+    chainType,
+    isSolana,
     dispatch,
     isInitialized,
   ]);
 
-  // Update balance when it changes (with extensive error handling)
+  // Update balance for EVM chains
   useEffect(() => {
     if (
       mounted &&
@@ -135,9 +169,10 @@ export function useWalletIntegration() {
       balance &&
       isInitialized &&
       !balanceError &&
-      balanceFetchEnabled
+      balanceFetchEnabled &&
+      !isSolana
     ) {
-      console.log("💰 Balance updated:", balance.formatted, balance.symbol);
+      console.log("💰 EVM Balance updated:", balance.formatted, balance.symbol);
 
       try {
         const balanceValue = parseFloat(balance.formatted);
@@ -165,19 +200,26 @@ export function useWalletIntegration() {
     isInitialized,
     balanceError,
     balanceFetchEnabled,
+    isSolana,
   ]);
 
-  // Return safe values, ensuring no hydration mismatches
   return {
     isConnected: mounted ? isConnected : false,
     isConnecting: mounted ? isConnecting : false,
-    isReconnecting: mounted ? isReconnecting : false, // Add this line
+    isReconnecting: mounted ? isReconnecting : false,
     address: mounted ? address : undefined,
     chain: mounted ? currentChain : undefined,
     chainId: mounted ? chainId : undefined,
+    chainType: mounted ? chainType : "evm",
+    isSolana: mounted ? isSolana : false,
     balance:
-      mounted && balance && !balanceError ? parseFloat(balance.formatted) : 0,
-    balanceSymbol: mounted && balance?.symbol ? balance.symbol : "ETH",
+      mounted && balance && !balanceError && !isSolana
+        ? parseFloat(balance.formatted)
+        : 0,
+    balanceSymbol:
+      mounted && balance?.symbol
+        ? balance.symbol
+        : currentChain?.nativeCurrency?.symbol || "ETH",
     isInitialized: mounted ? isInitialized : false,
     hasBalanceError: mounted ? !!balanceError : false,
     balanceLoading: mounted ? balanceLoading : false,
@@ -185,7 +227,6 @@ export function useWalletIntegration() {
   };
 }
 
-// Hook for wallet actions
 export function useWalletActions() {
   const dispatch = useDispatch();
 

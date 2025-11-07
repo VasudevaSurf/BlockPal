@@ -5,7 +5,8 @@ import { connectToDatabase } from "@/lib/mongodb";
 interface WalletPreferences {
   userEmail: string; // ✅ ADDED
   walletAddress: string;
-  chainId: number;
+  chainId: number | string; // Can be number (EVM) or 'solana'
+  chainType: "evm" | "solana";
   userAddedTokens: string[];
   hiddenTokens: string[];
   tokenDisplayOrder?: string[];
