@@ -1,4 +1,4 @@
-// src/config/appkit.ts - WITH DEBUGGING
+// src/config/appkit.ts - FIXED PROJECT ID LOADING
 import { createAppKit } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
@@ -40,20 +40,19 @@ const solanaNetwork: AppKitNetwork = {
   chainNamespace: "solana" as const,
 };
 
-// ✅ Get projectId with debugging
+// ✅ FIXED: Get projectId with proper error handling
 const projectId = process.env.NEXT_PUBLIC_PROJECT_ID;
 
 console.log("🔍 Environment check:", {
   projectId: projectId ? "✅ Found" : "❌ Missing",
-  projectIdValue: projectId?.substring(0, 10) + "...",
-  allEnvVars: Object.keys(process.env).filter((key) => key.includes("PROJECT")),
+  projectIdValue: projectId ? projectId.slice(0, 10) + "..." : "undefined",
+  allEnvVars: Object.keys(process.env).filter((k) => k.includes("PROJECT_ID")),
 });
 
 if (!projectId) {
-  console.error("❌ NEXT_PUBLIC_PROJECT_ID is not set!");
-  console.error("Available env vars:", Object.keys(process.env));
+  console.error("❌ NEXT_PUBLIC_PROJECT_ID is missing!");
   throw new Error(
-    "NEXT_PUBLIC_PROJECT_ID is not set. Please add it to your .env.local file and restart the dev server."
+    "NEXT_PUBLIC_PROJECT_ID is not set. Get one at https://dashboard.reown.com"
   );
 }
 
@@ -95,11 +94,11 @@ export const wagmiAdapter = new WagmiAdapter({
 // Create Solana Adapter
 export const solanaAdapter = new SolanaAdapter();
 
-// Create AppKit instance
+// ✅ Create AppKit instance - Make sure projectId is passed correctly
 createAppKit({
   adapters: [wagmiAdapter, solanaAdapter],
   networks,
-  projectId,
+  projectId, // ✅ This must be a valid string
   metadata,
   features: {
     analytics: false,
@@ -116,5 +115,14 @@ createAppKit({
 // Export chains for compatibility with existing code
 export const chains = [mainnet, base, polygon, arbitrum, avalanche, bsc];
 
-// Export Solana network separately
+// Export Solana network separately for easy identification
 export const solana = solanaNetwork;
+
+console.log(
+  "✅ AppKit configured successfully with project ID:",
+  projectId.slice(0, 10) + "..."
+);
+console.log("🔗 Supported networks:", [
+  ...chains.map((c) => ({ id: c.id, name: c.name })),
+  { id: "solana", name: "Solana" },
+]);
