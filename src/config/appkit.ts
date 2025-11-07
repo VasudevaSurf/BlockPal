@@ -1,4 +1,4 @@
-// src/config/appkit.ts - Reown AppKit Configuration (CORRECTED)
+// src/config/appkit.ts - WITH DEBUGGING
 import { createAppKit } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana/react";
@@ -14,7 +14,7 @@ import type { AppKitNetwork } from "@reown/appkit/react";
 import { QueryClient } from "@tanstack/react-query";
 import { cookieStorage, createStorage } from "wagmi";
 
-// Define Solana network manually
+// ✅ Define Solana network manually
 const solanaNetwork: AppKitNetwork = {
   id: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
   name: "Solana",
@@ -40,14 +40,21 @@ const solanaNetwork: AppKitNetwork = {
   chainNamespace: "solana" as const,
 };
 
-// Get projectId from environment variable
-const projectId =
-  process.env.NEXT_PUBLIC_PROJECT_ID ||
-  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ||
-  "ccbe76e1a5fcc580ca233ed69c4d09cb";
+// ✅ Get projectId with debugging
+const projectId = process.env.NEXT_PUBLIC_PROJECT_ID;
+
+console.log("🔍 Environment check:", {
+  projectId: projectId ? "✅ Found" : "❌ Missing",
+  projectIdValue: projectId?.substring(0, 10) + "...",
+  allEnvVars: Object.keys(process.env).filter((key) => key.includes("PROJECT")),
+});
 
 if (!projectId) {
-  throw new Error("NEXT_PUBLIC_PROJECT_ID is not set");
+  console.error("❌ NEXT_PUBLIC_PROJECT_ID is not set!");
+  console.error("Available env vars:", Object.keys(process.env));
+  throw new Error(
+    "NEXT_PUBLIC_PROJECT_ID is not set. Please add it to your .env.local file and restart the dev server."
+  );
 }
 
 // Setup query client
@@ -109,10 +116,5 @@ createAppKit({
 // Export chains for compatibility with existing code
 export const chains = [mainnet, base, polygon, arbitrum, avalanche, bsc];
 
-// Export Solana network separately for easy identification
+// Export Solana network separately
 export const solana = solanaNetwork;
-
-console.log("🔗 AppKit configured with chains:", [
-  ...chains.map((c) => ({ id: c.id, name: c.name })),
-  { id: "solana", name: "Solana" },
-]);

@@ -245,7 +245,16 @@ export default function WalletConnectButton({
   };
 
   const currentChainId = getCurrentChainId();
-  const isSolana = currentChainId === "solana";
+  const isSolana =
+    caipNetwork?.name?.toLowerCase() === "solana" ||
+    caipNetwork?.id?.toString().includes("solana") ||
+    caipNetwork?.chainNamespace === "solana";
+
+  console.log("Connected to:", {
+    address,
+    network: caipNetwork?.name,
+    isSolana,
+  });
 
   const getCurrentChainDisplay = () => {
     if (
