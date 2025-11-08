@@ -1,4 +1,4 @@
-// src/app/dashboard/swap/page.tsx - Complete Updated Version with Mobile Responsive
+// src/app/dashboard/swap/page.tsx - Complete Updated Version with Solana Support
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -19,8 +19,10 @@ import SwapChainSelector from "@/components/swap/SwapChainSelector";
 import TokenSelector from "@/components/swap/TokenSelectorModal";
 import SwapIcon from "@/components/icons/SwapIcon";
 import { useSwap } from "@/hooks/useSwap";
+import { useSwapSolana } from "@/hooks/useSwapSolana";
 import { swapHistoryService } from "@/services/swapHistoryService";
 import { useToast } from "@/contexts/ToastContext";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 
 // Icon Components
 const LightningIcon = ({ size = 16, className = "", ...props }: any) => (
@@ -355,41 +357,28 @@ export default function SwapPage() {
     };
   }, []);
 
-  const { isConnected, address } = useAccount();
+  // ✅ DETECT SOLANA WALLET
+  const { address: appKitAddress, isConnected: appKitConnected } =
+    useAppKitAccount();
+  const { caipNetwork } = useAppKitNetwork();
 
-  const chainId = useChainId();
-  const currentChain = chains.find((c) => c.id === chainId);
+  const isSolana =
+    caipNetwork?.name?.toLowerCase() === "solana" ||
+    caipNetwork?.id?.toString().includes("solana") ||
+    caipNetwork?.chainNamespace === "solana";
 
-  const chainDisplayData = getChainDisplayData();
-  const currentChainDisplay = chainDisplayData[chainId] || chainDisplayData[1];
+  console.log("🔍 Network Detection:", {
+    isSolana,
+    networkName: caipNetwork?.name,
+    networkId: caipNetwork?.id,
+    chainNamespace: caipNetwork?.chainNamespace,
+  });
 
-  useEffect(() => {
-    const preloadAllChainImages = async () => {
-      const images = Object.values(chainDisplayData)
-        .map((data) => data.image)
-        .filter(Boolean) as string[];
+  // ✅ USE APPROPRIATE SWAP HOOK
+  const evmSwap = useSwap();
+  const solanaSwap = useSwapSolana();
 
-      await Promise.all(images.map((src) => preloadImage(src)));
-    };
-
-    preloadAllChainImages();
-  }, []);
-
-  const truncateBalance = (value: string, decimals: number = 5): string => {
-    const num = parseFloat(value);
-    if (isNaN(num) || num === 0) return "0.00000";
-
-    const parts = value.split(".");
-    if (parts.length === 1) {
-      return `${parts[0]}.00000`;
-    }
-
-    const truncatedDecimals = parts[1].substring(0, decimals);
-    const paddedDecimals = truncatedDecimals.padEnd(decimals, "0");
-
-    return `${parts[0]}.${paddedDecimals}`;
-  };
-
+  // Choose the right swap hook based on network
   const {
     fromToken,
     setFromToken,
@@ -419,7 +408,50 @@ export default function SwapPage() {
     getExplorerLink,
     dbTransactions,
     loadingHistory,
-  } = useSwap();
+  } = isSolana ? solanaSwap : evmSwap;
+
+  const { isConnected } = useAccount();
+  const chainId = useChainId();
+  const currentChain = chains.find((c) => c.id === chainId);
+
+  const chainDisplayData = getChainDisplayData();
+  const currentChainDisplay = isSolana
+    ? {
+        name: "Solana",
+        color: "bg-gradient-to-r from-purple-500 to-blue-500",
+        icon: "◎",
+        image: "/chains/Solana.png",
+        fallbackIcon: "◎",
+        useBackground: false,
+      }
+    : chainDisplayData[chainId] || chainDisplayData[1];
+
+  useEffect(() => {
+    const preloadAllChainImages = async () => {
+      const images = Object.values(chainDisplayData)
+        .map((data) => data.image)
+        .filter(Boolean) as string[];
+
+      await Promise.all(images.map((src) => preloadImage(src)));
+    };
+
+    preloadAllChainImages();
+  }, []);
+
+  const truncateBalance = (value: string, decimals: number = 5): string => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num === 0) return "0.00000";
+
+    const parts = value.split(".");
+    if (parts.length === 1) {
+      return `${parts[0]}.00000`;
+    }
+
+    const truncatedDecimals = parts[1].substring(0, decimals);
+    const paddedDecimals = truncatedDecimals.padEnd(decimals, "0");
+
+    return `${parts[0]}.${paddedDecimals}`;
+  };
 
   const x = useMotionValue(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -489,6 +521,7 @@ export default function SwapPage() {
       address:
         token.address ||
         token.contractAddress ||
+        token.id ||
         "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       symbol: token.symbol,
       name: token.name,
@@ -503,6 +536,7 @@ export default function SwapPage() {
       address:
         token.address ||
         token.contractAddress ||
+        token.id ||
         "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       symbol: token.symbol,
       name: token.name,
@@ -546,6 +580,27 @@ export default function SwapPage() {
   const handleSelectTokensClick = () => {
     setShowFromTokenSelector(true);
   };
+
+  // ✅ SOLANA SWAP BUTTON HANDLER
+  const handleSolanaSwap = async () => {
+    try {
+      const success = await executeSwap();
+      if (success) {
+        showToast(
+          "success",
+          `Successfully swapped ${fromAmount} ${fromToken?.symbol} to ${toAmount} ${toToken?.symbol}`,
+          4000
+        );
+      } else {
+        showToast("error", "Swap failed. Please try again.", 5000);
+      }
+    } catch (error: any) {
+      console.error("Solana swap error:", error);
+      showToast("error", error.message || "Swap failed unexpectedly.", 5000);
+    }
+  };
+
+  const isWalletConnected = isSolana ? appKitConnected : isConnected;
 
   return (
     <div className="h-full bg-[#000000] rounded-[12px] lg:rounded-[16px] flex flex-col overflow-hidden relative isolate">
@@ -641,33 +696,48 @@ export default function SwapPage() {
               <div className="py-2.5 px-3 sm:py-4 sm:px-8 lg:px-16">
                 {/* Chain selector and slippage */}
                 <div className="flex flex-row items-center justify-between mb-2.5 sm:mb-4 gap-1.5 sm:gap-2">
-                  <button
-                    ref={chainButtonRef}
-                    onClick={() => setShowChainSelector(true)}
-                    className="flex items-center gap-1 sm:gap-2 hover:opacity-80 min-w-fit justify-center px-1.5 sm:px-3 py-1 sm:py-2"
-                  >
-                    <ChainIcon
-                      chainData={currentChainDisplay}
-                      size="sm"
-                      className="w-4 h-4 sm:w-6 sm:h-6"
-                    />
-                    <span className="text-white text-xs sm:text-base font-satoshi font-medium">
-                      {currentChainDisplay.name}
-                    </span>
-                    <svg
-                      className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  {!isSolana && (
+                    <button
+                      ref={chainButtonRef}
+                      onClick={() => setShowChainSelector(true)}
+                      className="flex items-center gap-1 sm:gap-2 hover:opacity-80 min-w-fit justify-center px-1.5 sm:px-3 py-1 sm:py-2"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
+                      <ChainIcon
+                        chainData={currentChainDisplay}
+                        size="sm"
+                        className="w-4 h-4 sm:w-6 sm:h-6"
                       />
-                    </svg>
-                  </button>
+                      <span className="text-white text-xs sm:text-base font-satoshi font-medium">
+                        {currentChainDisplay.name}
+                      </span>
+                      <svg
+                        className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+                  )}
+
+                  {isSolana && (
+                    <div className="flex items-center gap-1 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-2">
+                      <ChainIcon
+                        chainData={currentChainDisplay}
+                        size="sm"
+                        className="w-4 h-4 sm:w-6 sm:h-6"
+                      />
+                      <span className="text-white text-xs sm:text-base font-satoshi font-medium">
+                        Solana
+                      </span>
+                    </div>
+                  )}
 
                   <div className="relative">
                     <div className="relative p-[1px] rounded-[18px] sm:rounded-[25px] overflow-hidden">
@@ -975,12 +1045,12 @@ export default function SwapPage() {
                           ) : (
                             <div className="w-5 h-5 sm:w-7 sm:h-7 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                               <span className="text-white text-[10px] sm:text-xs font-bold">
-                                E
+                                {isSolana ? "S" : "E"}
                               </span>
                             </div>
                           )}
                           <span className="text-white text-xs sm:text-base font-satoshi">
-                            {fromToken?.symbol || "ETH"}
+                            {fromToken?.symbol || (isSolana ? "SOL" : "ETH")}
                           </span>
                           <svg
                             className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-gray-400"
@@ -1125,147 +1195,153 @@ export default function SwapPage() {
                         Estimated Fee:
                       </span>
                       <span className="text-[#FFFFFF] font-satoshi">
-                        {gasPrice ? `(~${gasPrice.gasCostUSD})` : "(~$0.00)"}
+                        {isSolana
+                          ? "(~$0.001)"
+                          : gasPrice
+                          ? `(~${gasPrice.gasCostUSD})`
+                          : "(~$0.00)"}
                       </span>
                     </div>
 
-                    {/* Gas Mode Selection Buttons */}
-                    <div className="flex gap-1.5 sm:gap-2">
-                      {/* Fast Button */}
-                      <div className="relative">
-                        <div className="relative p-[1px] rounded-[12px] overflow-hidden">
-                          <div
-                            className="absolute inset-0"
-                            style={{
-                              background:
-                                gasMode === "high"
-                                  ? `linear-gradient(135deg, 
-                rgba(255, 152, 0, 0.6) 0%,
-                rgba(255, 152, 0, 0.3) 20%,
-                rgba(255, 152, 0, 0.4) 40%,
-                rgba(255, 152, 0, 0.2) 60%,
-                rgba(255, 152, 0, 0.5) 80%,
-                rgba(255, 152, 0, 0.4) 100%)`
-                                  : `linear-gradient(135deg, 
-                rgba(255, 255, 255, 0.3) 0%,
-                rgba(255, 255, 255, 0.1) 20%,
-                rgba(226, 175, 25, 0.2) 40%,
-                rgba(255, 255, 255, 0.05) 60%,
-                rgba(226, 175, 25, 0.15) 80%,
-                rgba(255, 255, 255, 0.2) 100%)`,
-                            }}
-                          />
-
-                          <button
-                            onClick={() => setGasMode("high")}
-                            className={`relative flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-[11px] transition-all ${
-                              gasMode === "high"
-                                ? "text-black"
-                                : "text-white hover:opacity-80"
-                            }`}
-                            style={{
-                              background:
-                                gasMode === "high"
-                                  ? `linear-gradient(135deg, 
-                rgba(255, 152, 0, 0.9) 0%,
-                rgba(255, 152, 0, 1) 50%,
-                rgba(255, 152, 0, 0.9) 100%)`
-                                  : `linear-gradient(135deg, 
-                rgba(25, 25, 25, 0.85) 0%,
-                rgba(40, 40, 40, 0.75) 50%,
-                rgba(25, 25, 25, 0.85) 100%)`,
-                              backdropFilter: "blur(1px)",
-                              boxShadow:
-                                gasMode === "high"
-                                  ? `0 2px 8px rgba(255, 152, 0, 0.3)`
-                                  : `
-                inset 0 1px 2px rgba(255, 255, 255, 0.05),
-                inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-                0 2px 8px rgba(0, 0, 0, 0.3)
-              `,
-                            }}
-                          >
-                            <LightningIcon
-                              size={12}
-                              className="sm:w-[14px] sm:h-[14px]"
+                    {/* Gas Mode Selection Buttons - Only show for EVM */}
+                    {!isSolana && (
+                      <div className="flex gap-1.5 sm:gap-2">
+                        {/* Fast Button */}
+                        <div className="relative">
+                          <div className="relative p-[1px] rounded-[12px] overflow-hidden">
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                background:
+                                  gasMode === "high"
+                                    ? `linear-gradient(135deg, 
+                  rgba(255, 152, 0, 0.6) 0%,
+                  rgba(255, 152, 0, 0.3) 20%,
+                  rgba(255, 152, 0, 0.4) 40%,
+                  rgba(255, 152, 0, 0.2) 60%,
+                  rgba(255, 152, 0, 0.5) 80%,
+                  rgba(255, 152, 0, 0.4) 100%)`
+                                    : `linear-gradient(135deg, 
+                  rgba(255, 255, 255, 0.3) 0%,
+                  rgba(255, 255, 255, 0.1) 20%,
+                  rgba(226, 175, 25, 0.2) 40%,
+                  rgba(255, 255, 255, 0.05) 60%,
+                  rgba(226, 175, 25, 0.15) 80%,
+                  rgba(255, 255, 255, 0.2) 100%)`,
+                              }}
                             />
-                            <span className="text-[10px] sm:text-xs font-satoshi font-medium">
-                              Fast
-                            </span>
-                          </button>
+
+                            <button
+                              onClick={() => setGasMode("high")}
+                              className={`relative flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-[11px] transition-all ${
+                                gasMode === "high"
+                                  ? "text-black"
+                                  : "text-white hover:opacity-80"
+                              }`}
+                              style={{
+                                background:
+                                  gasMode === "high"
+                                    ? `linear-gradient(135deg, 
+                  rgba(255, 152, 0, 0.9) 0%,
+                  rgba(255, 152, 0, 1) 50%,
+                  rgba(255, 152, 0, 0.9) 100%)`
+                                    : `linear-gradient(135deg, 
+                  rgba(25, 25, 25, 0.85) 0%,
+                  rgba(40, 40, 40, 0.75) 50%,
+                  rgba(25, 25, 25, 0.85) 100%)`,
+                                backdropFilter: "blur(1px)",
+                                boxShadow:
+                                  gasMode === "high"
+                                    ? `0 2px 8px rgba(255, 152, 0, 0.3)`
+                                    : `
+                  inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                  inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                  0 2px 8px rgba(0, 0, 0, 0.3)
+                `,
+                              }}
+                            >
+                              <LightningIcon
+                                size={12}
+                                className="sm:w-[14px] sm:h-[14px]"
+                              />
+                              <span className="text-[10px] sm:text-xs font-satoshi font-medium">
+                                Fast
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Instant Button */}
+                        <div className="relative">
+                          <div className="relative p-[1px] rounded-[12px] overflow-hidden">
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                background:
+                                  gasMode === "instant"
+                                    ? `linear-gradient(135deg, 
+                  rgba(244, 67, 54, 0.6) 0%,
+                  rgba(244, 67, 54, 0.3) 20%,
+                  rgba(244, 67, 54, 0.4) 40%,
+                  rgba(244, 67, 54, 0.2) 60%,
+                  rgba(244, 67, 54, 0.5) 80%,
+                  rgba(244, 67, 54, 0.4) 100%)`
+                                    : `linear-gradient(135deg, 
+                  rgba(255, 255, 255, 0.3) 0%,
+                  rgba(255, 255, 255, 0.1) 20%,
+                  rgba(226, 175, 25, 0.2) 40%,
+                  rgba(255, 255, 255, 0.05) 60%,
+                  rgba(226, 175, 25, 0.15) 80%,
+                  rgba(255, 255, 255, 0.2) 100%)`,
+                              }}
+                            />
+
+                            <button
+                              onClick={() => setGasMode("instant")}
+                              className={`relative flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-[11px] transition-all ${
+                                gasMode === "instant"
+                                  ? "text-white"
+                                  : "text-white hover:opacity-80"
+                              }`}
+                              style={{
+                                background:
+                                  gasMode === "instant"
+                                    ? `linear-gradient(135deg, 
+                  rgba(244, 67, 54, 0.9) 0%,
+                  rgba(244, 67, 54, 1) 50%,
+                  rgba(244, 67, 54, 0.9) 100%)`
+                                    : `linear-gradient(135deg, 
+                  rgba(25, 25, 25, 0.85) 0%,
+                  rgba(40, 40, 40, 0.75) 50%,
+                  rgba(25, 25, 25, 0.85) 100%)`,
+                                backdropFilter: "blur(1px)",
+                                boxShadow:
+                                  gasMode === "instant"
+                                    ? `0 2px 8px rgba(244, 67, 54, 0.3)`
+                                    : `
+                  inset 0 1px 2px rgba(255, 255, 255, 0.05),
+                  inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+                  0 2px 8px rgba(0, 0, 0, 0.3)
+                `,
+                              }}
+                            >
+                              <LightningIcon
+                                size={12}
+                                className="sm:w-[14px] sm:h-[14px]"
+                              />
+                              <span className="text-[10px] sm:text-xs font-satoshi font-medium">
+                                Instant
+                              </span>
+                            </button>
+                          </div>
                         </div>
                       </div>
-
-                      {/* Instant Button */}
-                      <div className="relative">
-                        <div className="relative p-[1px] rounded-[12px] overflow-hidden">
-                          <div
-                            className="absolute inset-0"
-                            style={{
-                              background:
-                                gasMode === "instant"
-                                  ? `linear-gradient(135deg, 
-                rgba(244, 67, 54, 0.6) 0%,
-                rgba(244, 67, 54, 0.3) 20%,
-                rgba(244, 67, 54, 0.4) 40%,
-                rgba(244, 67, 54, 0.2) 60%,
-                rgba(244, 67, 54, 0.5) 80%,
-                rgba(244, 67, 54, 0.4) 100%)`
-                                  : `linear-gradient(135deg, 
-                rgba(255, 255, 255, 0.3) 0%,
-                rgba(255, 255, 255, 0.1) 20%,
-                rgba(226, 175, 25, 0.2) 40%,
-                rgba(255, 255, 255, 0.05) 60%,
-                rgba(226, 175, 25, 0.15) 80%,
-                rgba(255, 255, 255, 0.2) 100%)`,
-                            }}
-                          />
-
-                          <button
-                            onClick={() => setGasMode("instant")}
-                            className={`relative flex items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-[11px] transition-all ${
-                              gasMode === "instant"
-                                ? "text-white"
-                                : "text-white hover:opacity-80"
-                            }`}
-                            style={{
-                              background:
-                                gasMode === "instant"
-                                  ? `linear-gradient(135deg, 
-                rgba(244, 67, 54, 0.9) 0%,
-                rgba(244, 67, 54, 1) 50%,
-                rgba(244, 67, 54, 0.9) 100%)`
-                                  : `linear-gradient(135deg, 
-                rgba(25, 25, 25, 0.85) 0%,
-                rgba(40, 40, 40, 0.75) 50%,
-                rgba(25, 25, 25, 0.85) 100%)`,
-                              backdropFilter: "blur(1px)",
-                              boxShadow:
-                                gasMode === "instant"
-                                  ? `0 2px 8px rgba(244, 67, 54, 0.3)`
-                                  : `
-                inset 0 1px 2px rgba(255, 255, 255, 0.05),
-                inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-                0 2px 8px rgba(0, 0, 0, 0.3)
-              `,
-                            }}
-                          >
-                            <LightningIcon
-                              size={12}
-                              className="sm:w-[14px] sm:h-[14px]"
-                            />
-                            <span className="text-[10px] sm:text-xs font-satoshi font-medium">
-                              Instant
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Quote Info */}
-                {quote && toAmount && parseFloat(toAmount) > 0 && gasPrice && (
+                {quote && toAmount && parseFloat(toAmount) > 0 && (
                   <div className="px-1 py-1 bg-[#000000] rounded-lg text-xs sm:text-sm">
                     <div className="flex justify-between mb-1">
                       <span className="text-gray-400">Rate:</span>
@@ -1289,11 +1365,36 @@ export default function SwapPage() {
                 )}
 
                 {/* Button Logic */}
-                {!isConnected ? (
+                {!isWalletConnected ? (
                   <WalletConnectButton />
                 ) : !bothTokensSelected ? (
                   <SelectTokenButton onClick={handleSelectTokensClick} />
+                ) : isSolana ? (
+                  // ✅ SOLANA: Regular Button (No Swipe Animation)
+                  <button
+                    onClick={handleSolanaSwap}
+                    disabled={
+                      swapping || loading || insufficientBalance || !quote
+                    }
+                    className="relative w-full h-[44px] sm:h-[50px] rounded-[100px] bg-[#E2AF19] hover:bg-[#D4A853] transition-colors flex items-center justify-center overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="text-black font-mayeka-bold-demo text-sm sm:text-base px-2 text-center">
+                      {swapping ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-black"></div>
+                          SWAPPING...
+                        </div>
+                      ) : insufficientBalance ? (
+                        <span className="text-xs sm:text-base">
+                          Insufficient Balance
+                        </span>
+                      ) : (
+                        "Confirm Swap"
+                      )}
+                    </span>
+                  </button>
                 ) : (
+                  // ✅ EVM: Swipe Animation Button
                   <div
                     className="relative w-full h-[44px] sm:h-[50px] overflow-hidden animate-pulse-subtle"
                     style={{
@@ -1759,7 +1860,7 @@ export default function SwapPage() {
         onClose={() => setShowFromTokenSelector(false)}
         onTokenSelect={handleFromTokenSelect}
         selectedToken={fromToken}
-        showChainSelector={true}
+        showChainSelector={!isSolana}
       />
       <TokenSelector
         isOpen={showToTokenSelector}
@@ -1768,16 +1869,18 @@ export default function SwapPage() {
         selectedToken={toToken}
         showChainSelector={false}
       />
-      {/* Chain Selector Modal */}
-      <SwapChainSelector
-        isOpen={showChainSelector}
-        onClose={() => setShowChainSelector(false)}
-        onChainSelect={(chainId) => {
-          console.log("Chain selected:", chainId);
-          setShowChainSelector(false);
-        }}
-        triggerRef={chainButtonRef}
-      />
+      {/* Chain Selector Modal - Only show for EVM */}
+      {!isSolana && (
+        <SwapChainSelector
+          isOpen={showChainSelector}
+          onClose={() => setShowChainSelector(false)}
+          onChainSelect={(chainId) => {
+            console.log("Chain selected:", chainId);
+            setShowChainSelector(false);
+          }}
+          triggerRef={chainButtonRef}
+        />
+      )}
       {/* Custom Styles */}
       <style jsx>{`
         @keyframes shimmer {

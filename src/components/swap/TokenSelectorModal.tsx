@@ -1,17 +1,20 @@
-// src/components/swap/TokenSelectorModal.tsx - OPTIMIZED: Uses cached wallet data, no API calls
+// src/components/swap/TokenSelectorModal.tsx - WITH SOLANA SUPPORT
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { X, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 import { chains } from "@/components/wallet/WalletProvider";
 import { swapService } from "@/services/swapService";
-import { useWalletData } from "@/contexts/WalletDataContext"; // ✅ Import wallet data context
+import { useWalletData } from "@/contexts/WalletDataContext";
 
-// Chain data with proper PNG image paths
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+
+// Chain data with Solana included
 const getChainDisplayData = () => {
   const chainDisplayData: {
-    [key: number]: {
+    [key: string]: {
       name: string;
       color: string;
       icon: string;
@@ -68,12 +71,30 @@ const getChainDisplayData = () => {
       fallbackIcon: "B",
       useBackground: true,
     },
+    solana: {
+      name: "Solana",
+      color: "bg-gradient-to-r from-purple-500 to-blue-500",
+      icon: "◎",
+      image: "/chains/Solana.png",
+      fallbackIcon: "◎",
+      useBackground: false,
+    },
   };
 
   return chainDisplayData;
 };
 
-// ✅ FIXED: Preload images cache to prevent flickering
+// Combined chains array with Solana
+const allChains = [
+  ...chains,
+  {
+    id: "solana",
+    name: "Solana",
+    nativeCurrency: { name: "SOL", symbol: "SOL", decimals: 9 },
+  },
+];
+
+// Image cache
 const imageCache = new Map<string, boolean>();
 
 const preloadImage = (src: string): Promise<boolean> => {
@@ -248,11 +269,25 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
   selectedToken,
   showChainSelector = true,
 }) => {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
-  const [selectedChain, setSelectedChain] = useState(chainId);
+  // Get current network from AppKit
+  const { caipNetwork } = useAppKitNetwork();
+  const { address: appKitAddress } = useAppKitAccount();
+  const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount();
+  const wagmiChainId = useChainId();
 
-  // ✅ Use cached wallet data instead of API calls
+  // Determine if we're on Solana or EVM
+  const isSolana =
+    caipNetwork?.name?.toLowerCase() === "solana" ||
+    caipNetwork?.id?.toString().includes("solana");
+
+  const address = isSolana ? appKitAddress : wagmiAddress;
+  const isConnected = isSolana ? !!appKitAddress : wagmiConnected;
+
+  // Set initial chain based on network
+  const [selectedChain, setSelectedChain] = useState<number | string>(
+    isSolana ? "solana" : wagmiChainId
+  );
+
   const { walletData } = useWalletData();
 
   const [externalTokens, setExternalTokens] = useState<any[]>([]);
@@ -265,7 +300,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
 
   const chainDisplayData = getChainDisplayData();
 
-  // ✅ Preload all chain images on mount
+  // Preload all chain images
   useEffect(() => {
     const preloadAllChainImages = async () => {
       const images = Object.values(chainDisplayData)
@@ -278,19 +313,16 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     preloadAllChainImages();
   }, []);
 
+  // Update selected chain when network changes
   useEffect(() => {
-    setSelectedChain(chainId);
-  }, [chainId]);
-
-  useEffect(() => {
-    if (isOpen) {
-      setSearchQuery("");
-      setExternalTokens([]);
-      setShowAdditionalTokens(false);
+    if (isSolana) {
+      setSelectedChain("solana");
+    } else {
+      setSelectedChain(wagmiChainId);
     }
-  }, [selectedChain]);
+  }, [isSolana, wagmiChainId]);
 
-  // ✅ Search functionality: uses cached data for wallet tokens, only searches external for queries
+  // Search functionality
   useEffect(() => {
     if (isOpen) {
       if (searchTimeoutRef.current) {
@@ -327,7 +359,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     }
   }, [isOpen]);
 
-  // ✅ Only search external tokens when user types a query
+  // Search external tokens (Solana or EVM)
   const searchExternalTokens = async () => {
     if (!searchQuery.trim()) {
       setExternalTokens([]);
@@ -336,29 +368,65 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
 
     setLoading(true);
     try {
-      console.log(`🔍 Searching external tokens for: ${searchQuery}`);
-
-      const searchResults = await swapService.searchTokens(
-        selectedChain,
-        searchQuery
+      console.log(
+        `🔍 Searching tokens for: ${searchQuery} on chain: ${selectedChain}`
       );
 
-      const formattedTokens = searchResults.map((token: any) => ({
-        id: token.address,
-        symbol: token.symbol,
-        name: token.name,
-        contractAddress: token.address,
-        decimals: token.decimals,
-        balance: 0,
-        value: 0,
-        logoUrl: token.logoURI,
-        isNative:
-          token.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        isExternal: true,
-      }));
+      let searchResults;
 
-      setExternalTokens(formattedTokens);
-      console.log(`✅ Found ${formattedTokens.length} external tokens`);
+      if (selectedChain === "solana") {
+        // Use Jupiter search for Solana
+        console.log("Using Jupiter search for Solana");
+        const response = await fetch(
+          `${API_BASE_URL}/api/jupiter/search?query=${encodeURIComponent(
+            searchQuery
+          )}`
+        );
+        const data = await response.json();
+
+        if (data.success && Array.isArray(data.data)) {
+          searchResults = data.data.map((token: any) => ({
+            id: token.address || token.id,
+            symbol: token.symbol,
+            name: token.name,
+            contractAddress: token.address || token.id,
+            address: token.address || token.id,
+            decimals: token.decimals || 9,
+            balance: 0,
+            value: 0,
+            logoUrl: token.logoURI,
+            logoURI: token.logoURI,
+            isExternal: true,
+          }));
+          console.log(`✅ Found ${searchResults.length} Solana tokens`);
+        } else {
+          searchResults = [];
+        }
+      } else {
+        // Use 1inch search for EVM
+        console.log("Using 1inch search for EVM");
+        searchResults = await swapService.searchTokens(
+          selectedChain as number,
+          searchQuery
+        );
+
+        searchResults = searchResults.map((token: any) => ({
+          id: token.address,
+          symbol: token.symbol,
+          name: token.name,
+          contractAddress: token.address,
+          decimals: token.decimals,
+          balance: 0,
+          value: 0,
+          logoUrl: token.logoURI,
+          isNative:
+            token.address === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          isExternal: true,
+        }));
+        console.log(`✅ Found ${searchResults.length} EVM tokens`);
+      }
+
+      setExternalTokens(searchResults);
     } catch (error) {
       console.error("Error searching external tokens:", error);
       setExternalTokens([]);
@@ -378,21 +446,25 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     return address;
   };
 
-  // ✅ Use cached wallet tokens - split into main and additional
+  // Get wallet tokens (only for current chain and if connected)
   const { mainTokens, additionalTokens } = useMemo(() => {
-    // Only use wallet tokens when connected and on the same chain
+    // For Solana, we don't have cached tokens yet, return empty
+    if (selectedChain === "solana") {
+      console.log("📋 Solana selected - no cached tokens yet");
+      return { mainTokens: [], additionalTokens: [] };
+    }
+
+    // For EVM, use wallet data if on same chain and connected
     if (
       !isConnected ||
       !address ||
-      selectedChain !== chainId ||
+      selectedChain !== wagmiChainId ||
       !walletData.cacheValid
     ) {
       return { mainTokens: [], additionalTokens: [] };
     }
 
-    const allTokens = walletData.tokens.filter(
-      (token) => token.balance > 0 // Only show tokens with balance
-    );
+    const allTokens = walletData.tokens.filter((token) => token.balance > 0);
 
     const main = allTokens.filter((token) => {
       return token.isPreset || token.isUserAdded;
@@ -409,10 +481,10 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     isConnected,
     address,
     selectedChain,
-    chainId,
+    wagmiChainId,
   ]);
 
-  // ✅ Filter tokens based on search
+  // Filter tokens based on search
   const filteredMainTokens = useMemo(() => {
     if (!searchQuery) return mainTokens;
 
@@ -437,10 +509,9 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     );
   }, [additionalTokens, searchQuery]);
 
-  // ✅ Combined display tokens: wallet tokens + external search results
+  // Combined display tokens
   const displayTokens = useMemo(() => {
     if (searchQuery && externalTokens.length > 0) {
-      // When searching, show wallet matches first, then external results
       return [
         ...filteredMainTokens,
         ...filteredAdditionalTokens,
@@ -460,7 +531,9 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
     const formattedToken = {
       address:
         token.contractAddress === "native"
-          ? "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          ? selectedChain === "solana"
+            ? "So11111111111111111111111111111111111111112" // Wrapped SOL
+            : "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
           : token.contractAddress || token.address,
       symbol: token.symbol,
       name: token.name,
@@ -548,6 +621,8 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                 ? "Search Result"
                 : token.isNative
                 ? "Native"
+                : selectedChain === "solana"
+                ? "SPL Token"
                 : "ERC-20"}
             </div>
           )}
@@ -621,8 +696,10 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                       </div>
 
                       <div className="space-y-1">
-                        {chains.map((chain) => {
-                          const chainDisplay = chainDisplayData[chain.id] || {
+                        {allChains.map((chain) => {
+                          const chainId =
+                            typeof chain.id === "number" ? chain.id : "solana";
+                          const chainDisplay = chainDisplayData[chainId] || {
                             name: chain.name,
                             color: "bg-gray-500",
                             icon: chain.name.charAt(0),
@@ -630,22 +707,30 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                             useBackground: true,
                           };
 
-                          const isSelected = selectedChain === chain.id;
+                          const isSelected = selectedChain === chainId;
 
                           return (
                             <button
-                              key={chain.id}
-                              onClick={() => setSelectedChain(chain.id)}
+                              key={chainId}
+                              onClick={() => setSelectedChain(chainId)}
+                              disabled={chainId === "solana" && !isSolana}
                               className={`w-full p-3 rounded-[10px] transition-all duration-200 text-left ${
                                 isSelected
                                   ? "bg-[#71570C]"
                                   : "hover:bg-[#1A1A1A]"
+                              } ${
+                                chainId === "solana" && !isSolana
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : ""
                               }`}
                             >
                               <div className="flex items-center gap-3">
                                 <ChainIcon chainData={chainDisplay} size="md" />
                                 <span className="text-sm font-satoshi font-medium text-white">
                                   {chainDisplay.name}
+                                  {chainId === "solana" &&
+                                    !isSolana &&
+                                    " (Switch wallet)"}
                                 </span>
                               </div>
                             </button>
@@ -717,18 +802,27 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                           </h3>
                         </div>
                         <div className="flex flex-wrap gap-1.5 justify-between">
-                          {chains.map((chain) => {
-                            const chainDisplay = chainDisplayData[chain.id];
-                            const isSelected = selectedChain === chain.id;
+                          {allChains.map((chain) => {
+                            const chainId =
+                              typeof chain.id === "number"
+                                ? chain.id
+                                : "solana";
+                            const chainDisplay = chainDisplayData[chainId];
+                            const isSelected = selectedChain === chainId;
 
                             return (
                               <button
-                                key={chain.id}
-                                onClick={() => setSelectedChain(chain.id)}
+                                key={chainId}
+                                onClick={() => setSelectedChain(chainId)}
+                                disabled={chainId === "solana" && !isSolana}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-[10px] transition-all ${
                                   isSelected
                                     ? "bg-[#71570C]"
                                     : "bg-[#0F0F0F] hover:bg-[#1A1A1A]"
+                                } ${
+                                  chainId === "solana" && !isSolana
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
                                 }`}
                               >
                                 <ChainIcon chainData={chainDisplay} size="md" />
@@ -785,19 +879,16 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
                           ? "No tokens found. Try a different search."
                           : !isConnected
                           ? "Connect wallet to see your tokens"
-                          : selectedChain !== chainId
-                          ? `Switch to ${
-                              chainDisplayData[selectedChain]?.name ||
-                              "this chain"
-                            } to see tokens`
-                          : "No tokens available"}
+                          : selectedChain === "solana" && !isSolana
+                          ? "Switch to Solana wallet to see tokens"
+                          : "Search for tokens to trade"}
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-1.5 lg:space-y-2">
                       {/* Wallet Tokens */}
                       {displayTokens.map((token, index) => {
-                        if (token.isExternal) return null; // Skip external in main list
+                        if (token.isExternal) return null;
                         return renderTokenButton(token, index);
                       })}
 
