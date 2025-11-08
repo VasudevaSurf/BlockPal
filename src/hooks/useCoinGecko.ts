@@ -58,7 +58,7 @@ interface UseCoinGeckoReturn {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL_COIN ||
-  "http://localhost:5002";
+  "https://creative-amazement-production-7acf.up.railway.app";
 
 // ✅ Cache configuration
 const CACHE_KEY = "coingecko_trending_cache";

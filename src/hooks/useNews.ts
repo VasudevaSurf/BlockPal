@@ -35,7 +35,7 @@ interface UseNewsReturn {
   searchQuery: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://creative-amazement-production-7acf.up.railway.app";
 
 export function useNews(): UseNewsReturn {
   // ✅ Load cached news immediately on initialization

@@ -9,7 +9,7 @@ import { chains } from "@/components/wallet/WalletProvider";
 import { swapService } from "@/services/swapService";
 import { useWalletData } from "@/contexts/WalletDataContext";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://creative-amazement-production-7acf.up.railway.app";
 
 // Chain data with Solana included
 const getChainDisplayData = () => {

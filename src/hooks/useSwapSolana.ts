@@ -6,7 +6,7 @@ import { VersionedTransaction, PublicKey } from "@solana/web3.js"; // ✅ Add Pu
 import type { Provider } from "@reown/appkit-adapter-solana/react";
 import { swapHistoryService } from "@/services/swapHistoryService";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://creative-amazement-production-7acf.up.railway.app";
 
 export interface SolanaToken {
   address: string;
