@@ -20,7 +20,7 @@ interface TokenBalance {
 
 interface WalletTokensResponse {
   wallet: string;
-  chainId: number;
+  chainId: number | string; // ✅ CHANGED
   chainName: string;
   tokens: TokenBalance[];
   totalValue: number; // ALL tokens total value
@@ -61,7 +61,7 @@ class TokenService {
    */
   async getWalletTokens(
     walletAddress: string,
-    chainId: number,
+    chainId: number | string, // ✅ CHANGED: Accept string for Solana
     showHidden: boolean = false
   ): Promise<WalletTokensResponse> {
     try {

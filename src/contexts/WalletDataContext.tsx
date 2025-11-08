@@ -1,5 +1,6 @@
 // src/contexts/WalletDataContext.tsx - OPTIMIZED: 5-minute auto-refresh + smart cache
 "use client";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react"; // ✅ ADDED
 
 import React, {
   createContext,
@@ -77,11 +78,29 @@ export const useWalletData = () => {
 export const WalletDataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected } = useAppKitAccount(); // ✅ CHANGED
+  const { caipNetwork } = useAppKitNetwork(); // ✅ ADDED
   const authState = useSelector((state: RootState) => state.auth);
 
-  const currentChain = chains.find((c) => c.id === chainId);
+  const getChainId = (): number | string => {
+    if (!caipNetwork) return 1;
+
+    // Check if Solana
+    if (
+      caipNetwork.name?.toLowerCase() === "solana" ||
+      caipNetwork.id?.toString().includes("solana") ||
+      caipNetwork.chainNamespace === "solana"
+    ) {
+      return "solana";
+    }
+
+    // EVM chain
+    return Number(caipNetwork.id) || 1;
+  };
+
+  const chainId = getChainId(); // ✅ CHANGED
+
+  const currentChain = chains.find((c) => c.id === Number(chainId));
 
   const [walletData, setWalletData] = useState({
     tokens: [] as TokenBalance[],

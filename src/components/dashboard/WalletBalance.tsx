@@ -17,6 +17,7 @@ import { chains } from "@/components/wallet/WalletProvider";
 import { useWalletData } from "@/contexts/WalletDataContext";
 import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 import { useToast } from "@/contexts/ToastContext";
+import { useAppKitAccount } from "@reown/appkit/react";
 
 const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
   const isValidChange =
@@ -69,7 +70,7 @@ export default function WalletBalance() {
   const { walletData, refresh, isRefreshing } = useWalletData();
   const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
 
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useAppKitAccount(); // ✅ CHANGED
   const hasReportedMountRef = useRef(false);
   const hasReportedDataRef = useRef(false);
 
@@ -160,8 +161,8 @@ export default function WalletBalance() {
       <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
         <div className="flex items-center gap-2">
           <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo">
-            {walletData.chainName || currentChain?.name || "Ethereum"} Token
-            Balances
+            {walletData.chainName || "Unknown"} Token Balances{" "}
+            {/* ✅ Use walletData.chainName */}
           </h2>
 
           {isRefreshing && (
@@ -198,8 +199,8 @@ export default function WalletBalance() {
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
-          {walletData.chainName || currentChain?.name || "Ethereum"} Token
-          Balances
+          {walletData.chainName || "Unknown"} Token Balances{" "}
+          {/* ✅ Use walletData.chainName */}
         </h2>
         {isRefreshing && (
           <div className="flex items-center gap-1">
