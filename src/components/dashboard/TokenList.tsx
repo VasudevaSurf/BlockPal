@@ -11,7 +11,7 @@ import React, {
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { useAccount, useChainId } from "wagmi";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react"; // ✅ CHANGED
 import { useNavigationLoading } from "@/contexts/NavigationLoadingContext";
 import { useWalletTracking } from "@/hooks/useWalletTracking";
 import { useCoinGecko, TrendingToken, TopGainer } from "@/hooks/useCoinGecko";
@@ -90,7 +90,6 @@ const tokenRowStyles = `
   }
 `;
 
-// Token Interface
 interface TokenBalance {
   id: string;
   symbol: string;
@@ -115,12 +114,13 @@ interface TokenBalance {
 interface WalletPreferences {
   userEmail: string;
   walletAddress: string;
-  chainId: number | string; // Can be number (EVM) or 'solana'
+  chainId: number | string;
   chainType: "evm" | "solana";
   userAddedTokens: string[];
   lastUpdated: string;
 }
 
+// Helper components (copy from your existing file)
 const TokenImage = ({
   src,
   alt,
@@ -406,6 +406,10 @@ export default function TokenList() {
 
   const authState = useSelector((state: RootState) => state.auth);
 
+  // ✅ CHANGED: Use AppKit hooks instead of wagmi
+  const { address, isConnected } = useAppKitAccount();
+  const { caipNetwork } = useAppKitNetwork();
+
   // Get user email
   const getUserEmail = (): string | null => {
     if (!authState?.user) {
@@ -432,17 +436,30 @@ export default function TokenList() {
 
   const userEmail = getUserEmail();
 
-  // ✅ Get updateTokenCategories from context
   const { walletData, refresh, isRefreshing, updateTokenCategories } =
     useWalletData();
   const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
 
-  const { address, isConnected } = useAccount();
   const hasReportedMountRef = useRef(false);
   const hasReportedDataRef = useRef(false);
 
-  const chainId = useChainId();
-  const currentChain = chains.find((c) => c.id === chainId);
+  // ✅ CHANGED: Get chain ID from AppKit
+  const getChainId = (): number | string => {
+    if (!caipNetwork) return 1;
+
+    if (
+      caipNetwork.name?.toLowerCase() === "solana" ||
+      caipNetwork.id?.toString().includes("solana") ||
+      caipNetwork.chainNamespace === "solana"
+    ) {
+      return "solana";
+    }
+
+    return Number(caipNetwork.id) || 1;
+  };
+
+  const chainId = getChainId();
+  const currentChain = chains.find((c) => c.id === Number(chainId));
 
   const {
     data: coinGeckoData,
@@ -519,7 +536,7 @@ export default function TokenList() {
     }
   }, [walletData.cacheValid, trendingTokens.length, topGainersData.length]);
 
-  // ✅ Load preferences and sync with context
+  // Load preferences and sync with context
   useEffect(() => {
     const loadPreferences = async () => {
       if (!address || !chainId || !userEmail) {
@@ -541,8 +558,6 @@ export default function TokenList() {
         if (response.ok) {
           const data = await response.json();
           setPreferences(data.data);
-
-          // ✅ Sync with context immediately
           updateTokenCategories(data.data);
 
           console.log(
@@ -552,7 +567,6 @@ export default function TokenList() {
           );
         } else {
           console.error("❌ Failed to load preferences:", response.status);
-          // Set empty preferences
           const emptyPrefs = {
             userEmail: userEmail,
             walletAddress: address,
@@ -598,7 +612,7 @@ export default function TokenList() {
     }
   }, [allTokens, walletData.mainListValue, walletData.total24hrChange]);
 
-  // ✅ FIXED: Add token to main list with immediate update
+  // Add/Remove token handlers (keep your existing implementation)
   const handleAddToMainList = async (tokenAddress: string) => {
     if (!address || !chainId || !userEmail || addingToken) {
       console.log("⚠️ Cannot add token: missing required data");
@@ -613,7 +627,6 @@ export default function TokenList() {
     try {
       console.log(`➕ Adding token ${tokenAddress} for user ${userEmail}`);
 
-      // Create updated preferences
       const currentPrefs = preferences || {
         userEmail: userEmail,
         walletAddress: address,
@@ -632,15 +645,11 @@ export default function TokenList() {
         lastUpdated: new Date().toISOString(),
       };
 
-      // ✅ FIX 1: Update local state immediately (optimistic update)
       setPreferences(updatedPrefs);
-
-      // ✅ FIX 2: Update context immediately BEFORE any async calls
       updateTokenCategories(updatedPrefs);
 
       console.log("📤 Sending preferences to server:", updatedPrefs);
 
-      // ✅ FIX 3: Save to server (but don't wait for refresh)
       const response = await fetch(`/api/wallet/preferences`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -650,23 +659,15 @@ export default function TokenList() {
       if (response.ok) {
         const data = await response.json();
         console.log("✅ Server response:", data);
-
         showToast("success", "Token added to main list successfully!", 3000);
         console.log(
           `✅ Token ${tokenAddress} added to main list for user ${userEmail}`
         );
-
-        // ✅ FIX 4: Don't call refresh() here - the context already updated
-        // The wallet balance is already updated via updateTokenCategories
       } else {
-        // Rollback on error
         const errorData = await response.json();
         console.error("❌ Server error:", errorData);
-
-        // Revert the optimistic update
         setPreferences(currentPrefs);
         updateTokenCategories(currentPrefs);
-
         showToast(
           "error",
           errorData.error || "Failed to add token. Please try again.",
@@ -675,20 +676,16 @@ export default function TokenList() {
       }
     } catch (error: any) {
       console.error("❌ Error adding token:", error);
-
-      // Revert on error
       if (preferences) {
         setPreferences(preferences);
         updateTokenCategories(preferences);
       }
-
       showToast("error", "Failed to add token. Please try again.", 4000);
     } finally {
       setAddingToken(null);
     }
   };
 
-  // ✅ FIXED: Remove token from main list with immediate update
   const handleRemoveFromMainList = async (tokenAddress: string) => {
     if (!address || !chainId || !preferences || !userEmail || addingToken) {
       console.log("⚠️ Cannot remove token: missing required data");
@@ -703,10 +700,8 @@ export default function TokenList() {
     try {
       console.log(`➖ Removing token ${tokenAddress} for user ${userEmail}`);
 
-      // Store original for rollback
       const originalPrefs = preferences;
 
-      // Create updated preferences
       const updatedPrefs = {
         ...preferences,
         userEmail: userEmail,
@@ -716,13 +711,9 @@ export default function TokenList() {
         lastUpdated: new Date().toISOString(),
       };
 
-      // ✅ FIX 1: Update local state immediately (optimistic update)
       setPreferences(updatedPrefs);
-
-      // ✅ FIX 2: Update context immediately BEFORE any async calls
       updateTokenCategories(updatedPrefs);
 
-      // ✅ FIX 3: Save to server (but don't wait for refresh)
       const response = await fetch(`/api/wallet/preferences`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -734,17 +725,11 @@ export default function TokenList() {
         console.log(
           `✅ Token ${tokenAddress} removed from main list for user ${userEmail}`
         );
-
-        // ✅ FIX 4: Don't call refresh() here - the context already updated
       } else {
-        // Rollback on error
         const errorData = await response.json();
         console.error("❌ Failed to remove token:", errorData);
-
-        // Revert the optimistic update
         setPreferences(originalPrefs);
         updateTokenCategories(originalPrefs);
-
         showToast(
           "error",
           errorData.error || "Failed to remove token. Please try again.",
@@ -753,13 +738,10 @@ export default function TokenList() {
       }
     } catch (error: any) {
       console.error("❌ Error removing token:", error);
-
-      // Revert on error
       if (preferences) {
         setPreferences(preferences);
         updateTokenCategories(preferences);
       }
-
       showToast("error", "Failed to remove token. Please try again.", 4000);
     } finally {
       setAddingToken(null);
@@ -811,7 +793,7 @@ export default function TokenList() {
       <div className="bg-black rounded-[12px] lg:rounded-[16px] p-3 lg:p-4 border border-[#2C2C2C] flex flex-col h-full overflow-hidden pb-0 lg:pb-auto">
         {/* Header with Tabs */}
         <div className="flex items-center justify-between mb-3 px-2">
-          {/* Mobile Tabs - ALWAYS SHOW */}
+          {/* Mobile Tabs */}
           <div className="flex items-center gap-4 lg:hidden">
             {isConnected && (
               <button
@@ -878,37 +860,9 @@ export default function TokenList() {
               </span>
             </button>
           )}
-
-          {/* Trending 24h label */}
-          {/* {activeTab === "trending" && (
-            <div className="flex lg:hidden items-center gap-1 border border-[#2C2C2C] rounded-lg px-2 py-1">
-              <span className="text-gray-400 text-[10px] font-satoshi">
-                24h Change
-              </span>
-            </div>
-          )} */}
-
-          {/* Gainers timeframe */}
-          {/* {activeTab === "gainers" && (
-            <div className="flex lg:hidden items-center bg-[#0F0F0F] border border-[#2C2C2C] rounded-lg p-1">
-              {["1hr", "24h", "7d"].map((timeframe) => (
-                <button
-                  key={timeframe}
-                  onClick={() => setSelectedTimeframe(timeframe)}
-                  className={`px-2 py-1 text-[10px] font-satoshi rounded transition-colors ${
-                    selectedTimeframe === timeframe
-                      ? "bg-[#E2AF19] text-black"
-                      : "text-gray-400"
-                  }`}
-                >
-                  {timeframe}
-                </button>
-              ))}
-            </div>
-          )} */}
         </div>
 
-        {/* Error state - only for wallet errors */}
+        {/* Error state */}
         {walletData.error && activeTab === "holdings" && isConnected && (
           <div className="mb-3 p-2.5 bg-red-900/20 border border-red-500/50 rounded-lg">
             <div className="flex items-start">
@@ -930,7 +884,7 @@ export default function TokenList() {
 
         {/* Tab Content */}
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          {/* Holdings Tab - ALWAYS SHOW ON DESKTOP */}
+          {/* Holdings Tab */}
           <div
             className={`${
               activeTab === "holdings" ? "flex" : "hidden"
@@ -1129,7 +1083,7 @@ export default function TokenList() {
             )}
           </div>
 
-          {/* Trending Tab - ALWAYS SHOW (works without wallet) */}
+          {/* Trending Tab */}
           <div
             className={`${
               activeTab === "trending" ? "block" : "hidden"
@@ -1206,7 +1160,7 @@ export default function TokenList() {
             </div>
           </div>
 
-          {/* Top Gainers Tab - ALWAYS SHOW (works without wallet) */}
+          {/* Top Gainers Tab */}
           <div
             className={`${
               activeTab === "gainers" ? "block" : "hidden"

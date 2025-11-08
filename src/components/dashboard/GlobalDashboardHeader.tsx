@@ -22,6 +22,7 @@ import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 import { clearWalletConnection } from "@/utils/walletCleanup";
 import { useDisconnect } from "wagmi";
 import LogoutModal from "@/components/modals/LogoutModal";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react"; // ✅ ADD THIS
 
 interface GlobalDashboardHeaderProps {
   title: string;
@@ -315,8 +316,23 @@ export default function GlobalDashboardHeader({
   const { setComponentLoaded } = useUnifiedDashboard();
   const hasReportedRef = useRef(false);
 
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected } = useAppKitAccount(); // ✅ CHANGED
+  const { caipNetwork } = useAppKitNetwork();
+  const getChainId = (): number | string => {
+    if (!caipNetwork) return 1;
+
+    if (
+      caipNetwork.name?.toLowerCase() === "solana" ||
+      caipNetwork.id?.toString().includes("solana") ||
+      caipNetwork.chainNamespace === "solana"
+    ) {
+      return "solana";
+    }
+
+    return Number(caipNetwork.id) || 1;
+  };
+
+  const chainId = getChainId();
   const currentChain = chains.find((c) => c.id === chainId);
   const { disconnect } = useDisconnect();
 
