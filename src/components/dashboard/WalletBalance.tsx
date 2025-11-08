@@ -1,23 +1,16 @@
-// src/components/dashboard/WalletBalance.tsx - UPDATED WITH CACHE SUPPORT
+// src/components/dashboard/WalletBalance.tsx - FIXED FOR SOLANA
 "use client";
 
 import { useSelector } from "react-redux";
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  Copy,
-  RefreshCw,
-  AlertCircle,
-  TrendingUp,
-  TrendingDown,
-} from "lucide-react";
-import { useAccount, useChainId } from "wagmi";
+import { useState, useEffect, useRef } from "react";
+import { Copy, AlertCircle, TrendingUp, TrendingDown } from "lucide-react";
 import { RootState } from "@/store";
 import { tokenService } from "@/services/tokenService";
 import { chains } from "@/components/wallet/WalletProvider";
 import { useWalletData } from "@/contexts/WalletDataContext";
 import { useUnifiedDashboard } from "@/contexts/UnifiedDashboardContext";
 import { useToast } from "@/contexts/ToastContext";
-import { useAppKitAccount } from "@reown/appkit/react";
+import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 
 const PortfolioChange = ({ totalChange24h }: { totalChange24h?: number }) => {
   const isValidChange =
@@ -70,12 +63,32 @@ export default function WalletBalance() {
   const { walletData, refresh, isRefreshing } = useWalletData();
   const { setComponentLoaded, setComponentDataReady } = useUnifiedDashboard();
 
-  const { address, isConnected } = useAppKitAccount(); // ✅ CHANGED
+  const { address, isConnected } = useAppKitAccount();
+  const { caipNetwork } = useAppKitNetwork();
+
   const hasReportedMountRef = useRef(false);
   const hasReportedDataRef = useRef(false);
 
-  const chainId = useChainId();
-  const currentChain = chains.find((c) => c.id === chainId);
+  // ✅ Get chain info (handles both EVM and Solana)
+  const getChainId = (): number | string => {
+    if (!caipNetwork) return 1;
+
+    if (
+      caipNetwork.name?.toLowerCase() === "solana" ||
+      caipNetwork.id?.toString().includes("solana") ||
+      caipNetwork.chainNamespace === "solana"
+    ) {
+      return "solana";
+    }
+
+    return Number(caipNetwork.id) || 1;
+  };
+
+  const chainId = getChainId();
+  const isSolana = chainId === "solana";
+  const currentChain = !isSolana
+    ? chains.find((c) => c.id === Number(chainId))
+    : null;
 
   const { showToast } = useToast();
 
@@ -113,10 +126,10 @@ export default function WalletBalance() {
     };
   }, [setComponentLoaded]);
 
-  // Report data ready - now checks cache validity
+  // Report data ready
   useEffect(() => {
     if (!hasReportedDataRef.current && walletData.cacheValid) {
-      console.log("✅ WalletBalance: Data ready (from cache)");
+      console.log("✅ WalletBalance: Data ready");
       setComponentDataReady("walletBalance");
       hasReportedDataRef.current = true;
     }
@@ -161,16 +174,13 @@ export default function WalletBalance() {
       <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
         <div className="flex items-center gap-2">
           <h2 className="text-sm lg:text-base font-semibold text-white font-mayeka-demi-bold-demo">
-            {walletData.chainName || "Unknown"} Token Balances{" "}
-            {/* ✅ Use walletData.chainName */}
+            {walletData.chainName || (isSolana ? "Solana" : "Unknown")} Token
+            Balances
           </h2>
 
           {isRefreshing && (
             <div className="flex items-center gap-1">
-              {/* <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
-              <span className="text-xs text-[#E2AF19] font-satoshi">
-                Updating...
-              </span> */}
+              {/* Optional: Add loading indicator */}
             </div>
           )}
         </div>
@@ -199,15 +209,12 @@ export default function WalletBalance() {
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-white font-mayeka-demi-bold-demo">
-          {walletData.chainName || "Unknown"} Token Balances{" "}
-          {/* ✅ Use walletData.chainName */}
+          {walletData.chainName || (isSolana ? "Solana" : "Unknown")} Token
+          Balances
         </h2>
         {isRefreshing && (
           <div className="flex items-center gap-1">
-            {/* <RefreshCw className="w-3 h-3 text-[#E2AF19] animate-spin" />
-            <span className="text-xs text-[#E2AF19] font-satoshi">
-              Updating...
-            </span> */}
+            {/* Optional: Add loading indicator */}
           </div>
         )}
       </div>
